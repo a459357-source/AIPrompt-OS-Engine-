@@ -40,6 +40,7 @@ export default function Game() {
   const [customInput, setCustomInput] = useState('')
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [charPanelOpen, setCharPanelOpen] = useState(false)
+  const [showConsequences, setShowConsequences] = useState(true)
 
   const loadGame = useCallback(async () => {
     setLoading(true)
@@ -205,7 +206,19 @@ export default function Game() {
             <AnimatePresence>
               {options.length > 0 && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
-                  <p className="text-xs text-game-muted font-medium">🎯 做出你的选择</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-game-muted font-medium">🎯 做出你的选择</p>
+                    <button
+                      onClick={() => setShowConsequences(!showConsequences)}
+                      className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                        showConsequences
+                          ? 'border-game-accent/40 bg-game-accent/10 text-game-accent'
+                          : 'border-game-border text-game-dim hover:text-game-muted'
+                      }`}
+                    >
+                      {showConsequences ? '🔮 推测 ON' : '🔮 推测 OFF'}
+                    </button>
+                  </div>
                   {options.map((choice, i) => {
                     // Parse "行动 → 可能发展 | 态度变化"
                     const parts = choice.split(/\s*[→]\s*/)
@@ -221,11 +234,11 @@ export default function Game() {
                           <div className="flex items-start gap-2">
                             <span className="text-game-accent font-bold shrink-0 mt-0.5">{String.fromCharCode(65 + i)}.</span>
                             <span className="text-sm font-medium text-game-text">{action}</span>
-                            {attitude && (
+                            {showConsequences && attitude && (
                               <Badge variant="accent" size="sm" className="shrink-0 text-[10px]">{attitude.trim()}</Badge>
                             )}
                           </div>
-                          {consequence && (
+                          {showConsequences && consequence && (
                             <p className="text-xs text-game-dim ml-5 pl-0.5">{consequence.trim()}</p>
                           )}
                         </div>
