@@ -21,6 +21,8 @@ import argparse
 import json
 import logging
 import sys
+import threading
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 
@@ -252,7 +254,18 @@ def run_loop(n: int) -> int:
 
 # ── Web mode ───────────────────────────────────────────────────────
 
-def run_web(host: str = "0.0.0.0", port: int = 8000) -> None:
+def _open_browser(host: str, port: int) -> None:
+    """Open the web UI in the default browser after a short delay."""
+    url = f"http://{'127.0.0.1' if host == '0.0.0.0' else host}:{port}"
+    def _open():
+        import time
+        time.sleep(1.0)  # wait for uvicorn to start listening
+        logger.info("Opening browser → %s", url)
+        webbrowser.open(url)
+    threading.Thread(target=_open, daemon=True).start()
+
+
+def run_web(host: str = "0.0.0.0", port: int = 8000, no_browser: bool = False) -> None:
     """Start the FastAPI web server."""
     try:
         import uvicorn
@@ -261,6 +274,10 @@ def run_web(host: str = "0.0.0.0", port: int = 8000) -> None:
             "uvicorn not installed. Run: pip install uvicorn fastapi jinja2"
         )
         sys.exit(1)
+
+    # Auto-open browser after server starts
+    if not no_browser:
+        _open_browser(host, port)
 
     logger.info("Starting Galgame Web UI → http://%s:%d", host, port)
     uvicorn.run("ui.web_app:app", host=host, port=port, reload=False)
@@ -539,6 +556,10 @@ def main() -> None:
         "--port", type=int, default=8000,
         help="Web server port (default: 8000).",
     )
+    parser.add_argument(
+        "--no-browser", action="store_true",
+        help="Don't auto-open the browser on web mode startup.",
+    )
     args = parser.parse_args()
 
     # Check API key
@@ -569,7 +590,7 @@ def main() -> None:
 
     # Mode dispatch
     if args.mode == "web":
-        run_web(host=args.host, port=args.port)
+        run_web(host=args.host, port=args.port, no_browser=args.no_browser)
     elif args.mode == "cli":
         run_interactive()
     else:

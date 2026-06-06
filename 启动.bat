@@ -40,7 +40,7 @@ if %errorlevel% neq 0 (
 
 echo.
 echo [INFO] Starting web server...
-echo        Open http://localhost:8000
+echo        Browser will open automatically
 echo        Press Ctrl+C to stop
 echo.
 
