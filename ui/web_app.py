@@ -356,15 +356,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
     <div class="container">
         <div class="nav-col" id="navCol">
-            <button class="nav-toggle" onclick="event.stopPropagation();document.getElementById('navCol').classList.toggle('open')" title="锁定/解锁侧栏"><span class="arr">▶</span></button>
-            <a class="nav-item" href="/new"><span class="ni-icon">🆕</span><span class="ni-text">新故事</span></a>
-            <a class="nav-item" href="/npcs"><span class="ni-icon">👥</span><span class="ni-text">角色</span></a>
-            <a class="nav-item" href="/history"><span class="ni-icon">📜</span><span class="ni-text">历史</span></a>
-            <a class="nav-item" href="/dashboard"><span class="ni-icon">📊</span><span class="ni-text">仪表盘</span></a>
-            <a class="nav-item" href="/graph" target="_blank"><span class="ni-icon">🌳</span><span class="ni-text">分支图</span></a>
-            <a class="nav-item" href="/settings"><span class="ni-icon">⚙️</span><span class="ni-text">设置</span></a>
-            <a class="nav-item" href="#" onclick="if(confirm('确定要重置当前存档？所有进度将丢失。'))location.href='/reset'"><span class="ni-icon">🔄</span><span class="ni-text">重置</span></a>
-            <a class="nav-item" href="/export"><span class="ni-icon">📝</span><span class="ni-text">导出</span></a>
+            <button class="nav-toggle" onclick="event.stopPropagation();var n=document.getElementById('navCol');n.classList.toggle('open');localStorage.setItem('navOpen',n.classList.contains('open')?'1':'0')" title="锁定/解锁侧栏"><span class="arr">▶</span></button>
+            <a class="nav-item" href="/new" title="创建新故事世界"><span class="ni-icon">🆕</span><span class="ni-text">新故事</span></a>
+            <a class="nav-item" href="/npcs" title="管理角色与 NPC"><span class="ni-icon">👥</span><span class="ni-text">角色</span></a>
+            <a class="nav-item" href="/history" title="查看历史回合"><span class="ni-icon">📜</span><span class="ni-text">历史</span></a>
+            <a class="nav-item" href="/dashboard" title="数据仪表盘与分析"><span class="ni-icon">📊</span><span class="ni-text">仪表盘</span></a>
+            <a class="nav-item" href="/graph" target="_blank" title="剧情分支图（新窗口）"><span class="ni-icon">🌳</span><span class="ni-text">分支图</span></a>
+            <a class="nav-item" href="/settings" title="API Key 与模型设置"><span class="ni-icon">⚙️</span><span class="ni-text">设置</span></a>
+            <a class="nav-item" href="#" onclick="if(confirm('确定要重置当前存档？所有进度将丢失。'))location.href='/reset'" title="重置存档到初始状态"><span class="ni-icon">🔄</span><span class="ni-text">重置</span></a>
+            <a class="nav-item" href="/export" title="导出完整故事 Markdown"><span class="ni-icon">📝</span><span class="ni-text">导出</span></a>
         </div>
         <div class="main-col">
             <div class="header">
@@ -477,7 +477,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const sc = document.getElementById('sideCol');
             const btn = sc.querySelector('.side-toggle');
             sc.classList.toggle('collapsed');
-            btn.textContent = sc.classList.contains('collapsed') ? '▶' : '◀';
+            const collapsed = sc.classList.contains('collapsed');
+            btn.textContent = collapsed ? '▶' : '◀';
+            localStorage.setItem('sideCollapsed', collapsed ? '1' : '0');
         }
 
         // Resize handle: drag to adjust side panel width
@@ -506,6 +508,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
             });
+        })();
+
+        // Restore sidebar states from localStorage on load
+        (function(){
+            if(localStorage.getItem('navOpen')==='1'){
+                document.getElementById('navCol').classList.add('open');
+            }
+            if(localStorage.getItem('sideCollapsed')==='1'){
+                const sc = document.getElementById('sideCol');
+                sc.classList.add('collapsed');
+                const btn = sc.querySelector('.side-toggle');
+                if(btn) btn.textContent = '▶';
+            }
         })();
     </script>
 </body>
@@ -881,7 +896,7 @@ async def story_graph_page():
             display: flex; flex-direction: column; align-items: center;
         }}
         .container {{
-            max-width: 1200px; width: 100%; padding: 24px 20px;
+            width: 100%; padding: 24px 20px;
         }}
         .header {{
             text-align: center; padding: 24px 0;
@@ -984,7 +999,7 @@ async def history_page():
             height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center;
         }}
         .hist-container {{
-            max-width: 1100px; width: 100%; height: 100%;
+            width: 100%; height: 100%;
             display: flex; flex-direction: column; padding: 16px 20px;
         }}
         .hist-header {{
@@ -1119,7 +1134,7 @@ _NEW_PAGE = """<!DOCTYPE html>
             height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center;
         }
         .new-container {
-            max-width: 1000px; width: 100%; height: 100%;
+            width: 100%; height: 100%;
             display: flex; flex-direction: column; padding: 16px 20px;
         }
         .new-header {
@@ -1515,7 +1530,7 @@ _NPC_PAGE = """<!DOCTYPE html>
             height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center;
         }
         .npc-container {
-            max-width: 1100px; width: 100%; height: 100%;
+            width: 100%; height: 100%;
             display: flex; flex-direction: column; padding: 16px 20px;
         }
         .npc-header {
@@ -1931,6 +1946,10 @@ _SETTINGS_PAGE = """<!DOCTYPE html>
                 {{MODEL_OPTIONS}}
             </select>
             <div class="hint">{{MODEL_HINT}}</div>
+            <label style="margin-top:14px;">📝 每轮字数</label>
+            <input name="story_length" type="number" min="300" max="3000" step="100"
+                   value="{{STORY_LENGTH}}" style="width:120px;">
+            <div class="hint">AI 每轮生成的文字量（300–3000），默认 1000。对首次开篇也有影响。</div>
             <div class="status {{STATUS_CLASS}}">{{STATUS_TEXT}}</div>
             <div class="btn-row">
                 <button class="btn btn-save" type="submit">💾 保存</button>
