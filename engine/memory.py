@@ -50,7 +50,7 @@ def update_trust(memory: dict, character: str, delta: float, turn: int = 0,
                 好感度, 恐惧值, 羁绊, 声望, etc.
     """
     chars = memory.setdefault("characters", {})
-    entry = chars.setdefault(character, {"trust": 0.5, "flags": [], "relationship": ""})
+    entry = chars.setdefault(character, {"trust": 0.3, "flags": [], "relationship": ""})
 
     # Backward-compat: also set top-level field for the primary metric
     old = entry.get(metric, 0.5 if metric == "trust" else 0.0)
@@ -211,16 +211,9 @@ def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | Non
     """
     results: list[tuple[str, float, str | None]] = []
 
-    # Simple keyword → delta mappings
-    positive_keywords = {
-        "信任": 0.1, "感激": 0.15, "依赖": 0.1, "坦诚": 0.1,
-        "微笑": 0.05, "握住": 0.1, "拥抱": 0.15, "并肩": 0.1,
-        "拯救": 0.2, "保护": 0.15, "理解": 0.1, "共鸣": 0.15,
-    }
-    negative_keywords = {
-        "怀疑": -0.1, "背叛": -0.3, "隐瞒": -0.1, "欺骗": -0.2,
-        "愤怒": -0.1, "冷漠": -0.1, "离开": -0.1, "伤害": -0.2,
-    }
+    # Use the expanded keyword dictionaries defined above
+    positive_keywords = _TRUST_KEYWORDS_POSITIVE
+    negative_keywords = _TRUST_KEYWORDS_NEGATIVE
     flag_keywords = {
         "遗迹核心": "接触遗迹核心",
         "星痕": "感知星痕能量",
@@ -247,6 +240,99 @@ def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | Non
             results.append(("__any__", 0.02, flag))
 
     return results
+
+
+# ── Initial trust from world_pack relationships ─────────────────
+
+# Relationship → initial trust mapping.
+# "自身" = protagonist; positive relationships start higher;
+# negative/hostile relationships start lower.
+_RELATIONSHIP_TRUST: dict[str, float] = {
+    # Positive / allied
+    "自身": 0.50,
+    "盟友": 0.55,
+    "挚友": 0.60,
+    "恋人": 0.65,
+    "灵魂伴侣": 0.70,
+    "潜在合作者": 0.40,
+    "合作": 0.45,
+    "同盟": 0.50,
+    "羁绊": 0.55,
+    # Neutral
+    "试探": 0.35,
+    "认识": 0.35,
+    "熟悉": 0.40,
+    "朋友": 0.45,
+    # Negative / hostile
+    "疏远": 0.25,
+    "商业对手": 0.30,
+    "竞争": 0.30,
+    "对手": 0.25,
+    "冷漠": 0.20,
+    "对立": 0.15,
+    "敌视": 0.10,
+    "崩坏": 0.05,
+    "终极敌人": 0.10,
+}
+
+# Keyword-based trust detection: expanded vocabulary for diverse story genres.
+_TRUST_KEYWORDS_POSITIVE: dict[str, float] = {
+    # Universal
+    "信任": 0.08, "感激": 0.10, "坦诚": 0.08, "理解": 0.08,
+    "共鸣": 0.10, "微笑": 0.03, "并肩": 0.08, "保护": 0.10,
+    "拯救": 0.15, "牺牲": 0.20,
+    # Romance / relationship
+    "握住": 0.08, "拥抱": 0.12, "牵手": 0.08, "告白": 0.15,
+    "心动": 0.08, "温柔": 0.05,
+    # Business / political
+    "合作": 0.06, "结盟": 0.10, "支援": 0.08, "投资": 0.05,
+    "共赢": 0.08, "守信": 0.10, "赏识": 0.08, "提拔": 0.10,
+    # Conflict resolution
+    "和解": 0.12, "道歉": 0.08, "原谅": 0.12, "让步": 0.06,
+}
+_TRUST_KEYWORDS_NEGATIVE: dict[str, float] = {
+    # Universal
+    "怀疑": -0.08, "背叛": -0.25, "隐瞒": -0.08, "欺骗": -0.20,
+    "愤怒": -0.08, "冷漠": -0.08, "伤害": -0.15, "威胁": -0.10,
+    # Romance / relationship
+    "离开": -0.10, "分手": -0.20, "失望": -0.10, "疏远": -0.08,
+    "嫉妒": -0.08,
+    # Business / political
+    "算计": -0.10, "利用": -0.12, "出卖": -0.20, "毁约": -0.15,
+    "打压": -0.10, "陷害": -0.20, "窃取": -0.15, "背刺": -0.25,
+    # Hostile
+    "攻击": -0.12, "敌对": -0.10, "警告": -0.06,
+}
+
+
+def get_initial_trust(name: str, world_pack: dict | None = None) -> float:
+    """
+    Compute initial trust for a character based on their world_pack
+    relationship tags.  Falls back to 0.30 for unknown characters
+    (slightly wary, not neutral).
+    """
+    if not world_pack:
+        return 0.30
+    world_chars = world_pack.get("world", {}).get("characters", [])
+    for wc in world_chars:
+        if wc.get("name") == name:
+            relationships = wc.get("relationship", [])
+            if not relationships:
+                return 0.35
+            # Use the best-matching relationship tag
+            best = 0.30
+            for rel in relationships:
+                if rel in _RELATIONSHIP_TRUST:
+                    best = max(best, _RELATIONSHIP_TRUST[rel])
+            # Also check negative tags — take the minimum
+            for rel in relationships:
+                if rel in _RELATIONSHIP_TRUST:
+                    val = _RELATIONSHIP_TRUST[rel]
+                    if val < 0.35:  # negative relationship
+                        best = min(best, val)
+            return round(best, 2)
+    # Not in world_pack — NPC, slightly wary
+    return 0.30
 
 
 def detect_new_characters_from_story(story: str,

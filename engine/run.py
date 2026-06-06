@@ -42,6 +42,7 @@ from engine.memory import (
     load_memory, save_memory, update_trust, set_flag,
     get_context_for_prompt, guess_trust_delta_from_story,
     parse_option_trust_deltas, detect_new_characters_from_story,
+    get_initial_trust,
     init_factions, update_faction_reputation, set_faction_flag,
     assign_character_tier, degrade_inactive_characters,
     build_character_tier_context, promote_to_core, remove_core_status,
@@ -428,9 +429,10 @@ def _update_memory(response: dict, state: dict, choice: str | None = None) -> No
         for key, sc in state_chars.items():
             name = sc.get("name", key)
             if name not in mem_chars:
-                # New NPC discovered — auto-register
+                # New NPC discovered — auto-register with relationship-based trust
+                init_trust = get_initial_trust(name, world_pack)
                 mem_chars[name] = {
-                    "trust": 0.5,
+                    "trust": init_trust,
                     "flags": [],
                     "relationship": sc.get("relation", ""),
                     "role": sc.get("role", ""),
@@ -438,8 +440,8 @@ def _update_memory(response: dict, state: dict, choice: str | None = None) -> No
                 # Record first appearance in metric_history
                 mem_chars[name].setdefault("metric_history", {}).setdefault(
                     "trust", []
-                ).append([turn, 0.5])
-                logger.info("Memory: auto-registered new NPC '%s' (turn %d)", name, turn)
+                ).append([turn, init_trust])
+                logger.info("Memory: auto-registered '%s' (turn %d, trust=%.2f)", name, turn, init_trust)
 
         # ── Character tier management ─────────────────────────
         # Assign tiers to newly registered NPCs (and migration for existing unclassified chars)
@@ -460,17 +462,20 @@ def _update_memory(response: dict, state: dict, choice: str | None = None) -> No
         known = set(mem_chars.keys())
         story_newcomers = detect_new_characters_from_story(story, known)
         for name in story_newcomers:
+            init_trust = get_initial_trust(name, world_pack)
+            # Story-detected chars get slightly lower trust than state-registered
+            init_trust = round(init_trust * 0.8, 2)
             mem_chars[name] = {
-                "trust": 0.4,  # lower confidence than state- registered (0.5)
+                "trust": init_trust,
                 "flags": [],
                 "relationship": "",
                 "role": "story-detected",
             }
             mem_chars[name].setdefault("metric_history", {}).setdefault(
                 "trust", []
-            ).append([turn, 0.4])
+            ).append([turn, init_trust])
             assign_character_tier(memory, name, world_pack)
-            logger.info("Memory: story-detected new character '%s' (turn %d)", name, turn)
+            logger.info("Memory: story-detected '%s' (turn %d, trust=%.2f)", name, turn, init_trust)
 
         # Track last_appearance_turn for characters appearing in this turn's story
         for name in list(mem_chars.keys()):
