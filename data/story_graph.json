@@ -31,16 +31,30 @@
       "scene": "京都西园寺邸，皋月独自在祖父书房中翻阅旧信，随后决定深夜拜访茶道大师山本。",
       "status": "BUILD",
       "choices": {
-        "A": null,
+        "A": "3",
         "B": null,
         "C": null,
         "D": null
       },
       "parent": "1",
       "choice_taken": "A"
+    },
+    "3": {
+      "turn": 3,
+      "text": "夜色如墨，京都的街巷在薄雾中若隐若现。皋月穿着一件深色和服，脚步轻快地穿过石板路，来到山本大师的茶室前。茶室隐于一片竹林之后，竹篱笆上爬满青苔，一盏纸灯笼在风中摇曳，投下昏黄的光。\n\n她轻轻叩门，木门应声而开。一位白发苍苍的老者站在门内，正",
+      "scene": "京都西园寺邸，皋月在祖父书房中反复阅读旧信，窗外夜色深沉。",
+      "status": "BUILD",
+      "choices": {
+        "A": null,
+        "B": null,
+        "C": null,
+        "D": null
+      },
+      "parent": "2",
+      "choice_taken": "A"
     }
   },
-  "current_node": "2",
+  "current_node": "3",
   "edges": [
     {
       "from": "0",
@@ -53,6 +67,12 @@
       "to": "2",
       "choice": "A",
       "turn": 2
+    },
+    {
+      "from": "2",
+      "to": "3",
+      "choice": "A",
+      "turn": 3
     }
   ]
 }

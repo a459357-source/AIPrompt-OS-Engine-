@@ -206,15 +206,32 @@ export default function Game() {
               {options.length > 0 && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
                   <p className="text-xs text-game-muted font-medium">🎯 做出你的选择</p>
-                  {options.map((choice, i) => (
-                    <Button key={`${turn}-${i}`} variant="outline" disabled={choosing}
-                      onClick={() => handleChoice(String.fromCharCode(65 + i))}
-                      className="w-full justify-start text-left h-auto py-3 px-4 hover:bg-game-primary/10 hover:border-game-primary/50 transition-all"
-                    >
-                      <span className="text-game-accent mr-2 font-bold shrink-0">{String.fromCharCode(65 + i)}.</span>
-                      <span className="text-sm">{choice}</span>
-                    </Button>
-                  ))}
+                  {options.map((choice, i) => {
+                    // Parse "行动 → 可能发展 | 态度变化"
+                    const parts = choice.split(/\s*[→]\s*/)
+                    const action = parts[0] || choice
+                    const rest = parts.slice(1).join(' → ')
+                    const [consequence, attitude] = rest.split(/\s*\|\s*/)
+                    return (
+                      <Button key={`${turn}-${i}`} variant="outline" disabled={choosing}
+                        onClick={() => handleChoice(action)}
+                        className="w-full justify-start text-left h-auto py-3 px-4 hover:bg-game-primary/10 hover:border-game-primary/50 transition-all"
+                      >
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <div className="flex items-start gap-2">
+                            <span className="text-game-accent font-bold shrink-0 mt-0.5">{String.fromCharCode(65 + i)}.</span>
+                            <span className="text-sm font-medium text-game-text">{action}</span>
+                            {attitude && (
+                              <Badge variant="accent" size="sm" className="shrink-0 text-[10px]">{attitude.trim()}</Badge>
+                            )}
+                          </div>
+                          {consequence && (
+                            <p className="text-xs text-game-dim ml-5 pl-0.5">{consequence.trim()}</p>
+                          )}
+                        </div>
+                      </Button>
+                    )
+                  })}
 
                   {!showCustomInput ? (
                     <Button variant="ghost" size="sm" disabled={choosing}
