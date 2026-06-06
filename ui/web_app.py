@@ -66,8 +66,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>星痕纪元 — Galgame Runtime</title>
+    <title>{{TITLE}} — Galgame Runtime</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -201,7 +200,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border: 1px solid #30363d;
             border-radius: 6px;
             padding: 6px 14px;
-            margin-bottom: 10px;
+            margin: 0 auto 10px;
+            max-width: 900px; width: 100%;
             font-size: 0.82em; flex-wrap: wrap;
         }
         .state-panel .sep {
@@ -248,7 +248,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border: 1px solid #30363d;
             border-radius: 8px;
             padding: 20px 28px;
-            margin-bottom: 10px;
+            margin: 0 auto 10px;
+            max-width: 900px; width: 100%;
             line-height: 1.9;
             font-size: 1.05em;
             white-space: pre-wrap;
@@ -257,7 +258,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             display: flex; flex-shrink: 0;
             flex-direction: column;
             gap: 8px;
-            margin-bottom: 10px;
+            margin: 0 auto 10px;
+            max-width: 900px; width: 100%;
         }
         .option-btn {
             display: block;
@@ -307,7 +309,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         @keyframes spin { to { transform: rotate(360deg); } }
         .custom-choice {
             display: flex; gap: 6px; align-items: center; flex-shrink: 0;
-            margin-bottom: 8px;
+            margin: 0 auto 8px;
+            max-width: 900px; width: 100%;
         }
         .custom-choice .cc-label {
             color: #8b949e; font-size: 0.82em; white-space: nowrap;
@@ -328,7 +331,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .custom-choice button:hover { background: #212b3d; border-color: #ffa657; }
         .toolbar {
             display: flex; gap: 12px; flex-wrap: wrap; flex-shrink: 0;
-            margin-bottom: 4px; justify-content: center;
+            margin: 0 auto 4px;
+            max-width: 900px; width: 100%; justify-content: center;
         }
         .tb-group {
             display: flex; align-items: center; gap: 4px;
@@ -941,7 +945,7 @@ async def story_graph_page():
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>剧情分支图 — 星痕纪元</title>
+<title>剧情分支图 — Prompt OS Galgame</title>
 <script src="/static/mermaid.min.js"></script>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
@@ -1027,7 +1031,7 @@ async def history_page():
 <head>
     <meta charset="UTF-8">
     <meta charset="UTF-8">
-    <title>历史回顾 — 星痕纪元</title>
+    <title>历史回顾 — Prompt OS Galgame</title>
     <style>
         *{{box-sizing:border-box;margin:0;padding:0}}
         body{{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh}}
