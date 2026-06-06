@@ -1451,7 +1451,9 @@ function renderAllCharTags(i){
     var c = characters[i];
     renderCharTags('ch_'+i+'_role_tags', c.role_tags||[], ROLE_PRESETS, i, 'role_tags');
     renderCharTags('ch_'+i+'_personality_tags', c.personality_tags||[], PERSONALITY_PRESETS, i, 'personality_tags');
-    renderCharTags('ch_'+i+'_relationship', c.relationship||[], RELATION_PRESETS, i, 'relationship');
+    if(!c.isMain){
+        renderCharTags('ch_'+i+'_relationship', c.relationship||[], RELATION_PRESETS, i, 'relationship');
+    }
 }
 
 function renderCharacters(){
@@ -1472,10 +1474,10 @@ function renderCharacters(){
             '<div style=\"display:flex;gap:4px;margin:2px 0\"><input id=\"ch_'+i+'_personality_tags\" placeholder=\"输入后回车添加\" style=\"flex:1;font-size:0.8em;padding:3px 8px\" onkeydown=\"if(event.key==&quot;Enter&quot;){event.preventDefault();addCharTag('+i+',&quot;personality_tags&quot;,this.value)}\"></div>'+
             '<div id=\"ch_'+i+'_personality_tags_tags\" style=\"min-height:18px\"></div>'+
             '<div id=\"ch_'+i+'_personality_tags_sug\" style=\"max-height:48px;overflow-y:auto;line-height:1.6\"></div></div>'+
-            '<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#8b949e\">与主角关系</span>'+
+            (!c.isMain?'<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#8b949e\">与主角关系</span>'+
             '<div style=\"display:flex;gap:4px;margin:2px 0\"><input id=\"ch_'+i+'_relationship\" placeholder=\"输入后回车添加\" style=\"flex:1;font-size:0.8em;padding:3px 8px\" onkeydown=\"if(event.key==&quot;Enter&quot;){event.preventDefault();addCharTag('+i+',&quot;relationship&quot;,this.value)}\"></div>'+
             '<div id=\"ch_'+i+'_relationship_tags\" style=\"min-height:18px\"></div>'+
-            '<div id=\"ch_'+i+'_relationship_sug\" style=\"max-height:48px;overflow-y:auto;line-height:1.6\"></div></div>'+
+            '<div id=\"ch_'+i+'_relationship_sug\" style=\"max-height:48px;overflow-y:auto;line-height:1.6\"></div></div>':'')+
             '<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#8b949e\">当前目标</span>'+
             '<input placeholder=\"角色想要达成的事…\" value=\"'+esc(c.goal||'')+'\" onchange=\"updateChar('+i+',&quot;goal&quot;,this.value)\" style=\"font-size:0.8em;padding:3px 8px;margin-top:2px\"></div>'+
             (!c.isMain?'<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#d2a8ff\">🔒 隐藏秘密</span>'+
