@@ -5,11 +5,18 @@
     "turn": 0,
     "characters": {
       "A": {
-        "name": "主角",
-        "role": "",
+        "name": "林夜",
+        "role": "调查船船长 / 退役军人",
         "level": "L0",
-        "relation": "初识",
-        "note": ""
+        "relation": "陌生",
+        "note": "外貌：短发，眼神锐利，常穿深色作战服\n性格：冷静 / 理性 / 内敛 / 有责任感\n目标：寻找星痕背后的真相\n背景：曾参与第七远征舰队\n能力：星痕感知"
+      },
+      "B": {
+        "name": "艾琳",
+        "role": "考古语言学家",
+        "level": "L0",
+        "relation": "陌生",
+        "note": "外貌：金色长发，碧绿色眼睛\n性格：热情 / 好奇 / 冲动 / 敏锐\n关系：工作伙伴\n目标：破解星痕文字\n秘密：能够听见遗迹中的低语"
       }
     },
     "history": [],
@@ -33,13 +40,31 @@
   },
   "memory": {
     "characters": {
-      "主角": {
+      "林夜": {
         "trust": 0.5,
         "flags": [],
-        "relationship": "初识"
+        "relationship": "调查船船长 / 退役军人，陌生"
+      },
+      "艾琳": {
+        "trust": 0.5,
+        "flags": [
+          "隐藏秘密：能够听见遗迹中的低语"
+        ],
+        "relationship": "考古语言学家，陌生"
       }
     },
     "world_flags": [],
-    "global_trust": 0.5
+    "global_trust": 0.5,
+    "relationship_system": {
+      "stages": [
+        "陌生",
+        "熟悉",
+        "朋友",
+        "信赖",
+        "暧昧",
+        "恋人"
+      ],
+      "affection": 0
+    }
   }
 }

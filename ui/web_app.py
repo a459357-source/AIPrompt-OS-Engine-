@@ -1985,7 +1985,7 @@ async def generate_world(keywords: str = Form("")):
 5. 只输出JSON，不要输出markdown代码块或其他文字"""
 
     try:
-        result = call_deepseek(system, user, temperature=0.9, max_tokens=1024)
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=1024, skip_validation=True)
         return JSONResponse(result)
     except DeepSeekError as exc:
         return JSONResponse({"error": f"AI 生成失败: {exc}"}, status_code=500)
@@ -2028,7 +2028,7 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
         return JR({"error": f"未知字段类型: {field}"}, status_code=400)
 
     try:
-        result = call_deepseek(system, user, temperature=0.9, max_tokens=512)
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=512, skip_validation=True)
         # For character field, try to parse JSON from response
         if field == "character":
             story = result.get("story", "")
@@ -2385,7 +2385,7 @@ async def generate_rules(
 5. 只输出 JSON"""
 
     try:
-        result = call_deepseek(system, user, temperature=0.9, max_tokens=512)
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=512, skip_validation=True)
         return JSONResponse(result)
     except DeepSeekError as exc:
         return JSONResponse({"error": f"AI 生成失败: {exc}"}, status_code=500)

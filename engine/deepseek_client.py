@@ -27,12 +27,16 @@ def call_deepseek(
     *,
     temperature: float = 0.8,
     max_tokens: int = 2048,
+    skip_validation: bool = False,
 ) -> dict:
     """
     Call the DeepSeek Chat Completions API and return the parsed JSON body.
 
     The API is expected to return a JSON object in the format:
         {"story": "...", "state": {...}, "options": [...]}
+
+    Set skip_validation=True for endpoints that use a different response format
+    (e.g. world generation, field generation).
 
     Raises DeepSeekError on HTTP failure or JSON parse failure.
     """
@@ -98,8 +102,9 @@ def call_deepseek(
                 f"Model returned unparseable JSON: {raw_content[:500]}"
             ) from exc
 
-    # Validate required keys
-    _validate_response(result)
+    # Validate required keys (skip for world/field generation endpoints)
+    if not skip_validation:
+        _validate_response(result)
 
     # Log API usage for analytics
     _log_usage(body, result)
