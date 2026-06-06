@@ -1143,7 +1143,8 @@ _PRESETS = {
             {"name": "艾琳", "isMain": False, "role_tags": ["考古语言学家"], "personality_tags": ["热情", "好奇", "冲动", "敏锐"], "appearance": "金色长发，碧绿色眼睛", "relationship": ["工作伙伴"], "goal": "破解星痕文字", "secret": "能够听见遗迹中的低语", "background": "", "special_ability": ""}
         ],
         "rel_stages": ["陌生", "熟悉", "朋友", "信赖", "暧昧", "恋人"],
-        "rel_affection": 0
+        "rel_affection": 0,
+        "stats": [{"key": "trust", "label": "好感度", "max": 100}, {"key": "insight", "label": "洞察力", "max": 100}]
     },
     "school": {
         "title": "樱之诗",
@@ -1156,7 +1157,8 @@ _PRESETS = {
             {"name": "雪乃", "isMain": False, "role_tags": ["学生会长"], "personality_tags": ["高冷", "完美主义", "外冷内热"], "appearance": "黑色长发，戴眼镜", "relationship": ["同班同学"], "goal": "维持学生会权威", "secret": "私下喜欢画漫画", "background": "", "special_ability": ""}
         ],
         "rel_stages": ["陌生", "认识", "朋友", "知己", "暧昧", "恋人"],
-        "rel_affection": 0
+        "rel_affection": 0,
+        "stats": [{"key": "trust", "label": "好感度", "max": 100}, {"key": "popularity", "label": "人气", "max": 100}]
     },
     "fantasy": {
         "title": "剑与星辉",
@@ -1169,7 +1171,8 @@ _PRESETS = {
             {"name": "艾莉西亚", "isMain": False, "role_tags": ["精灵弓箭手"], "personality_tags": ["冷静", "高傲", "忠诚"], "appearance": "金色长发，尖耳朵，绿色披风", "relationship": ["同伴", "救命恩人"], "goal": "保护森林族人的安全", "secret": "拥有预知箭术的能力", "background": "", "special_ability": ""}
         ],
         "rel_stages": ["陌路", "同行", "战友", "信赖", "羁绊", "灵魂共鸣"],
-        "rel_affection": 0
+        "rel_affection": 0,
+        "stats": [{"key": "bond", "label": "羁绊", "max": 100}, {"key": "power", "label": "战力", "max": 100}]
     },
     "mystery": {
         "title": "第七日",
@@ -1182,7 +1185,8 @@ _PRESETS = {
             {"name": "墨言", "isMain": False, "role_tags": ["咖啡馆老板"], "personality_tags": ["神秘", "优雅", "深不可测"], "appearance": "黑发，常穿深色西装", "relationship": ["线人", "对手"], "goal": "守护第七日的秘密", "secret": "知道所有失踪案的真相", "background": "", "special_ability": ""}
         ],
         "rel_stages": ["陌生", "试探", "合作", "信任", "依赖", "命运共同体"],
-        "rel_affection": 0
+        "rel_affection": 0,
+        "stats": [{"key": "trust", "label": "信任度", "max": 100}, {"key": "clue", "label": "线索进度", "max": 100}]
     },
 }
 
@@ -1596,6 +1600,13 @@ function loadPreset(key,btn){
     renderCharacters();
     if(p.rel_stages){ relStagesArr=p.rel_stages.slice(); renderRelStages(); }
     if(p.rel_affection!=null){ document.getElementById('affectionSlider').value=p.rel_affection; document.getElementById('affVal').textContent=p.rel_affection; }
+    if(p.stats){
+        var rulesData = {stats: p.stats, stages: p.rel_stages || relStagesArr};
+        document.getElementById('customRulesInput').value = JSON.stringify(rulesData);
+        var statsLabels=(p.stats||[]).map(function(s){return s.label;}).join(' · ');
+        var stagesLabels=(p.rel_stages||relStagesArr).join(' → ');
+        document.getElementById('rulesPreview').innerHTML='<span style=\"color:#7ee787;\">✅ 预设</span><br>追踪维度: <b style=\"color:#ffa657;\">'+statsLabels+'</b><br>关系阶段: <b style=\"color:#d2a8ff;\">'+stagesLabels+'</b>';
+    }
     updateRelSystem();
 }
 
@@ -1704,6 +1715,13 @@ async function generateWorld(){
             renderCharacters();
             if(data.rel_stages){ relStagesArr=data.rel_stages.slice(); renderRelStages(); }
             if(data.rel_affection!=null){ document.getElementById('affectionSlider').value=data.rel_affection; document.getElementById('affVal').textContent=data.rel_affection; updateRelSystem(); }
+            if(data.stats){
+                var rulesData = {stats: data.stats, stages: data.rel_stages || relStagesArr};
+                document.getElementById('customRulesInput').value = JSON.stringify(rulesData);
+                var stats=(data.stats||[]).map(function(s){return s.label;}).join(' · ');
+                var stages=(data.rel_stages||relStagesArr).join(' → ');
+                document.getElementById('rulesPreview').innerHTML='<span style=\"color:#7ee787;\">✅ 已生成</span><br>追踪维度: <b style=\"color:#ffa657;\">'+stats+'</b><br>关系阶段: <b style=\"color:#d2a8ff;\">'+stages+'</b>';
+            }
             document.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('active');});
             status.textContent='✅ 已生成，可继续修改';
             status.style.color='#7ee787';
@@ -1976,15 +1994,20 @@ async def generate_world(keywords: str = Form("")):
     }}
   ],
   "rel_stages": ["陌生", "熟悉", "朋友", "信赖", "暧昧", "恋人"],
-  "rel_affection": 0
+  "rel_affection": 0,
+  "stats": [
+    {{"key": "trust", "label": "好感度", "max": 100}}
+  ]
 }}
 
 要求：
 1. 角色要有个性，包含外貌、性格标签、目标、隐藏秘密
 2. 主角和至少1个NPC之间要有潜在的戏剧冲突或情感张力
 3. 初始场景要具体、有画面感
-4. 所有文字用中文
-5. 只输出JSON，不要输出markdown代码块或其他文字"""
+4. stats 根据故事类型设计2-3个专属追踪维度（如修仙→修为/道心，宫廷→忠诚/权势，悬疑→信任/线索），key用英文label用中文
+5. rel_stages 设计5-7个贴合故事的递进阶段
+6. 所有文字用中文
+7. 只输出JSON，不要输出markdown代码块或其他文字"""
 
     try:
         result = call_deepseek(system, user, temperature=0.9, max_tokens=1024, skip_validation=True)
