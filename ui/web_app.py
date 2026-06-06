@@ -1255,7 +1255,7 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
     <div class="sidebar">
         <div class="card">
             <h3>🤖 一键生成</h3>
-            <textarea id="kw_input" placeholder="输入关键词或粘贴小说简介、设定描述……&#10;示例：修仙 宗门 重生&#10;也可以直接粘贴一段故事简介" style="width:100%;height:80px;padding:8px 10px;background:#0d1117;border:1px solid #30363d;border-radius:5px;color:#c9d1d9;font-size:0.85em;resize:vertical;font-family:inherit;margin-bottom:6px"></textarea>
+            <textarea id="kw_input" placeholder="粘贴小说简介 / 世界观描述 / 关键词均可&#10;&#10;示例 ①：修仙 宗门 重生 系统流&#10;示例 ②：一个被退婚的废柴少年，在悬崖下捡到一枚神秘戒指……&#10;示例 ③：公元2247年，人类发现了外星遗迹……" style="width:100%;height:110px;padding:10px 12px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.85em;resize:vertical;font-family:inherit;margin-bottom:6px;line-height:1.5"></textarea>
             <button class="btn primary" onclick="generateWorld()">✨ 一键生成完整设定</button>
             <div class="hint" id="kw_status"></div>
         </div>
