@@ -1,0 +1,110 @@
+// ── API response types ──
+
+export interface Character {
+  name: string
+  isMain: boolean
+  role_tags: string[]
+  personality_tags: string[]
+  appearance: string
+  relationship: string[]
+  goal: string
+  secret: string
+  background: string
+  special_ability: string
+  notes?: string
+}
+
+export interface WorldGenRequest {
+  keywords: string
+}
+
+export interface WorldGenResponse {
+  title?: string
+  world?: string
+  genre?: string[]
+  scene?: string
+  main_goal?: string
+  characters?: Character[]
+  rel_stages?: string[]
+  rel_affection?: number
+  stats?: StatDimension[]
+}
+
+export interface StatDimension {
+  key: string
+  label: string
+  max: number
+}
+
+export interface FieldGenRequest {
+  field: string
+  title?: string
+  world?: string
+  genre?: string
+  context?: string
+  char_role?: string
+}
+
+export interface FieldGenResponse {
+  story?: string
+  title?: string
+  name?: string
+  main_goal?: string
+  genre?: string[]
+  rel_stages?: string[]
+  rel_affection?: number
+  role_tags?: string[]
+  personality_tags?: string[]
+  appearance?: string
+  relationship?: string[]
+  goal?: string
+  secret?: string
+  isMain?: boolean
+  error?: string
+}
+
+export interface GameState {
+  scene: string
+  status: 'SETUP' | 'BUILD' | 'TENSION' | 'CLIMAX' | 'COOLDOWN'
+  turn: number
+  characters: Record<string, StateCharacter>
+  history: unknown[]
+  force_event_pending: boolean
+  chapter: number
+}
+
+export interface StateCharacter {
+  name: string
+  role: string
+  level: string
+  relation: string
+  note: string
+}
+
+export interface GameTurnResponse {
+  story: string
+  state: GameState
+  options: string[]
+  error?: string
+}
+
+export interface CustomRules {
+  stats: StatDimension[]
+  stages: string[]
+}
+
+export interface RelationshipSystem {
+  stages: string[]
+  affection: number
+}
+
+export interface StoryFormData {
+  title: string
+  world: string
+  genre: string[]
+  scene: string
+  main_goal: string
+  characters: Character[]
+  custom_rules?: CustomRules
+  rel_system: RelationshipSystem
+}

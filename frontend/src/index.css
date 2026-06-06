@@ -1,0 +1,58 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-game-bg: #0d1117;
+  --color-game-surface: #161b22;
+  --color-game-card: #1c2333;
+  --color-game-border: #30363d;
+  --color-game-primary: #58a6ff;
+  --color-game-accent: #d2a8ff;
+  --color-game-success: #7ee787;
+  --color-game-warning: #ffa657;
+  --color-game-danger: #f85149;
+  --color-game-text: #c9d1d9;
+  --color-game-muted: #8b949e;
+  --color-game-dim: #484f58;
+  --color-game-secret: #4a3060;
+  --radius-game: 0.5rem;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', 'Noto Sans SC', system-ui, sans-serif;
+  background: var(--color-game-bg);
+  color: var(--color-game-text);
+  min-height: 100vh;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-game-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-game-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-game-muted);
+}
+
+/* Animations */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px var(--color-game-accent); }
+  50% { box-shadow: 0 0 12px var(--color-game-accent); }
+}
+.animate-fade-in { animation: fade-in 0.3s ease-out; }
+.animate-slide-up { animation: slide-up 0.4s ease-out; }
+.animate-pulse-glow { animation: pulse-glow 2s infinite; }
