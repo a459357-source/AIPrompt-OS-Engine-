@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { get, set } from 'idb-keyval'
 
 export function useAutoSave<T>(
@@ -9,21 +9,25 @@ export function useAutoSave<T>(
   const { debounceMs = 2000 } = options
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const isRestoredRef = useRef(false)
-  const restoredDataRef = useRef<T | null>(null)
+  const [restoredData, setRestoredData] = useState<T | null>(null)
 
   // Restore on mount
   useEffect(() => {
     get<T>(key).then((saved) => {
       if (saved !== undefined && saved !== null) {
-        restoredDataRef.current = saved
+        setRestoredData(saved)
         isRestoredRef.current = true
+      } else {
+        isRestoredRef.current = true // mark as checked even if empty
       }
+    }).catch(() => {
+      isRestoredRef.current = true
     })
   }, [key])
 
   // Auto-save with debounce
   useEffect(() => {
-    if (!isRestoredRef.current) return // Don't save before restore check
+    if (!isRestoredRef.current) return
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
       set(key, data).catch(console.error)
@@ -38,7 +42,7 @@ export function useAutoSave<T>(
   }, [key])
 
   return {
-    restoredData: restoredDataRef.current,
+    restoredData,
     isRestored: isRestoredRef.current,
     clearSaved,
   }
