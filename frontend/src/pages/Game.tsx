@@ -289,7 +289,17 @@ export default function Game() {
                             <p className="text-sm text-game-muted ml-5 pl-0.5">{consequence.trim()}</p>
                           )}
                           {showConsequences && relation && (
-                            <p className="text-sm text-game-success ml-5 pl-0.5">💞 {relation.trim()}</p>
+                            <p className="text-sm ml-5 pl-0.5">
+                              💞 {relation.trim().split(/[,，、]/).map((r, j) => {
+                                const t = r.trim()
+                                if (!t) return null
+                                const isUp = /[↑➕+]/g.test(t)
+                                const isDown = /[↓➖-]/g.test(t)
+                                const isNew = /新人|new|\+/i.test(t)
+                                const color = isDown ? 'text-game-danger' : isNew ? 'text-game-accent' : isUp ? 'text-game-success' : 'text-game-muted'
+                                return <span key={j} className={color}>{t}{j < relation.trim().split(/[,，、]/).filter(Boolean).length - 1 ? '、' : ''}</span>
+                              })}
+                            </p>
                           )}
                         </div>
                       </Button>
