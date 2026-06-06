@@ -430,26 +430,84 @@ export default function NewStory() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-3 flex-wrap">
-                  {relStages.map((s, i) => (
-                    <span key={i} className="flex items-center gap-1">
-                      <Badge variant="primary">{s}</Badge>
-                      {i < relStages.length - 1 && <span className="text-game-dim text-xs">→</span>}
-                    </span>
-                  ))}
+                {/* Who's involved */}
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="font-bold text-game-accent">
+                    {watch('characters.0.name') || '主角'}
+                  </span>
+                  <span className="text-game-accent text-lg">💞</span>
+                  <span className="font-bold text-game-primary">
+                    {watch('characters.1.name') || 'NPC'}
+                  </span>
                 </div>
-                <div className="flex items-center gap-4">
-                  <Label className="whitespace-nowrap">初始好感（0~100）：</Label>
+                <p className="text-xs text-game-muted">
+                  设置主角与核心 NPC 之间的关系阶段递进路径。AI 会根据此路径推进角色关系发展。
+                </p>
+
+                {/* Stage chain with descriptions */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-game-muted">关系阶段递进</Label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {relStages.map((s, i) => (
+                      <span key={i} className="flex items-center gap-1">
+                        <Badge variant="primary" size="sm">{s}</Badge>
+                        {i < relStages.length - 1 && (
+                          <span className="text-game-dim text-[10px]">→</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Affection slider with visual bar */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-game-muted">初始好感度</Label>
+                    <Badge variant="accent" size="sm">
+                      {watch('rel_affection')}/100
+                    </Badge>
+                  </div>
+                  {/* Visual bar */}
+                  <div className="h-3 bg-game-border rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-game-primary via-game-accent to-game-success rounded-full transition-all duration-300"
+                      style={{ width: `${watch('rel_affection')}%` }}
+                    />
+                  </div>
                   <input
                     type="range"
                     min={0}
                     max={100}
                     {...register('rel_affection', { valueAsNumber: true })}
-                    className="flex-1 accent-game-accent"
+                    className="w-full accent-game-accent h-1.5"
                   />
-                  <span className="text-game-accent font-bold text-sm w-8 text-right tabular-nums">
-                    {watch('rel_affection')}
-                  </span>
+                  <div className="flex justify-between text-[10px] text-game-dim">
+                    <span>陌生人</span>
+                    <span>初识</span>
+                    <span>朋友</span>
+                    <span>亲密</span>
+                    <span>灵魂伴侣</span>
+                  </div>
+                </div>
+
+                {/* Stage-affinity mapping hint */}
+                <div className="bg-game-surface border border-game-border rounded-md p-3 text-xs text-game-muted space-y-1">
+                  <p className="text-game-accent font-medium mb-1">📋 阶段与好感度对应</p>
+                  {relStages.map((s, i) => {
+                    const pct = Math.round((i / Math.max(1, relStages.length - 1)) * 100)
+                    return (
+                      <div key={s} className="flex items-center gap-2">
+                        <Badge variant="outline" size="sm" className="w-16 justify-center">{s}</Badge>
+                        <div className="flex-1 h-1.5 bg-game-border rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-game-primary/40 rounded-full"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-game-dim w-8 text-right tabular-nums">{pct}%</span>
+                      </div>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
