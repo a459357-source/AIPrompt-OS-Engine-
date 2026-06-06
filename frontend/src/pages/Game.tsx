@@ -153,159 +153,114 @@ export default function Game() {
 
       {/* Game */}
       {hasGame && (
-        <div className="space-y-4">
-          {/* Top status bar */}
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 text-sm">
-              <Badge variant="primary" size="sm">📖 第 {turn} 轮</Badge>
-              <Badge
-                variant={
-                  status === 'TENSION' ? 'warning' :
-                  status === 'CLIMAX' ? 'danger' :
-                  status === 'COOLDOWN' ? 'success' : 'primary'
-                }
+        <div className="flex gap-0">
+          {/* Main content */}
+          <div className="flex-1 min-w-0 space-y-4">
+            {/* Top status bar */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 text-sm">
+                <Badge variant="primary" size="sm">📖 第 {turn} 轮</Badge>
+                <Badge
+                  variant={
+                    status === 'TENSION' ? 'warning' :
+                    status === 'CLIMAX' ? 'danger' :
+                    status === 'COOLDOWN' ? 'success' : 'primary'
+                  }
+                  size="sm"
+                >
+                  {status}
+                </Badge>
+                {scene && <span className="text-game-dim text-xs truncate max-w-[200px]">📍 {scene}</span>}
+              </div>
+
+              <Button
+                variant="ghost"
                 size="sm"
+                className="gap-1.5 text-game-muted hover:text-game-text"
+                onClick={() => setCharPanelOpen(!charPanelOpen)}
               >
-                {status}
-              </Badge>
-              {scene && <span className="text-game-dim text-xs truncate max-w-[200px]">📍 {scene}</span>}
+                👥 角色
+                {characters.length > 0 && (
+                  <Badge variant="accent" size="sm" className="ml-0.5">{characters.length}</Badge>
+                )}
+              </Button>
             </div>
 
-            {/* Character panel trigger */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-game-muted hover:text-game-text"
-              onClick={() => setCharPanelOpen(true)}
-            >
-              👥 角色
-              {characters.length > 0 && (
-                <Badge variant="accent" size="sm" className="ml-0.5">{characters.length}</Badge>
+            {/* Story */}
+            <Card>
+              <CardContent className="pt-6 md:px-8">
+                <motion.div key={turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+                  {story.split('\n').filter(Boolean).map((paragraph, i) => (
+                    <motion.p key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
+                      className="text-game-text leading-relaxed text-[16px] mb-5"
+                    >
+                      {paragraph}
+                    </motion.p>
+                  ))}
+                </motion.div>
+              </CardContent>
+            </Card>
+
+            {/* Choices */}
+            <AnimatePresence>
+              {options.length > 0 && (
+                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
+                  <p className="text-xs text-game-muted font-medium">🎯 做出你的选择</p>
+                  {options.map((choice, i) => (
+                    <Button key={`${turn}-${i}`} variant="outline" disabled={choosing}
+                      onClick={() => handleChoice(String.fromCharCode(65 + i))}
+                      className="w-full justify-start text-left h-auto py-3 px-4 hover:bg-game-primary/10 hover:border-game-primary/50 transition-all"
+                    >
+                      <span className="text-game-accent mr-2 font-bold shrink-0">{String.fromCharCode(65 + i)}.</span>
+                      <span className="text-sm">{choice}</span>
+                    </Button>
+                  ))}
+
+                  {!showCustomInput ? (
+                    <Button variant="ghost" size="sm" disabled={choosing}
+                      onClick={() => setShowCustomInput(true)}
+                      className="w-full text-game-dim hover:text-game-text border border-dashed border-game-border"
+                    >
+                      ✏️ 自定义输入…
+                    </Button>
+                  ) : (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="flex gap-2">
+                      <input value={customInput} onChange={(e) => setCustomInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && customInput.trim()) { handleChoice(customInput.trim()); setCustomInput(''); setShowCustomInput(false) }
+                          if (e.key === 'Escape') { setShowCustomInput(false); setCustomInput('') }
+                        }}
+                        placeholder="输入你想做的事…" disabled={choosing} autoFocus
+                        className="flex-1 bg-game-bg border border-game-border rounded-md px-3 py-2 text-sm text-game-text placeholder:text-game-dim focus:outline-none focus:border-game-primary"
+                      />
+                      <Button variant="accent" size="sm" disabled={choosing || !customInput.trim()}
+                        onClick={() => { if (customInput.trim()) { handleChoice(customInput.trim()); setCustomInput(''); setShowCustomInput(false) } }}
+                      >确定</Button>
+                    </motion.div>
+                  )}
+                </motion.div>
               )}
-            </Button>
+            </AnimatePresence>
+
+            {choosing && (
+              <div className="text-center text-game-muted text-sm py-4">
+                <span className="inline-block w-3 h-3 border-2 border-game-accent/30 border-t-game-accent rounded-full animate-spin mr-2" />
+                AI 正在生成下一段剧情…
+              </div>
+            )}
           </div>
 
-          {/* Story */}
-          <Card>
-            <CardContent className="pt-6 md:px-8">
-              <motion.div
-                key={turn}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-              >
-                {story.split('\n').filter(Boolean).map((paragraph, i) => (
-                  <motion.p
-                    key={i}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.08 }}
-                    className="text-game-text leading-relaxed text-[16px] mb-5"
-                  >
-                    {paragraph}
-                  </motion.p>
-                ))}
-              </motion.div>
-            </CardContent>
-          </Card>
-
-          {/* Choices */}
-          <AnimatePresence>
-            {options.length > 0 && (
-              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
-                <p className="text-xs text-game-muted font-medium">🎯 做出你的选择</p>
-                {options.map((choice, i) => (
-                  <Button
-                    key={`${turn}-${i}`}
-                    variant="outline"
-                    disabled={choosing}
-                    onClick={() => handleChoice(String.fromCharCode(65 + i))}
-                    className="w-full justify-start text-left h-auto py-3 px-4 hover:bg-game-primary/10 hover:border-game-primary/50 transition-all"
-                  >
-                    <span className="text-game-accent mr-2 font-bold shrink-0">
-                      {String.fromCharCode(65 + i)}.
-                    </span>
-                    <span className="text-sm">{choice}</span>
-                  </Button>
-                ))}
-
-                {/* Custom input toggle */}
-                {!showCustomInput ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={choosing}
-                    onClick={() => setShowCustomInput(true)}
-                    className="w-full text-game-dim hover:text-game-text border border-dashed border-game-border"
-                  >
-                    ✏️ 自定义输入…
-                  </Button>
-                ) : (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="flex gap-2"
-                  >
-                    <input
-                      value={customInput}
-                      onChange={(e) => setCustomInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && customInput.trim()) {
-                          handleChoice(customInput.trim())
-                          setCustomInput('')
-                          setShowCustomInput(false)
-                        }
-                        if (e.key === 'Escape') {
-                          setShowCustomInput(false)
-                          setCustomInput('')
-                        }
-                      }}
-                      placeholder="输入你想做的事…"
-                      disabled={choosing}
-                      autoFocus
-                      className="flex-1 bg-game-bg border border-game-border rounded-md px-3 py-2 text-sm text-game-text placeholder:text-game-dim focus:outline-none focus:border-game-primary"
-                    />
-                    <Button
-                      variant="accent"
-                      size="sm"
-                      disabled={choosing || !customInput.trim()}
-                      onClick={() => {
-                        if (customInput.trim()) {
-                          handleChoice(customInput.trim())
-                          setCustomInput('')
-                          setShowCustomInput(false)
-                        }
-                      }}
-                    >
-                      确定
-                    </Button>
-                  </motion.div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {choosing && (
-            <div className="text-center text-game-muted text-sm py-4">
-              <span className="inline-block w-3 h-3 border-2 border-game-accent/30 border-t-game-accent rounded-full animate-spin mr-2" />
-              AI 正在生成下一段剧情…
+          {/* Character side panel — inline, pushes content */}
+          {charPanelOpen && (
+            <div className="w-64 shrink-0 border-l border-game-border bg-game-card p-4 overflow-auto max-h-[calc(100vh-64px)] sticky top-14">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold text-game-accent">👥 角色状态</h3>
+                <button onClick={() => setCharPanelOpen(false)} className="text-game-muted hover:text-game-text">✕</button>
+              </div>
+              <CharacterList />
             </div>
           )}
         </div>
-      )}
-
-      {/* Character side panel */}
-      {charPanelOpen && (
-        <>
-          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setCharPanelOpen(false)} />
-          <div className="fixed right-0 top-0 h-full w-72 z-50 bg-game-card border-l border-game-border shadow-xl p-6 overflow-auto animate-in slide-in-from-right">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-game-accent">👥 角色状态</h3>
-              <button onClick={() => setCharPanelOpen(false)} className="text-game-muted hover:text-game-text text-lg">✕</button>
-            </div>
-            <CharacterList />
-          </div>
-        </>
       )}
     </div>
   )
