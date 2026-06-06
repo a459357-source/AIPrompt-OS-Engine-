@@ -124,7 +124,7 @@ def reload_model() -> str:
 
 
 # ── Story length ────────────────────────────────────────────────────
-DEFAULT_STORY_LENGTH = 1500
+DEFAULT_STORY_LENGTH = 1000
 
 
 def _load_story_length() -> int:
