@@ -1318,34 +1318,104 @@ const presets = """ + json.dumps(_PRESETS, ensure_ascii=False) + """;
 
 // ── Character management ──
 let characters = [
-    {name:'林夜',role:'调查船船长',note:'冷静、理性，背负过去的秘密',isMain:true},
-    {name:'艾琳',role:'考古语言学家',note:'热情、好奇，对星痕有特殊的感知力',isMain:false}
+    {name:'林夜',role_tags:['调查船船长','退役军人'],appearance:'短发，眼神锐利，常穿深色作战服',personality_tags:['冷静','理性','内敛','有责任感'],relationship:['上级','同伴'],goal:'寻找星痕背后的真相',notes:'',isMain:true},
+    {name:'艾琳',role_tags:['考古语言学家'],appearance:'红发，绿瞳，常戴一副老式眼镜',personality_tags:['热情','好奇','冲动','敏锐'],relationship:['同伴','暗恋对象'],goal:'解读星痕符文，证明自己的理论',notes:'',isMain:false}
 ];
 let charIdCounter = 2;
+
+// ── Tag presets ──
+var ROLE_PRESETS = ['战士','法师','刺客','治疗师','船长','指挥官','科学家','考古学家','语言学家','工程师','商人','情报贩子','贵族','平民','学生','教师','侦探','记者','黑客','飞行员','赏金猎人','走私者','叛军','特工','流浪者','隐士'];
+var PERSONALITY_PRESETS = ['冷静','热情','理性','冲动','内敛','外向','乐观','悲观','勇敢','谨慎','狡猾','正直','温柔','冷酷','幽默','严肃','忠诚','叛逆','善良','自私','敏感','迟钝','固执','灵活','孤僻','开朗','腹黑','天然呆','傲娇','病娇'];
+var RELATION_PRESETS = ['同伴','朋友','恋人','暗恋对象','青梅竹马','上级','下属','导师','学生','亲人','兄弟','姐妹','父亲','母亲','对手','仇人','陌生人','盟友','敌人','救命恩人','背叛者','守护者','被守护者'];
+
+function renderCharTags(containerId, tags, presetList, charIdx, fieldName){
+    var div = document.getElementById(containerId);
+    if(!div) return;
+    var h='';
+    for(var t=0; t<tags.length; t++){
+        h+='<span style=\"display:inline-block;padding:1px 8px;background:#1a3a5c;border:1px solid #58a6ff;border-radius:10px;color:#58a6ff;font-size:0.7em;cursor:pointer;margin:2px 3px 2px 0\" onclick=\"removeCharTag('+charIdx+',&quot;'+esc(fieldName)+'&quot;,'+t+')\">'+esc(tags[t])+' ×</span>';
+    }
+    div.innerHTML = h;
+
+    // Also render suggestion chips
+    var sugDiv = document.getElementById(containerId+'_sug');
+    if(sugDiv && presetList){
+        var s='';
+        for(var p=0; p<presetList.length; p++){
+            var tag = presetList[p];
+            if(tags.indexOf(tag)<0){
+                s+='<span style=\"display:inline-block;padding:1px 6px;background:#1c2333;border:1px solid #30363d;border-radius:8px;color:#8b949e;font-size:0.65em;cursor:pointer;margin:1px 2px\" onclick=\"addCharTag('+charIdx+',&quot;'+esc(fieldName)+'&quot;,&quot;'+esc(tag)+'&quot;)\">'+esc(tag)+'</span>';
+            }
+        }
+        sugDiv.innerHTML = s;
+    }
+}
+
+function addCharTag(i, field, tag){
+    if(!tag) return;
+    var arr = characters[i][field];
+    if(!arr) arr = characters[i][field] = [];
+    if(arr.indexOf(tag)<0){ arr.push(tag); renderAllCharTags(i); }
+    // Clear input
+    var inp = document.getElementById('ch_'+i+'_'+field);
+    if(inp) inp.value = '';
+}
+
+function removeCharTag(i, field, idx){
+    var arr = characters[i][field];
+    if(arr){ arr.splice(idx,1); renderAllCharTags(i); }
+}
+
+function renderAllCharTags(i){
+    var c = characters[i];
+    renderCharTags('ch_'+i+'_role_tags', c.role_tags||[], ROLE_PRESETS, i, 'role_tags');
+    renderCharTags('ch_'+i+'_personality_tags', c.personality_tags||[], PERSONALITY_PRESETS, i, 'personality_tags');
+    renderCharTags('ch_'+i+'_relationship', c.relationship||[], RELATION_PRESETS, i, 'relationship');
+}
 
 function renderCharacters(){
     var html='';
     characters.forEach(function(c,i){
-        html+='<div class=\"char-card\">'+
+        html+='<div class=\"char-card\" id=\"chcard_'+i+'\">'+
             '<div class=\"ch-top\"><span class=\"ch-num\">'+(c.isMain?'⭐ 主角':'👤 NPC #'+(i+1))+'</span>'+
             (!c.isMain && characters.length>1?'<button class=\"ch-del\" onclick=\"removeChar('+i+')\" title=\"移除\">×</button>':'')+
             '</div>'+
-            '<input placeholder=\"姓名\" value=\"'+esc(c.name)+'\" onchange=\"updateChar('+i+',&quot;name&quot;,this.value)\" required'+(i===0?'':'')+'>'+
-            '<input placeholder=\"身份 / 职业\" value=\"'+esc(c.role)+'\" onchange=\"updateChar('+i+',&quot;role&quot;,this.value)\">'+
-            '<input placeholder=\"性格描述（15-30字）\" value=\"'+esc(c.note)+'\" onchange=\"updateChar('+i+',&quot;note&quot;,this.value)\">'+
+            '<input placeholder=\"姓名\" value=\"'+esc(c.name)+'\" onchange=\"updateChar('+i+',&quot;name&quot;,this.value)\" required style=\"font-weight:bold\">'+
+            '<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#8b949e\">身份/职业</span>'+
+            '<div style=\"display:flex;gap:4px;margin:2px 0\"><input id=\"ch_'+i+'_role_tags\" placeholder=\"输入后回车添加\" style=\"flex:1;font-size:0.8em;padding:3px 8px\" onkeydown=\"if(event.key==&quot;Enter&quot;){event.preventDefault();addCharTag('+i+',&quot;role_tags&quot;,this.value)}\"></div>'+
+            '<div id=\"ch_'+i+'_role_tags_tags\" style=\"min-height:18px\"></div>'+
+            '<div id=\"ch_'+i+'_role_tags_sug\" style=\"max-height:48px;overflow-y:auto;line-height:1.6\"></div></div>'+
+            '<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#8b949e\">外貌特征</span>'+
+            '<input placeholder=\"发型、瞳色、着装风格…\" value=\"'+esc(c.appearance||'')+'\" onchange=\"updateChar('+i+',&quot;appearance&quot;,this.value)\" style=\"font-size:0.8em;padding:3px 8px;margin-top:2px\"></div>'+
+            '<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#8b949e\">性格标签</span>'+
+            '<div style=\"display:flex;gap:4px;margin:2px 0\"><input id=\"ch_'+i+'_personality_tags\" placeholder=\"输入后回车添加\" style=\"flex:1;font-size:0.8em;padding:3px 8px\" onkeydown=\"if(event.key==&quot;Enter&quot;){event.preventDefault();addCharTag('+i+',&quot;personality_tags&quot;,this.value)}\"></div>'+
+            '<div id=\"ch_'+i+'_personality_tags_tags\" style=\"min-height:18px\"></div>'+
+            '<div id=\"ch_'+i+'_personality_tags_sug\" style=\"max-height:48px;overflow-y:auto;line-height:1.6\"></div></div>'+
+            '<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#8b949e\">与主角关系</span>'+
+            '<div style=\"display:flex;gap:4px;margin:2px 0\"><input id=\"ch_'+i+'_relationship\" placeholder=\"输入后回车添加\" style=\"flex:1;font-size:0.8em;padding:3px 8px\" onkeydown=\"if(event.key==&quot;Enter&quot;){event.preventDefault();addCharTag('+i+',&quot;relationship&quot;,this.value)}\"></div>'+
+            '<div id=\"ch_'+i+'_relationship_tags\" style=\"min-height:18px\"></div>'+
+            '<div id=\"ch_'+i+'_relationship_sug\" style=\"max-height:48px;overflow-y:auto;line-height:1.6\"></div></div>'+
+            '<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#8b949e\">当前目标</span>'+
+            '<input placeholder=\"角色想要达成的事…\" value=\"'+esc(c.goal||'')+'\" onchange=\"updateChar('+i+',&quot;goal&quot;,this.value)\" style=\"font-size:0.8em;padding:3px 8px;margin-top:2px\"></div>'+
+            '<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#8b949e\">自由设定</span>'+
+            '<textarea placeholder=\"任何你想补充的角色细节…\" onchange=\"updateChar('+i+',&quot;notes&quot;,this.value)\" style=\"width:100%;font-size:0.8em;padding:3px 8px;margin-top:2px;resize:vertical;min-height:36px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-family:inherit\">'+esc(c.notes||'')+'</textarea></div>'+
             '<button type=\"button\" class=\"ch-ai-btn\" onclick=\"genCharacter('+i+')\">✨ 生成此角色</button>'+
             '</div>';
     });
     document.getElementById('charList').innerHTML=html;
+    // Render tags for each character after DOM update
+    for(var i=0; i<characters.length; i++){
+        renderAllCharTags(i);
+    }
 }
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function updateChar(i,field,val){characters[i][field]=val;}
 function addCharacter(){
-    characters.push({name:'',role:'',note:'',isMain:false});
+    characters.push({name:'',role_tags:[],appearance:'',personality_tags:[],relationship:[],goal:'',notes:'',isMain:false});
     renderCharacters();
 }
 function removeChar(i){
-    if(characters[i].isMain) return; // 主角不可删除
+    if(characters[i].isMain) return;
     if(characters.length<=1) return;
     characters.splice(i,1);
     renderCharacters();
@@ -1413,8 +1483,8 @@ function loadPreset(key,btn){
     selectedGenres=p.genre.split('/').map(function(s){return s.trim();}).filter(Boolean);
     renderGenreTags();
     characters=[
-        {name:p.char1_name,role:p.char1_role,note:p.char1_note,isMain:true},
-        {name:p.char2_name,role:p.char2_role,note:p.char2_note,isMain:false}
+        {name:p.char1_name,role_tags:p.char1_role?[p.char1_role]:[],appearance:'',personality_tags:[],relationship:[],goal:'',notes:p.char1_note||'',isMain:true},
+        {name:p.char2_name,role_tags:p.char2_role?[p.char2_role]:[],appearance:'',personality_tags:[],relationship:[],goal:'',notes:p.char2_note||'',isMain:false}
     ];
     renderCharacters();
 }
@@ -1445,15 +1515,20 @@ async function genCharacter(i){
     btn.disabled=true;btn.textContent='⏳ 生成中';
     var title=document.getElementById('f_title').value;
     var world=document.getElementById('f_world').value;
-    var role=characters[i].role||'重要NPC';
     try{
-        var params=new URLSearchParams({field:'character',title:title,world:world,char_role:role});
+        var params=new URLSearchParams({field:'character',title:title,world:world,char_role:''});
         var res=await fetch('/generate-field',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:params});
         var data=await res.json();
         if(!data.error){
-            characters[i].name=data.name||characters[i].name||'新角色';
-            characters[i].role=data.role||characters[i].role;
-            characters[i].note=data.note||characters[i].note;
+            if(data.name) characters[i].name=data.name;
+            if(data.role_tags){ characters[i].role_tags=Array.isArray(data.role_tags)?data.role_tags:[data.role_tags]; }
+            else if(data.role){ characters[i].role_tags=[data.role]; }
+            if(data.appearance) characters[i].appearance=data.appearance;
+            if(data.personality_tags){ characters[i].personality_tags=Array.isArray(data.personality_tags)?data.personality_tags:[data.personality_tags]; }
+            else if(data.personality){ characters[i].personality_tags=[data.personality]; }
+            if(data.relationship){ characters[i].relationship=Array.isArray(data.relationship)?data.relationship:[data.relationship]; }
+            if(data.goal) characters[i].goal=data.goal;
+            if(data.notes) characters[i].notes=data.notes;
             renderCharacters();
         }
     }catch(e){alert('生成失败: '+e.message);}
@@ -1478,8 +1553,8 @@ async function generateWorld(){
             document.getElementById('f_genre').value=data.genre||'科幻 / 冒险 / 情感';
             document.getElementById('f_scene').value=data.scene||'';
             characters=[
-                {name:data.char1_name||'主角',role:data.char1_role||'',note:data.char1_note||'',isMain:true},
-                {name:data.char2_name||'',role:data.char2_role||'',note:data.char2_note||'',isMain:false}
+                {name:data.char1_name||'主角',role_tags:data.char1_role?[data.char1_role]:[],appearance:'',personality_tags:[],relationship:[],goal:'',notes:data.char1_note||'',isMain:true},
+                {name:data.char2_name||'',role_tags:data.char2_role?[data.char2_role]:[],appearance:'',personality_tags:[],relationship:[],goal:'',notes:data.char2_note||'',isMain:false}
             ];
             renderCharacters();
             document.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('active');});
@@ -1582,11 +1657,24 @@ async def create_new_story(
             break
         key = letters[i]
         name = ch.get("name", f"角色{i+1}")
-        role = ch.get("role", "")
-        note = ch.get("note", "")
+        role_tags = ch.get("role_tags", ch.get("role_tags", []))
+        if isinstance(role_tags, str): role_tags = [role_tags]
+        role_str = " / ".join(role_tags) if role_tags else (ch.get("role", ""))
+        personality_tags = ch.get("personality_tags", [])
+        if isinstance(personality_tags, str): personality_tags = [personality_tags]
+        relationship = ch.get("relationship", [])
+        if isinstance(relationship, str): relationship = [relationship]
+        note_parts = []
+        if ch.get("appearance"): note_parts.append(f"外貌：{ch['appearance']}")
+        if personality_tags: note_parts.append(f"性格：{' / '.join(personality_tags)}")
+        if relationship: note_parts.append(f"关系：{' / '.join(relationship)}")
+        if ch.get("goal"): note_parts.append(f"目标：{ch['goal']}")
+        if ch.get("notes"): note_parts.append(ch['notes'])
+        note = ch.get("note", "") or "\n".join(note_parts)
+        if not note: note = ""
         state_chars[key] = {
             "name": name,
-            "role": role,
+            "role": role_str,
             "level": "L0",
             "relation": "初识",
             "note": note,
@@ -1594,7 +1682,7 @@ async def create_new_story(
         mem_chars[name] = {
             "trust": 0.5,
             "flags": [],
-            "relationship": f"{role}，初识" if role else "初识",
+            "relationship": role_str + "，初识" if role_str else "初识",
         }
 
     initial_state = {
