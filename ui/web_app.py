@@ -42,6 +42,13 @@ _static_dir = config.OUTPUT_DIR
 _static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
+
+@app.get("/health")
+async def health():
+    """Lightweight health-check endpoint."""
+    return {"status": "ok"}
+
+
 # ── HTML template (inline) ────────────────────────────────────────
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -374,7 +381,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             {{ERROR}}
 
-            <div class="state-panel">{{STATE_ROW}}</div>
+            <div class="state-panel">{{STATE_ROW}} <span id="connDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#484f58;margin-left:8px;flex-shrink:0" title="连接状态"></span></div>
 
             <div class="story-block">{{STORY}}</div>
 
@@ -522,6 +529,29 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if(btn) btn.textContent = '▶';
             }
         })();
+
+        // ── Connection health check ──
+        const connDot = document.getElementById('connDot');
+        if(connDot){
+            function checkConn(){
+                fetch('/health').then(function(){
+                    connDot.style.background = '#3fb950';
+                    connDot.title = '服务器在线';
+                }).catch(function(){
+                    connDot.style.background = '#f85149';
+                    connDot.title = '服务器断开 — 请检查';
+                });
+            }
+            checkConn();
+            setInterval(checkConn, 30000);
+        }
+
+        // ── Warn before closing / refreshing ──
+        window.addEventListener('beforeunload', function(e){
+            e.preventDefault();
+            e.returnValue = '剧情进度可能丢失，确定离开？';
+            return e.returnValue;
+        });
     </script>
 </body>
 </html>"""
