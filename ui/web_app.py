@@ -1181,141 +1181,99 @@ _PRESETS = {
 _NEW_PAGE = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>新故事 — Prompt OS Galgame</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: "Segoe UI", "Noto Sans SC", system-ui, sans-serif;
-            background: #0d1117; color: #c9d1d9;
-            min-height: 100vh; display: flex; flex-direction: column; align-items: center;
-        }
-        .new-container {
-            width: 100%; height: 100%;
-            display: flex; flex-direction: column; padding: 16px 20px;
-        }
-        .new-header {
-            text-align: center; flex-shrink: 0;
-            padding: 12px 0; border-bottom: 1px solid #30363d; margin-bottom: 12px;
-        }
-        .new-header h1 { font-size: 1.4em; color: #58a6ff; margin-bottom: 8px; }
-        .back-btn { display:inline-block;padding:6px 16px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.85em;transition:all 0.15s; }
-        .back-btn:hover { background:#1a3a5c;color:#79c0ff; }
-        .new-body {
-            flex: 1; overflow-y: auto; min-height: 0;
-        }
-        .new-body label {
-            display: block; color: #8b949e; font-size: 0.85em; margin: 12px 0 4px;
-        }
-        .new-body input, .new-body textarea, .new-body select {
-            width: 100%; padding: 8px 12px;
-            background: #161b22; border: 1px solid #30363d;
-            border-radius: 6px; color: #c9d1d9; font-size: 0.9em;
-            font-family: inherit;
-        }
-        .new-body input:focus, .new-body textarea:focus, .new-body select:focus {
-            outline: none; border-color: #58a6ff;
-        }
-        .new-body textarea { resize: vertical; min-height: 60px; }
-        .new-body .row { display: flex; gap: 12px; }
-        .new-body .row > div { flex: 1; }
-        .new-body button {
-            width: 100%; margin-top: 16px; padding: 12px;
-            background: #238636; border: none; border-radius: 8px;
-            color: #fff; font-size: 1em; cursor: pointer;
-            font-weight: bold; transition: all 0.15s;
-        }
-        .new-body button:hover { background: #2ea043; }
-        .kw-section {{
-            background: #161b22; border: 1px solid #30363d;
-            border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;
-        }}
-        .kw-section label {{
-            display: block; color: #8b949e; font-size: 0.85em; margin-bottom: 6px;
-        }}
-        .kw-section input {{
-            padding: 8px 12px; background: #0d1117; border: 1px solid #30363d;
-            border-radius: 6px; color: #c9d1d9; font-size: 0.9em;
-            font-family: inherit;
-        }}
-        .kw-section input:focus {{ outline: none; border-color: #58a6ff; }}
-        .kw-section .btn-save {{
-            padding: 8px 16px; background: #238636; color: #fff;
-            border: none; border-radius: 6px; font-size: 0.9em;
-            cursor: pointer; font-weight: bold;
-        }}
-        .kw-section .btn-save:hover {{ background: #2ea043; }}
-        .kw-section .btn-save:disabled {{ opacity: 0.5; cursor: not-allowed; }}
-        .kw-section .hint {{ color: #8b949e; font-size: 0.75em; }}
-        .preset-bar {{ display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }}
-        .preset-btn {
-            padding: 5px 14px; background: #1c2333; border: 1px solid #30363d;
-            border-radius: 16px; color: #8b949e; font-size: 0.8em; cursor: pointer;
-            transition: all 0.15s;
-        }
-        .preset-btn:hover { border-color: #58a6ff; color: #58a6ff; }
-        .preset-btn.active { background: #1a3a5c; border-color: #58a6ff; color: #58a6ff; }
-    </style>
+<meta charset="UTF-8">
+<title>新故事 — Prompt OS Galgame</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 24px;border-bottom:1px solid #21262d;background:#0d1117}
+.topbar h1{font-size:1.15em;color:#58a6ff}
+.back-btn{display:inline-block;padding:5px 14px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.82em}
+.back-btn:hover{background:#1a3a5c;color:#79c0ff}
+.layout{display:flex;gap:20px;max-width:1100px;margin:0 auto;padding:16px 24px}
+.sidebar{width:280px;flex-shrink:0}
+.sidebar .card{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:14px;margin-bottom:12px}
+.sidebar .card h3{font-size:0.85em;color:#8b949e;margin-bottom:8px}
+.sidebar .card input{width:100%;padding:7px 10px;background:#0d1117;border:1px solid #30363d;border-radius:5px;color:#c9d1d9;font-size:0.85em;margin-bottom:6px}
+.sidebar .card input:focus{outline:none;border-color:#58a6ff}
+.sidebar .card .btn{display:inline-block;padding:6px 14px;background:#238636;color:#fff;border:none;border-radius:5px;font-size:0.82em;cursor:pointer}
+.sidebar .card .btn:hover{background:#2ea043}
+.sidebar .card .btn:disabled{opacity:0.5;cursor:not-allowed}
+.sidebar .card .hint{color:#8b949e;font-size:0.72em;margin-top:4px;min-height:16px}
+.preset-bar{display:flex;flex-direction:column;gap:4px}
+.preset-btn{padding:7px 12px;background:#1c2333;border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:0.82em;cursor:pointer;text-align:left;transition:all 0.12s}
+.preset-btn:hover{border-color:#58a6ff;color:#58a6ff}
+.preset-btn.active{background:#1a3a5c;border-color:#58a6ff;color:#58a6ff}
+.main-form{flex:1;min-width:0}
+.main-form label{display:block;color:#8b949e;font-size:0.82em;margin:10px 0 3px}
+.main-form input,.main-form textarea{width:100%;padding:8px 12px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.88em;font-family:inherit}
+.main-form input:focus,.main-form textarea:focus{outline:none;border-color:#58a6ff}
+.main-form textarea{resize:vertical;min-height:70px}
+.main-form .row{display:flex;gap:14px}
+.main-form .row>div{flex:1}
+.main-form .row input{margin-top:3px}
+.btn-submit{display:inline-block;margin-top:16px;padding:10px 32px;background:#238636;border:none;border-radius:6px;color:#fff;font-size:0.95em;cursor:pointer;font-weight:bold}
+.btn-submit:hover{background:#2ea043}
+.btn-rules{display:inline-block;margin-top:6px;padding:6px 16px;background:#1c2333;border:1px solid #d2a8ff;border-radius:5px;color:#d2a8ff;font-size:0.82em;cursor:pointer}
+.btn-rules:hover{background:#1f1a2e}
+</style>
 </head>
 <body>
-    <div class="new-container">
-        <div class="new-header">
-            <h1>🆕 创建新故事</h1>
-            <a href="/" class="back-btn">← 返回游戏</a>
+<div class="topbar">
+    <h1>🆕 创建新故事</h1>
+    <a href="/" class="back-btn">← 返回游戏</a>
+</div>
+<div class="layout">
+    <div class="sidebar">
+        <div class="card">
+            <h3>💡 AI 关键词生成</h3>
+            <input id="kw_input" placeholder="输入关键词，如：修仙 宗门 重生">
+            <button class="btn" onclick="generateWorld()" style="margin-top:4px">✨ 生成世界观</button>
+            <div class="hint" id="kw_status"></div>
         </div>
-        <div class="new-body">
-            <div class="kw-section">
-                <label>💡 AI 关键词生成</label>
-                <div style="display:flex;gap:8px;">
-                    <input id="kw_input" placeholder="输入关键词，如：修仙 宗门 重生 师徒" style="flex:1">
-                    <button type="button" class="btn btn-save" onclick="generateWorld()" style="flex-shrink:0;">✨ 生成</button>
-                </div>
-                <div class="hint" id="kw_status" style="margin-top:4px;min-height:18px;"></div>
-            </div>
-
+        <div class="card">
+            <h3>📦 预设模板</h3>
             <div class="preset-bar" id="presets">
-                <button class="preset-btn active" onclick="loadPreset('scifi',this)">🚀 科幻</button>
-                <button class="preset-btn" onclick="loadPreset('school',this)">🌸 校园恋爱</button>
+                <button class="preset-btn active" onclick="loadPreset('scifi',this)">🚀 星痕纪元 · 科幻</button>
+                <button class="preset-btn" onclick="loadPreset('school',this)">🌸 樱之诗 · 校园恋爱</button>
                 <button class="preset-btn" onclick="loadPreset('fantasy',this)">⚔️ 奇幻冒险</button>
                 <button class="preset-btn" onclick="loadPreset('mystery',this)">🔍 都市悬疑</button>
-                <button class="preset-btn" onclick="loadPreset('custom',this)">✨ 自定义</button>
+                <button class="preset-btn" onclick="loadPreset('custom',this)">✨ 空白自定义</button>
             </div>
-            <form method="post" action="/new">
-                <label>📖 故事标题</label>
-                <input name="title" id="f_title" value="星痕纪元" required>
-                <label>🌍 世界观 / 背景</label>
-                <textarea name="world" id="f_world" required>公元2247年，人类已进入星际殖民时代……</textarea>
-                <label>🎭 类型 / 风格</label>
-                <input name="genre" id="f_genre" value="科幻 / 冒险 / 情感">
-                <label>📍 初始场景</label>
-                <input name="scene" id="f_scene" value="回声号 — 舰桥" required>
-                <div class="row">
-                    <div>
-                        <label>👤 主角</label>
-                        <input name="char1_name" id="f_c1n" value="林夜" placeholder="姓名" required>
-                        <input name="char1_role" id="f_c1r" value="调查船船长" placeholder="身份" style="margin-top:4px">
-                        <input name="char1_note" id="f_c1t" value="冷静、理性，背负过去的秘密" placeholder="性格描述" style="margin-top:4px">
-                    </div>
-                    <div>
-                        <label>👤 角色B</label>
-                        <input name="char2_name" id="f_c2n" value="艾琳" placeholder="姓名" required>
-                        <input name="char2_role" id="f_c2r" value="考古语言学家" placeholder="身份" style="margin-top:4px">
-                        <input name="char2_note" id="f_c2t" value="热情、好奇，对星痕有特殊的感知力" placeholder="性格描述" style="margin-top:4px">
-                    </div>
-                </div>
-                <div class="rules-section" style="margin-top:12px;">
-                    <label>🎨 故事专属规则（可选）</label>
-                    <button type="button" class="btn-ai" onclick="generateRules()" id="rulesBtn">
-                        ✨ AI 生成专属规则
-                    </button>
-                    <div id="rulesPreview" style="margin-top:8px;font-size:0.8em;color:#8b949e;min-height:20px;"></div>
-                    <input type="hidden" name="custom_rules" id="customRulesInput" value="">
-                </div>
-                <button type="submit">🎬 开始新故事</button>
-            </form>
         </div>
     </div>
+    <form class="main-form" method="post" action="/new">
+        <label>📖 故事标题</label>
+        <input name="title" id="f_title" value="星痕纪元" required>
+        <label>🌍 世界观 / 背景设定</label>
+        <textarea name="world" id="f_world" required>公元2247年，人类已进入星际殖民时代……</textarea>
+        <label>🎭 类型 / 风格</label>
+        <input name="genre" id="f_genre" value="科幻 / 冒险 / 情感">
+        <label>📍 初始场景</label>
+        <input name="scene" id="f_scene" value="回声号 — 舰桥" required>
+        <div class="row">
+            <div>
+                <label>👤 主角</label>
+                <input name="char1_name" id="f_c1n" value="林夜" placeholder="姓名" required>
+                <input name="char1_role" id="f_c1r" value="调查船船长" placeholder="身份">
+                <input name="char1_note" id="f_c1t" value="冷静、理性，背负过去的秘密" placeholder="性格描述">
+            </div>
+            <div>
+                <label>👤 角色B</label>
+                <input name="char2_name" id="f_c2n" value="艾琳" placeholder="姓名" required>
+                <input name="char2_role" id="f_c2r" value="考古语言学家" placeholder="身份">
+                <input name="char2_note" id="f_c2t" value="热情、好奇，对星痕有特殊的感知力" placeholder="性格描述">
+            </div>
+        </div>
+        <div style="margin-top:12px">
+            <label>🎨 故事专属规则（可选）</label>
+            <button type="button" class="btn-rules" onclick="generateRules()" id="rulesBtn">✨ AI 生成专属规则</button>
+            <div id="rulesPreview" style="margin-top:6px;font-size:0.78em;color:#8b949e;min-height:18px"></div>
+            <input type="hidden" name="custom_rules" id="customRulesInput" value="">
+        </div>
+        <button type="submit" class="btn-submit">🎬 开始新故事</button>
+    </form>
+</div>
     <script>
         const presets = """ + json.dumps(_PRESETS, ensure_ascii=False) + """;
         function loadPreset(key, btn) {
@@ -1577,106 +1535,68 @@ async def generate_world(keywords: str = Form("")):
 _NPC_PAGE = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>角色管理 — Prompt OS Galgame</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: "Segoe UI", "Noto Sans SC", system-ui, sans-serif;
-            background: #0d1117; color: #c9d1d9;
-            min-height: 100vh; display: flex; flex-direction: column; align-items: center;
-        }
-        .npc-container {
-            width: 100%; height: 100%;
-            display: flex; flex-direction: column; padding: 16px 20px;
-        }
-        .npc-header {
-            text-align: center; flex-shrink: 0;
-            padding: 12px 0; border-bottom: 1px solid #30363d; margin-bottom: 12px;
-        }
-        .npc-header h1 { font-size: 1.3em; color: #58a6ff; margin-bottom: 8px; }
-        .back-btn { display:inline-block;padding:6px 16px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.85em;transition:all 0.15s; }
-        .back-btn:hover { background:#1a3a5c;color:#79c0ff; }
-        .npc-body { flex: 1; overflow-y: auto; min-height: 0; }
-        .npc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
-        .npc-card {
-            background: #161b22; border: 1px solid #30363d;
-            border-radius: 8px; padding: 14px 16px; position: relative;
-        }
-        .npc-card .tag {
-            display: inline-block; padding: 1px 6px; border-radius: 3px;
-            font-size: 0.7em; margin-left: 6px; vertical-align: middle;
-        }
-        .npc-card .tag.main { background: #1a3a5c; color: #58a6ff; }
-        .npc-card .tag.npc { background: #3d2a1a; color: #ffa657; }
-        .npc-card .name { font-weight: bold; color: #d2a8ff; font-size: 1.05em; }
-        .npc-card .role { color: #8b949e; font-size: 0.85em; margin: 4px 0; }
-        .npc-card .note { color: #c9d1d9; font-size: 0.82em; line-height: 1.5; margin-top: 6px; }
-        .npc-card .level { color: #ffa657; font-size: 0.8em; }
-        .npc-card .trust { color: #7ee787; font-size: 0.8em; }
-        .npc-card .del-btn {
-            position: absolute; top: 8px; right: 10px;
-            background: none; border: none; color: #484f58;
-            font-size: 1em; cursor: pointer;
-        }
-        .npc-card .del-btn:hover { color: #f85149; }
-        .add-section {
-            background: #161b22; border: 1px solid #30363d;
-            border-radius: 8px; padding: 14px 16px; margin-bottom: 14px;
-        }
-        .add-section label { display: block; color: #8b949e; font-size: 0.85em; margin: 6px 0 3px; }
-        .add-section input, .add-section textarea {
-            width: 100%; padding: 6px 10px;
-            background: #0d1117; border: 1px solid #30363d;
-            border-radius: 4px; color: #c9d1d9; font-size: 0.85em;
-            font-family: inherit;
-        }
-        .add-section input:focus, .add-section textarea:focus { outline: none; border-color: #58a6ff; }
-        .add-section textarea { resize: vertical; min-height: 40px; }
-        .add-section .btn-row { display: flex; gap: 8px; margin-top: 10px; }
-        .add-section button {
-            padding: 7px 16px; border-radius: 6px; font-size: 0.85em;
-            cursor: pointer; border: none; font-weight: bold;
-        }
-        .btn-add { background: #238636; color: #fff; }
-        .btn-add:hover { background: #2ea043; }
-        .btn-ai { background: #1a3a5c; color: #58a6ff; border: 1px solid #58a6ff; }
-        .btn-ai:hover { background: #1f4a73; }
-        .btn-ai:disabled { opacity: 0.5; cursor: not-allowed; }
-        .ai-row { display: flex; gap: 8px; margin-top: 4px; }
-        .ai-row input { flex: 1; }
-    </style>
+<meta charset="UTF-8">
+<title>角色管理 — Prompt OS Galgame</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 24px;border-bottom:1px solid #21262d;background:#0d1117}
+.topbar h1{font-size:1.15em;color:#58a6ff}
+.back-btn{display:inline-block;padding:5px 14px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.82em}
+.back-btn:hover{background:#1a3a5c;color:#79c0ff}
+.content{max-width:1100px;margin:0 auto;padding:16px 24px}
+.add-bar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;padding:14px;background:#161b22;border:1px solid #21262d;border-radius:8px}
+.add-bar label{font-size:0.78em;color:#8b949e;margin-bottom:2px;display:block}
+.add-bar input{padding:7px 10px;background:#0d1117;border:1px solid #30363d;border-radius:5px;color:#c9d1d9;font-size:0.85em;min-width:100px}
+.add-bar input:focus{outline:none;border-color:#58a6ff}
+.add-bar button{padding:7px 14px;border-radius:5px;font-size:0.82em;cursor:pointer;border:none;font-weight:bold;white-space:nowrap}
+.btn-add{background:#238636;color:#fff}
+.btn-add:hover{background:#2ea043}
+.btn-ai{background:#1a3a5c;color:#58a6ff;border:1px solid #58a6ff!important}
+.btn-ai:hover{background:#1f4a73}
+.btn-ai:disabled{opacity:0.5;cursor:not-allowed}
+.npc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.npc-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px 16px;position:relative}
+.npc-card .tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:0.68em;margin-left:6px;vertical-align:middle}
+.npc-card .tag.main{background:#1a3a5c;color:#58a6ff}
+.npc-card .tag.npc{background:#3d2a1a;color:#ffa657}
+.npc-card .name{font-weight:bold;color:#d2a8ff;font-size:1.05em}
+.npc-card .role{color:#8b949e;font-size:0.82em;margin:4px 0}
+.npc-card .note{color:#c9d1d9;font-size:0.8em;line-height:1.5;margin-top:6px}
+.npc-card .level{color:#ffa657;font-size:0.78em}
+.npc-card .trust{color:#7ee787;font-size:0.78em}
+.npc-card .del-btn{position:absolute;top:8px;right:10px;background:none;border:none;color:#484f58;font-size:1em;cursor:pointer}
+.npc-card .del-btn:hover{color:#f85149}
+</style>
 </head>
 <body>
-    <div class="npc-container">
-        <div class="npc-header">
-            <h1>👥 角色管理</h1>
-            <a href="/" class="back-btn">← 返回游戏</a>
+<div class="topbar">
+    <h1>👥 角色管理</h1>
+    <a href="/" class="back-btn">← 返回游戏</a>
+</div>
+<div class="content">
+    <div class="add-bar">
+        <div>
+            <label>🤖 AI 生成</label>
+            <div style="display:flex;gap:6px">
+                <input id="ai_kw" placeholder="关键词：神秘商人 情报贩子" style="width:220px">
+                <button class="btn-ai" id="ai_btn" onclick="generateNPC()">生成</button>
+            </div>
+            <div id="ai_status" style="font-size:0.72em;color:#8b949e;margin-top:2px;min-height:16px"></div>
         </div>
-        <div class="npc-body">
-            <div class="add-section">
-                <label>✨ AI 生成 NPC（输入关键词或描述）</label>
-                <div class="ai-row">
-                    <input id="ai_kw" placeholder="如：神秘商人 情报贩子 亦正亦邪">
-                    <button class="btn-ai" id="ai_btn" onclick="generateNPC()">🤖 AI 生成</button>
-                </div>
-                <div id="ai_status" style="font-size:0.75em;color:#8b949e;margin-top:4px;min-height:18px;"></div>
-                <label>或手动添加</label>
-                <form method="post" action="/npcs/add">
-                    <input name="name" placeholder="姓名" required>
-                    <input name="role" placeholder="身份" style="margin-top:4px;">
-                    <input name="note" placeholder="性格 / 背景描述" style="margin-top:4px;">
-                    <div class="btn-row">
-                        <button class="btn-add" type="submit">➕ 添加角色</button>
-                    </div>
-                </form>
-            </div>
-            <div class="npc-grid">
-                {{NPC_CARDS}}
-            </div>
+        <div style="border-left:1px solid #21262d;padding-left:12px">
+            <form method="post" action="/npcs/add" style="display:flex;gap:6px;align-items:flex-end">
+                <div><label>姓名</label><input name="name" placeholder="姓名" required style="width:100px"></div>
+                <div><label>身份</label><input name="role" placeholder="身份" style="width:110px"></div>
+                <div><label>描述</label><input name="note" placeholder="性格/背景" style="width:160px"></div>
+                <button class="btn-add" type="submit">+ 添加</button>
+            </form>
         </div>
     </div>
+    <div class="npc-grid">
+        {{NPC_CARDS}}
+    </div>
+</div>
     <script>
         async function generateNPC() {
             const kw = document.getElementById('ai_kw').value.trim();
