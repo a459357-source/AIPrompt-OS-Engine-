@@ -1935,50 +1935,9 @@ async def clear_settings():
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard():
-    """Analytics dashboard with 10 toggleable panels."""
-    import json as _json
-
-    try: state = io_utils.read_yaml(config.SESSION_STATE_PATH)
-    except: state = {}
-    try: graph = io_utils.read_json(config.STORY_GRAPH_PATH)
-    except: graph = {}
-    try: memory = load_memory()
-    except: memory = {}
-    try: world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
-    except: world_pack = {}
-
-    api_logs = []
-    if config.API_USAGE_PATH.exists():
-        for line in config.API_USAGE_PATH.read_text(encoding='utf-8').strip().split(chr(10)):
-            if line.strip():
-                try: api_logs.append(_json.loads(line))
-                except: pass
-
-    history = state.get('history', [])
-    turn = state.get('turn', 0)
-    chars = state.get('characters', {})
-    total_chars = sum(len(h.get('story','')) for h in history)
-    nodes = graph.get('nodes', {})
-    edges = graph.get('edges', [])
-    prompt_t = sum(e.get('prompt_tokens',0) for e in api_logs)
-    comp_t = sum(e.get('completion_tokens',0) for e in api_logs)
-    cost = prompt_t/1e6*0.14 + comp_t/1e6*0.28
-
-    js_data = _json.dumps({
-        'turn': turn, 'status': state.get('status','SETUP'),
-        'char_count': len(chars), 'total_chars': total_chars,
-        'node_count': len(nodes), 'cost': round(cost, 4),
-        'total_tokens': prompt_t + comp_t,
-        'history': history, 'nodes': nodes, 'edges': edges,
-        'memory': memory, 'api_logs': api_logs,
-        'world_title': world_pack.get('world',{}).get('title',''),
-    }, ensure_ascii=False)
-
-    template_path = Path(__file__).parent / 'ui' / 'templates' / 'dashboard.html'
-    html = template_path.read_text(encoding='utf-8')
-    html = html.replace('{{DATA_JSON}}', js_data)
-    html = html.replace('{{WORLD_TITLE}}', world_pack.get('world',{}).get('title',''))
-    return HTMLResponse(html)
+    """Analytics dashboard with toggleable panels — uses unified engine."""
+    from engine.dashboard import build_html
+    return HTMLResponse(build_html())
 
 
 @app.get("/export")

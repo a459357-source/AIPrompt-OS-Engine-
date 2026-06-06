@@ -100,13 +100,16 @@ def step(choice: str | None = None) -> dict | None:
     # 7. Write chapter.md
     _write_chapter(response, new_state, choice)
 
-    # 8. Live export to Obsidian vault
+    # 8. Write dashboard HTML → output/ (always, no Obsidian needed)
+    _write_dashboard_html()
+
+    # 9. Live export to Obsidian vault (optional)
     obsidian_live.on_turn(response, new_state, choice)
 
-    # 9. Log turn
+    # 10. Log turn
     _log_turn(response, choice)
 
-    # 10. Autosave
+    # 11. Autosave
     do_autosave()
 
     logger.info("═══ TURN COMPLETE ═══")
@@ -229,6 +232,7 @@ def run_one_turn() -> bool:
     _update_graph(response, new_state, None)
     _update_memory(response, new_state)
     _write_chapter(response, new_state, None)
+    _write_dashboard_html()
     obsidian_live.on_turn(response, new_state, None)
     _log_turn(response, None)
     do_autosave()
@@ -284,6 +288,15 @@ def run_web(host: str = "0.0.0.0", port: int = 8000, no_browser: bool = False) -
 
 
 # ── Output helpers ─────────────────────────────────────────────────
+
+def _write_dashboard_html() -> None:
+    """Write the analytics dashboard HTML to output/ (no Obsidian needed)."""
+    try:
+        from engine.dashboard import write_standalone
+        write_standalone()
+    except Exception as exc:
+        logger.warning("Failed to write dashboard HTML: %s", exc)
+
 
 def _write_chapter(response: dict, state: dict, choice: str | None) -> None:
     """Write (append) the chapter Markdown file with Obsidian frontmatter."""

@@ -19,7 +19,7 @@ PROMPT_TEMPLATE_PATH = ROOT / "prompt_template.yaml"
 OUTPUT_DIR           = ROOT / "output"
 CHAPTER_PATH         = OUTPUT_DIR / "chapter.md"
 TURN_LOG_PATH        = OUTPUT_DIR / "turn_log.json"
-API_USAGE_PATH        = OUTPUT_DIR / "api_usage.jsonl"
+DASHBOARD_HTML_PATH  = OUTPUT_DIR / "dashboard.html"
 
 DATA_DIR             = ROOT / "data"
 STORY_GRAPH_PATH     = DATA_DIR / "story_graph.json"
