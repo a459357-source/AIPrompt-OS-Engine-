@@ -32,10 +32,9 @@ if %errorlevel% neq 0 (
 echo.
 echo [INFO] Starting server...
 echo        Browser will open automatically
-echo        Press Ctrl+C to stop
+echo        Window closes when server stops
 echo.
 
 cd /d "%~dp0"
 python engine\run.py --mode web
-
-pause
+exit /b %errorlevel%
