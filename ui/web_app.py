@@ -599,9 +599,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if(sessionStorage.getItem('internalNav') === '1') return;
             try { navigator.sendBeacon('/shutdown'); } catch(ex) {}
         });
-        window.addEventListener('beforeunload', function(){
+        window.addEventListener('beforeunload', function(e){
             if(sessionStorage.getItem('internalNav') === '1') return;
             try { navigator.sendBeacon('/shutdown'); } catch(ex) {}
+            e.preventDefault();
+            e.returnValue = '';
         });
     </script>
 </body>
