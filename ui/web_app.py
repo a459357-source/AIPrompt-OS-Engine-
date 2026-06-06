@@ -1135,34 +1135,54 @@ _PRESETS = {
     "scifi": {
         "title": "星痕纪元",
         "world": "公元2247年，人类已进入星际殖民时代。在银河系边缘的「碎星带」，一艘名为「回声号」的调查船发现了一处远古外星遗迹。遗迹中封存着名为「星痕」的神秘能量。",
-        "genre": "科幻 / 冒险 / 情感",
+        "genre": ["科幻", "冒险", "情感"],
         "scene": "回声号 — 舰桥",
-        "char1_name": "林夜", "char1_role": "调查船船长", "char1_note": "冷静、理性，背负过去的秘密",
-        "char2_name": "艾琳", "char2_role": "考古语言学家", "char2_note": "热情、好奇，对星痕有特殊的感知力",
+        "main_goal": "调查星痕遗迹的真相",
+        "characters": [
+            {"name": "林夜", "isMain": true, "role_tags": ["调查船船长", "退役军人"], "personality_tags": ["冷静", "理性", "内敛", "有责任感"], "appearance": "短发，眼神锐利，常穿深色作战服", "relationship": [], "goal": "寻找星痕背后的真相", "secret": "", "background": "曾参与第七远征舰队", "special_ability": "星痕感知"},
+            {"name": "艾琳", "isMain": false, "role_tags": ["考古语言学家"], "personality_tags": ["热情", "好奇", "冲动", "敏锐"], "appearance": "金色长发，碧绿色眼睛", "relationship": ["工作伙伴"], "goal": "破解星痕文字", "secret": "能够听见遗迹中的低语", "background": "", "special_ability": ""}
+        ],
+        "rel_stages": ["陌生", "熟悉", "朋友", "信赖", "暧昧", "恋人"],
+        "rel_affection": 0
     },
     "school": {
         "title": "樱之诗",
         "world": "私立樱丘学园，坐落于沿海小城。春天，樱花如雪般飘落。主人公在开学典礼那天，遇见了改变命运的两个人。",
-        "genre": "校园 / 恋爱 / 日常",
+        "genre": ["校园", "恋爱", "日常"],
         "scene": "樱丘学园 — 校门口樱花道",
-        "char1_name": "小樱", "char1_role": "同班同学 / 美术部员", "char1_note": "开朗活泼，有点天然呆，画画天赋极高",
-        "char2_name": "雪乃", "char2_role": "学生会长", "char2_note": "冰山美人，成绩顶尖，内心藏着柔软的一面",
+        "main_goal": "在樱花飘落的季节，找到属于自己的青春答案",
+        "characters": [
+            {"name": "小樱", "isMain": true, "role_tags": ["转学生"], "personality_tags": ["开朗", "温柔", "天然呆"], "appearance": "粉色长发，常穿校服", "relationship": [], "goal": "融入新学校，交到朋友", "secret": "", "background": "因家庭原因频繁转学", "special_ability": ""},
+            {"name": "雪乃", "isMain": false, "role_tags": ["学生会长"], "personality_tags": ["高冷", "完美主义", "外冷内热"], "appearance": "黑色长发，戴眼镜", "relationship": ["同班同学"], "goal": "维持学生会权威", "secret": "私下喜欢画漫画", "background": "", "special_ability": ""}
+        ],
+        "rel_stages": ["陌生", "认识", "朋友", "知己", "暧昧", "恋人"],
+        "rel_affection": 0
     },
     "fantasy": {
         "title": "剑与星辉",
         "world": "艾泽拉大陆，魔法与剑术并存的世界。千年和平被北方出现的「虚空裂隙」打破。王国的冒险者公会正在招募勇者。",
-        "genre": "奇幻 / 冒险 / 史诗",
+        "genre": ["奇幻", "冒险", "史诗"],
         "scene": "冒险者公会 — 王都大厅",
-        "char1_name": "艾莉西亚", "char1_role": "精灵弓箭手", "char1_note": "来自古老森林的精灵族，沉默寡言但箭术无双",
-        "char2_name": "雷恩", "char2_role": "流浪骑士", "char2_note": "失去记忆的骑士，剑术高超，追寻自己的过去",
+        "main_goal": "封印虚空裂隙，拯救艾泽拉大陆",
+        "characters": [
+            {"name": "雷恩", "isMain": true, "role_tags": ["流浪骑士"], "personality_tags": ["正直", "勇敢", "沉默"], "appearance": "银白短发，蓝色眼睛，身穿旧铠甲", "relationship": [], "goal": "找回失去的记忆", "secret": "", "background": "失去记忆的骑士", "special_ability": "剑术无双"},
+            {"name": "艾莉西亚", "isMain": false, "role_tags": ["精灵弓箭手"], "personality_tags": ["冷静", "高傲", "忠诚"], "appearance": "金色长发，尖耳朵，绿色披风", "relationship": ["同伴", "救命恩人"], "goal": "保护森林族人的安全", "secret": "拥有预知箭术的能力", "background": "", "special_ability": ""}
+        ],
+        "rel_stages": ["陌路", "同行", "战友", "信赖", "羁绊", "灵魂共鸣"],
+        "rel_affection": 0
     },
     "mystery": {
         "title": "第七日",
         "world": "现代都市。一连串离奇的失踪案打破了城市的平静。作为私家侦探的主角，在调查中发现所有线索都指向一家名为「第七日」的神秘咖啡馆。",
-        "genre": "悬疑 / 都市 / 推理",
+        "genre": ["悬疑", "都市", "推理"],
         "scene": "第七日咖啡馆 — 深夜",
-        "char1_name": "苏晓", "char1_role": "私家侦探", "char1_note": "冷静敏锐，观察力极强，有不愿提及的过去",
-        "char2_name": "墨言", "char2_role": "神秘顾客", "char2_note": "总是在同一个位置喝黑咖啡，似乎知道所有答案",
+        "main_goal": "破解失踪案的真相，揭开第七日的秘密",
+        "characters": [
+            {"name": "苏晓", "isMain": true, "role_tags": ["私家侦探"], "personality_tags": ["冷静", "敏锐", "孤僻"], "appearance": "黑色风衣，常戴墨镜", "relationship": [], "goal": "查明真相，找回失踪者", "secret": "", "background": "曾是一名刑警", "special_ability": "过目不忘的观察力"},
+            {"name": "墨言", "isMain": false, "role_tags": ["咖啡馆老板"], "personality_tags": ["神秘", "优雅", "深不可测"], "appearance": "黑发，常穿深色西装", "relationship": ["线人", "对手"], "goal": "守护第七日的秘密", "secret": "知道所有失踪案的真相", "background": "", "special_ability": ""}
+        ],
+        "rel_stages": ["陌生", "试探", "合作", "信任", "依赖", "命运共同体"],
+        "rel_affection": 0
     },
 }
 
@@ -1235,8 +1255,8 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
     <div class="sidebar">
         <div class="card">
             <h3>🤖 一键生成</h3>
-            <input id="kw_input" placeholder="输入关键词：修仙 宗门 重生">
-            <button class="btn primary" onclick="generateWorld()">✨ 一键生成完整世界观</button>
+            <textarea id="kw_input" placeholder="输入关键词或粘贴小说简介、设定描述……&#10;示例：修仙 宗门 重生&#10;也可以直接粘贴一段故事简介" style="width:100%;height:80px;padding:8px 10px;background:#0d1117;border:1px solid #30363d;border-radius:5px;color:#c9d1d9;font-size:0.85em;resize:vertical;font-family:inherit;margin-bottom:6px"></textarea>
+            <button class="btn primary" onclick="generateWorld()">✨ 一键生成完整设定</button>
             <div class="hint" id="kw_status"></div>
         </div>
         <div class="card">
@@ -1253,20 +1273,14 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
     <form class="main-form" method="post" action="/new" onsubmit="prepareSubmit()">
         <input type="hidden" name="chars_json" id="charsJson" value="">
         <input type="hidden" name="custom_rules" id="customRulesInput" value="">
+        <input type="hidden" name="main_goal" id="f_main_goal" value="调查星痕遗迹的真相">
+        <input type="hidden" name="rel_system" id="f_rel_system" value="">
 
         <div class="field-group">
-            <div class="fg-header"><label>📖 故事标题</label><span class="desc">8字以内，吸引人的名称</span></div>
+            <div class="fg-header"><label>📖 故事标题</label><span class="desc">8~20字，吸引人的名称</span></div>
             <div class="fg-row">
                 <input name="title" id="f_title" value="星痕纪元" required placeholder="给你的故事起个名字">
                 <button type="button" class="ai-btn" onclick="genField('title')">✨ 生成</button>
-            </div>
-        </div>
-
-        <div class="field-group">
-            <div class="fg-header"><label>🌍 世界观背景设定</label><span class="desc">150-300字，描述故事发生的世界</span></div>
-            <div class="fg-row">
-                <textarea name="world" id="f_world" required placeholder="公元2247年，人类已进入星际殖民时代…">公元2247年，人类已进入星际殖民时代……</textarea>
-                <button type="button" class="ai-btn" onclick="genField('world')">✨ 生成</button>
             </div>
         </div>
 
@@ -1291,10 +1305,42 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
         </div>
 
         <div class="field-group">
-            <div class="fg-header"><label>📍 初始场景</label><span class="desc">故事开始的第一个地点</span></div>
+            <div class="fg-header"><label>📍 开局地点</label><span class="desc">故事开始的第一个场景</span></div>
             <div class="fg-row">
-                <input name="scene" id="f_scene" value="回声号 — 舰桥" required placeholder="如：回声号 — 舰桥">
+                <input name="scene" id="f_scene" value="回声号 — 舰桥" required placeholder="如：高二三班教室、回声号舰桥、云岚宗外门">
+                <button type="button" class="ai-btn" onclick="genField('scene')">✨ AI生成</button>
             </div>
+        </div>
+
+        <div class="field-group">
+            <div class="fg-header"><label>🎯 故事主线目标</label><span class="desc">为AI提供长期剧情驱动力</span></div>
+            <div class="fg-row">
+                <input id="f_main_goal_input" value="调查星痕遗迹的真相" placeholder="如：调查失踪舰队、找到失踪的妹妹、攻略五位女主、成为最强修仙者" onchange="document.getElementById('f_main_goal').value=this.value">
+                <button type="button" class="ai-btn" onclick="genField('main_goal')">✨ AI生成</button>
+            </div>
+        </div>
+
+        <div class="field-group" style="border-style:dashed;border-color:#30363d;opacity:0.85">
+            <div class="fg-header"><label>🌍 世界观背景</label><span class="desc">可选 · 50~300字 · 校园恋爱/都市日常可跳过</span></div>
+            <div class="fg-row">
+                <textarea name="world" id="f_world" placeholder="公元2247年，人类已进入星际殖民时代…（留空也完全可以）">公元2247年，人类已进入星际殖民时代。在银河系边缘的「碎星带」，一艘名为「回声号」的调查船发现了一处远古外星遗迹。遗迹中封存着名为「星痕」的神秘能量。</textarea>
+                <button type="button" class="ai-btn" onclick="genField('world')">✨ AI生成</button>
+            </div>
+        </div>
+
+        <div class="field-group">
+            <div class="fg-header"><label>❤️ 关系系统</label><span class="desc">设定角色关系阶段和初始好感度</span></div>
+            <div id="relStages" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-height:28px"></div>
+            <div class="fg-row" style="gap:6px;align-items:center;margin-bottom:6px">
+                <input id="relStageInput" placeholder="输入阶段名，回车添加…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addRelStage()}">
+                <span style="font-size:0.78em;color:#8b949e;white-space:nowrap">终点</span>
+            </div>
+            <div class="fg-row" style="align-items:center;gap:10px">
+                <label style="font-size:0.78em;color:#8b949e;white-space:nowrap">初始好感（0~100）：</label>
+                <input type="range" id="affectionSlider" min="0" max="100" value="0" oninput="document.getElementById('affVal').textContent=this.value;updateRelSystem()" style="flex:1;accent-color:#d2a8ff">
+                <span id="affVal" style="font-size:0.85em;color:#d2a8ff;font-weight:bold;min-width:28px;text-align:center">0</span>
+            </div>
+            <button type="button" class="ai-btn" onclick="genField('rel_system')" style="margin-top:6px">✨ AI推荐关系系统</button>
         </div>
 
         <div class="field-group">
@@ -1318,15 +1364,50 @@ const presets = """ + json.dumps(_PRESETS, ensure_ascii=False) + """;
 
 // ── Character management ──
 let characters = [
-    {name:'林夜',role_tags:['调查船船长','退役军人'],appearance:'短发，眼神锐利，常穿深色作战服',personality_tags:['冷静','理性','内敛','有责任感'],relationship:['上级','同伴'],goal:'寻找星痕背后的真相',notes:'',isMain:true},
-    {name:'艾琳',role_tags:['考古语言学家'],appearance:'红发，绿瞳，常戴一副老式眼镜',personality_tags:['热情','好奇','冲动','敏锐'],relationship:['同伴','暗恋对象'],goal:'解读星痕符文，证明自己的理论',notes:'',isMain:false}
+    {name:'林夜',role_tags:['调查船船长','退役军人'],appearance:'短发，眼神锐利，常穿深色作战服',personality_tags:['冷静','理性','内敛','有责任感'],relationship:[],goal:'寻找星痕背后的真相',secret:'',background:'曾参与第七远征舰队',special_ability:'星痕感知',notes:'',isMain:true},
+    {name:'艾琳',role_tags:['考古语言学家'],appearance:'金色长发，碧绿色眼睛',personality_tags:['热情','好奇','冲动','敏锐'],relationship:['工作伙伴'],goal:'破解星痕文字',secret:'能够听见遗迹中的低语',background:'',special_ability:'',notes:'',isMain:false}
 ];
 let charIdCounter = 2;
+
+// ── Relationship system defaults ──
+var relStagesArr = ['陌生','熟悉','朋友','信赖','暧昧','恋人'];
+var relAffection = 0;
 
 // ── Tag presets ──
 var ROLE_PRESETS = ['战士','法师','刺客','治疗师','船长','指挥官','科学家','考古学家','语言学家','工程师','商人','情报贩子','贵族','平民','学生','教师','侦探','记者','黑客','飞行员','赏金猎人','走私者','叛军','特工','流浪者','隐士'];
 var PERSONALITY_PRESETS = ['冷静','热情','理性','冲动','内敛','外向','乐观','悲观','勇敢','谨慎','狡猾','正直','温柔','冷酷','幽默','严肃','忠诚','叛逆','善良','自私','敏感','迟钝','固执','灵活','孤僻','开朗','腹黑','天然呆','傲娇','病娇'];
-var RELATION_PRESETS = ['同伴','朋友','恋人','暗恋对象','青梅竹马','上级','下属','导师','学生','亲人','兄弟','姐妹','父亲','母亲','对手','仇人','陌生人','盟友','敌人','救命恩人','背叛者','守护者','被守护者'];
+var RELATION_PRESETS = ['同伴','朋友','恋人','暗恋对象','青梅竹马','上级','下属','导师','学生','亲人','兄弟','姐妹','父亲','母亲','对手','仇人','陌生人','盟友','敌人','救命恩人','背叛者','守护者','被守护者','房东','师尊','同班同学','工作伙伴','上司'];
+
+// ── Relationship stage management ──
+function renderRelStages(){
+    var div = document.getElementById('relStages');
+    if(!div) return;
+    var h='';
+    for(var i=0; i<relStagesArr.length; i++){
+        h+='<span class="rel-tag" onclick="removeRelStage('+i+')" style="display:inline-block;padding:3px 10px;background:#1a3a5c;border:1px solid #58a6ff;border-radius:12px;color:#58a6ff;font-size:0.75em;cursor:pointer;margin:2px 3px">'+esc(relStagesArr[i])+' ×</span>';
+        if(i < relStagesArr.length-1) h+='<span style="color:#484f58;font-size:0.75em">→</span>';
+    }
+    div.innerHTML = h || '<span style="color:#484f58;font-size:0.75em">点击下方输入框添加阶段</span>';
+    updateRelSystem();
+}
+function addRelStage(){
+    var inp = document.getElementById('relStageInput');
+    var val = inp.value.trim();
+    if(!val) return;
+    relStagesArr.push(val);
+    inp.value = '';
+    renderRelStages();
+}
+function removeRelStage(idx){
+    if(relStagesArr.length <= 2) return;
+    relStagesArr.splice(idx,1);
+    renderRelStages();
+}
+function updateRelSystem(){
+    var aff = parseInt(document.getElementById('affectionSlider').value) || 0;
+    document.getElementById('f_rel_system').value = JSON.stringify({stages:relStagesArr, affection:aff});
+}
+renderRelStages();
 
 function renderCharTags(containerId, tags, presetList, charIdx, fieldName){
     var div = document.getElementById(containerId);
@@ -1397,6 +1478,8 @@ function renderCharacters(){
             '<div id=\"ch_'+i+'_relationship_sug\" style=\"max-height:48px;overflow-y:auto;line-height:1.6\"></div></div>'+
             '<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#8b949e\">当前目标</span>'+
             '<input placeholder=\"角色想要达成的事…\" value=\"'+esc(c.goal||'')+'\" onchange=\"updateChar('+i+',&quot;goal&quot;,this.value)\" style=\"font-size:0.8em;padding:3px 8px;margin-top:2px\"></div>'+
+            (!c.isMain?'<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#d2a8ff\">🔒 隐藏秘密</span>'+
+            '<input placeholder=\"用于制造剧情爆点的秘密…\" value=\"'+esc(c.secret||'')+'\" onchange=\"updateChar('+i+',&quot;secret&quot;,this.value)\" style=\"font-size:0.8em;padding:3px 8px;margin-top:2px;background:#1a121f;border-color:#4a3060;color:#d2a8ff\"></div>':'')+
             '<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#8b949e\">自由设定</span>'+
             '<textarea placeholder=\"任何你想补充的角色细节…\" onchange=\"updateChar('+i+',&quot;notes&quot;,this.value)\" style=\"width:100%;font-size:0.8em;padding:3px 8px;margin-top:2px;resize:vertical;min-height:36px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-family:inherit\">'+esc(c.notes||'')+'</textarea></div>'+
             '<button type=\"button\" class=\"ch-ai-btn\" onclick=\"genCharacter('+i+')\">✨ 生成此角色</button>'+
@@ -1411,7 +1494,7 @@ function renderCharacters(){
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function updateChar(i,field,val){characters[i][field]=val;}
 function addCharacter(){
-    characters.push({name:'',role_tags:[],appearance:'',personality_tags:[],relationship:[],goal:'',notes:'',isMain:false});
+    characters.push({name:'',role_tags:[],appearance:'',personality_tags:[],relationship:[],goal:'',secret:'',background:'',special_ability:'',notes:'',isMain:false});
     renderCharacters();
 }
 function removeChar(i){
@@ -1423,6 +1506,8 @@ function removeChar(i){
 function prepareSubmit(){
     document.getElementById('charsJson').value=JSON.stringify(characters);
     document.getElementById('f_genre').value=selectedGenres.join(' / ');
+    document.getElementById('f_main_goal').value=document.getElementById('f_main_goal_input').value;
+    updateRelSystem();
 }
 renderCharacters();
 
@@ -1474,19 +1559,42 @@ function loadPreset(key,btn){
     btn.classList.add('active');
     if(key==='custom'){
         document.getElementById('f_title').value='';document.getElementById('f_world').value='';
-        document.getElementById('f_scene').value='';characters=[{name:'',role:'',note:'',isMain:true}];renderCharacters();return;
+        document.getElementById('f_scene').value='';document.getElementById('f_main_goal_input').value='';
+        document.getElementById('f_main_goal').value='';
+        characters=[{name:'',role_tags:[],appearance:'',personality_tags:[],relationship:[],goal:'',secret:'',background:'',special_ability:'',notes:'',isMain:true}];
+        relStagesArr=['陌生','熟悉','朋友','信赖','暧昧','恋人'];
+        document.getElementById('affectionSlider').value=0;document.getElementById('affVal').textContent='0';
+        renderCharacters();renderRelStages();return;
     }
     var p=presets[key];
-    document.getElementById('f_title').value=p.title;document.getElementById('f_world').value=p.world;
+    document.getElementById('f_title').value=p.title;document.getElementById('f_world').value=p.world||'';
     document.getElementById('f_scene').value=p.scene;
-    // Parse genre into tags
-    selectedGenres=p.genre.split('/').map(function(s){return s.trim();}).filter(Boolean);
+    if(p.main_goal){ document.getElementById('f_main_goal_input').value=p.main_goal; document.getElementById('f_main_goal').value=p.main_goal; }
+    // Parse genre
+    if(Array.isArray(p.genre)){selectedGenres=p.genre.slice();}
+    else{selectedGenres=(p.genre||'').split('/').map(function(s){return s.trim();}).filter(Boolean);}
     renderGenreTags();
-    characters=[
-        {name:p.char1_name,role_tags:p.char1_role?[p.char1_role]:[],appearance:'',personality_tags:[],relationship:[],goal:'',notes:p.char1_note||'',isMain:true},
-        {name:p.char2_name,role_tags:p.char2_role?[p.char2_role]:[],appearance:'',personality_tags:[],relationship:[],goal:'',notes:p.char2_note||'',isMain:false}
-    ];
+    if(p.characters && p.characters.length>0){
+        characters=p.characters.map(function(c){
+            return {
+                name:c.name||'',isMain:!!c.isMain,
+                role_tags:Array.isArray(c.role_tags)?c.role_tags.slice():(c.role_tags?[c.role_tags]:[]),
+                personality_tags:Array.isArray(c.personality_tags)?c.personality_tags.slice():[],
+                appearance:c.appearance||'',relationship:Array.isArray(c.relationship)?c.relationship.slice():[],
+                goal:c.goal||'',secret:c.secret||'',background:c.background||'',
+                special_ability:c.special_ability||'',notes:c.note||''
+            };
+        });
+    } else {
+        characters=[
+            {name:p.char1_name||'主角',role_tags:p.char1_role?[p.char1_role]:[],personality_tags:[],appearance:'',relationship:[],goal:'',secret:'',background:'',special_ability:'',notes:p.char1_note||'',isMain:true},
+            {name:p.char2_name||'',role_tags:p.char2_role?[p.char2_role]:[],personality_tags:[],appearance:'',relationship:[],goal:'',secret:'',background:'',special_ability:'',notes:p.char2_note||'',isMain:false}
+        ];
+    }
     renderCharacters();
+    if(p.rel_stages){ relStagesArr=p.rel_stages.slice(); renderRelStages(); }
+    if(p.rel_affection!=null){ document.getElementById('affectionSlider').value=p.rel_affection; document.getElementById('affVal').textContent=p.rel_affection; }
+    updateRelSystem();
 }
 
 // ── AI field generation ──
@@ -1505,6 +1613,22 @@ async function genField(field){
             var story=data.story||data.title||data.name||'';
             if(field==='title')document.getElementById('f_title').value=story.replace(/["']/g,'').trim().slice(0,20);
             if(field==='world')document.getElementById('f_world').value=story.trim();
+            if(field==='main_goal'){
+                var goal=story||data.main_goal||'';
+                document.getElementById('f_main_goal_input').value=goal.trim();
+                document.getElementById('f_main_goal').value=goal.trim();
+            }
+            if(field==='scene')document.getElementById('f_scene').value=story.trim();
+            if(field==='genre' && data.genre){
+                if(Array.isArray(data.genre)){selectedGenres=data.genre;}
+                else{selectedGenres=data.genre.split('/').map(function(s){return s.trim();}).filter(Boolean);}
+                renderGenreTags();
+            }
+            if(field==='rel_system'){
+                if(data.rel_stages){ relStagesArr=data.rel_stages; renderRelStages(); }
+                if(data.rel_affection!=null){ document.getElementById('affectionSlider').value=data.rel_affection; document.getElementById('affVal').textContent=data.rel_affection; }
+                updateRelSystem();
+            }
         }
     }catch(e){alert('生成失败: '+e.message);}
     btn.disabled=false;btn.textContent=orig;
@@ -1528,6 +1652,9 @@ async function genCharacter(i){
             else if(data.personality){ characters[i].personality_tags=[data.personality]; }
             if(data.relationship){ characters[i].relationship=Array.isArray(data.relationship)?data.relationship:[data.relationship]; }
             if(data.goal) characters[i].goal=data.goal;
+            if(data.secret) characters[i].secret=data.secret;
+            if(data.background) characters[i].background=data.background;
+            if(data.special_ability) characters[i].special_ability=data.special_ability;
             if(data.notes) characters[i].notes=data.notes;
             renderCharacters();
         }
@@ -1550,13 +1677,31 @@ async function generateWorld(){
         else{
             document.getElementById('f_title').value=data.title||'';
             document.getElementById('f_world').value=data.world||'';
-            document.getElementById('f_genre').value=data.genre||'科幻 / 冒险 / 情感';
+            if(data.genre){
+                if(Array.isArray(data.genre)){selectedGenres=data.genre;}
+                else{selectedGenres=data.genre.split('/').map(function(s){return s.trim();}).filter(Boolean);}
+                renderGenreTags();
+            }
             document.getElementById('f_scene').value=data.scene||'';
-            characters=[
-                {name:data.char1_name||'主角',role_tags:data.char1_role?[data.char1_role]:[],appearance:'',personality_tags:[],relationship:[],goal:'',notes:data.char1_note||'',isMain:true},
-                {name:data.char2_name||'',role_tags:data.char2_role?[data.char2_role]:[],appearance:'',personality_tags:[],relationship:[],goal:'',notes:data.char2_note||'',isMain:false}
-            ];
+            if(data.main_goal){
+                document.getElementById('f_main_goal_input').value=data.main_goal;
+                document.getElementById('f_main_goal').value=data.main_goal;
+            }
+            if(data.characters && data.characters.length>0){
+                characters=data.characters.map(function(c){
+                    return {
+                        name:c.name||'',isMain:!!c.isMain,
+                        role_tags:Array.isArray(c.role_tags)?c.role_tags:(c.role?[c.role]:[]),
+                        personality_tags:Array.isArray(c.personality_tags)?c.personality_tags:(c.personality?[c.personality]:[]),
+                        appearance:c.appearance||'',relationship:Array.isArray(c.relationship)?c.relationship:[],
+                        goal:c.goal||'',secret:c.secret||'',background:c.background||'',
+                        special_ability:c.special_ability||'',notes:c.note||c.notes||''
+                    };
+                });
+            }
             renderCharacters();
+            if(data.rel_stages){ relStagesArr=data.rel_stages.slice(); renderRelStages(); }
+            if(data.rel_affection!=null){ document.getElementById('affectionSlider').value=data.rel_affection; document.getElementById('affVal').textContent=data.rel_affection; updateRelSystem(); }
             document.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('active');});
             status.textContent='✅ 已生成，可继续修改';
             status.style.color='#7ee787';
@@ -1584,6 +1729,7 @@ async function generateRules(){
             var stats=(data.stats||[]).map(function(s){return s.label;}).join(' · ');
             var stages=(data.stages||[]).join(' → ');
             preview.innerHTML='<span style="color:#7ee787;">✅ 已生成</span><br>追踪维度: <b style="color:#ffa657;">'+stats+'</b><br>关系阶段: <b style="color:#d2a8ff;">'+stages+'</b>';
+            if(data.stages && data.stages.length>0){ relStagesArr=data.stages.slice(); renderRelStages(); updateRelSystem(); }
         }
     }catch(e){preview.textContent='❌ '+e.message;preview.style.color='#f85149';}
     btn.disabled=false;
@@ -1602,11 +1748,13 @@ async def new_story_page():
 @app.post("/new", response_class=HTMLResponse)
 async def create_new_story(
     title: str = Form(...),
-    world: str = Form(...),
+    world: str = Form(""),
     genre: str = Form(""),
     scene: str = Form(...),
     chars_json: str = Form(""),
     custom_rules: str = Form(""),
+    main_goal: str = Form(""),
+    rel_system: str = Form(""),
 ):
     """Process the new story form and initialize all state."""
     import yaml
@@ -1619,13 +1767,24 @@ async def create_new_story(
         except Exception:
             pass
     if not chars:
-        chars = [{"name": "主角", "role": "", "note": "", "isMain": True}]
+        chars = [{"name": "主角", "role_tags": [], "appearance": "", "personality_tags": [], "relationship": [], "goal": "", "secret": "", "background": "", "special_ability": "", "isMain": True}]
 
     # Parse custom rules if provided
     custom = {}
     if custom_rules.strip():
         try:
             custom = json.loads(custom_rules.strip())
+        except Exception:
+            pass
+
+    # Parse main goal
+    main_goal_text = main_goal.strip() if main_goal else ""
+
+    # Parse relationship system
+    rel_config = {"stages": ["陌生", "熟悉", "朋友", "信赖", "暧昧", "恋人"], "affection": 0}
+    if rel_system.strip():
+        try:
+            rel_config = json.loads(rel_system.strip())
         except Exception:
             pass
 
@@ -1636,54 +1795,93 @@ async def create_new_story(
             "genre": genre,
             "era": "故事开端",
             "setting": world,
+            "main_goal": main_goal_text,
             "factions": [],
             "locations": [
                 {"name": scene, "desc": "初始场景"},
             ],
             "tone": "聚焦人物情感与选择",
             "themes": [],
+            "characters": [],
+            "relationship_system": rel_config,
         }
     }
     if custom:
         world_pack["custom"] = custom
+
+    # Build rich character data for world_pack
+    for ch in chars:
+        char_data = {
+            "name": ch.get("name", ""),
+            "is_main": ch.get("isMain", False),
+            "role_tags": ch.get("role_tags", []),
+            "personality_tags": ch.get("personality_tags", []),
+            "appearance": ch.get("appearance", ""),
+            "relationship": ch.get("relationship", []),
+            "goal": ch.get("goal", ""),
+            "secret": ch.get("secret", ""),
+            "background": ch.get("background", ""),
+            "special_ability": ch.get("special_ability", ""),
+        }
+        if isinstance(char_data["role_tags"], str): char_data["role_tags"] = [char_data["role_tags"]]
+        if isinstance(char_data["personality_tags"], str): char_data["personality_tags"] = [char_data["personality_tags"]]
+        if isinstance(char_data["relationship"], str): char_data["relationship"] = [char_data["relationship"]]
+        world_pack["world"]["characters"].append(char_data)
     io_utils.write_yaml(config.WORLD_PACK_PATH, world_pack)
 
     # Build initial state with dynamic characters
     state_chars = {}
     mem_chars = {}
+    init_stage = rel_config.get("stages", ["陌生"])[0] if rel_config.get("stages") else "陌生"
+    init_affection = rel_config.get("affection", 0)
     letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     for i, ch in enumerate(chars):
         if i >= len(letters):
             break
         key = letters[i]
         name = ch.get("name", f"角色{i+1}")
-        role_tags = ch.get("role_tags", ch.get("role_tags", []))
+        is_main = ch.get("isMain", False)
+        role_tags = ch.get("role_tags", [])
         if isinstance(role_tags, str): role_tags = [role_tags]
         role_str = " / ".join(role_tags) if role_tags else (ch.get("role", ""))
         personality_tags = ch.get("personality_tags", [])
         if isinstance(personality_tags, str): personality_tags = [personality_tags]
         relationship = ch.get("relationship", [])
         if isinstance(relationship, str): relationship = [relationship]
+        appearance = ch.get("appearance", "")
+        goal = ch.get("goal", "")
+        secret = ch.get("secret", "")
+        background = ch.get("background", "")
+        special_ability = ch.get("special_ability", "")
+
         note_parts = []
-        if ch.get("appearance"): note_parts.append(f"外貌：{ch['appearance']}")
+        if appearance: note_parts.append(f"外貌：{appearance}")
         if personality_tags: note_parts.append(f"性格：{' / '.join(personality_tags)}")
-        if relationship: note_parts.append(f"关系：{' / '.join(relationship)}")
-        if ch.get("goal"): note_parts.append(f"目标：{ch['goal']}")
-        if ch.get("notes"): note_parts.append(ch['notes'])
-        note = ch.get("note", "") or "\n".join(note_parts)
+        if relationship and not is_main: note_parts.append(f"关系：{' / '.join(relationship)}")
+        if goal: note_parts.append(f"目标：{goal}")
+        if secret: note_parts.append(f"秘密：{secret}")
+        if background and is_main: note_parts.append(f"背景：{background}")
+        if special_ability and is_main: note_parts.append(f"能力：{special_ability}")
+        note_parts.append(ch.get("notes", ""))
+        note = "\n".join(p for p in note_parts if p)
         if not note: note = ""
+
         state_chars[key] = {
             "name": name,
             "role": role_str,
             "level": "L0",
-            "relation": "初识",
+            "relation": init_stage,
             "note": note,
         }
+        initial_trust = init_affection / 100.0 if init_affection > 0 else 0.5
+        rel_desc = (role_str + "，" if role_str else "") + init_stage
         mem_chars[name] = {
-            "trust": 0.5,
+            "trust": initial_trust,
             "flags": [],
-            "relationship": role_str + "，初识" if role_str else "初识",
+            "relationship": rel_desc,
         }
+        if secret:
+            mem_chars[name].setdefault("flags", []).append(f"隐藏秘密：{secret}")
 
     initial_state = {
         "scene": scene,
@@ -1722,6 +1920,7 @@ async def create_new_story(
         "characters": mem_chars,
         "world_flags": [],
         "global_trust": 0.5,
+        "relationship_system": rel_config,
     }
     io_utils.write_json(config.MEMORY_PATH, initial_memory)
 
@@ -1749,27 +1948,38 @@ async def generate_world(keywords: str = Form("")):
     if not kw:
         return JSONResponse({"error": "请输入关键词"}, status_code=400)
 
-    system = "你是一个 Galgame 世界观生成器。根据用户提供的关键词，生成完整的中文 Galgame 世界观设定。只输出合法 JSON，不要输出其他内容。"
-    user = f"""关键词：{kw}
+    system = "你是一个 Galgame 世界观生成器。根据用户提供的描述或关键词，生成完整的中文 Galgame 世界观设定。只输出合法 JSON，不要输出其他内容。"
+    user = f"""输入内容：{kw}
 
-请根据这些关键词，生成一个完整的 Galgame 世界观设定。输出必须是合法的 JSON：
+请根据以上内容，生成一个完整的 Galgame 世界观设定。输出必须是合法的 JSON：
 
 {{
-  "title": "故事标题（8字以内）",
-  "world": "世界观/背景描述（150-300字，吸引人的叙事风格）",
-  "genre": "类型标签（如：修仙/悬疑/恋爱/奇幻，用 / 分隔）",
+  "title": "故事标题（8~20字）",
+  "world": "世界观/背景描述（50-300字）",
+  "genre": ["标签1", "标签2"],
   "scene": "初始场景/地点名称",
-  "char1_name": "主角姓名",
-  "char1_role": "主角身份",
-  "char1_note": "主角性格描述（15-30字）",
-  "char2_name": "第二角色姓名",
-  "char2_role": "第二角色身份",
-  "char2_note": "第二角色性格描述（15-30字）"
+  "main_goal": "故事主线目标（一句话）",
+  "characters": [
+    {{
+      "name": "角色姓名",
+      "isMain": true,
+      "role_tags": ["身份标签"],
+      "personality_tags": ["性格标签1", "性格标签2", "性格标签3"],
+      "appearance": "外貌特征（10~30字）",
+      "relationship": ["与主角关系"],
+      "goal": "角色目标",
+      "secret": "隐藏秘密",
+      "background": "背景经历（主角）",
+      "special_ability": "特殊能力（主角）"
+    }}
+  ],
+  "rel_stages": ["陌生", "熟悉", "朋友", "信赖", "暧昧", "恋人"],
+  "rel_affection": 0
 }}
 
 要求：
-1. 世界观要有创意和吸引力，能在150-300字内建立独特的设定
-2. 两个角色之间要有潜在的戏剧冲突或情感张力
+1. 角色要有个性，包含外貌、性格标签、目标、隐藏秘密
+2. 主角和至少1个NPC之间要有潜在的戏剧冲突或情感张力
 3. 初始场景要具体、有画面感
 4. 所有文字用中文
 5. 只输出JSON，不要输出markdown代码块或其他文字"""
@@ -1796,12 +2006,24 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
     system = "你是一个中文 Galgame 创作助手。只输出要求的内容，不要输出解释、引号或 JSON 包装。"
 
     if field == "title":
-        user = f"根据以下世界观，生成一个吸引人的故事标题（8字以内）：\n{world or context}\n\n标题："
+        user = f"根据以下世界观，生成一个吸引人的故事标题（8~20字）：\n{world or context}\n\n标题："
     elif field == "world":
         ctx = f"标题：{title}，风格：{genre}" if title else context
-        user = f"为以下 Galgame 生成世界观背景描述（150-300字，沉浸式叙事风格）：\n{ctx}\n\n世界观："
+        user = f"为以下 Galgame 生成世界观背景描述（50-300字，沉浸式叙事风格）：\n{ctx}\n\n世界观："
+    elif field == "main_goal":
+        ctx = f"标题：{title}，世界观：{world[:200] if world else context[:200]}"
+        user = f"为以下 Galgame 生成一个清晰的故事主线目标（一句话）：\n{ctx}\n\n主线目标："
+    elif field == "scene":
+        ctx = f"标题：{title}，世界观：{world[:200] if world else context[:200]}"
+        user = f"为以下 Galgame 生成一个具体的开局场景名称：\n{ctx}\n\n场景："
+    elif field == "genre":
+        ctx = f"标题：{title}，世界观：{world[:200] if world else context[:200]}"
+        user = f"为以下 Galgame 推荐3-5个风格标签（校园、恋爱、后宫、日常、轻小说、科幻、奇幻、修仙、末日、悬疑、推理、克苏鲁、冒险、战争、搞笑、黑暗、治愈、百合、女性向）：\n{ctx}\n\n输出JSON数组：[\"标签1\", \"标签2\"]"
     elif field == "character":
-        user = f"为以下故事生成一个新角色，用 JSON 格式输出：\n故事标题：{title}\n世界观：{world[:200] if world else context[:200]}\n角色定位：{char_role or '重要NPC'}\n\n输出格式：{{\"name\":\"角色名\",\"role\":\"身份\",\"note\":\"性格描述\"}}"
+        user = f"为以下故事生成一个完整的角色，用 JSON 格式输出：\n故事标题：{title}\n世界观：{world[:300] if world else context[:300]}\n角色定位：{char_role or '重要NPC'}\n\n输出格式：{{\"name\":\"角色名\",\"isMain\":false,\"role_tags\":[\"身份\"],\"personality_tags\":[\"性格1\",\"性格2\",\"性格3\"],\"appearance\":\"外貌特征（10~30字）\",\"relationship\":[\"与主角关系\"],\"goal\":\"角色目标\",\"secret\":\"隐藏秘密\"}}\n\n要求：角色要有个性、有目标、有秘密，避免平淡。只输出JSON。"
+    elif field == "rel_system":
+        ctx = f"标题：{title}，世界观：{world[:200] if world else context[:200]}"
+        user = f"为以下 Galgame 推荐关系阶段系统（5-7个递进阶段）：\n{ctx}\n\n输出JSON：{{\"rel_stages\":[\"阶段1\",\"阶段2\",...],\"rel_affection\":0}}"
     else:
         return JR({"error": f"未知字段类型: {field}"}, status_code=400)
 
@@ -1810,16 +2032,39 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
         # For character field, try to parse JSON from response
         if field == "character":
             story = result.get("story", "")
-            # Extract JSON if wrapped in code blocks or text
             import re as _re
-            m = _re.search(r'\{[^}]+\}', story)
+            m = _re.search(r'\{[^{}]*\{[^{}]*\}[^{}]*\}', story)
+            if not m:
+                m = _re.search(r'\{[^}]+\}', story)
             if m:
                 import json as _json
                 try:
                     return JR(_json.loads(m.group()))
                 except Exception:
                     pass
-            return JR({"name": story.strip()[:20], "role": char_role, "note": story.strip()[:80]})
+            return JR({"name": story.strip()[:20], "role_tags": [char_role] if char_role else [], "isMain": False})
+        if field == "genre":
+            story = result.get("story", "")
+            import re as _re2
+            m = _re2.search(r'\[[^\]]+\]', story)
+            if m:
+                import json as _json2
+                try:
+                    return JR({"genre": _json2.loads(m.group())})
+                except Exception:
+                    pass
+            return JR({"genre": [story.strip()[:10]]})
+        if field == "rel_system":
+            story = result.get("story", "")
+            import re as _re3
+            m = _re3.search(r'\{[^}]+\}', story)
+            if m:
+                import json as _json3
+                try:
+                    return JR(_json3.loads(m.group()))
+                except Exception:
+                    pass
+            return JR({"rel_stages": ["陌生", "熟悉", "朋友", "信赖", "暧昧", "恋人"], "rel_affection": 0})
         return JR(result)
     except DeepSeekError as exc:
         return JR({"error": f"AI 生成失败: {exc}"}, status_code=500)

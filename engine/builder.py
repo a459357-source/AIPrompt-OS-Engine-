@@ -67,6 +67,57 @@ def build_prompt() -> tuple[str, str]:
             stage_chain = " → ".join(stages)
             custom_rules_text += f"【关系阶段】角色关系阶段为：{stage_chain}。重要事件推进阶段变化。\n"
 
+    # ── Main goal ──────────────────────────────────────────────
+    world_data = world_pack.get("world", {})
+    main_goal = world_data.get("main_goal", "")
+    if not main_goal:
+        main_goal = "推进剧情发展，探索角色关系"
+
+    # ── Characters context ─────────────────────────────────────
+    characters_list = world_data.get("characters", [])
+    characters_context = ""
+    if characters_list:
+        lines = ["【角色信息】"]
+        for ch in characters_list:
+            name = ch.get("name", "?")
+            is_main = "⭐主角" if ch.get("is_main") else "👤NPC"
+            role_tags = ch.get("role_tags", [])
+            role_str = " / ".join(role_tags) if role_tags else ""
+            personality_tags = ch.get("personality_tags", [])
+            pers_str = "、".join(personality_tags) if personality_tags else ""
+            appearance = ch.get("appearance", "")
+            relationship = ch.get("relationship", [])
+            rel_str = "、".join(relationship) if relationship else ""
+            goal = ch.get("goal", "")
+            secret = ch.get("secret", "")
+            background = ch.get("background", "")
+            special_ability = ch.get("special_ability", "")
+            parts = [f"{name}（{is_main}）"]
+            if role_str: parts.append(f"身份：{role_str}")
+            if appearance: parts.append(f"外貌：{appearance}")
+            if pers_str: parts.append(f"性格：{pers_str}")
+            if rel_str: parts.append(f"关系：{rel_str}")
+            if goal: parts.append(f"目标：{goal}")
+            if secret: parts.append(f"🔒秘密：{secret}")
+            if background: parts.append(f"背景：{background}")
+            if special_ability: parts.append(f"能力：{special_ability}")
+            lines.append("  " + " | ".join(parts))
+        characters_context = "\n".join(lines)
+
+    # ── Relationship system ────────────────────────────────────
+    rel_system = world_data.get("relationship_system", {})
+    relationship_context = ""
+    if rel_system:
+        stages = rel_system.get("stages", [])
+        affection = rel_system.get("affection", 0)
+        if stages:
+            stage_chain = " → ".join(stages)
+            relationship_context = f"【关系系统】阶段递进：{stage_chain}。初始好感度：{affection}/100。角色关系应随剧情自然推进。"
+        else:
+            relationship_context = "【关系系统】使用默认7阶段好感度系统（陌生→认识→熟悉→朋友→暧昧→恋人→灵魂伴侣）。"
+    if not relationship_context:
+        relationship_context = "【关系系统】使用默认好感度系统。"
+
     # ── Interpolate system prompt ──────────────────────────────
     system_raw = template.get("system", "")
     system_prompt = (
@@ -74,6 +125,7 @@ def build_prompt() -> tuple[str, str]:
         .replace("{{FORCE_EVENT_NOTICE}}", force_notice)
         .replace("{{STORY_LENGTH}}", str(config.STORY_LENGTH))
         .replace("{{CUSTOM_RULES}}", custom_rules_text)
+        .replace("{{MAIN_GOAL}}", main_goal)
     )
 
     # ── Memory context ─────────────────────────────────────────
@@ -96,6 +148,8 @@ def build_prompt() -> tuple[str, str]:
         .replace("{{ENGINE_RULES}}", json.dumps(engine_config, ensure_ascii=False, indent=2))
         .replace("{{FORCE_EVENT_PROMPT}}", force_prompt)
         .replace("{{LAST_CHOICE}}", last_choice_text)
+        .replace("{{CHARACTERS_CONTEXT}}", characters_context)
+        .replace("{{RELATIONSHIP_SYSTEM}}", relationship_context)
         .replace("{{MEMORY_CONTEXT}}", memory_context)
     )
 

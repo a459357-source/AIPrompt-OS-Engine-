@@ -2,7 +2,7 @@
 # Prompt OS Engine Lite v1 — Prompt Template
 # ─────────────────────────────────────────────────────────────────
 # Template variables are interpolated by builder.py each turn.
-# Variables: {{WORLD}}, {{STATE_JSON}}, {{LAST_CHOICE}}, {{MEMORY_CONTEXT}}, {{FORCE_EVENT}}
+# Variables: {{WORLD}}, {{STATE_JSON}}, {{LAST_CHOICE}}, {{MEMORY_CONTEXT}}, {{FORCE_EVENT}}, {{MAIN_GOAL}}, {{CHARACTERS_CONTEXT}}, {{RELATIONSHIP_SYSTEM}}
 # ─────────────────────────────────────────────────────────────────
 
 system: |
@@ -40,9 +40,16 @@ system: |
   18. 负面关系阶段：疏远 → 冷漠 → 对立 → 敌视 → 崩坏，由冲突/背叛事件触发。
   19. 关键事件（如拯救、牺牲、告白）应标记为 FLAG 事件。
 
+  【主线目标】
+  20. 故事的长期目标是：{{MAIN_GOAL}}。每轮剧情都应有意识地朝此目标推进。
+
+  【角色驱动力】
+  21. 每个角色都有各自的目标和隐藏秘密（见下方角色信息）。叙事应体现角色的个性差异和目标冲突。
+  22. 角色的隐藏秘密是剧情爆点的来源，应在合适的时机自然揭示。
+
   【防重复规则】
-  20. 不可重复已发生过的相同情节。
-  21. 不可将角色倒退回已通过的剧情阶段。
+  23. 不可重复已发生过的相同情节。
+  24. 不可将角色倒退回已通过的剧情阶段。
 
   {{CUSTOM_RULES}}
 
@@ -56,6 +63,10 @@ user: |
   {{STATE_JSON}}
 
   {{LAST_CHOICE}}
+
+  {{CHARACTERS_CONTEXT}}
+
+  {{RELATIONSHIP_SYSTEM}}
 
   {{MEMORY_CONTEXT}}
 

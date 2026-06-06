@@ -107,10 +107,23 @@ def get_context_for_prompt(memory: dict) -> str:
             trust = data.get("trust", 0.5)
             rel = data.get("relationship", "")
             flags = data.get("flags", [])
+            metric_history = data.get("metric_history", {})
             trust_label = _trust_label(trust)
-            lines.append(f"  {name}: 信任度 {trust:.0%}（{trust_label}）, 关系: {rel or '无'}")
+            line = f"  {name}: 信任度 {trust:.0%}（{trust_label}）, 关系: {rel or '无'}"
+            # Include other tracked metrics
+            for metric_key, hist in metric_history.items():
+                if metric_key != "trust" and hist:
+                    line += f", {metric_key}: {hist[-1][1]:.0%}"
+            lines.append(line)
             if flags:
                 lines.append(f"    已触发事件: {', '.join(flags)}")
+
+    # Include relationship system info if present
+    rel_system = memory.get("relationship_system", {})
+    if rel_system:
+        stages = rel_system.get("stages", [])
+        if stages:
+            lines.append(f"【关系阶段系统】{' → '.join(stages)}")
 
     world_flags = memory.get("world_flags", [])
     if world_flags:
