@@ -203,6 +203,14 @@ export default function Game() {
               </div>
             </div>
 
+            {/* Generating indicator */}
+            {choosing && (
+              <div className="flex items-center justify-center gap-2 py-3 bg-game-accent/10 border border-game-accent/30 rounded-lg text-sm text-game-accent animate-pulse">
+                <span className="inline-block w-3.5 h-3.5 border-2 border-game-accent/30 border-t-game-accent rounded-full animate-spin" />
+                AI 正在生成下一段剧情…
+              </div>
+            )}
+
             {/* Story */}
             <Card>
               <CardContent className="pt-6 md:px-8">
@@ -300,12 +308,6 @@ export default function Game() {
               )}
             </AnimatePresence>
 
-            {choosing && (
-              <div className="text-center text-game-muted text-sm py-4">
-                <span className="inline-block w-3 h-3 border-2 border-game-accent/30 border-t-game-accent rounded-full animate-spin mr-2" />
-                AI 正在生成下一段剧情…
-              </div>
-            )}
           </div>
 
           {/* Character side panel — inline, pushes content */}
