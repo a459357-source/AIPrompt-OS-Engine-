@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
+import { logger } from '@/lib/logger'
 import {
   loadSettings,
   saveSettings,
@@ -170,7 +171,12 @@ export default function Settings() {
       .catch(() => {})
   }, [])
 
+  const [apiSaving, setApiSaving] = useState(false)
+  const [apiSaved, setApiSaved] = useState(false)
+
   const saveApiKey = useCallback(async () => {
+    setApiSaving(true)
+    setApiSaved(false)
     const fd = new FormData()
     if (apiKey) fd.append('api_key', apiKey)
     fd.append('model', model)
@@ -182,9 +188,15 @@ export default function Settings() {
     fd.append('max_context_messages', String(maxContextMsgs))
     fd.append('auto_compress', autoCompress ? '1' : '0')
     fd.append('compress_threshold', String(compressThreshold))
-    await fetch('/settings', { method: 'POST', body: fd })
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    try {
+      await fetch('/settings', { method: 'POST', body: fd })
+      setApiSaved(true)
+      setSaved(true)
+      setTimeout(() => { setSaved(false); setApiSaved(false) }, 2500)
+    } catch (e) {
+      logger.error('Settings', 'Save API failed', { error: String(e) })
+    }
+    setApiSaving(false)
   }, [apiKey, model, storyLength, maxTokens, temperature, topP, stream, maxContextMsgs, autoCompress, compressThreshold])
 
   return (
@@ -554,8 +566,8 @@ export default function Settings() {
                     <span className="text-xs text-game-dim">500–32000</span>
                   </div>
                 </div>
-                <Button variant="success" className="w-full" onClick={saveApiKey}>
-                  💾 保存 API 设置
+                <Button variant={apiSaved ? 'success' : 'success'} className="w-full" onClick={saveApiKey} disabled={apiSaving}>
+                  {apiSaving ? '⏳ 保存中…' : apiSaved ? '✅ 已保存' : '💾 保存 API 设置'}
                 </Button>
               </CardContent>
             </AccordionContent>
