@@ -55,7 +55,7 @@ def call_deepseek(
         "temperature": temperature if temperature is not None else config.TEMPERATURE,
         "max_tokens": max_tokens if max_tokens is not None else config.MAX_TOKENS,
         "top_p": config.TOP_P,
-        "stream": config.STREAM,
+        "stream": False,  # JSON mode is incompatible with streaming
         "response_format": {"type": "json_object"},  # force JSON output
     }
 

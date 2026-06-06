@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -78,6 +78,7 @@ export default function NewStory() {
   const [aiStatusType, setAiStatusType] = useState<'info' | 'success' | 'error' | 'loading'>('info')
   const [generating, setGenerating] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({})
+  const kwRef = useRef<HTMLTextAreaElement>(null)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -128,7 +129,7 @@ export default function NewStory() {
     setGenerating('world')
     showStatus('正在生成世界观、角色和规则…', 'loading')
     try {
-      const kw = (document.getElementById('kw-input') as HTMLTextAreaElement)?.value || '奇幻冒险'
+      const kw = kwRef.current?.value?.trim() || '奇幻冒险'
       const data = await generateWorld(kw)
       if (data.title) setValue('title', data.title)
       if (data.world) setValue('world', data.world)
@@ -155,7 +156,8 @@ export default function NewStory() {
       showStatus('✅ 生成完成，可继续修改', 'success')
       setFieldErrors((prev) => ({ ...prev, world: null }))
     } catch (e) {
-      const msg = (e as Error).message
+      const msg = (e as Error).message || String(e)
+      console.error('[handleWorldGen]', e)
       showStatus(`❌ ${msg}`, 'error')
       setFieldErrors((prev) => ({ ...prev, world: msg }))
     }
@@ -235,7 +237,8 @@ export default function NewStory() {
       if (data.stages?.length) setValue('rel_stages', data.stages)
       showStatus('✅ 专属规则生成完成', 'success')
     } catch (e) {
-      const msg = (e as Error).message
+      const msg = (e as Error).message || String(e)
+      console.error('[handleRulesGen]', e)
       showStatus(`❌ ${msg}`, 'error')
       setFieldErrors((prev) => ({ ...prev, rules: msg }))
     }
@@ -280,6 +283,7 @@ export default function NewStory() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Textarea
+                  ref={kwRef}
                   id="kw-input"
                   placeholder="粘贴小说简介 / 世界观描述 / 关键词均可&#10;&#10;示例①：修仙 宗门 重生&#10;示例②：被退婚的废柴少年捡到神秘戒指…"
                   className="h-28 resize-y text-xs"
