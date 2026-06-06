@@ -558,25 +558,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             setInterval(checkConn, 30000);
         }
 
-        // ── Internal nav tracking (suppress warning for in-app clicks) ──
+        // ── Internal nav tracking (suppress shutdown for in-app clicks) ──
         document.addEventListener('click', function(e){
             var a = e.target.closest('a');
             if(a && a.href && a.origin === location.origin && !a.target){
-                window._internalNav = true;
-                setTimeout(function(){ window._internalNav = false; }, 100);
+                sessionStorage.setItem('internalNav', '1');
             }
         });
-        // Also track form submissions and toolbar buttons
-        document.addEventListener('submit', function(){ window._internalNav = true; setTimeout(function(){ window._internalNav = false; }, 100); });
+        document.addEventListener('submit', function(){ sessionStorage.setItem('internalNav', '1'); });
+        // Clear flag on fresh load
+        if(sessionStorage.getItem('internalNav') === '1'){
+            sessionStorage.removeItem('internalNav');
+        }
 
-        // ── Warn before closing / refreshing (skip for in-app navigation) ──
-        window.addEventListener('beforeunload', function(e){
-            if(window._internalNav) return;
-            // Try to shut down server when leaving
+        // ── Auto-shutdown server when tab closes ──
+        window.addEventListener('pagehide', function(){
+            if(sessionStorage.getItem('internalNav') === '1') return;
             try { navigator.sendBeacon('/shutdown'); } catch(ex) {}
-            e.preventDefault();
-            e.returnValue = '确定离开？请使用页面底部红色 ⏻ 按钮正常关闭服务器。';
-            return e.returnValue;
+        });
+        window.addEventListener('beforeunload', function(){
+            if(sessionStorage.getItem('internalNav') === '1') return;
+            try { navigator.sendBeacon('/shutdown'); } catch(ex) {}
         });
     </script>
 </body>
