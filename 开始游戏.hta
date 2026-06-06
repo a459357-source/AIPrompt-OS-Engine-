@@ -27,9 +27,6 @@ h1{font-size:1.4em;color:#58a6ff;margin-bottom:4px}
 .btn.stop{background:#3d1a1a;border-color:#da3633;color:#f85149}
 .btn.stop:hover{background:#4d2020}
 .status{color:#8b949e;font-size:0.85em;margin-top:16px;min-height:22px}
-.spinner{display:none;width:22px;height:22px;border:2px solid #21262d;border-top-color:#58a6ff;border-radius:50%;animation:spin 0.7s linear infinite;margin:12px auto 0}
-@keyframes spin{to{transform:rotate(360deg)}}
-.footer{position:fixed;bottom:16px;color:#484f58;font-size:0.7em}
 </style>
 </head>
 <body onbeforeunload="if(document.getElementById('btnStop').style.display!=='none'){try{KillServer()}catch(e){}}">
@@ -37,36 +34,18 @@ h1{font-size:1.4em;color:#58a6ff;margin-bottom:4px}
 <div class="sub">AI Interactive Narrative Engine</div>
 <button class="btn" id="btnStart" onclick="startGame()">🚀 启动游戏服务器</button>
 <button class="btn stop" id="btnStop" onclick="stopGame()" style="display:none">⏻ 关闭服务器</button>
-<div class="spinner" id="spinner"></div>
 <div class="status" id="status">点击上方按钮启动</div>
-<div class="footer" id="footer"></div>
 
 <script language="VBScript">
 Dim objShell, strDir
 
 Sub Window_OnLoad()
-    ' Resize to compact launcher
-    window.resizeTo 380, 320
-    window.moveTo (screen.availWidth - 380) / 2, (screen.availHeight - 320) / 2
-
+    window.resizeTo 380, 280
+    window.moveTo (screen.availWidth - 380) / 2, (screen.availHeight - 280) / 2
     Set objShell = CreateObject("WScript.Shell")
     Set objFSO = CreateObject("Scripting.FileSystemObject")
     strDir = objFSO.GetParentFolderName(objFSO.GetAbsolutePathName("."))
     objShell.CurrentDirectory = strDir
-    ' Check if already running
-    Dim xhr : Set xhr = CreateObject("MSXML2.XMLHTTP")
-    On Error Resume Next
-    xhr.Open "GET", "http://127.0.0.1:8000/health", False
-    xhr.Send
-    If Err.Number = 0 And xhr.Status = 200 Then
-        document.getElementById("status").innerText = "服务器已在运行，正在打开浏览器..."
-        document.getElementById("status").style.color = "#7ee787"
-        document.getElementById("btnStart").style.display = "none"
-        document.getElementById("btnStop").style.display = "inline-block"
-        document.getElementById("footer").innerText = "浏览器已打开游戏"
-        objShell.Run "http://127.0.0.1:8000"
-    End If
-    On Error Goto 0
 End Sub
 
 Sub LaunchServer()
@@ -79,13 +58,11 @@ Sub LaunchServer()
     End If
     On Error Goto 0
 
-    ' Only install deps if fastapi is missing
     Dim missing : missing = False
     On Error Resume Next
     objShell.Run "cmd /c python -c ""import fastapi"" > nul 2>&1", 0, True
     If Err.Number <> 0 Then missing = True
     On Error Goto 0
-
     If missing Then
         document.getElementById("status").innerText = "首次运行，正在安装依赖..."
         objShell.Run "cmd /c pip install -r requirements.txt --quiet > nul 2>&1", 0, True
@@ -100,63 +77,30 @@ End Sub
 </script>
 
 <script>
-var pollTimer = null, attempts = 0, gameWindow = null;
-
 function startGame(){
     document.getElementById('btnStart').style.display = 'none';
-    document.getElementById('spinner').style.display = 'block';
     document.getElementById('status').innerText = '正在启动服务器...';
     document.getElementById('status').style.color = '#8b949e';
-    document.getElementById('footer').innerText = '';
-    try { LaunchServer(); } catch(e){}
-    attempts = 0;
-    pollTimer = setInterval(checkReady, 1500);
-}
 
-function checkReady(){
-    attempts++;
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', 'http://127.0.0.1:8000/health', true);
-    xhr.timeout = 2000;
-    xhr.onload = function(){
-        if(xhr.status === 200){
-            clearInterval(pollTimer);
-            document.getElementById('status').innerText = '就绪，正在打开浏览器...';
-            document.getElementById('status').style.color = '#7ee787';
-            document.getElementById('spinner').style.display = 'none';
-            document.getElementById('btnStop').style.display = 'inline-block';
-            document.getElementById('footer').innerText = '浏览器已打开游戏';
-            // Open in default browser (not IE/HTA window)
-            try {
-                var shell = new ActiveXObject('WScript.Shell');
-                shell.Run('http://127.0.0.1:8000');
-            } catch(e){ window.open('http://127.0.0.1:8000'); }
-        }
-    };
-    xhr.onerror = xhr.ontimeout = function(){
-        if(attempts >= 40){
-            clearInterval(pollTimer);
-            document.getElementById('status').innerText = '超时 — 请运行 启动.bat 查看错误日志';
-            document.getElementById('status').style.color = '#f85149';
-            document.getElementById('spinner').style.display = 'none';
-            document.getElementById('btnStart').style.display = 'inline-block';
-            document.getElementById('footer').innerText = '关闭此窗口不会停止服务器';
-        } else {
-            document.getElementById('status').innerText = '等待服务器就绪... (' + attempts + '/40)';
-        }
-    };
-    try { xhr.send(); } catch(e){ clearInterval(pollTimer); }
+    try { LaunchServer(); } catch(e){}
+
+    // Wait a few seconds then open browser
+    setTimeout(function(){
+        var shell = new ActiveXObject('WScript.Shell');
+        shell.Run('http://127.0.0.1:8000');
+        document.getElementById('status').innerText = '游戏已在浏览器中打开';
+        document.getElementById('status').style.color = '#7ee787';
+        document.getElementById('btnStop').style.display = 'inline-block';
+    }, 4000);
 }
 
 function stopGame(){
-    if(confirm('确定要关闭服务器？浏览器中的游戏页面将无法访问。')){
+    if(confirm('确定要关闭服务器？')){
         try { KillServer(); } catch(e){}
-        gameWindow = null;
         document.getElementById('status').innerText = '服务器已关闭 — 可重新启动';
         document.getElementById('status').style.color = '#8b949e';
         document.getElementById('btnStart').style.display = 'inline-block';
         document.getElementById('btnStop').style.display = 'none';
-        document.getElementById('footer').innerText = '';
     }
 }
 </script>
