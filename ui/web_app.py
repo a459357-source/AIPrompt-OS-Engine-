@@ -72,6 +72,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             transition: width 0.2s; overflow: hidden; z-index: 10;
         }
         .nav-col:hover, .nav-col.open { width: 170px; }
+        .nav-toggle {
+            display: flex; align-items: center; justify-content: center;
+            width: 100%; padding: 6px 0; margin-bottom: 6px;
+            background: transparent; border: 1px solid #30363d;
+            border-radius: 6px; color: #8b949e;
+            font-size: 0.85em; cursor: pointer;
+            transition: all 0.15s; flex-shrink: 0;
+        }
+        .nav-toggle:hover { border-color: #58a6ff; color: #58a6ff; }
+        .nav-col:not(.open) .nav-toggle span.arr { display: inline-block; transform: rotate(0deg); transition: transform 0.2s; }
+        .nav-col.open .nav-toggle span.arr { display: inline-block; transform: rotate(180deg); }
         .nav-item {
             display: flex; align-items: center; gap: 10px;
             padding: 8px 10px; border-radius: 6px;
@@ -337,7 +348,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
     <div class="container">
-        <div class="nav-col" id="navCol" onclick="this.classList.toggle('open')">
+        <div class="nav-col" id="navCol">
+            <button class="nav-toggle" onclick="event.stopPropagation();document.getElementById('navCol').classList.toggle('open')" title="锁定/解锁侧栏"><span class="arr">▶</span></button>
             <a class="nav-item" href="/new"><span class="ni-icon">🆕</span><span class="ni-text">新故事</span></a>
             <a class="nav-item" href="/npcs"><span class="ni-icon">👥</span><span class="ni-text">角色</span></a>
             <a class="nav-item" href="/history"><span class="ni-icon">📜</span><span class="ni-text">历史</span></a>
