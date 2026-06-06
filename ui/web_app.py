@@ -201,7 +201,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border-radius: 6px;
             padding: 6px 14px;
             margin: 0 auto 10px;
-            max-width: 900px; width: 100%;
+            max-width: 100%; width: 100%;
             font-size: 0.82em; flex-wrap: wrap;
         }
         body.wide-layout .state-panel,
@@ -254,7 +254,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border-radius: 8px;
             padding: 20px 28px;
             margin: 0 auto 10px;
-            max-width: 900px; width: 100%;
+            max-width: 100%; width: 100%;
             line-height: 1.9;
             font-size: 1.05em;
             white-space: pre-wrap;
@@ -264,7 +264,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             flex-direction: column;
             gap: 8px;
             margin: 0 auto 10px;
-            max-width: 900px; width: 100%;
+            max-width: 100%; width: 100%;
         }
         .option-btn {
             display: block;
@@ -315,7 +315,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .custom-choice {
             display: flex; gap: 6px; align-items: center; flex-shrink: 0;
             margin: 0 auto 8px;
-            max-width: 900px; width: 100%;
+            max-width: 100%; width: 100%;
         }
         .custom-choice .cc-label {
             color: #8b949e; font-size: 0.82em; white-space: nowrap;
@@ -337,7 +337,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .toolbar {
             display: flex; gap: 12px; flex-wrap: wrap; flex-shrink: 0;
             margin: 0 auto 4px;
-            max-width: 900px; width: 100%; justify-content: center;
+            max-width: 100%; width: 100%; justify-content: center;
         }
         .tb-group {
             display: flex; align-items: center; gap: 4px;
