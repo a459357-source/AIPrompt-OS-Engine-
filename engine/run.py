@@ -48,6 +48,11 @@ from engine.memory import (
     assign_character_tier, degrade_inactive_characters,
     build_character_tier_context, promote_to_core, remove_core_status,
 )
+from engine.events import (
+    init_events, check_event_triggers, seed_default_events,
+    get_event_context,
+)
+from engine.world_driver import passive_faction_drift
 from engine.save_manager import autosave as do_autosave
 from engine import obsidian_live
 
@@ -421,6 +426,15 @@ def _update_memory(response: dict, state: dict, choice: str | None = None) -> No
         # ── Initialize factions from world pack (first time) ──────
         init_factions(memory)
         init_faction_attitudes(memory)
+        init_events(memory)
+        # Seed default events from faction goals (first time only)
+        if not memory.get("world_events"):
+            seed_default_events(memory, world_pack)
+
+        # ── Check event triggers ───────────────────────────────
+        triggered = check_event_triggers(memory, turn)
+        for evt in triggered:
+            logger.info("Event triggered: %s (turn %d)", evt.get("title"), turn)
 
         # Load world_pack for tier assignment
         world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
@@ -582,6 +596,9 @@ def _update_memory(response: dict, state: dict, choice: str | None = None) -> No
                         elif neg and not pos:
                             update_faction_attitude(memory, fa, fb, -0.05, turn)
                             update_faction_attitude(memory, fb, fa, -0.04, turn)
+
+        # ── Passive faction drift ──────────────────────────────
+        passive_faction_drift(memory, turn)
 
         save_memory(memory)
     except Exception as exc:
