@@ -1357,34 +1357,44 @@ function prepareSubmit(){
 renderCharacters();
 
 // ── Genre tag management ──
-var selectedGenres=['科幻','冒险','情感'];
+var selectedGenres = ['科幻','冒险','情感'];
 function renderGenreTags(){
-    var html='';
-    selectedGenres.forEach(function(g){
-        html+='<span onclick="removeGenre(\''+g.replace(/'/g,'\\\'')+'\')" style="display:inline-block;padding:4px 12px;background:#1a3a5c;border:1px solid #58a6ff;border-radius:14px;color:#58a6ff;font-size:0.78em;cursor:pointer;transition:all 0.12s;user-select:none" title="点击移除">'+g+' ×</span>';
-    });
-    document.getElementById('genreTags').innerHTML=html||'<span style="color:#484f58;font-size:0.78em">从下拉菜单挑选，或输入自定义风格</span>';
-    document.getElementById('f_genre').value=selectedGenres.join(' / ');
+    var container = document.getElementById('genreTags');
+    container.innerHTML = '';
+    for(var i=0; i<selectedGenres.length; i++){
+        var g = selectedGenres[i];
+        var tag = document.createElement('span');
+        tag.textContent = g + ' \u00d7';
+        tag.title = '\u70b9\u51fb\u79fb\u9664';
+        tag.style.cssText = 'display:inline-block;padding:2px 10px;background:#1a3a5c;border:1px solid #58a6ff;border-radius:12px;color:#58a6ff;font-size:0.78em;cursor:pointer;margin:2px 4px 2px 0;user-select:none';
+        tag.onclick = (function(genre){ return function(){ removeGenre(genre); }; })(g);
+        container.appendChild(tag);
+    }
+    if(selectedGenres.length === 0){
+        container.innerHTML = '<span style="color:#484f58;font-size:0.78em">\u4ece\u4e0b\u62c9\u83dc\u5355\u6311\u9009\uff0c\u6216\u8f93\u5165\u81ea\u5b9a\u4e49\u98ce\u683c</span>';
+    }
+    document.getElementById('f_genre').value = selectedGenres.join(' / ');
 }
 function pickGenre(g){
-    if(!g)return;
-    if(selectedGenres.indexOf(g)<0){
+    if(!g) return;
+    if(selectedGenres.indexOf(g) < 0){
         selectedGenres.push(g);
         renderGenreTags();
     }
 }
 function addCustomGenre(){
-    var val=document.getElementById('genreInput').value.trim();
-    if(!val)return;
-    if(selectedGenres.indexOf(val)<0){
+    var inp = document.getElementById('genreInput');
+    var val = inp.value.trim();
+    if(!val) return;
+    if(selectedGenres.indexOf(val) < 0){
         selectedGenres.push(val);
         renderGenreTags();
     }
-    document.getElementById('genreInput').value='';
+    inp.value = '';
 }
 function removeGenre(g){
-    var idx=selectedGenres.indexOf(g);
-    if(idx>=0){selectedGenres.splice(idx,1);renderGenreTags();}
+    var idx = selectedGenres.indexOf(g);
+    if(idx >= 0){ selectedGenres.splice(idx,1); renderGenreTags(); }
 }
 renderGenreTags();
 
