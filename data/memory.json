@@ -1,0 +1,52 @@
+{
+  "characters": {},
+  "factions": {
+    "星联（Stellar Union）": {
+      "reputation": 0.55,
+      "flags": [],
+      "role": "人类政府，追求秩序与控制",
+      "metric_history": {
+        "reputation": [
+          [
+            1,
+            0.6
+          ],
+          [
+            2,
+            0.65
+          ],
+          [
+            3,
+            0.55
+          ]
+        ]
+      }
+    },
+    "自由航行者（Free Navigators）": {
+      "reputation": 0.45,
+      "flags": [],
+      "role": "独立探险者联盟，反对星联垄断",
+      "metric_history": {
+        "reputation": [
+          [
+            1,
+            0.45
+          ]
+        ]
+      }
+    },
+    "守护者（Guardians）": {
+      "reputation": 0.65,
+      "flags": [],
+      "role": "远古AI实体，保护遗迹",
+      "metric_history": {
+        "reputation": [
+          [
+            2,
+            0.65
+          ]
+        ]
+      }
+    }
+  }
+}

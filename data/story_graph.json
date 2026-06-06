@@ -1,0 +1,26 @@
+{
+  "nodes": {
+    "0": {
+      "turn": 1,
+      "text": "星联舰队出现。",
+      "scene": "舰桥",
+      "status": "SETUP",
+      "choices": {
+        "A": null,
+        "B": null,
+        "auto": "0"
+      },
+      "parent": "0",
+      "choice_taken": "auto"
+    }
+  },
+  "edges": [
+    {
+      "from": "0",
+      "to": "0",
+      "choice": "auto",
+      "turn": 1
+    }
+  ],
+  "current_node": "0"
+}

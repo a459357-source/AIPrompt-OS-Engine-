@@ -1,0 +1,54 @@
+# ─────────────────────────────────────────────────────────────────
+# Prompt OS Engine Lite v1 — Engine Rules
+# ─────────────────────────────────────────────────────────────────
+# Defines the engine behavior: state machine, interaction rules,
+# force-event thresholds, and output constraints.
+# ─────────────────────────────────────────────────────────────────
+
+engine:
+  name: "Prompt OS Engine Lite v1"
+  version: "1.0.0"
+
+  state_machine:
+    states:
+      - SETUP
+      - BUILD
+      - TENSION
+      - CLIMAX
+      - COOLDOWN
+    transition_rule: "SETUP→BUILD→TENSION→CLIMAX→COOLDOWN"
+    min_turns_before_advance: 2
+    max_turns_same_status: 2
+    climax_must_cool_down: true
+
+  interaction:
+    levels:
+      L0: "对话 — 言语交流，信息交换"
+      L1: "轻微接触 — 眼神/手势/短暂触碰"
+      L2: "身体接触 — 握手/扶持/并肩"
+      L3: "强互动 — 拥抱/冲突/协作危机"
+      L4: "关键事件 — 重大转折/情感爆发/牺牲"
+    rule: "每轮必须维持或提升互动等级"
+    stagnation_limit: 2          # turns before FORCE_EVENT
+
+  force_event:
+    triggers:
+      - "同场景 ≥ 3 轮"
+      - "同状态 ≥ 2 轮"
+      - "互动停滞 ≥ 2 轮"
+    effect: "强制推进剧情 / 改变场景 / 插入新事件"
+
+  output:
+    format: "json"
+    fields:
+      - story:  "本轮的叙事文本 (Markdown)"
+      - state:  "更新后的完整 state 对象"
+      - options: "4 个玩家可选的后续行动"
+    target_files:
+      - "output/chapter.md"
+      - "session_state.yaml"
+
+  narrative:
+    language: "中文"
+    style: "小说体，注重心理描写与环境氛围"
+    max_chapter_chars: 1500
