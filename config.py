@@ -165,7 +165,7 @@ def reload_story_length() -> int:
 
 
 # ── Max tokens (AI response length) ─────────────────────────────────
-DEFAULT_MAX_TOKENS = 2048
+DEFAULT_MAX_TOKENS = 4096
 
 
 def _load_max_tokens() -> int:
@@ -174,7 +174,7 @@ def _load_max_tokens() -> int:
         try:
             data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
             val = data.get("max_tokens", DEFAULT_MAX_TOKENS)
-            return max(512, min(8192, int(val)))
+            return max(512, min(16384, int(val)))
         except Exception:
             pass
     return DEFAULT_MAX_TOKENS
