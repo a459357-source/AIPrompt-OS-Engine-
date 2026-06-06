@@ -40,7 +40,7 @@ if %errorlevel% neq 0 (
 echo.
 echo [INFO] 服务器启动中...
 echo        浏览器将自动打开
-echo        按 Ctrl+C 停止
+echo        关闭方式：页面底部红色 ⏻ 按钮 或 Ctrl+C
 echo.
 echo 提示：下次可直接双击 "启动.vbs" 静默启动（无命令行窗口）
 echo       运行 "安装桌面快捷方式.vbs" 可在桌面创建快捷方式

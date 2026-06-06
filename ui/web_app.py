@@ -49,6 +49,13 @@ async def health():
     return {"status": "ok"}
 
 
+@app.post("/shutdown")
+async def shutdown():
+    """Gracefully shut down the server."""
+    import os
+    os._exit(0)
+
+
 # ── HTML template (inline) ────────────────────────────────────────
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -406,6 +413,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <button class="tb-slot" onclick="loadGame('slot2')" title="读档 2">2</button>
                 <button class="tb-slot" onclick="loadGame('slot3')" title="读档 3">3</button>
             </span>
+            <button class="tb-slot" onclick="if(confirm('确定要关闭服务器？')){fetch('/shutdown',{method:'POST'});setTimeout(function(){document.body.innerHTML='<div style=color:#8b949e;text-align:center;padding-top:40vh;font-size:1.2em>服务器已关闭，可以安全关闭此页面。</div>'},500)}" title="关闭游戏服务器" style="width:auto;padding:0 10px;color:#f85149;border-color:#da3633;">⏻</button>
         </div>
 
 

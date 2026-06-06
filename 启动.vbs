@@ -1,6 +1,6 @@
 ' Prompt OS Galgame Runtime — 一键启动（无黑窗）
 ' 双击此文件 → 自动启动服务器 → 自动打开浏览器
-' 需要停止时：关闭浏览器，在任务栏右键 Python 图标退出
+' 需要停止时：点击游戏页面底部红色 ⏻ 按钮关闭服务器
 
 Set objShell = CreateObject("WScript.Shell")
 Set objFSO = CreateObject("Scripting.FileSystemObject")
