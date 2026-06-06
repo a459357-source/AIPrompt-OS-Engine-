@@ -303,25 +303,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
         .custom-choice button:hover { background: #212b3d; border-color: #ffa657; }
         .toolbar {
-            display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
+            display: flex; gap: 12px; flex-wrap: wrap; flex-shrink: 0;
             margin-bottom: 4px; justify-content: center;
         }
-        .toolbar-btn {
-            padding: 7px 16px;
+        .tb-group {
+            display: flex; align-items: center; gap: 4px;
+            background: #161b22; border: 1px solid #21262d;
+            border-radius: 8px; padding: 4px 8px;
+        }
+        .tb-label { font-size: 0.9em; opacity: 0.7; }
+        .tb-slot {
+            width: 26px; height: 26px; padding: 0;
             background: #1c2333; border: 1px solid #30363d;
-            border-radius: 6px; color: #8b949e;
-            font-size: 0.82em; cursor: pointer;
-            transition: all 0.15s; text-decoration: none;
+            border-radius: 4px; color: #8b949e;
+            font-size: 0.75em; cursor: pointer;
+            transition: all 0.12s; line-height: 24px; text-align: center;
         }
-        .toolbar-btn:hover {
-            background: #212b3d; border-color: #58a6ff; color: #58a6ff;
-        }
-        .toolbar-btn.save { color: #7ee787; }
-        .toolbar-btn.save:hover { border-color: #7ee787; }
-        .toolbar-btn.load { color: #d2a8ff; }
-        .toolbar-btn.load:hover { border-color: #d2a8ff; }
-        .toolbar-btn.graph-link { color: #ffa657; }
-        .toolbar-btn.graph-link:hover { border-color: #ffa657; }
+        .tb-group:first-child .tb-slot { color: #7ee787; }
+        .tb-group:first-child .tb-slot:hover { border-color: #7ee787; color: #7ee787; background: #1a2e1a; }
+        .tb-group:last-child .tb-slot { color: #d2a8ff; }
+        .tb-group:last-child .tb-slot:hover { border-color: #d2a8ff; color: #d2a8ff; background: #1f1a2e; }
         .toast {
             position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
             background: #1c2333; border: 1px solid #58a6ff;
@@ -380,13 +381,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
 
             <div class="toolbar">
-            <button class="toolbar-btn save" onclick="saveGame('slot1')" title="保存到存档槽 1">💾 存档 1</button>
-            <button class="toolbar-btn save" onclick="saveGame('slot2')" title="保存到存档槽 2">💾 存档 2</button>
-            <button class="toolbar-btn save" onclick="saveGame('slot3')" title="保存到存档槽 3">💾 存档 3</button>
-            <button class="toolbar-btn load" onclick="loadGame('slot1')" title="读取存档槽 1">📂 读档 1</button>
-            <button class="toolbar-btn load" onclick="loadGame('slot2')" title="读取存档槽 2">📂 读档 2</button>
-            <button class="toolbar-btn load" onclick="loadGame('slot3')" title="读取存档槽 3">📂 读档 3</button>
-            <a class="toolbar-btn graph-link" href="/graph" target="_blank">🌳 分支图</a>
+            <span class="tb-group">
+                <span class="tb-label">💾</span>
+                <button class="tb-slot" onclick="saveGame('slot1')" title="存档 1">1</button>
+                <button class="tb-slot" onclick="saveGame('slot2')" title="存档 2">2</button>
+                <button class="tb-slot" onclick="saveGame('slot3')" title="存档 3">3</button>
+            </span>
+            <span class="tb-group">
+                <span class="tb-label">📂</span>
+                <button class="tb-slot" onclick="loadGame('slot1')" title="读档 1">1</button>
+                <button class="tb-slot" onclick="loadGame('slot2')" title="读档 2">2</button>
+                <button class="tb-slot" onclick="loadGame('slot3')" title="读档 3">3</button>
+            </span>
         </div>
 
 
