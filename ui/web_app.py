@@ -22,6 +22,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 from fastapi import FastAPI, Query, Request, Form
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from engine.run import step
 from engine import io_utils
 from engine import save_manager
@@ -35,6 +36,15 @@ app = FastAPI(
     title="Prompt OS Galgame Runtime",
     description="🎮 Interactive AI Narrative Engine — Web UI",
     version="1.0.0",
+)
+
+# Allow CORS for React dev server
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Serve local JS libraries for offline dashboard / graph pages

@@ -18,21 +18,41 @@
       "status": "SETUP",
       "choices": {
         "A": null,
-        "B": null,
+        "B": "2",
         "C": null,
         "D": null
       },
       "parent": "0",
       "choice_taken": "auto"
+    },
+    "2": {
+      "turn": 2,
+      "text": "## 第二章：深夜密谋\n\n雨势渐弱，深夜的京都笼罩在薄雾中。西园寺家老宅的书房里，皋月合上那本账册，指尖还残留着纸张的触感。五十万美元——这笔资金在普通人眼中是巨款，但对于她心中的宏大计划而言，不过是启动的燃料。她需要更多，需要更快。\n\n她",
+      "scene": "京都西园寺家老宅，庭院及仓库",
+      "status": "BUILD",
+      "choices": {
+        "A": null,
+        "B": null,
+        "C": null,
+        "D": null
+      },
+      "parent": "1",
+      "choice_taken": "B"
     }
   },
-  "current_node": "1",
+  "current_node": "2",
   "edges": [
     {
       "from": "0",
       "to": "1",
       "choice": "auto",
       "turn": 1
+    },
+    {
+      "from": "1",
+      "to": "2",
+      "choice": "B",
+      "turn": 2
     }
   ]
 }

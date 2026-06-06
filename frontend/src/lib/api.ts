@@ -6,7 +6,7 @@ import type {
   CustomRules,
 } from './types'
 
-const BASE = '/api'
+const BASE = ''
 
 async function post<T>(url: string, body: Record<string, string>): Promise<T> {
   const params = new URLSearchParams(body)
