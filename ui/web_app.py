@@ -2035,8 +2035,27 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
         if field == "character":
             # The result might already be the character object (skip_validation mode)
             # or wrapped in a {"story": "..."} envelope
-            if "name" in result and "role_tags" in result:
-                return JR(result)
+            if "name" in result:
+                # Normalize: AI might return singular strings instead of lists
+                if "role_tags" not in result and "role" in result:
+                    result["role_tags"] = [result.pop("role")] if isinstance(result.get("role"), str) else result.pop("role")
+                if "personality_tags" not in result and "personality" in result:
+                    p = result.pop("personality")
+                    result["personality_tags"] = [p] if isinstance(p, str) else p
+                if "relationship" in result and isinstance(result["relationship"], str):
+                    result["relationship"] = [result["relationship"]]
+                # Ensure list fields are lists
+                for f in ["role_tags", "personality_tags", "relationship"]:
+                    if f in result and not isinstance(result[f], list):
+                        result[f] = [result[f]] if result[f] else []
+                if "name" in result and ("role_tags" in result or "role" not in result):
+                    result.setdefault("role_tags", [])
+                    result.setdefault("personality_tags", [])
+                    result.setdefault("appearance", "")
+                    result.setdefault("relationship", [])
+                    result.setdefault("goal", "")
+                    result.setdefault("secret", "")
+                    return JR(result)
             story = result.get("story", "") or result.get("name", "") or ""
             import re as _re
             m = _re.search(r'\{[^{}]*\{[^{}]*\}[^{}]*\}', story)
