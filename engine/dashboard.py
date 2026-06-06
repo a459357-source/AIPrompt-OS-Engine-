@@ -333,7 +333,10 @@ a{{color:#58a6ff;text-decoration:none}}
 </style></head>
 <body>
 <div class="header">
+<div style="display:flex;align-items:center;justify-content:space-between">
 <h1>🌳 {world_title} — 剧情仪表盘</h1>
+<a href="/" style="display:inline-block;padding:5px 14px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.82em">← 返回游戏</a>
+</div>
 <div class="stats">
 <div class="stat"><div class="val">{turn}</div><div class="lbl">轮次</div></div>
 <div class="stat"><div class="val">{status}</div><div class="lbl">状态</div></div>
