@@ -108,7 +108,11 @@ function checkReady(){
             document.getElementById('spinner').style.display = 'none';
             document.getElementById('btnStop').style.display = 'inline-block';
             document.getElementById('footer').innerText = '游戏浏览器已打开 | 点上方按钮关闭服务器';
-            gameWindow = window.open('http://127.0.0.1:8000', 'galgame');
+            // Open in default browser (not IE/HTA window)
+            try {
+                var shell = new ActiveXObject('WScript.Shell');
+                shell.Run('http://127.0.0.1:8000');
+            } catch(e){ window.open('http://127.0.0.1:8000'); }
         }
     };
     xhr.onerror = xhr.ontimeout = function(){
@@ -129,9 +133,6 @@ function checkReady(){
 function stopGame(){
     if(confirm('确定要关闭服务器？浏览器中的游戏页面将无法访问。')){
         try { KillServer(); } catch(e){}
-        if(gameWindow && !gameWindow.closed){
-            try { gameWindow.close(); } catch(e){}
-        }
         gameWindow = null;
         document.getElementById('status').innerText = '服务器已关闭 — 可重新启动';
         document.getElementById('status').style.color = '#8b949e';
