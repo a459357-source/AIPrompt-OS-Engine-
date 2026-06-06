@@ -696,7 +696,7 @@ async def next_turn(choice: str = Query(..., min_length=1, max_length=1)):
         char_stats=char_stats,
         title=title,
         subtitle=subtitle,
-        chapter=state.get("chapter", 1),
+        chapter=updated_state.get("chapter", 1),
     )
 
 
@@ -991,25 +991,9 @@ async def reset():
     }
     io_utils.write_json(config.MEMORY_PATH, initial_memory)
 
-    # Build initial world_pack for custom rules  
-    initial_wp = {"world": {"title": "", "genre": ""}}
-    if "custom" in initial_state:
-        initial_wp["custom"] = initial_state.get("custom", {})
-    char_stats = get_char_stats_for_ui(initial_state, initial_memory, initial_wp)
-    title, subtitle = _get_world_title()
-
-    return _render_template(
-        story="存档已重置。点击下方选项开始新的故事。",
-        options=["前往遗迹核心调查异常波动", "先和星联总部通信报告情况", "询问艾琳她对星痕的感知细节", "检查舰船系统，确保安全"],
-        turn=0,
-        status="SETUP",
-        scene="回声号 — 舰桥",
-        characters=initial_state.get("characters"),
-        force_event=False,
-        char_stats=char_stats,
-        title=title,
-        subtitle=subtitle,
-    )
+    # Redirect to index so it picks up the fresh state properly
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/", status_code=303)
 
 
 # ── New Story creator ──────────────────────────────────────────────
