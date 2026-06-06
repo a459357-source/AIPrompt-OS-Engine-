@@ -37,6 +37,8 @@ export default function Game() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [choosing, setChoosing] = useState(false)
+  const [customInput, setCustomInput] = useState('')
+  const [showCustomInput, setShowCustomInput] = useState(false)
 
   const loadGame = useCallback(async () => {
     setLoading(true)
@@ -232,6 +234,59 @@ export default function Game() {
                     <span className="text-sm">{choice}</span>
                   </Button>
                 ))}
+
+                {/* Custom input toggle */}
+                {!showCustomInput ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={choosing}
+                    onClick={() => setShowCustomInput(true)}
+                    className="w-full text-game-dim hover:text-game-text border border-dashed border-game-border"
+                  >
+                    ✏️ 自定义输入…
+                  </Button>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="flex gap-2"
+                  >
+                    <input
+                      value={customInput}
+                      onChange={(e) => setCustomInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && customInput.trim()) {
+                          handleChoice(customInput.trim())
+                          setCustomInput('')
+                          setShowCustomInput(false)
+                        }
+                        if (e.key === 'Escape') {
+                          setShowCustomInput(false)
+                          setCustomInput('')
+                        }
+                      }}
+                      placeholder="输入你想做的事…"
+                      disabled={choosing}
+                      autoFocus
+                      className="flex-1 bg-game-bg border border-game-border rounded-md px-3 py-2 text-sm text-game-text placeholder:text-game-dim focus:outline-none focus:border-game-primary"
+                    />
+                    <Button
+                      variant="accent"
+                      size="sm"
+                      disabled={choosing || !customInput.trim()}
+                      onClick={() => {
+                        if (customInput.trim()) {
+                          handleChoice(customInput.trim())
+                          setCustomInput('')
+                          setShowCustomInput(false)
+                        }
+                      }}
+                    >
+                      确定
+                    </Button>
+                  </motion.div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
