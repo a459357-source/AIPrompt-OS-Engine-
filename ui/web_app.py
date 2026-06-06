@@ -63,7 +63,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
         .container {
             display: flex; gap: 0; align-items: flex-start;
-            max-width: 1440px; width: 100%; height: 100%;
+            width: 100%; height: 100%;
         }
         .nav-col {
             width: 48px; flex-shrink: 0; height: 100%;
