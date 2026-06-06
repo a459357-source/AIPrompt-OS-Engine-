@@ -1352,7 +1352,7 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
         <div class="field-group">
             <div class="fg-header"><label>🎨 专属规则</label><span class="desc">可选，AI 生成追踪维度和关系阶段</span></div>
             <button type="button" class="ai-btn" onclick="generateRules()" id="rulesBtn">✨ AI 生成专属规则</button>
-            <div id="rulesPreview" style="margin-top:6px;font-size:0.78em;color:#8b949e;min-height:18px"></div>
+            <div id="rulesPreview" style="margin-top:6px;font-size:0.78em;color:#8b949e;min-height:18px">📊 默认追踪：<b style="color:#7ee787">好感度</b>（陌生→恋人，7阶段）· 无需生成即可使用</div>
         </div>
 
         <button type="submit" class="btn-submit">🎬 开始新故事</button>
