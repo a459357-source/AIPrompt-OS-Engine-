@@ -13,6 +13,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      '/api/game-state': 'http://localhost:8000',
+      '/api/next': 'http://localhost:8000',
       '/generate-world': 'http://localhost:8000',
       '/generate-field': 'http://localhost:8000',
       '/generate-rules': 'http://localhost:8000',

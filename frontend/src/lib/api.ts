@@ -89,22 +89,19 @@ export async function createStory(formData: FormData): Promise<Response> {
 }
 
 export async function getGameState(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; error?: string }> {
-  const res = await fetch('/')
-  const html = await res.text()
-  // Parse the embedded JSON from the HTML (legacy endpoint)
-  const match = html.match(/__STATE__\s*=\s*({[^<]+})/)
-  if (match) {
-    return JSON.parse(match[1])
+  const res = await fetch('/api/game-state')
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+    return { story: '', options: [], state: {}, error: (data as { error?: string }).error || 'Failed to load game' }
   }
-  return { story: '', options: [], state: {}, error: 'Failed to parse state' }
+  return res.json()
 }
 
 export async function nextTurn(choice: string): Promise<GameTurnResponse> {
-  const res = await fetch(`/next?choice=${encodeURIComponent(choice)}`)
-  const html = await res.text()
-  const match = html.match(/__STATE__\s*=\s*({[^<]+})/)
-  if (match) {
-    return JSON.parse(match[1])
+  const res = await fetch(`/api/next?choice=${encodeURIComponent(choice)}`)
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+    return { story: '', state: {} as GameTurnResponse['state'], options: [], error: (data as { error?: string }).error || 'Failed to advance' }
   }
-  return { story: '', state: {} as GameTurnResponse['state'], options: [], error: 'Failed to parse state' }
+  return res.json()
 }

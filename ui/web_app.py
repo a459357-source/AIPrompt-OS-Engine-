@@ -61,6 +61,84 @@ _static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 
+# ── JSON API for React frontend ────────────────────────────────────
+
+@app.get("/api/game-state")
+async def api_game_state():
+    """Return current game state as JSON for the React frontend."""
+    from fastapi.responses import JSONResponse
+    from engine.run import step
+
+    try:
+        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+    except Exception:
+        return JSONResponse({"error": "没有活动中的游戏，请先创建故事"}, status_code=404)
+
+    history = state.get("history", [])
+    if history:
+        last = history[-1]
+        story = last.get("story", last.get("summary", ""))
+        options = last.get("options", [])
+    else:
+        # No history — auto-generate the opening scene
+        result = step(None)
+        if result is not None:
+            try:
+                state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+            except Exception:
+                pass
+            story = result["story"]
+            options = result["options"]
+        else:
+            return JSONResponse({"error": "AI 生成失败，请检查 API Key 后刷新"}, status_code=500)
+
+    return JSONResponse({
+        "story": story,
+        "options": options,
+        "state": {
+            "turn": state.get("turn", 0),
+            "status": state.get("status", "SETUP"),
+            "scene": state.get("scene", ""),
+            "characters": state.get("characters", {}),
+            "force_event_pending": state.get("force_event_pending", False),
+            "chapter": state.get("chapter", 1),
+        },
+    })
+
+
+@app.get("/api/next")
+async def api_next_turn(choice: str = "A"):
+    """Advance the game with a choice and return new state as JSON."""
+    from fastapi.responses import JSONResponse
+    from engine.run import step
+
+    try:
+        result = step(choice)
+    except Exception as e:
+        return JSONResponse({"error": f"生成失败: {e}"}, status_code=500)
+
+    if result is None:
+        return JSONResponse({"error": "AI 生成失败，请重试"}, status_code=500)
+
+    try:
+        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+    except Exception:
+        state = {}
+
+    return JSONResponse({
+        "story": result["story"],
+        "options": result["options"],
+        "state": {
+            "turn": state.get("turn", result.get("turn", 0)),
+            "status": state.get("status", result.get("status", "SETUP")),
+            "scene": state.get("scene", result.get("scene", "")),
+            "characters": state.get("characters", {}),
+            "force_event_pending": state.get("force_event_pending", False),
+            "chapter": state.get("chapter", 1),
+        },
+    })
+
+
 @app.get("/health")
 async def health():
     """Lightweight health-check endpoint (CORS-friendly for splash loader)."""
