@@ -156,11 +156,11 @@ export default function Game() {
 
       {/* Game */}
       {hasGame && (
-        <div className="flex gap-0">
+        <div className="flex gap-0" style={{ height: 'calc(100vh - 80px)' }}>
           {/* Main content */}
-          <div className="flex-1 min-w-0 space-y-4">
+          <div className="flex-1 min-w-0 flex flex-col">
             {/* Top status bar */}
-            <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center justify-between gap-3 flex-wrap shrink-0">
               <div className="flex items-center gap-2 text-sm">
                 <Badge variant="primary">📖 第 {turn} 轮</Badge>
                 <Badge
@@ -211,7 +211,16 @@ export default function Game() {
               </div>
             )}
 
-            {/* Story */}
+            {/* Story — scrollable */}
+            <div className="flex-1 overflow-y-auto min-h-0 space-y-4">
+            {/* Generating indicator */}
+            {choosing && (
+              <div className="flex items-center justify-center gap-2 py-3 bg-game-accent/10 border border-game-accent/30 rounded-lg text-sm text-game-accent animate-pulse">
+                <span className="inline-block w-3.5 h-3.5 border-2 border-game-accent/30 border-t-game-accent rounded-full animate-spin" />
+                AI 正在生成下一段剧情…
+              </div>
+            )}
+
             <Card>
               <CardContent className="pt-6 md:px-8">
                 <motion.div key={turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -225,8 +234,10 @@ export default function Game() {
                 </motion.div>
               </CardContent>
             </Card>
+            </div>{/* end scrollable area */}
 
-            {/* Choices */}
+            {/* Choices — fixed at bottom */}
+            <div className="shrink-0 border-t border-game-border bg-game-bg/95 backdrop-blur-sm pt-3 pb-1">
             <AnimatePresence>
               {options.length > 0 && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
@@ -307,6 +318,7 @@ export default function Game() {
                 </motion.div>
               )}
             </AnimatePresence>
+            </div>
 
           </div>
 
