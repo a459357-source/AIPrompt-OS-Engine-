@@ -34,18 +34,21 @@ export function TagInput({
   const [input, setInput] = useState('')
   const [showCommand, setShowCommand] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const valueRef = useRef(value)
+  valueRef.current = value
 
   const add = (tag: string) => {
     const t = tag.trim()
-    if (t && !value.includes(t) && value.length < maxTags) {
-      onChange([...value, t])
+    const current = valueRef.current
+    if (t && !current.includes(t) && current.length < maxTags) {
+      onChange([...current, t])
     }
     setInput('')
     setShowCommand(false)
   }
 
   const remove = (idx: number) => {
-    onChange(value.filter((_, i) => i !== idx))
+    onChange(valueRef.current.filter((_, i) => i !== idx))
   }
 
   const filteredPresets = presets.filter(
@@ -137,16 +140,16 @@ export function TagInput({
 
       {/* Quick presets */}
       {!input && presets.length > 0 && (
-        <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+        <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
           {presets.filter((p) => !value.includes(p)).slice(0, 20).map((p) => (
-            <Badge
+            <button
               key={p}
-              variant="outline"
-              className="cursor-pointer hover:bg-game-primary/10 hover:text-game-primary hover:border-game-primary/30 transition-colors"
-              onClick={() => add(p)}
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); add(p) }}
+              className="inline-flex items-center rounded-full border border-game-border bg-transparent text-game-muted px-2.5 py-0.5 text-xs font-medium hover:bg-game-primary/10 hover:text-game-primary hover:border-game-primary/30 transition-colors"
             >
               + {p}
-            </Badge>
+            </button>
           ))}
         </div>
       )}
