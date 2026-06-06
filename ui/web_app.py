@@ -1163,26 +1163,46 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
 .sidebar .card h3{font-size:0.85em;color:#8b949e;margin-bottom:8px}
 .sidebar .card input{width:100%;padding:7px 10px;background:#0d1117;border:1px solid #30363d;border-radius:5px;color:#c9d1d9;font-size:0.85em;margin-bottom:6px}
 .sidebar .card input:focus{outline:none;border-color:#58a6ff}
-.sidebar .card .btn{display:inline-block;padding:6px 14px;background:#238636;color:#fff;border:none;border-radius:5px;font-size:0.82em;cursor:pointer}
-.sidebar .card .btn:hover{background:#2ea043}
+.sidebar .card .btn{display:block;width:100%;padding:8px 0;background:#1a3a5c;color:#58a6ff;border:1px solid #58a6ff;border-radius:5px;font-size:0.85em;cursor:pointer;text-align:center;margin-top:6px}
+.sidebar .card .btn:hover{background:#1f4a7a}
+.sidebar .card .btn.primary{background:#238636;color:#fff;border-color:#238636}
+.sidebar .card .btn.primary:hover{background:#2ea043}
 .sidebar .card .btn:disabled{opacity:0.5;cursor:not-allowed}
 .sidebar .card .hint{color:#8b949e;font-size:0.72em;margin-top:4px;min-height:16px}
 .preset-bar{display:flex;flex-direction:column;gap:4px}
 .preset-btn{padding:7px 12px;background:#1c2333;border:1px solid #30363d;border-radius:6px;color:#8b949e;font-size:0.82em;cursor:pointer;text-align:left;transition:all 0.12s}
 .preset-btn:hover{border-color:#58a6ff;color:#58a6ff}
 .preset-btn.active{background:#1a3a5c;border-color:#58a6ff;color:#58a6ff}
-.main-form{flex:1;min-width:0}
-.main-form label{display:block;color:#8b949e;font-size:0.82em;margin:10px 0 3px}
-.main-form input,.main-form textarea{width:100%;padding:8px 12px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.88em;font-family:inherit}
-.main-form input:focus,.main-form textarea:focus{outline:none;border-color:#58a6ff}
-.main-form textarea{resize:vertical;min-height:70px}
-.main-form .row{display:flex;gap:14px}
-.main-form .row>div{flex:1}
-.main-form .row input{margin-top:3px}
-.btn-submit{display:inline-block;margin-top:16px;padding:10px 32px;background:#238636;border:none;border-radius:6px;color:#fff;font-size:0.95em;cursor:pointer;font-weight:bold}
+.main-form{flex:1;min-width:0;padding-bottom:40px}
+.field-group{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:14px 18px;margin-bottom:12px}
+.field-group .fg-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.field-group .fg-header label{font-size:0.85em;color:#8b949e;font-weight:600}
+.field-group .fg-header .desc{font-size:0.72em;color:#484f58;margin-left:8px}
+.field-group .fg-row{display:flex;gap:8px;align-items:flex-start}
+.field-group .fg-row input,.field-group .fg-row textarea,.field-group .fg-row select{flex:1;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:5px;color:#c9d1d9;font-size:0.88em;font-family:inherit}
+.field-group .fg-row textarea{resize:vertical;min-height:60px}
+.field-group .fg-row input:focus,.field-group .fg-row textarea:focus,.field-group .fg-row select:focus{outline:none;border-color:#58a6ff}
+.ai-btn{flex-shrink:0;padding:7px 12px;background:transparent;border:1px solid #d2a8ff;border-radius:5px;color:#d2a8ff;font-size:0.78em;cursor:pointer;white-space:nowrap;transition:all 0.12s}
+.ai-btn:hover{background:#1f1a2e;border-color:#bc8cff;color:#bc8cff}
+.ai-btn:disabled{opacity:0.4;cursor:not-allowed}
+.ai-btn .spin{display:none}
+.ai-btn.loading .spin{display:inline-block;animation:spin 0.7s linear infinite}
+.char-list{display:flex;flex-wrap:wrap;gap:12px}
+.char-card{flex:1;min-width:260px;max-width:380px;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:12px}
+.char-card .ch-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.char-card .ch-top .ch-num{font-size:0.75em;color:#484f58}
+.char-card .ch-top .ch-del{background:none;border:none;color:#484f58;font-size:0.9em;cursor:pointer}
+.char-card .ch-top .ch-del:hover{color:#f85149}
+.char-card input{padding:6px 10px;width:100%;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-size:0.85em;margin-bottom:4px}
+.char-card input:focus{outline:none;border-color:#58a6ff}
+.char-card .ch-ai-btn{display:inline-block;padding:4px 10px;margin-top:4px;background:transparent;border:1px solid #d2a8ff;border-radius:4px;color:#d2a8ff;font-size:0.72em;cursor:pointer}
+.char-card .ch-ai-btn:hover{background:#1f1a2e}
+.char-card .ch-ai-btn:disabled{opacity:0.4}
+.add-char-btn{display:inline-flex;align-items:center;gap:4px;padding:8px 16px;margin-top:8px;background:transparent;border:1px dashed #30363d;border-radius:6px;color:#8b949e;font-size:0.82em;cursor:pointer}
+.add-char-btn:hover{border-color:#58a6ff;color:#58a6ff}
+.btn-submit{display:inline-block;margin-top:16px;padding:12px 40px;background:#238636;border:none;border-radius:6px;color:#fff;font-size:1em;cursor:pointer;font-weight:bold}
 .btn-submit:hover{background:#2ea043}
-.btn-rules{display:inline-block;margin-top:6px;padding:6px 16px;background:#1c2333;border:1px solid #d2a8ff;border-radius:5px;color:#d2a8ff;font-size:0.82em;cursor:pointer}
-.btn-rules:hover{background:#1f1a2e}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -1193,9 +1213,9 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
 <div class="layout">
     <div class="sidebar">
         <div class="card">
-            <h3>💡 AI 关键词生成</h3>
-            <input id="kw_input" placeholder="输入关键词，如：修仙 宗门 重生">
-            <button class="btn" onclick="generateWorld()" style="margin-top:4px">✨ 生成世界观</button>
+            <h3>🤖 一键生成</h3>
+            <input id="kw_input" placeholder="输入关键词：修仙 宗门 重生">
+            <button class="btn primary" onclick="generateWorld()">✨ 一键生成完整世界观</button>
             <div class="hint" id="kw_status"></div>
         </div>
         <div class="card">
@@ -1209,123 +1229,229 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
             </div>
         </div>
     </div>
-    <form class="main-form" method="post" action="/new">
-        <label>📖 故事标题</label>
-        <input name="title" id="f_title" value="星痕纪元" required>
-        <label>🌍 世界观 / 背景设定</label>
-        <textarea name="world" id="f_world" required>公元2247年，人类已进入星际殖民时代……</textarea>
-        <label>🎭 类型 / 风格</label>
-        <input name="genre" id="f_genre" value="科幻 / 冒险 / 情感">
-        <label>📍 初始场景</label>
-        <input name="scene" id="f_scene" value="回声号 — 舰桥" required>
-        <div class="row">
-            <div>
-                <label>👤 主角</label>
-                <input name="char1_name" id="f_c1n" value="林夜" placeholder="姓名" required>
-                <input name="char1_role" id="f_c1r" value="调查船船长" placeholder="身份">
-                <input name="char1_note" id="f_c1t" value="冷静、理性，背负过去的秘密" placeholder="性格描述">
-            </div>
-            <div>
-                <label>👤 角色B</label>
-                <input name="char2_name" id="f_c2n" value="艾琳" placeholder="姓名" required>
-                <input name="char2_role" id="f_c2r" value="考古语言学家" placeholder="身份">
-                <input name="char2_note" id="f_c2t" value="热情、好奇，对星痕有特殊的感知力" placeholder="性格描述">
+    <form class="main-form" method="post" action="/new" onsubmit="prepareSubmit()">
+        <input type="hidden" name="chars_json" id="charsJson" value="">
+        <input type="hidden" name="custom_rules" id="customRulesInput" value="">
+
+        <div class="field-group">
+            <div class="fg-header"><label>📖 故事标题</label><span class="desc">8字以内，吸引人的名称</span></div>
+            <div class="fg-row">
+                <input name="title" id="f_title" value="星痕纪元" required placeholder="给你的故事起个名字">
+                <button type="button" class="ai-btn" onclick="genField('title')">✨ 生成</button>
             </div>
         </div>
-        <div style="margin-top:12px">
-            <label>🎨 故事专属规则（可选）</label>
-            <button type="button" class="btn-rules" onclick="generateRules()" id="rulesBtn">✨ AI 生成专属规则</button>
+
+        <div class="field-group">
+            <div class="fg-header"><label>🌍 世界观背景设定</label><span class="desc">150-300字，描述故事发生的世界</span></div>
+            <div class="fg-row">
+                <textarea name="world" id="f_world" required placeholder="公元2247年，人类已进入星际殖民时代…">公元2247年，人类已进入星际殖民时代……</textarea>
+                <button type="button" class="ai-btn" onclick="genField('world')">✨ 生成</button>
+            </div>
+        </div>
+
+        <div class="field-group">
+            <div class="fg-header"><label>🎭 类型 / 风格</label><span class="desc">选择故事的类型和基调</span></div>
+            <div class="fg-row">
+                <select name="genre" id="f_genre">
+                    <option value="科幻 / 冒险 / 情感">🚀 科幻 / 冒险 / 情感</option>
+                    <option value="校园 / 恋爱 / 日常">🌸 校园 / 恋爱 / 日常</option>
+                    <option value="奇幻 / 冒险 / 成长">⚔️ 奇幻 / 冒险 / 成长</option>
+                    <option value="悬疑 / 推理 / 都市">🔍 悬疑 / 推理 / 都市</option>
+                    <option value="修仙 / 玄幻 / 热血">🏔️ 修仙 / 玄幻 / 热血</option>
+                    <option value="恐怖 / 惊悚 / 生存">👻 恐怖 / 惊悚 / 生存</option>
+                    <option value="历史 / 权谋 / 战争">🏯 历史 / 权谋 / 战争</option>
+                    <option value="赛博朋克 / 反乌托邦">🤖 赛博朋克 / 反乌托邦</option>
+                    <option value="自定义">✏️ 自定义（在下方输入）</option>
+                </select>
+                <input name="genre_custom" id="f_genre_custom" placeholder="自定义风格" style="display:none;flex:1">
+            </div>
+            <script>
+                document.getElementById('f_genre').onchange=function(){
+                    var c=document.getElementById('f_genre_custom');
+                    c.style.display=this.value==='自定义'?'block':'none';
+                    if(this.value!=='自定义')c.value='';
+                };
+            </script>
+        </div>
+
+        <div class="field-group">
+            <div class="fg-header"><label>📍 初始场景</label><span class="desc">故事开始的第一个地点</span></div>
+            <div class="fg-row">
+                <input name="scene" id="f_scene" value="回声号 — 舰桥" required placeholder="如：回声号 — 舰桥">
+            </div>
+        </div>
+
+        <div class="field-group">
+            <div class="fg-header"><label>👥 角色设定</label><span class="desc">主角 + 重要NPC，可自由增减</span></div>
+            <div id="charList" class="char-list"></div>
+            <button type="button" class="add-char-btn" onclick="addCharacter()">➕ 新增角色</button>
+        </div>
+
+        <div class="field-group">
+            <div class="fg-header"><label>🎨 专属规则</label><span class="desc">可选，AI 生成追踪维度和关系阶段</span></div>
+            <button type="button" class="ai-btn" onclick="generateRules()" id="rulesBtn">✨ AI 生成专属规则</button>
             <div id="rulesPreview" style="margin-top:6px;font-size:0.78em;color:#8b949e;min-height:18px"></div>
-            <input type="hidden" name="custom_rules" id="customRulesInput" value="">
         </div>
+
         <button type="submit" class="btn-submit">🎬 开始新故事</button>
     </form>
 </div>
-    <script>
-        const presets = """ + json.dumps(_PRESETS, ensure_ascii=False) + """;
-        function loadPreset(key, btn) {
-            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            if (key === 'custom') return;
-            const p = presets[key];
-            document.getElementById('f_title').value = p.title;
-            document.getElementById('f_world').value = p.world;
-            document.getElementById('f_genre').value = p.genre;
-            document.getElementById('f_scene').value = p.scene;
-            document.getElementById('f_c1n').value = p.char1_name;
-            document.getElementById('f_c1r').value = p.char1_role;
-            document.getElementById('f_c1t').value = p.char1_note;
-            document.getElementById('f_c2n').value = p.char2_name;
-            document.getElementById('f_c2r').value = p.char2_role;
-            document.getElementById('f_c2t').value = p.char2_note;
-        }
 
-        async function generateRules() {
-            const title = document.getElementById('f_title').value;
-            const world = document.getElementById('f_world').value;
-            const genre = document.getElementById('f_genre').value;
-            const c1n = document.getElementById('f_c1n').value;
-            const c1r = document.getElementById('f_c1r').value;
-            const c2n = document.getElementById('f_c2n').value;
-            const c2r = document.getElementById('f_c2r').value;
-            const preview = document.getElementById('rulesPreview');
-            const btn = document.getElementById('rulesBtn');
-            preview.textContent = '⏳ 正在生成专属规则…';
-            preview.style.color = '#ffa657';
-            btn.disabled = true;
-            try {
-                const params = new URLSearchParams({title,world,genre,char1_name:c1n,char1_role:c1r,char2_name:c2n,char2_role:c2r});
-                const res = await fetch('/generate-rules', {method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:params});
-                const data = await res.json();
-                if (data.error) { preview.textContent = '❌ '+data.error; preview.style.color='#f85149'; }
-                else {
-                    document.getElementById('customRulesInput').value = JSON.stringify(data);
-                    const stats = (data.stats||[]).map(s=>s.label).join(' · ');
-                    const stages = (data.stages||[]).join(' → ');
-                    preview.innerHTML = '<span style="color:#7ee787;">✅ 已生成</span><br>追踪维度: <b style="color:#ffa657;">'+stats+'</b><br>关系阶段: <b style="color:#d2a8ff;">'+stages+'</b>';
-                }
-            } catch(e) { preview.textContent = '❌ '+e.message; preview.style.color='#f85149'; }
-            btn.disabled = false;
-        }
+<script>
+const presets = """ + json.dumps(_PRESETS, ensure_ascii=False) + """;
 
-        async function generateWorld() {
-            const kw = document.getElementById('kw_input').value.trim();
-            const status = document.getElementById('kw_status');
-            const btn = document.querySelector('.kw-section .btn-save');
-            if (!kw) { status.textContent = '请输入关键词'; status.style.color = '#f85149'; return; }
-            status.textContent = '⏳ AI 正在生成世界观…';
-            status.style.color = '#ffa657';
-            btn.disabled = true;
-            try {
-                const res = await fetch('/generate-world', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: 'keywords=' + encodeURIComponent(kw)
-                });
-                const data = await res.json();
-                if (data.error) {
-                    status.textContent = '❌ ' + data.error; status.style.color = '#f85149';
-                } else {
-                    document.getElementById('f_title').value = data.title || '';
-                    document.getElementById('f_world').value = data.world || '';
-                    document.getElementById('f_genre').value = data.genre || '';
-                    document.getElementById('f_scene').value = data.scene || '';
-                    document.getElementById('f_c1n').value = data.char1_name || '';
-                    document.getElementById('f_c1r').value = data.char1_role || '';
-                    document.getElementById('f_c1t').value = data.char1_note || '';
-                    document.getElementById('f_c2n').value = data.char2_name || '';
-                    document.getElementById('f_c2r').value = data.char2_role || '';
-                    document.getElementById('f_c2t').value = data.char2_note || '';
-                    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-                    status.textContent = '✅ 已生成！检查并修改后点击「开始新故事」';
-                    status.style.color = '#7ee787';
-                }
-            } catch(e) {
-                status.textContent = '❌ 网络错误：' + e.message; status.style.color = '#f85149';
-            }
-            btn.disabled = false;
+// ── Character management ──
+let characters = [
+    {name:'林夜',role:'调查船船长',note:'冷静、理性，背负过去的秘密',isMain:true},
+    {name:'艾琳',role:'考古语言学家',note:'热情、好奇，对星痕有特殊的感知力',isMain:false}
+];
+let charIdCounter = 2;
+
+function renderCharacters(){
+    var html='';
+    characters.forEach(function(c,i){
+        html+='<div class="char-card">'+
+            '<div class="ch-top"><span class="ch-num">'+(c.isMain?'⭐ 主角':'👤 NPC #'+(i+1))+'</span>'+
+            (characters.length>1?'<button class="ch-del" onclick="removeChar('+i+')" title="移除">×</button>':'')+
+            '</div>'+
+            '<input placeholder="姓名" value="'+esc(c.name)+'" onchange="updateChar('+i+',\'name\',this.value)" required'+(i===0?'':'')+'>'+
+            '<input placeholder="身份 / 职业" value="'+esc(c.role)+'" onchange="updateChar('+i+',\'role\',this.value)">'+
+            '<input placeholder="性格描述（15-30字）" value="'+esc(c.note)+'" onchange="updateChar('+i+',\'note\',this.value)">'+
+            '<button type="button" class="ch-ai-btn" onclick="genCharacter('+i+')">✨ 生成此角色</button>'+
+            '</div>';
+    });
+    document.getElementById('charList').innerHTML=html;
+}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function updateChar(i,field,val){characters[i][field]=val;}
+function addCharacter(){
+    characters.push({name:'',role:'',note:'',isMain:false});
+    renderCharacters();
+}
+function removeChar(i){
+    if(characters.length<=1)return;
+    characters.splice(i,1);
+    if(i===0 && characters.length>0) characters[0].isMain=true;
+    renderCharacters();
+}
+function prepareSubmit(){
+    document.getElementById('charsJson').value=JSON.stringify(characters);
+}
+renderCharacters();
+
+// ── Load preset ──
+function loadPreset(key,btn){
+    document.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('active');});
+    btn.classList.add('active');
+    if(key==='custom'){
+        document.getElementById('f_title').value='';document.getElementById('f_world').value='';
+        document.getElementById('f_scene').value='';characters=[{name:'',role:'',note:'',isMain:true}];renderCharacters();return;
+    }
+    var p=presets[key];
+    document.getElementById('f_title').value=p.title;document.getElementById('f_world').value=p.world;
+    document.getElementById('f_genre').value=p.genre;document.getElementById('f_scene').value=p.scene;
+    characters=[
+        {name:p.char1_name,role:p.char1_role,note:p.char1_note,isMain:true},
+        {name:p.char2_name,role:p.char2_role,note:p.char2_note,isMain:false}
+    ];
+    renderCharacters();
+}
+
+// ── AI field generation ──
+async function genField(field){
+    var btn=event.target, orig=btn.textContent;
+    btn.disabled=true;btn.innerHTML='<span class="spin">⏳</span> 生成中';
+    var title=document.getElementById('f_title').value;
+    var world=document.getElementById('f_world').value;
+    var genre=document.getElementById('f_genre').value;
+    try{
+        var params=new URLSearchParams({field:field,title:title,world:world,genre:genre});
+        var res=await fetch('/generate-field',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:params});
+        var data=await res.json();
+        if(data.error){alert(data.error);}
+        else{
+            var story=data.story||data.title||data.name||'';
+            if(field==='title')document.getElementById('f_title').value=story.replace(/["']/g,'').trim().slice(0,20);
+            if(field==='world')document.getElementById('f_world').value=story.trim();
         }
-    </script>
+    }catch(e){alert('生成失败: '+e.message);}
+    btn.disabled=false;btn.textContent=orig;
+}
+
+async function genCharacter(i){
+    var btn=event.target, orig=btn.textContent;
+    btn.disabled=true;btn.textContent='⏳ 生成中';
+    var title=document.getElementById('f_title').value;
+    var world=document.getElementById('f_world').value;
+    var role=characters[i].role||'重要NPC';
+    try{
+        var params=new URLSearchParams({field:'character',title:title,world:world,char_role:role});
+        var res=await fetch('/generate-field',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:params});
+        var data=await res.json();
+        if(!data.error){
+            characters[i].name=data.name||characters[i].name||'新角色';
+            characters[i].role=data.role||characters[i].role;
+            characters[i].note=data.note||characters[i].note;
+            renderCharacters();
+        }
+    }catch(e){alert('生成失败: '+e.message);}
+    btn.disabled=false;btn.textContent=orig;
+}
+
+// ── One-click world generation ──
+async function generateWorld(){
+    var kw=document.getElementById('kw_input').value.trim();
+    var status=document.getElementById('kw_status');
+    var btn=document.querySelector('.sidebar .btn.primary');
+    if(!kw){status.textContent='请输入关键词';status.style.color='#f85149';return;}
+    status.textContent='⏳ AI 正在生成…';status.style.color='#ffa657';
+    btn.disabled=true;
+    try{
+        var res=await fetch('/generate-world',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'keywords='+encodeURIComponent(kw)});
+        var data=await res.json();
+        if(data.error){status.textContent='❌ '+data.error;status.style.color='#f85149';}
+        else{
+            document.getElementById('f_title').value=data.title||'';
+            document.getElementById('f_world').value=data.world||'';
+            document.getElementById('f_genre').value=data.genre||'科幻 / 冒险 / 情感';
+            document.getElementById('f_scene').value=data.scene||'';
+            characters=[
+                {name:data.char1_name||'主角',role:data.char1_role||'',note:data.char1_note||'',isMain:true},
+                {name:data.char2_name||'',role:data.char2_role||'',note:data.char2_note||'',isMain:false}
+            ];
+            renderCharacters();
+            document.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('active');});
+            status.textContent='✅ 已生成，可继续修改';
+            status.style.color='#7ee787';
+        }
+    }catch(e){status.textContent='❌ 网络错误: '+e.message;status.style.color='#f85149';}
+    btn.disabled=false;
+}
+
+// ── Rules generation ──
+async function generateRules(){
+    var title=document.getElementById('f_title').value;
+    var world=document.getElementById('f_world').value;
+    var preview=document.getElementById('rulesPreview');
+    var btn=document.getElementById('rulesBtn');
+    var names=characters.map(function(c){return c.name;}).filter(Boolean);
+    preview.textContent='⏳ 正在生成专属规则…';preview.style.color='#ffa657';
+    btn.disabled=true;
+    try{
+        var params=new URLSearchParams({title:title,world:world,genre:'',char1_name:names[0]||'',char1_role:'',char2_name:names[1]||'',char2_role:''});
+        var res=await fetch('/generate-rules',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:params});
+        var data=await res.json();
+        if(data.error){preview.textContent='❌ '+data.error;preview.style.color='#f85149';}
+        else{
+            document.getElementById('customRulesInput').value=JSON.stringify(data);
+            var stats=(data.stats||[]).map(function(s){return s.label;}).join(' · ');
+            var stages=(data.stages||[]).join(' → ');
+            preview.innerHTML='<span style="color:#7ee787;">✅ 已生成</span><br>追踪维度: <b style="color:#ffa657;">'+stats+'</b><br>关系阶段: <b style="color:#d2a8ff;">'+stages+'</b>';
+        }
+    }catch(e){preview.textContent='❌ '+e.message;preview.style.color='#f85149';}
+    btn.disabled=false;
+}
+</script>
 </body>
 </html>"""
 
@@ -1342,16 +1468,26 @@ async def create_new_story(
     world: str = Form(...),
     genre: str = Form(""),
     scene: str = Form(...),
-    char1_name: str = Form(...),
-    char1_role: str = Form(""),
-    char1_note: str = Form(""),
-    char2_name: str = Form(...),
-    char2_role: str = Form(""),
-    char2_note: str = Form(""),
+    chars_json: str = Form(""),
     custom_rules: str = Form(""),
+    genre_custom: str = Form(""),
 ):
     """Process the new story form and initialize all state."""
     import yaml
+
+    # Use custom genre if selected
+    if genre == "自定义" and genre_custom.strip():
+        genre = genre_custom.strip()
+
+    # Parse characters from JSON
+    chars = []
+    if chars_json.strip():
+        try:
+            chars = json.loads(chars_json.strip())
+        except Exception:
+            pass
+    if not chars:
+        chars = [{"name": "主角", "role": "", "note": "", "isMain": True}]
 
     # Parse custom rules if provided
     custom = {}
@@ -1380,27 +1516,35 @@ async def create_new_story(
         world_pack["custom"] = custom
     io_utils.write_yaml(config.WORLD_PACK_PATH, world_pack)
 
-    # Build initial state
+    # Build initial state with dynamic characters
+    state_chars = {}
+    mem_chars = {}
+    letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    for i, ch in enumerate(chars):
+        if i >= len(letters):
+            break
+        key = letters[i]
+        name = ch.get("name", f"角色{i+1}")
+        role = ch.get("role", "")
+        note = ch.get("note", "")
+        state_chars[key] = {
+            "name": name,
+            "role": role,
+            "level": "L0",
+            "relation": "初识",
+            "note": note,
+        }
+        mem_chars[name] = {
+            "trust": 0.5,
+            "flags": [],
+            "relationship": f"{role}，初识" if role else "初识",
+        }
+
     initial_state = {
         "scene": scene,
         "status": "SETUP",
         "turn": 0,
-        "characters": {
-            "A": {
-                "name": char1_name,
-                "role": char1_role,
-                "level": "L0",
-                "relation": "初识",
-                "note": char1_note,
-            },
-            "B": {
-                "name": char2_name,
-                "role": char2_role,
-                "level": "L0",
-                "relation": "初识",
-                "note": char2_note,
-            },
-        },
+        "characters": state_chars,
         "history": [],
         "force_event_pending": False,
         "chapter": 1,
@@ -1430,10 +1574,7 @@ async def create_new_story(
 
     # Reset memory
     initial_memory = {
-        "characters": {
-            char1_name: {"trust": 0.5, "flags": [], "relationship": f"{char1_role}，初识"},
-            char2_name: {"trust": 0.5, "flags": [], "relationship": f"{char2_role}，初识"},
-        },
+        "characters": mem_chars,
         "world_flags": [],
         "global_trust": 0.5,
     }
@@ -1495,6 +1636,50 @@ async def generate_world(keywords: str = Form("")):
         return JSONResponse({"error": f"AI 生成失败: {exc}"}, status_code=500)
     except Exception as exc:
         return JSONResponse({"error": f"未知错误: {exc}"}, status_code=500)
+
+
+# ── Field-level AI generation ─────────────────────────────────────
+
+@app.post("/generate-field")
+async def generate_field(field: str = Form(""), title: str = Form(""), world: str = Form(""),
+                         genre: str = Form(""), char_name: str = Form(""), char_role: str = Form(""),
+                         context: str = Form("")):
+    """Generate a single story field via AI (title, world, or character)."""
+    from engine.deepseek_client import call_deepseek, DeepSeekError
+    from fastapi.responses import JSONResponse as JR
+
+    system = "你是一个中文 Galgame 创作助手。只输出要求的内容，不要输出解释、引号或 JSON 包装。"
+
+    if field == "title":
+        user = f"根据以下世界观，生成一个吸引人的故事标题（8字以内）：\n{world or context}\n\n标题："
+    elif field == "world":
+        ctx = f"标题：{title}，风格：{genre}" if title else context
+        user = f"为以下 Galgame 生成世界观背景描述（150-300字，沉浸式叙事风格）：\n{ctx}\n\n世界观："
+    elif field == "character":
+        user = f"为以下故事生成一个新角色，用 JSON 格式输出：\n故事标题：{title}\n世界观：{world[:200] if world else context[:200]}\n角色定位：{char_role or '重要NPC'}\n\n输出格式：{{\"name\":\"角色名\",\"role\":\"身份\",\"note\":\"性格描述\"}}"
+    else:
+        return JR({"error": f"未知字段类型: {field}"}, status_code=400)
+
+    try:
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=512)
+        # For character field, try to parse JSON from response
+        if field == "character":
+            story = result.get("story", "")
+            # Extract JSON if wrapped in code blocks or text
+            import re as _re
+            m = _re.search(r'\{[^}]+\}', story)
+            if m:
+                import json as _json
+                try:
+                    return JR(_json.loads(m.group()))
+                except Exception:
+                    pass
+            return JR({"name": story.strip()[:20], "role": char_role, "note": story.strip()[:80]})
+        return JR(result)
+    except DeepSeekError as exc:
+        return JR({"error": f"AI 生成失败: {exc}"}, status_code=500)
+    except Exception as exc:
+        return JR({"error": f"未知错误: {exc}"}, status_code=500)
 
 
 # ── NPC Management ────────────────────────────────────────────────
