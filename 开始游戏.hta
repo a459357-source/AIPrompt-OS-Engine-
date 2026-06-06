@@ -72,7 +72,19 @@ Sub LaunchServer()
         Exit Sub
     End If
     On Error Goto 0
-    objShell.Run "cmd /c pip install -r requirements.txt --quiet > nul 2>&1", 0, True
+
+    ' Only install deps if fastapi is missing
+    Dim missing : missing = False
+    On Error Resume Next
+    objShell.Run "cmd /c python -c ""import fastapi"" > nul 2>&1", 0, True
+    If Err.Number <> 0 Then missing = True
+    On Error Goto 0
+
+    If missing Then
+        document.getElementById("status").innerText = "首次运行，正在安装依赖..."
+        objShell.Run "cmd /c pip install -r requirements.txt --quiet > nul 2>&1", 0, True
+    End If
+
     objShell.Run "python engine\run.py --mode web", 0, False
 End Sub
 
