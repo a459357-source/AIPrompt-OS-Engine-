@@ -2874,7 +2874,7 @@ async def settings_page():
     current_max_tokens = config.MAX_TOKENS
     max_tokens_opts = []
     max_tokens_hint = ""
-    for val in [512, 1024, 2048, 4096, 8192]:
+    for val in [512, 1024, 2048, 4096, 8192, 16384]:
         sel = ' selected' if val == current_max_tokens else ''
         label = f"{val} tokens（{'快速/可能截断' if val <= 1024 else '标准' if val <= 2048 else '完整/较慢' if val <= 4096 else '最大/最慢'}）"
         max_tokens_opts.append(f'<option value="{val}"{sel}>{label}</option>')
@@ -2935,7 +2935,7 @@ async def save_settings(
         reload_model()
     save_story_length(max(300, min(3000, story_length)))
     reload_story_length()
-    save_max_tokens(max(512, min(8192, max_tokens)))
+    save_max_tokens(max(512, min(16384, max_tokens)))
     reload_max_tokens()
     save_temperature(max(0.1, min(2.0, temperature)))
     reload_temperature()

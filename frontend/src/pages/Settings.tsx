@@ -489,7 +489,8 @@ export default function Settings() {
                       <SelectItem value="1024">1024 tokens（较短）</SelectItem>
                       <SelectItem value="2048">2048 tokens（标准）</SelectItem>
                       <SelectItem value="4096">4096 tokens（完整/较慢）</SelectItem>
-                      <SelectItem value="8192">8192 tokens（最大/最慢）</SelectItem>
+                      <SelectItem value="8192">8192 tokens（最大/较慢）</SelectItem>
+                      <SelectItem value="16384">16384 tokens（超大/慢）</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-game-dim">控制 AI 回复长度上限，世界观生成会用双倍值</p>
