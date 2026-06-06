@@ -4,6 +4,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { generateWorld, generateField, generateRules, createStory } from '@/lib/api'
+import { logger } from '@/lib/logger'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -128,6 +129,7 @@ export default function NewStory() {
   const handleWorldGen = useCallback(async () => {
     setGenerating('world')
     showStatus('正在生成世界观、角色和规则…', 'loading')
+    logger.info('NewStory', 'handleWorldGen: starting')
     try {
       const kw = kwRef.current?.value?.trim() || '奇幻冒险'
       const data = await generateWorld(kw)
@@ -157,7 +159,7 @@ export default function NewStory() {
       setFieldErrors((prev) => ({ ...prev, world: null }))
     } catch (e) {
       const msg = (e as Error).message || String(e)
-      console.error('[handleWorldGen]', e)
+      logger.error('NewStory', 'handleWorldGen: failed', { error: msg })
       showStatus(`❌ ${msg}`, 'error')
       setFieldErrors((prev) => ({ ...prev, world: msg }))
     }
@@ -166,6 +168,7 @@ export default function NewStory() {
 
   const handleFieldGen = useCallback(async (field: string) => {
     setGenerating(field)
+    logger.info('NewStory', `handleFieldGen: ${field}`)
     const fieldLabels: Record<string, string> = { title: '标题', main_goal: '主线目标', scene: '场景', world: '世界观' }
     showStatus(`正在生成${fieldLabels[field] || field}…`, 'loading')
     setFieldErrors((prev) => ({ ...prev, [field]: null }))
@@ -183,7 +186,8 @@ export default function NewStory() {
       if (field === 'scene') setValue('scene', story.trim())
       showStatus('✅ 生成完成', 'success')
     } catch (e) {
-      const msg = (e as Error).message
+      const msg = (e as Error).message || String(e)
+      logger.error('NewStory', `handleFieldGen: ${field} failed`, { error: msg })
       showStatus(`❌ ${msg}`, 'error')
       setFieldErrors((prev) => ({ ...prev, [field]: msg }))
     }
@@ -192,6 +196,7 @@ export default function NewStory() {
 
   const handleCharGen = useCallback(async (idx: number) => {
     setGenerating(`char-${idx}`)
+    logger.info('NewStory', `handleCharGen: char-${idx}`)
     showStatus('正在生成角色…', 'loading')
     setFieldErrors((prev) => ({ ...prev, [`char-${idx}`]: null }))
     try {
@@ -212,7 +217,8 @@ export default function NewStory() {
       setValue('characters', chars)
       showStatus('✅ 角色生成完成', 'success')
     } catch (e) {
-      const msg = (e as Error).message
+      const msg = (e as Error).message || String(e)
+      logger.error('NewStory', `handleCharGen: char-${idx} failed`, { error: msg })
       showStatus(`❌ ${msg}`, 'error')
       setFieldErrors((prev) => ({ ...prev, [`char-${idx}`]: msg }))
     }
@@ -221,6 +227,7 @@ export default function NewStory() {
 
   const handleRulesGen = useCallback(async () => {
     setGenerating('rules')
+    logger.info('NewStory', 'handleRulesGen: starting')
     showStatus('正在生成专属规则…', 'loading')
     setFieldErrors((prev) => ({ ...prev, rules: null }))
     try {
@@ -238,7 +245,7 @@ export default function NewStory() {
       showStatus('✅ 专属规则生成完成', 'success')
     } catch (e) {
       const msg = (e as Error).message || String(e)
-      console.error('[handleRulesGen]', e)
+      logger.error('NewStory', 'handleRulesGen: failed', { error: msg })
       showStatus(`❌ ${msg}`, 'error')
       setFieldErrors((prev) => ({ ...prev, rules: msg }))
     }

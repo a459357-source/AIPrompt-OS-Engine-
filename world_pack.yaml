@@ -1,96 +1,54 @@
 world:
-  title: 泡沫之巅：财阀千金的重生商战
-  genre: 商战 / 重生 / 女性主角
+  title: 星痕纪元
+  genre: 科幻 / 冒险 / 情感
   era: 故事开端
-  setting: 1985年，日本京都华族西园寺家的大小姐皋月，实为2024年华尔街顶级对冲基金经理林月重生。她背负300亿日元债务，在广场协议前夕精准做空美元，开启金融帝国之路。世界正处于泡沫经济狂欢中，华尔街势力暗中操控全球资本。皋月以东京为棋盘，在股市、地产、科技领域疯狂扩张，建立西园寺财团，对抗以华尔街为核心的全球金融霸权。
-  main_goal: 建立西园寺财团，摧毁华尔街金融霸权，改写世界经济规则。
+  setting: 公元2247年，人类已进入星际殖民时代。在银河系边缘的「碎星带」，一艘名为「回声号」的调查船发现了一处远古外星遗迹。遗迹中封存着名为「星痕」的神秘能量。
+  main_goal: 调查星痕遗迹的真相
   factions: []
   locations:
-  - name: 京都西园寺家祖宅，和式客厅内债主围坐，皋月身着黑色和服，神情冷峻地面对逼宫。
+  - name: 回声号 — 舰桥
     desc: 初始场景
   tone: 聚焦人物情感与选择
   themes: []
   characters:
-  - name: 西园寺皋月
+  - name: 林夜
     is_main: true
     role_tags:
-    - 主角
-    - 财阀千金
-    - 重生者
+    - 调查船船长
+    - 退役军人
     personality_tags:
     - 冷静
-    - 果决
-    - 腹黑
-    - 野心勃勃
-    appearance: 黑长直发，紫色眼眸，身材高挑，常穿黑色和服或西装，气质冷艳。
-    relationship:
-    - 自我
-    goal: 建立金融帝国，复仇华尔街势力。
-    secret: 前世是华人基金经理林月，因反抗华尔街势力被害。
-    background: 前世林月是华尔街顶级对冲基金经理，因拒绝配合做空中国新能源产业被陷害身亡，重生为1985年京都华族西园寺家大小姐皋月。
-    special_ability: 预知未来经济走势（基于前世记忆），高超的金融操作与谈判能力。
-  - name: 西园寺静香
+    - 理性
+    - 内敛
+    - 有责任感
+    appearance: 短发，眼神锐利，常穿深色作战服
+    relationship: []
+    goal: 寻找星痕背后的真相
+    secret: ''
+    background: 曾参与第七远征舰队
+    special_ability: 星痕感知
+  - name: 艾琳
     is_main: false
     role_tags:
-    - 妹妹
-    - 家族成员
+    - 考古语言学家
     personality_tags:
-    - 温柔
-    - 善良
-    - 软弱
-    - 依赖
-    appearance: 棕色短发，琥珀色眼眸，面容清秀，常穿素色和服。
+    - 热情
+    - 好奇
+    - 冲动
+    - 敏锐
+    appearance: 金色长发，碧绿色眼睛
     relationship:
-    - 妹妹
-    - 潜在对立
-    goal: 维系家族传统与亲情，反对姐姐的激进手段。
-    secret: 暗中与旧财阀势力有联系，试图阻止皋月改造家族。
-    background: 西园寺家次女，从小被教育遵守传统，对姐姐的突然转变感到不安，被旧势力利用。
-    special_ability: 无
-  - name: 约翰·摩根
-    is_main: false
-    role_tags:
-    - 华尔街代表
-    - 敌人
-    personality_tags:
-    - 冷酷
-    - 精明
-    - 傲慢
-    - 残忍
-    appearance: 金发蓝眼，身材高大，常穿定制西装，鹰钩鼻。
-    relationship:
-    - 仇敌
-    - 对手
-    goal: 维护华尔街金融霸权，摧毁西园寺财团。
-    secret: 涉嫌策划前世林月的死亡。
-    background: 摩根家族成员，华尔街顶级资本家，察觉皋月的异常，视其为威胁。
-    special_ability: 控制全球资本流动，拥有政经界影响力。
+    - 工作伙伴
+    goal: 破解星痕文字
+    secret: 能够听见遗迹中的低语
+    background: ''
+    special_ability: ''
   relationship_system:
     stages:
     - 陌生
-    - 对立
-    - 猜疑
-    - 试探
-    - 合作
-    - 同盟
-    - 羁绊
+    - 熟悉
+    - 朋友
+    - 信赖
+    - 暧昧
+    - 恋人
     affection: 0
-custom:
-  stats:
-  - key: finance
-    label: 金融力
-    max: 100
-  - key: influence
-    label: 影响力
-    max: 100
-  - key: trust
-    label: 信任度
-    max: 100
-  stages:
-  - 陌生
-  - 对立
-  - 猜疑
-  - 试探
-  - 合作
-  - 同盟
-  - 羁绊

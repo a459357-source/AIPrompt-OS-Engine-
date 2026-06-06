@@ -27,6 +27,8 @@ MEMORY_PATH          = DATA_DIR / "memory.json"
 SAVES_DIR            = DATA_DIR / "saves"
 WORLD_INIT_PATH      = DATA_DIR / "world_init.json"
 API_USAGE_PATH       = DATA_DIR / "api_usage.jsonl"
+LOG_PATH             = DATA_DIR / "app.log"
+ERROR_LOG_PATH       = DATA_DIR / "error.log"
 
 # ── Save system ────────────────────────────────────────────────────
 MAX_SAVE_SLOTS = 3
@@ -377,6 +379,44 @@ def save_obsidian_path(path: str) -> None:
     )
 
 OBSIDIAN_VAULT_PATH = _load_obsidian_path()
+
+# ── Logging setup ───────────────────────────────────────────────────
+
+def setup_logging():
+    """Configure Python logging: console + rotating file handlers."""
+    import logging
+    from logging.handlers import RotatingFileHandler
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    # File handler — all logs (rotating: 5 files × 2 MB)
+    fh = RotatingFileHandler(
+        str(LOG_PATH), maxBytes=2 * 1024 * 1024, backupCount=5, encoding="utf-8"
+    )
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    ))
+    root_logger.addHandler(fh)
+
+    # Error file handler — errors only
+    efh = RotatingFileHandler(
+        str(ERROR_LOG_PATH), maxBytes=1 * 1024 * 1024, backupCount=3, encoding="utf-8"
+    )
+    efh.setLevel(logging.ERROR)
+    efh.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s\n"
+        "  File: %(pathname)s:%(lineno)d\n"
+        "  Function: %(funcName)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    root_logger.addHandler(efh)
+
+    logging.getLogger("engine.deepseek_client").info("Logging initialized — app.log + error.log")
+
 
 # ── Engine constants ────────────────────────────────────────────────
 STATUS_ORDER = ["SETUP", "BUILD", "TENSION", "CLIMAX", "COOLDOWN"]

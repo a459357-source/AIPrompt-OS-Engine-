@@ -5,18 +5,47 @@ import type {
   GameTurnResponse,
   CustomRules,
 } from './types'
+import { logger } from './logger'
 
 const BASE = ''
 
 async function post<T>(url: string, body: Record<string, string>): Promise<T> {
   const params = new URLSearchParams(body)
-  const res = await fetch(`${BASE}${url}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString(),
-  })
-  const data = await res.json()
-  if (data.error) throw new Error(data.error)
+  const startTime = Date.now()
+  logger.info('API', `→ POST ${url}`, { ...body })
+
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${url}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    })
+  } catch (err) {
+    logger.error('API', `✗ POST ${url} — network error`, err)
+    throw err
+  }
+
+  if (!res.ok) {
+    logger.error('API', `✗ POST ${url} — HTTP ${res.status}`, { status: res.status })
+    throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+  }
+
+  let data: T & { error?: string }
+  try {
+    data = await res.json()
+  } catch (err) {
+    logger.error('API', `✗ POST ${url} — JSON parse failed`, err)
+    throw new Error('服务器返回了无效数据')
+  }
+
+  const elapsed = Date.now() - startTime
+  if (data.error) {
+    logger.warn('API', `✗ POST ${url} — ${elapsed}ms — ${data.error}`)
+    throw new Error(data.error)
+  }
+
+  logger.info('API', `✓ POST ${url} — ${elapsed}ms`)
   return data as T
 }
 

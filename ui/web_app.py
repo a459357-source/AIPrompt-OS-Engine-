@@ -37,6 +37,9 @@ from config import save_stream, reload_stream
 from config import save_context_settings, reload_context_settings
 import config
 
+# Initialize file logging for uvicorn workers
+config.setup_logging()
+
 app = FastAPI(
     title="Prompt OS Galgame Runtime",
     description="🎮 Interactive AI Narrative Engine — Web UI",

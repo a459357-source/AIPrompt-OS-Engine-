@@ -575,6 +575,9 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # Setup file logging
+    config.setup_logging()
+
     # Check API key
     if not args.dry_run and not config.DEEPSEEK_API_KEY:
         logger.error(
