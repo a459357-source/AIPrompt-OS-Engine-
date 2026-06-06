@@ -31,14 +31,7 @@ def call_deepseek(
 ) -> dict:
     """
     Call the DeepSeek Chat Completions API and return the parsed JSON body.
-
-    The API is expected to return a JSON object in the format:
-        {"story": "...", "state": {...}, "options": [...]}
-
-    Set skip_validation=True for endpoints that use a different response format
-    (e.g. world generation, field generation).
-
-    Raises DeepSeekError on HTTP failure or JSON parse failure.
+    Auto-retries with 2x max_tokens on JSON truncation (up to 2 retries).
     """
 
     headers = {
@@ -46,72 +39,87 @@ def call_deepseek(
         "Content-Type": "application/json",
     }
 
-    payload = {
-        "model": config.DEEPSEEK_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "temperature": temperature if temperature is not None else config.TEMPERATURE,
-        "max_tokens": max_tokens if max_tokens is not None else config.MAX_TOKENS,
-        "top_p": config.TOP_P,
-        "stream": False,  # JSON mode is incompatible with streaming
-        "response_format": {"type": "json_object"},  # force JSON output
-    }
+    temp = temperature if temperature is not None else config.TEMPERATURE
+    mt = max_tokens if max_tokens is not None else config.MAX_TOKENS
 
-    logger.info("Calling DeepSeek API → %s", config.DEEPSEEK_ENDPOINT)
-    logger.debug("Payload: %s", json.dumps(payload, ensure_ascii=False, indent=2))
+    for attempt in range(3):
+        payload = {
+            "model": config.DEEPSEEK_MODEL,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": temp,
+            "max_tokens": mt,
+            "top_p": config.TOP_P,
+            "stream": False,
+            "response_format": {"type": "json_object"},
+        }
 
-    try:
-        resp = requests.post(
-            config.DEEPSEEK_ENDPOINT,
-            headers=headers,
-            json=payload,
-            timeout=60,
-        )
-    except requests.RequestException as exc:
-        raise DeepSeekError(f"HTTP request failed: {exc}") from exc
+        logger.info("Calling DeepSeek API → %s (attempt %d, max_tokens=%d)",
+                     config.DEEPSEEK_ENDPOINT, attempt + 1, mt)
 
-    if resp.status_code != 200:
-        raise DeepSeekError(
-            f"API returned {resp.status_code}: {resp.text[:500]}"
-        )
+        try:
+            resp = requests.post(
+                config.DEEPSEEK_ENDPOINT,
+                headers=headers,
+                json=payload,
+                timeout=90,
+            )
+        except requests.RequestException as exc:
+            raise DeepSeekError(f"HTTP request failed: {exc}") from exc
 
-    body = resp.json()
-    logger.debug("Raw API response: %s", json.dumps(body, ensure_ascii=False, indent=2))
-
-    # Extract the assistant message content
-    try:
-        raw_content = body["choices"][0]["message"]["content"]
-    except (KeyError, IndexError) as exc:
-        raise DeepSeekError(f"Unexpected API response shape: {body}") from exc
-
-    # Parse the JSON inside the content string
-    try:
-        result = json.loads(raw_content)
-    except json.JSONDecodeError as exc:
-        # If the model returned markdown-fenced JSON, try to extract it
-        stripped = _extract_json_from_markdown(raw_content)
-        if stripped:
-            try:
-                result = json.loads(stripped)
-            except json.JSONDecodeError:
-                raise DeepSeekError(
-                    f"Model returned unparseable JSON: {raw_content[:500]}"
-                ) from exc
-        else:
+        if resp.status_code != 200:
             raise DeepSeekError(
-                f"Model returned unparseable JSON: {raw_content[:500]}"
-            ) from exc
+                f"API returned {resp.status_code}: {resp.text[:500]}"
+            )
 
-    # Validate required keys (skip for world/field generation endpoints)
-    if not skip_validation:
-        _validate_response(result)
+        body = resp.json()
 
-    # Log API usage for analytics
-    _log_usage(body, result)
+        try:
+            raw_content = body["choices"][0]["message"]["content"]
+        except (KeyError, IndexError) as exc:
+            raise DeepSeekError(f"Unexpected API response shape: {body}") from exc
 
-    return result
+        # Try parsing JSON
+        result = None
+        parse_error = None
+        try:
+            result = json.loads(raw_content)
+        except json.JSONDecodeError as exc:
+            parse_error = exc
+            stripped = _extract_json_from_markdown(raw_content)
+            if stripped:
+                try:
+                    result = json.loads(stripped)
+                    parse_error = None
+                except json.JSONDecodeError:
+                    pass
+
+        if result is not None:
+            if not skip_validation:
+                _validate_response(result)
+            _log_usage(body, result)
+            return result
+
+        # JSON parse failed — likely truncated, retry with more tokens
+        if attempt < 2:
+            new_mt = min(mt * 2, 16384)
+            if new_mt > mt:
+                logger.warning(
+                    "JSON parse failed (attempt %d), retrying with max_tokens=%d (was %d). "
+                    "Tip: increase 'AI 最大 Token' in settings.",
+                    attempt + 1, new_mt, mt
+                )
+                mt = new_mt
+                continue
+
+        # Final attempt failed
+        raise DeepSeekError(
+            f"AI 返回被截断，请到设置页面将「AI 最大 Token」调高（当前 {mt}）"
+        ) from parse_error
+
+    raise DeepSeekError("AI 生成失败，请重试")
 
 
 def _extract_json_from_markdown(text: str) -> str | None:

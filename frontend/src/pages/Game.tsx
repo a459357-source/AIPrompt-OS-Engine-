@@ -90,7 +90,12 @@ export default function Game() {
     } catch (e) {
       const msg = (e as Error).message || String(e)
       logger.error('Game', 'Choice failed', { error: msg })
-      setError(msg)
+      // Detect truncation errors and add settings link
+      if (msg.includes('截断') || msg.includes('Token') || msg.includes('unparseable')) {
+        setError(`${msg}。建议前往设置调高「AI 最大 Token」。`)
+      } else {
+        setError(msg)
+      }
     }
     setChoosing(false)
   }, [])
@@ -145,11 +150,17 @@ export default function Game() {
           className="flex flex-col items-center justify-center min-h-[50vh] gap-6 text-center"
         >
           <div className="text-5xl">❌</div>
-          <h2 className="text-lg font-bold text-game-danger">加载失败</h2>
-          <p className="text-game-muted text-sm">{error}</p>
-          <div className="flex gap-3">
+          <h2 className="text-lg font-bold text-game-danger">出错了</h2>
+          <p className="text-game-muted text-sm max-w-md">{error}</p>
+          <div className="flex gap-3 flex-wrap justify-center">
             <Button variant="outline" onClick={loadGame}>🔄 重试</Button>
-            <Button variant="glow" onClick={() => window.location.href = '/new'}>✨ 创建新故事</Button>
+            {error.includes('Token') || error.includes('截断') ? (
+              <Button variant="accent" onClick={() => window.location.href = '/settings'}>
+                ⚙️ 调整 Token 设置
+              </Button>
+            ) : (
+              <Button variant="glow" onClick={() => window.location.href = '/new'}>✨ 创建新故事</Button>
+            )}
           </div>
         </motion.div>
       )}
