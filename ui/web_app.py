@@ -21,6 +21,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from fastapi import FastAPI, Query, Request, Form
 from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from engine.run import step
 from engine import io_utils
 from engine import save_manager
@@ -35,6 +36,11 @@ app = FastAPI(
     description="🎮 Interactive AI Narrative Engine — Web UI",
     version="1.0.0",
 )
+
+# Serve local JS libraries for offline dashboard / graph pages
+_static_dir = config.OUTPUT_DIR
+_static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 # ── HTML template (inline) ────────────────────────────────────────
 
@@ -787,7 +793,7 @@ async def story_graph_page():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>剧情分支图 — 星痕纪元</title>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/static/mermaid.min.js"></script>
     <style>
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{
@@ -1936,8 +1942,13 @@ async def clear_settings():
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard():
     """Analytics dashboard with toggleable panels — uses unified engine."""
-    from engine.dashboard import build_html
-    return HTMLResponse(build_html())
+    from engine.dashboard import build_html, ensure_local_js
+    ensure_local_js()
+    html = build_html()
+    # Rewrite local paths for web serving
+    html = html.replace('./mermaid.min.js', '/static/mermaid.min.js')
+    html = html.replace('./chart.umd.min.js', '/static/chart.umd.min.js')
+    return HTMLResponse(html)
 
 
 @app.get("/export")

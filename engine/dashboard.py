@@ -21,6 +21,30 @@ from engine.analytics import compute_all
 
 logger = logging.getLogger(__name__)
 
+# CDN URLs & local filenames for offline bundling
+_JS_LIBS = {
+    "mermaid.min.js": "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js",
+    "chart.umd.min.js": "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js",
+}
+
+
+def ensure_local_js() -> None:
+    """Download Chart.js & Mermaid.js to output/ so HTML works offline."""
+    import urllib.request
+
+    out = config.OUTPUT_DIR
+    out.mkdir(parents=True, exist_ok=True)
+    for filename, url in _JS_LIBS.items():
+        dest = out / filename
+        if dest.exists():
+            continue
+        logger.info("Downloading %s → %s ...", filename, dest)
+        try:
+            urllib.request.urlretrieve(url, dest)
+            logger.info("Downloaded %s (%d bytes)", filename, dest.stat().st_size)
+        except Exception as exc:
+            logger.warning("Failed to download %s: %s", filename, exc)
+
 
 # ── Public API ──────────────────────────────────────────────────────
 
@@ -116,6 +140,7 @@ def write_standalone(output_path: Path | None = None) -> Path:
     """Write the dashboard HTML to disk. Returns the output path."""
     if output_path is None:
         output_path = config.DASHBOARD_HTML_PATH
+    ensure_local_js()
     html = build_html()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(html, encoding="utf-8")
@@ -268,8 +293,8 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>{world_title} — 剧情仪表盘</title>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="./mermaid.min.js"></script>
+<script src="./chart.umd.min.js"></script>
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:#0d1117;color:#c9d1d9;font-family:system-ui,sans-serif;min-height:100vh}}

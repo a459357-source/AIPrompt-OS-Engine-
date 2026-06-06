@@ -219,7 +219,7 @@ def export_graph_html(output_path: Path | None = None) -> Path:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>星痕纪元 — 剧情分支图</title>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="./mermaid.min.js"></script>
 <style>
   * {{ margin:0; padding:0; box-sizing:border-box; }}
   body {{
@@ -318,6 +318,13 @@ def export_graph_html(output_path: Path | None = None) -> Path:
 </script>
 </body>
 </html>"""
+
+    # Ensure Mermaid.js is available locally for offline use
+    try:
+        from engine.dashboard import ensure_local_js
+        ensure_local_js()
+    except Exception:
+        pass
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(html, encoding="utf-8")
