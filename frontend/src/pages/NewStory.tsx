@@ -264,7 +264,7 @@ export default function NewStory() {
     showStatus('正在创建故事…', 'loading')
     try {
       await createStory(fd)
-      window.location.href = '/'
+      window.location.href = '/game'
     } catch (e) {
       showStatus(`❌ ${(e as Error).message}`, 'error')
     }
