@@ -1326,14 +1326,14 @@ let charIdCounter = 2;
 function renderCharacters(){
     var html='';
     characters.forEach(function(c,i){
-        html+='<div class="char-card">'+
-            '<div class="ch-top"><span class="ch-num">'+(c.isMain?'⭐ 主角':'👤 NPC #'+(i+1))+'</span>'+
-            (characters.length>1?'<button class="ch-del" onclick="removeChar('+i+')" title="移除">×</button>':'')+
+        html+='<div class=\"char-card\">'+
+            '<div class=\"ch-top\"><span class=\"ch-num\">'+(c.isMain?'⭐ 主角':'👤 NPC #'+(i+1))+'</span>'+
+            (characters.length>1?'<button class=\"ch-del\" onclick=\"removeChar('+i+')\" title=\"移除\">×</button>':'')+
             '</div>'+
-            '<input placeholder="姓名" value="'+esc(c.name)+'" onchange="updateChar('+i+',\'name\',this.value)" required'+(i===0?'':'')+'>'+
-            '<input placeholder="身份 / 职业" value="'+esc(c.role)+'" onchange="updateChar('+i+',\'role\',this.value)">'+
-            '<input placeholder="性格描述（15-30字）" value="'+esc(c.note)+'" onchange="updateChar('+i+',\'note\',this.value)">'+
-            '<button type="button" class="ch-ai-btn" onclick="genCharacter('+i+')">✨ 生成此角色</button>'+
+            '<input placeholder=\"姓名\" value=\"'+esc(c.name)+'\" onchange=\"updateChar('+i+',&quot;name&quot;,this.value)\" required'+(i===0?'':'')+'>'+
+            '<input placeholder=\"身份 / 职业\" value=\"'+esc(c.role)+'\" onchange=\"updateChar('+i+',&quot;role&quot;,this.value)\">'+
+            '<input placeholder=\"性格描述（15-30字）\" value=\"'+esc(c.note)+'\" onchange=\"updateChar('+i+',&quot;note&quot;,this.value)\">'+
+            '<button type=\"button\" class=\"ch-ai-btn\" onclick=\"genCharacter('+i+')\">✨ 生成此角色</button>'+
             '</div>';
     });
     document.getElementById('charList').innerHTML=html;
