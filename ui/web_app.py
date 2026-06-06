@@ -101,10 +101,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
         .side-col {
             width: 240px; flex-shrink: 0; height: 100%;
-            transition: width 0.25s, opacity 0.25s;
+            transition: opacity 0.25s;
             overflow: hidden;
             display: flex; flex-direction: column;
         }
+        .resize-handle {
+            width: 5px; flex-shrink: 0; height: 100%;
+            background: transparent; cursor: col-resize;
+            transition: background 0.15s; z-index: 5;
+        }
+        .resize-handle:hover, .resize-handle.active { background: #30363d; }
         .side-col.collapsed {
             width: 28px; opacity: 0.6;
         }
@@ -398,6 +404,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         </div><!-- .main-col -->
 
+        <div class="resize-handle" id="resizeHandle"></div>
+
         <div class="side-col" id="sideCol">
             <button class="side-toggle" onclick="toggleSidebar()" title="折叠/展开角色面板">◀</button>
             <div class="side-inner">{{SIDEBAR}}</div>
@@ -471,6 +479,34 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             sc.classList.toggle('collapsed');
             btn.textContent = sc.classList.contains('collapsed') ? '▶' : '◀';
         }
+
+        // Resize handle: drag to adjust side panel width
+        (function(){
+            const handle = document.getElementById('resizeHandle');
+            const side = document.getElementById('sideCol');
+            let dragging = false, startX, startW;
+            handle.addEventListener('mousedown', function(e){
+                if(side.classList.contains('collapsed')) return;
+                dragging = true; startX = e.clientX; startW = side.offsetWidth;
+                handle.classList.add('active');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+            document.addEventListener('mousemove', function(e){
+                if(!dragging) return;
+                var newW = startW + startX - e.clientX;
+                newW = Math.max(160, Math.min(500, newW));
+                side.style.width = newW + 'px';
+            });
+            document.addEventListener('mouseup', function(){
+                if(!dragging) return;
+                dragging = false;
+                handle.classList.remove('active');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            });
+        })();
     </script>
 </body>
 </html>"""
