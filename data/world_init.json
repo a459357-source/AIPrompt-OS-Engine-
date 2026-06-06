@@ -1,0 +1,45 @@
+{
+  "state": {
+    "scene": "回声号 — 舰桥",
+    "status": "SETUP",
+    "turn": 0,
+    "characters": {
+      "A": {
+        "name": "主角",
+        "role": "",
+        "level": "L0",
+        "relation": "初识",
+        "note": ""
+      }
+    },
+    "history": [],
+    "force_event_pending": false,
+    "chapter": 1
+  },
+  "graph": {
+    "nodes": {
+      "0": {
+        "turn": 0,
+        "text": "初始场景：回声号 — 舰桥",
+        "scene": "回声号 — 舰桥",
+        "status": "SETUP",
+        "choices": {},
+        "parent": null,
+        "choice_taken": null
+      }
+    },
+    "current_node": "0",
+    "edges": []
+  },
+  "memory": {
+    "characters": {
+      "主角": {
+        "trust": 0.5,
+        "flags": [],
+        "relationship": "初识"
+      }
+    },
+    "world_flags": [],
+    "global_trust": 0.5
+  }
+}

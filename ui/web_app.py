@@ -1269,10 +1269,21 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
         </div>
 
         <div class="field-group">
-            <div class="fg-header"><label>🎭 类型 / 风格</label><span class="desc">点击下方标签选中，或自行输入后回车添加</span></div>
-            <div id="genreTags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
-            <div class="fg-row">
-                <input id="genreInput" placeholder="输入自定义风格后按回车添加…" style="flex:1" onkeydown="addGenreTag(event)">
+            <div class="fg-header"><label>🎭 类型 / 风格</label><span class="desc">下拉挑选 + 回车自定义，可多选</span></div>
+            <div id="genreTags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;min-height:28px"></div>
+            <div class="fg-row" style="gap:6px">
+                <select id="genreSelect" onchange="pickGenre(this.value);this.value=''" style="flex:1;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:5px;color:#c9d1d9;font-size:0.88em">
+                    <option value="">— 挑选风格标签 —</option>
+                    <option value="科幻">🚀 科幻</option><option value="冒险">⚔️ 冒险</option><option value="情感">💕 情感</option>
+                    <option value="校园">🌸 校园</option><option value="恋爱">💌 恋爱</option><option value="日常">☕ 日常</option>
+                    <option value="奇幻">🧙 奇幻</option><option value="成长">🌱 成长</option><option value="悬疑">🔍 悬疑</option>
+                    <option value="推理">🧩 推理</option><option value="都市">🏙️ 都市</option><option value="修仙">🏔️ 修仙</option>
+                    <option value="玄幻">✨ 玄幻</option><option value="热血">🔥 热血</option><option value="恐怖">👻 恐怖</option>
+                    <option value="惊悚">😱 惊悚</option><option value="生存">🏕️ 生存</option><option value="历史">🏯 历史</option>
+                    <option value="权谋">♟️ 权谋</option><option value="战争">⚡ 战争</option><option value="赛博朋克">🤖 赛博朋克</option>
+                    <option value="反乌托邦">🏚️ 反乌托邦</option>
+                </select>
+                <input id="genreInput" placeholder="输入自定义，回车添加…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomGenre()}">
             </div>
             <input type="hidden" name="genre" id="f_genre" value="科幻 / 冒险 / 情感">
         </div>
@@ -1344,45 +1355,34 @@ function prepareSubmit(){
 renderCharacters();
 
 // ── Genre tag management ──
-var genrePresets=['科幻','冒险','情感','校园','恋爱','日常','奇幻','成长','悬疑','推理','都市','修仙','玄幻','热血','恐怖','惊悚','生存','历史','权谋','战争','赛博朋克','反乌托邦'];
 var selectedGenres=['科幻','冒险','情感'];
 function renderGenreTags(){
     var html='';
-    genrePresets.forEach(function(g){
-        var active=selectedGenres.indexOf(g)>=0;
-        html+='<span class="genre-tag'+(active?' active':'')+'" onclick="toggleGenre(\''+g+'\')" style="display:inline-block;padding:4px 12px;background:'+(active?'#1a3a5c':'#1c2333')+';border:1px solid '+(active?'#58a6ff':'#30363d')+';border-radius:14px;color:'+(active?'#58a6ff':'#8b949e')+';font-size:0.78em;cursor:pointer;transition:all 0.12s;user-select:none">'+g+'</span>';
-    });
-    // Show selected custom tags
     selectedGenres.forEach(function(g){
-        if(genrePresets.indexOf(g)<0){
-            html+='<span class="genre-tag active" onclick="removeGenre(\''+g+'\')" style="display:inline-block;padding:4px 12px;background:#1a3a5c;border:1px solid #58a6ff;border-radius:14px;color:#58a6ff;font-size:0.78em;cursor:pointer;transition:all 0.12s;user-select:none">'+g+' ×</span>';
-        }
+        html+='<span onclick="removeGenre(\''+g.replace(/'/g,'\\\'')+'\')" style="display:inline-block;padding:4px 12px;background:#1a3a5c;border:1px solid #58a6ff;border-radius:14px;color:#58a6ff;font-size:0.78em;cursor:pointer;transition:all 0.12s;user-select:none" title="点击移除">'+g+' ×</span>';
     });
-    document.getElementById('genreTags').innerHTML=html;
+    document.getElementById('genreTags').innerHTML=html||'<span style="color:#484f58;font-size:0.78em">从下拉菜单挑选，或输入自定义风格</span>';
     document.getElementById('f_genre').value=selectedGenres.join(' / ');
 }
-function toggleGenre(g){
-    var idx=selectedGenres.indexOf(g);
-    if(idx>=0) selectedGenres.splice(idx,1);
-    else selectedGenres.push(g);
-    renderGenreTags();
+function pickGenre(g){
+    if(!g)return;
+    if(selectedGenres.indexOf(g)<0){
+        selectedGenres.push(g);
+        renderGenreTags();
+    }
 }
-function removeGenre(g){
-    var idx=selectedGenres.indexOf(g);
-    if(idx>=0) selectedGenres.splice(idx,1);
-    renderGenreTags();
-}
-function addGenreTag(e){
-    if(e.key!=='Enter')return;
-    e.preventDefault();
+function addCustomGenre(){
     var val=document.getElementById('genreInput').value.trim();
     if(!val)return;
     if(selectedGenres.indexOf(val)<0){
         selectedGenres.push(val);
-        if(genrePresets.indexOf(val)<0) genrePresets.push(val);
         renderGenreTags();
     }
     document.getElementById('genreInput').value='';
+}
+function removeGenre(g){
+    var idx=selectedGenres.indexOf(g);
+    if(idx>=0){selectedGenres.splice(idx,1);renderGenreTags();}
 }
 renderGenreTags();
 
@@ -1399,7 +1399,6 @@ function loadPreset(key,btn){
     document.getElementById('f_scene').value=p.scene;
     // Parse genre into tags
     selectedGenres=p.genre.split('/').map(function(s){return s.trim();}).filter(Boolean);
-    selectedGenres.forEach(function(g){if(genrePresets.indexOf(g)<0)genrePresets.push(g);});
     renderGenreTags();
     characters=[
         {name:p.char1_name,role:p.char1_role,note:p.char1_note,isMain:true},

@@ -1,39 +1,11 @@
-# ─────────────────────────────────────────────────────────────────
-# Prompt OS Engine Lite v1 — World Pack
-# ─────────────────────────────────────────────────────────────────
-# This file defines the world, lore, and starting scenario.
-# The engine reads this every turn and includes it in the AI prompt.
-# ─────────────────────────────────────────────────────────────────
-
 world:
-  title: "星痕纪元 — Epoch of Starlight"
-  genre: "科幻 / 冒险 / 情感"
-  era: "公元 2247 年"
-
-  setting: >
-    人类已进入星际殖民时代。在银河系边缘的「碎星带」，
-    一艘名为「回声号」的调查船发现了一处远古外星遗迹。
-    遗迹中封存着名为「星痕」的神秘能量，能改写物质与意识。
-    但激活星痕的同时，也唤醒了沉睡的守护者。
-
-  factions:
-    - name: "星联（Stellar Union）"
-      role: "人类政府，追求秩序与控制"
-    - name: "自由航行者（Free Navigators）"
-      role: "独立探险者联盟，反对星联垄断"
-    - name: "守护者（Guardians）"
-      role: "远古AI实体，保护遗迹"
-
+  title: 星痕纪元
+  genre: 科幻 / 冒险 / 情感
+  era: 故事开端
+  setting: 公元2247年，人类已进入星际殖民时代……
+  factions: []
   locations:
-    - name: "回声号"
-      desc: "中型调查船，搭载6名船员"
-    - name: "遗迹核心"
-      desc: "星痕能量的源头，充满未知"
-    - name: "碎星带空间站"
-      desc: "边缘地带的中立交易站"
-
-  tone: "在宏大科幻背景下，聚焦人物情感与选择"
-  themes:
-    - "记忆与身份"
-    - "自由与秩序"
-    - "人类与未知"
+  - name: 回声号 — 舰桥
+    desc: 初始场景
+  tone: 聚焦人物情感与选择
+  themes: []

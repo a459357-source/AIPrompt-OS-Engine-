@@ -1,63 +1,20 @@
 {
   "characters": {
-    "林夜": {
-      "trust": 0.81,
-      "flags": [
-        "接触遗迹核心",
-        "感知星痕能量",
-        "星联介入"
-      ],
-      "relationship": "船长，初识",
-      "metric_history": {
-        "trust": [
-          [
-            1,
-            0.6
-          ],
-          [
-            1,
-            0.75
-          ],
-          [
-            1,
-            0.77
-          ],
-          [
-            1,
-            0.79
-          ],
-          [
-            1,
-            0.81
-          ]
-        ]
-      }
-    },
-    "艾琳": {
-      "trust": 0.81,
+    "主角": {
+      "trust": 0.5,
       "flags": [],
-      "relationship": "考古语言学家，初识",
+      "relationship": "初识"
+    },
+    "伊芙": {
+      "trust": 0.5,
+      "flags": [],
+      "relationship": "初识",
+      "role": "AI助手",
       "metric_history": {
         "trust": [
           [
             1,
-            0.6
-          ],
-          [
-            1,
-            0.75
-          ],
-          [
-            1,
-            0.77
-          ],
-          [
-            1,
-            0.79
-          ],
-          [
-            1,
-            0.81
+            0.5
           ]
         ]
       }
@@ -65,30 +22,5 @@
   },
   "world_flags": [],
   "global_trust": 0.5,
-  "factions": {
-    "星联（Stellar Union）": {
-      "reputation": 0.5,
-      "flags": [],
-      "role": "人类政府，追求秩序与控制",
-      "metric_history": {
-        "reputation": []
-      }
-    },
-    "自由航行者（Free Navigators）": {
-      "reputation": 0.5,
-      "flags": [],
-      "role": "独立探险者联盟，反对星联垄断",
-      "metric_history": {
-        "reputation": []
-      }
-    },
-    "守护者（Guardians）": {
-      "reputation": 0.5,
-      "flags": [],
-      "role": "远古AI实体，保护遗迹",
-      "metric_history": {
-        "reputation": []
-      }
-    }
-  }
+  "factions": {}
 }
