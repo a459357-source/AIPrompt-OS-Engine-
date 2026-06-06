@@ -3,18 +3,18 @@
 
 @theme {
   --color-game-bg: #0d1117;
-  --color-game-surface: #161b22;
-  --color-game-card: #1c2333;
-  --color-game-border: #30363d;
-  --color-game-primary: #58a6ff;
-  --color-game-accent: #d2a8ff;
-  --color-game-success: #7ee787;
-  --color-game-warning: #ffa657;
-  --color-game-danger: #f85149;
-  --color-game-text: #c9d1d9;
-  --color-game-muted: #8b949e;
-  --color-game-dim: #484f58;
-  --color-game-secret: #4a3060;
+  --color-game-surface: #1a1f2b;
+  --color-game-card: #1e2433;
+  --color-game-border: #3a4050;
+  --color-game-primary: #6cb6ff;
+  --color-game-accent: #dfb8ff;
+  --color-game-success: #8aef93;
+  --color-game-warning: #ffb870;
+  --color-game-danger: #ff6b6b;
+  --color-game-text: #e2e5ea;
+  --color-game-muted: #a0aab4;
+  --color-game-dim: #6e7681;
+  --color-game-secret: #5a3d72;
   --radius-game: 0.5rem;
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;

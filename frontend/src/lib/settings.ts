@@ -92,7 +92,7 @@ export function applySettings(s: AppSettings) {
 
   // Background theme
   const bgMap: Record<string, { bg: string; surface: string; card: string; text: string }> = {
-    dark: { bg: '#0d1117', surface: '#161b22', card: '#1c2333', text: '#c9d1d9' },
+    dark: { bg: '#0d1117', surface: '#1a1f2b', card: '#1e2433', text: '#e2e5ea' },
     sepia: { bg: '#2a2218', surface: '#332b1f', card: '#3d3326', text: '#d4c5a9' },
     gray: { bg: '#1a1a1a', surface: '#222222', card: '#2a2a2a', text: '#cccccc' },
   }
