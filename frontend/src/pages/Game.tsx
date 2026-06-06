@@ -171,7 +171,7 @@ export default function Game() {
                 >
                   {status}
                 </Badge>
-                {scene && <span className="text-game-dim text-xs truncate max-w-[200px]">📍 {scene}</span>}
+                {scene && <span className="text-game-muted text-xs truncate max-w-[250px]">📍 {scene}</span>}
               </div>
 
               <Button
@@ -209,7 +209,7 @@ export default function Game() {
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-game-muted font-medium">🎯 做出你的选择</p>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-game-dim hidden sm:inline">
+                      <span className="text-[10px] text-game-muted/80 hidden sm:inline">
                         {showConsequences ? 'AI 预测每个选项的剧情发展和好感影响' : '已隐藏剧情推测'}
                       </span>
                       <button
