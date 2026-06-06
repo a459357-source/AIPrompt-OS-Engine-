@@ -148,6 +148,22 @@ export interface DashboardData {
   error?: string
 }
 
+// ── History ──
+export interface HistoryTurn {
+  turn: number
+  story: string
+  options: string[]
+  choice: string
+  status: string
+  scene: string
+}
+
+export async function getHistory(): Promise<{ turns: HistoryTurn[]; total: number; error?: string }> {
+  const res = await fetch('/api/history')
+  if (!res.ok) return { turns: [], total: 0, error: `HTTP ${res.status}` }
+  return res.json()
+}
+
 export async function getDashboard(): Promise<DashboardData> {
   const res = await fetch('/api/dashboard')
   if (!res.ok) return { turn: 0, status: '', scene: '', chapter: 0, word_count: 0, character_count: 0, branch_count: 0, node_count: 0, api_calls: 0, total_tokens: 0, characters: [], history: [], error: `HTTP ${res.status}` }

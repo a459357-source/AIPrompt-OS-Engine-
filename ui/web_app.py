@@ -221,6 +221,29 @@ async def api_generate_npc(role_hint: str = Form("")):
     return JSONResponse(ch)
 
 
+@app.get("/api/history")
+async def api_history():
+    """Return the full story history as JSON."""
+    from fastapi.responses import JSONResponse
+    try:
+        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+    except Exception:
+        return JSONResponse({"turns": []})
+
+    history = state.get("history", [])
+    turns = []
+    for h in history:
+        turns.append({
+            "turn": h.get("turn", 0),
+            "story": h.get("story", ""),
+            "options": h.get("options", []),
+            "choice": h.get("choice", ""),
+            "status": h.get("status", ""),
+            "scene": h.get("scene", ""),
+        })
+    return JSONResponse({"turns": turns, "total": len(turns)})
+
+
 @app.get("/api/dashboard")
 async def api_dashboard():
     """Return dashboard stats as JSON."""

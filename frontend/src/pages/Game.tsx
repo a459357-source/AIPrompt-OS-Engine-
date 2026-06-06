@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { StatusToast } from '@/components/StatusToast'
-import { getGameState, nextTurn } from '@/lib/api'
+import { getGameState, nextTurn, getHistory, type HistoryTurn } from '@/lib/api'
 import { logger } from '@/lib/logger'
 
 
@@ -41,6 +41,8 @@ export default function Game() {
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [charPanelOpen, setCharPanelOpen] = useState(false)
   const [showConsequences, setShowConsequences] = useState(true)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [history, setHistory] = useState<HistoryTurn[]>([])
 
   const loadGame = useCallback(async () => {
     setLoading(true)
@@ -174,17 +176,31 @@ export default function Game() {
                 {scene && <span className="text-game-muted text-xs truncate max-w-[250px]">📍 {scene}</span>}
               </div>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1.5 text-game-muted hover:text-game-text"
-                onClick={() => setCharPanelOpen(!charPanelOpen)}
-              >
-                👥 角色
-                {characters.length > 0 && (
-                  <Badge variant="accent" size="sm" className="ml-0.5">{characters.length}</Badge>
-                )}
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1 text-game-muted hover:text-game-text"
+                  onClick={async () => {
+                    setHistoryOpen(true)
+                    const data = await getHistory()
+                    if (!data.error) setHistory(data.turns)
+                  }}
+                >
+                  📜 回顾
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-game-muted hover:text-game-text"
+                  onClick={() => setCharPanelOpen(!charPanelOpen)}
+                >
+                  👥 角色
+                  {characters.length > 0 && (
+                    <Badge variant="accent" size="sm" className="ml-0.5">{characters.length}</Badge>
+                  )}
+                </Button>
+              </div>
             </div>
 
             {/* Story */}
@@ -302,6 +318,92 @@ export default function Game() {
               <CharacterList />
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── History Dialog ── */}
+      {historyOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-12 px-4">
+          <div className="fixed inset-0 bg-black/70" onClick={() => setHistoryOpen(false)} />
+          <div className="relative z-50 w-full max-w-2xl max-h-[85vh] bg-game-card border border-game-border rounded-lg shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-game-border shrink-0">
+              <h2 className="text-base font-bold text-game-accent">📜 剧情回顾</h2>
+              <div className="flex items-center gap-2">
+                {/* Download with options */}
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => {
+                    const text = history.map((h) => {
+                      const opts = h.options.length > 0 ? '\n选项：\n' + h.options.map((o, i) => `  ${String.fromCharCode(65 + i)}. ${o}`).join('\n') : ''
+                      const choice = h.choice ? `\n👉 选择：${h.choice}` : ''
+                      return `第${h.turn}轮 [${h.status}] ${h.scene || ''}\n${'─'.repeat(40)}\n${h.story}${choice}${opts}\n`
+                    }).join('\n\n')
+                    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+                    const a = document.createElement('a')
+                    a.href = URL.createObjectURL(blob)
+                    a.download = `剧情回顾_含选项.txt`
+                    a.click()
+                  }}
+                >
+                  ⬇ 含选项
+                </Button>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => {
+                    const text = history.map((h) =>
+                      `第${h.turn}轮 [${h.status}] ${h.scene || ''}\n${'─'.repeat(40)}\n${h.story}\n`
+                    ).join('\n\n')
+                    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+                    const a = document.createElement('a')
+                    a.href = URL.createObjectURL(blob)
+                    a.download = `剧情回顾_纯正文.txt`
+                    a.click()
+                  }}
+                >
+                  ⬇ 纯正文
+                </Button>
+                <button onClick={() => setHistoryOpen(false)} className="text-game-muted hover:text-game-text text-lg px-1">✕</button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="overflow-y-auto p-5 space-y-6 flex-1">
+              {history.length === 0 ? (
+                <p className="text-game-muted text-center py-8">暂无剧情记录</p>
+              ) : (
+                history.map((h, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-game-muted">
+                      <Badge variant="primary" size="sm">第{h.turn}轮</Badge>
+                      <Badge variant="outline" size="sm">{h.status}</Badge>
+                      {h.scene && <span>📍 {h.scene}</span>}
+                    </div>
+                    <div className="text-sm text-game-text leading-relaxed whitespace-pre-wrap">
+                      {h.story}
+                    </div>
+                    {h.choice && (
+                      <div className="bg-game-surface border border-game-border rounded-md px-3 py-2 text-sm">
+                        <span className="text-game-accent font-medium">👉 选择：</span>
+                        <span className="text-game-text">{h.choice}</span>
+                      </div>
+                    )}
+                    {h.options.length > 0 && !h.choice && (
+                      <div className="text-xs text-game-dim space-y-0.5">
+                        <span className="text-game-muted">可选项：</span>
+                        {h.options.map((o, j) => (
+                          <span key={j} className="block ml-3">{String.fromCharCode(65 + j)}. {o.split('→')[0].trim()}</span>
+                        ))}
+                      </div>
+                    )}
+                    {i < history.length - 1 && <div className="border-t border-game-border pt-4" />}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
