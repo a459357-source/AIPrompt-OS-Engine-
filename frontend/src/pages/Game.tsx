@@ -117,7 +117,7 @@ export default function Game() {
   )
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <StatusToast
         message={loading ? '正在生成开篇剧情…' : error ? `❌ ${error}` : ''}
         type={loading ? 'loading' : error ? 'error' : 'info'}
@@ -193,7 +193,7 @@ export default function Game() {
 
           {/* Story */}
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 md:px-8">
               <motion.div
                 key={turn}
                 initial={{ opacity: 0, y: 10 }}
@@ -206,7 +206,7 @@ export default function Game() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.08 }}
-                    className="text-game-text leading-relaxed text-[15px] mb-4"
+                    className="text-game-text leading-relaxed text-[16px] mb-5"
                   >
                     {paragraph}
                   </motion.p>
