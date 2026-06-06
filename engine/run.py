@@ -43,7 +43,7 @@ from engine.memory import (
     get_context_for_prompt, guess_trust_delta_from_story,
     init_factions, update_faction_reputation, set_faction_flag,
     assign_character_tier, degrade_inactive_characters,
-    build_character_tier_context,
+    build_character_tier_context, promote_to_core, remove_core_status,
 )
 from engine.save_manager import autosave as do_autosave
 from engine import obsidian_live

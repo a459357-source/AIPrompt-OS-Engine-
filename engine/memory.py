@@ -398,13 +398,14 @@ def get_char_stats_for_ui(session_state: dict, memory: dict, world_pack: dict | 
 # ═══════════════════════════════════════════════════════════════════
 #
 #  Four tiers with hard capacity limits:
-#    主角 (max 1)  → 核心 (max 6)  → 重要 (max 15)  → 背景 (unlimited)
+#    主角 (max 1)  → 核心 (max 6, PERMANENT)  → 重要 (max 15)  → 背景 (unlimited)
 #
 #  Lifecycle:
 #    NEW → tier assigned (respecting caps)
-#        → inactive too long → auto-degrade
-#        → goal complete → retire
-#    Retired/BG chars can be reactivated when capacity frees up.
+#    核心 → NEVER auto-degrades; only removed via death/permanent exit/break-up/forced departure
+#    重要 → inactive too long → auto-degrade to 背景
+#    核心 slot opens → promote from 重要 (priority)
+#    Goal complete → retire
 # ═══════════════════════════════════════════════════════════════════
 
 def get_tier_counts(memory: dict) -> dict[str, int]:
@@ -484,8 +485,9 @@ def assign_character_tier(memory: dict, name: str,
 def degrade_inactive_characters(memory: dict, current_turn: int) -> list[str]:
     """
     Degrade characters that haven't appeared for TIER_DEGRADATION_TURNS.
-    Degradation chain: 核心 → 重要 → 背景.
-    主角 is never degraded. 背景 is the floor.
+    Degradation chain: 重要 → 背景.
+    主角 and 核心 are never auto-degraded. 背景 is the floor.
+    核心 only loses status via remove_core_status() (death/permanent exit/etc).
 
     Returns list of degradation messages for logging.
     """
@@ -495,8 +497,8 @@ def degrade_inactive_characters(memory: dict, current_turn: int) -> list[str]:
 
     for name, data in chars.items():
         tier = data.get("tier", "")
-        if tier in ("主角", "退休", "背景"):
-            continue  # never degrade these
+        if tier in ("主角", "核心", "退休", "背景"):
+            continue  # never degrade these — 核心 is permanent
 
         last_appearance = data.get("last_appearance_turn", 0)
         if last_appearance == 0:
@@ -517,6 +519,92 @@ def degrade_inactive_characters(memory: dict, current_turn: int) -> list[str]:
                 logger.info(msg)
 
     return messages
+
+
+# ── Core slot lifecycle ─────────────────────────────────────────
+# 核心角色 is PERMANENT — only removed via death / permanent exit /
+# player break-up / forced story departure.  Never auto-degrades.
+
+# Valid reasons for losing core status
+CORE_REMOVAL_REASONS = ["死亡", "永久退场", "玩家主动决裂", "剧情强制离队"]
+
+
+def remove_core_status(memory: dict, name: str, reason: str) -> bool:
+    """
+    Strip a character's 核心 status for one of the four allowed reasons.
+    The character is moved to 退休 (since these are permanent exits).
+
+    Allowed reasons: 死亡, 永久退场, 玩家主动决裂, 剧情强制离队
+
+    Returns True on success, False if character not found or not 核心.
+    """
+    chars = memory.get("characters", {})
+    if name not in chars:
+        logger.warning("Core: cannot remove core status from unknown '%s'", name)
+        return False
+
+    entry = chars[name]
+    if entry.get("tier") != "核心":
+        logger.warning("Core: '%s' is not a 核心 character (tier=%s)", name, entry.get("tier"))
+        return False
+
+    if reason not in CORE_REMOVAL_REASONS:
+        logger.warning(
+            "Core: reason '%s' not in allowed list %s — still applying",
+            reason, CORE_REMOVAL_REASONS,
+        )
+
+    entry["tier"] = "退休"
+    entry["retired"] = True
+    entry["retirement_reason"] = f"核心移除: {reason}"
+    entry["core_removal_reason"] = reason
+    logger.info("Core: %s 失去核心身份 → 退休 (原因: %s)", name, reason)
+    return True
+
+
+def promote_to_core(memory: dict, name: str) -> bool:
+    """
+    Promote a 重要 character to 核心 when a core slot opens up.
+    Checks capacity before promoting.
+
+    Returns True on success, False if no slot or character not eligible.
+    """
+    chars = memory.get("characters", {})
+    if name not in chars:
+        logger.warning("Core: cannot promote unknown character '%s'", name)
+        return False
+
+    entry = chars[name]
+    current_tier = entry.get("tier", "")
+
+    if current_tier == "核心":
+        logger.info("Core: '%s' is already 核心", name)
+        return True
+
+    if current_tier == "主角":
+        logger.info("Core: '%s' is already 主角 (above 核心)", name)
+        return True
+
+    if current_tier == "退休":
+        # Reactivate first, then promote
+        entry.pop("retired", None)
+        entry.pop("retirement_reason", None)
+        logger.info("Core: '%s' reactivated from retirement for promotion", name)
+
+    # Check capacity
+    counts = get_tier_counts(memory)
+    if counts.get("核心", 0) >= config.CHARACTER_TIER_LIMITS["核心"]:
+        logger.warning("Core: 核心 slots full (%d/%d), cannot promote '%s'",
+                       counts["核心"], config.CHARACTER_TIER_LIMITS["核心"], name)
+        return False
+
+    old_tier = current_tier
+    entry["tier"] = "核心"
+    # Clear any retirement flags
+    entry.pop("retired", None)
+    entry.pop("retirement_reason", None)
+    logger.info("Core: %s 晋升 %s → 核心", name, old_tier or "未分类")
+    return True
 
 
 def retire_character(memory: dict, name: str, reason: str = "") -> bool:
