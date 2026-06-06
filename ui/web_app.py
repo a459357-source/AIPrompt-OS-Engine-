@@ -204,6 +204,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             max-width: 900px; width: 100%;
             font-size: 0.82em; flex-wrap: wrap;
         }
+        body.wide-layout .state-panel,
+        body.wide-layout .story-block,
+        body.wide-layout .options,
+        body.wide-layout .custom-choice,
+        body.wide-layout .toolbar { max-width: none; }
         .state-panel .sep {
             color: #30363d; margin: 0 2px;
         }
@@ -396,7 +401,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             {{ERROR}}
 
-            <div class="state-panel">{{STATE_ROW}} <span id="connDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#484f58;margin-left:8px;flex-shrink:0" title="连接状态"></span></div>
+            <div class="state-panel">{{STATE_ROW}} <span id="widthToggle" onclick="toggleWidth()" title="切换宽屏/窄屏阅读模式" style="display:inline-block;width:20px;height:20px;line-height:18px;text-align:center;border:1px solid #30363d;border-radius:4px;color:#8b949e;cursor:pointer;font-size:0.7em;margin-left:4px;flex-shrink:0;user-select:none">↔</span> <span id="connDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#484f58;margin-left:2px;flex-shrink:0" title="连接状态"></span></div>
 
             <div class="story-block">{{STORY}}</div>
 
@@ -547,6 +552,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         })();
 
 
+
+        // ── Width toggle ──
+        function toggleWidth(){
+            var wide = document.body.classList.toggle('wide-layout');
+            localStorage.setItem('wideLayout', wide ? '1' : '0');
+            var btn = document.getElementById('widthToggle');
+            btn.style.color = wide ? '#58a6ff' : '#8b949e';
+            btn.style.borderColor = wide ? '#58a6ff' : '#30363d';
+        }
+        if(localStorage.getItem('wideLayout') === '1'){
+            document.body.classList.add('wide-layout');
+            var btn = document.getElementById('widthToggle');
+            if(btn){ btn.style.color = '#58a6ff'; btn.style.borderColor = '#58a6ff'; }
+        }
 
         // ── Connection indicator ──
         const connDot = document.getElementById('connDot');
