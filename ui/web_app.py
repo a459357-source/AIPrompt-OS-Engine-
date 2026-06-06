@@ -1328,7 +1328,7 @@ function renderCharacters(){
     characters.forEach(function(c,i){
         html+='<div class=\"char-card\">'+
             '<div class=\"ch-top\"><span class=\"ch-num\">'+(c.isMain?'⭐ 主角':'👤 NPC #'+(i+1))+'</span>'+
-            (characters.length>1?'<button class=\"ch-del\" onclick=\"removeChar('+i+')\" title=\"移除\">×</button>':'')+
+            (!c.isMain && characters.length>1?'<button class=\"ch-del\" onclick=\"removeChar('+i+')\" title=\"移除\">×</button>':'')+
             '</div>'+
             '<input placeholder=\"姓名\" value=\"'+esc(c.name)+'\" onchange=\"updateChar('+i+',&quot;name&quot;,this.value)\" required'+(i===0?'':'')+'>'+
             '<input placeholder=\"身份 / 职业\" value=\"'+esc(c.role)+'\" onchange=\"updateChar('+i+',&quot;role&quot;,this.value)\">'+
@@ -1345,9 +1345,9 @@ function addCharacter(){
     renderCharacters();
 }
 function removeChar(i){
-    if(characters.length<=1)return;
+    if(characters[i].isMain) return; // 主角不可删除
+    if(characters.length<=1) return;
     characters.splice(i,1);
-    if(i===0 && characters.length>0) characters[0].isMain=true;
     renderCharacters();
 }
 function prepareSubmit(){
