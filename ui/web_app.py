@@ -2031,7 +2031,11 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
         result = call_deepseek(system, user, temperature=0.9, max_tokens=512, skip_validation=True)
         # For character field, try to parse JSON from response
         if field == "character":
-            story = result.get("story", "")
+            # The result might already be the character object (skip_validation mode)
+            # or wrapped in a {"story": "..."} envelope
+            if "name" in result and "role_tags" in result:
+                return JR(result)
+            story = result.get("story", "") or result.get("name", "") or ""
             import re as _re
             m = _re.search(r'\{[^{}]*\{[^{}]*\}[^{}]*\}', story)
             if not m:
@@ -2042,7 +2046,7 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
                     return JR(_json.loads(m.group()))
                 except Exception:
                     pass
-            return JR({"name": story.strip()[:20], "role_tags": [char_role] if char_role else [], "isMain": False})
+            return JR({"name": story.strip()[:20], "role_tags": [char_role] if char_role else [], "isMain": False, "personality_tags": [], "appearance": "", "relationship": [], "goal": "", "secret": ""})
         if field == "genre":
             story = result.get("story", "")
             import re as _re2
