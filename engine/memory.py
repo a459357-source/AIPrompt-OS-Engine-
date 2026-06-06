@@ -249,6 +249,65 @@ def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | Non
     return results
 
 
+def parse_option_trust_deltas(options: list[str]) -> list[tuple[str, float]]:
+    """
+    Parse AI-generated trust hints from option strings.
+
+    The AI writes hints like:
+      "艾琳↑5、林夜↓3、新人+10"
+      "与皋月并肩作战，近卫↑8、卡洛琳↓5"
+
+    Patterns matched:
+      name↑N   → +N/100
+      name↓N   → -N/100
+      name+N   → +N/100
+      name-N   → -N/100
+      name➕N  → +N/100
+      name➖N  → -N/100
+
+    Returns list of (character_name, delta) where delta is in 0-1 range.
+    """
+    import re
+
+    results: list[tuple[str, float]] = []
+
+    # Pattern: Chinese/English name followed by ↑↓+-➕➖ and a number
+    # Chinese names: up to 12 chars including middle dot (e.g. 卡洛琳·福斯特)
+    # ASCII names: 2-20 word chars
+    pattern = re.compile(
+        r'([\u4e00-\u9fff·]{1,12}|[A-Za-z_]\w{1,19})\s*'
+        r'([↑➕\+↓➖\-])\s*'
+        r'(\d+)'
+    )
+
+    for opt in options:
+        if not isinstance(opt, str):
+            continue
+        # Focus on the third segment (trust hints) if pipe-delimited
+        # Format: "action→consequence|attitude|trust hints"
+        segments = opt.split("|")
+        target = segments[-1] if segments else opt
+
+        for match in pattern.finditer(target):
+            name = match.group(1)
+            arrow = match.group(2)
+            value = int(match.group(3))
+
+            # Determine direction and magnitude
+            if arrow in ('↑', '➕', '+'):
+                delta = value / 100.0  # e.g. 5 → 0.05
+            elif arrow in ('↓', '➖', '-'):
+                delta = -value / 100.0
+            else:
+                continue  # shouldn't happen due to regex
+
+            # Clamp to reasonable bounds
+            delta = max(-1.0, min(1.0, delta))
+            results.append((name, delta))
+
+    return results
+
+
 # ── UI helpers ─────────────────────────────────────────────────────
 
 # 7-stage affection progression

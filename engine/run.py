@@ -41,6 +41,7 @@ from engine.router import load_graph, save_graph, get_current_node, append_node
 from engine.memory import (
     load_memory, save_memory, update_trust, set_flag,
     get_context_for_prompt, guess_trust_delta_from_story,
+    parse_option_trust_deltas,
     init_factions, update_faction_reputation, set_faction_flag,
     assign_character_tier, degrade_inactive_characters,
     build_character_tier_context, promote_to_core, remove_core_status,
@@ -448,7 +449,25 @@ def _update_memory(response: dict, state: dict) -> None:
         for msg in degrade_messages:
             logger.info(msg)
 
-        # Heuristic trust deltas from story keywords
+        # ── Option trust deltas (AI-explicit, highest priority) ──
+        options = response.get("options", [])
+        option_deltas = parse_option_trust_deltas(options)
+        for char_name, delta in option_deltas:
+            # Match against known characters (fuzzy: name must be in the character key)
+            matched = False
+            for mem_name in list(mem_chars.keys()):
+                if char_name in mem_name or mem_name in char_name:
+                    update_trust(memory, mem_name, delta, turn)
+                    matched = True
+                    logger.info("Memory: option trust delta %s %+.2f (matched '%s')",
+                                mem_name, delta, char_name)
+            if not matched:
+                # Character not in memory yet — register and apply
+                update_trust(memory, char_name, delta, turn)
+                logger.info("Memory: option trust delta %s %+.2f (new char, auto-registered)",
+                            char_name, delta)
+
+        # Heuristic trust deltas from story keywords (fallback)
         deltas = guess_trust_delta_from_story(story)
         for char_name, delta, flag in deltas:
             # Apply to all known characters
