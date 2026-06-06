@@ -140,27 +140,38 @@ function TagInput({
 // ── AI Button Component ──
 function AIButton({
   loading,
+  error,
   onClick,
   children,
 }: {
   loading: boolean
+  error?: string | null
   onClick: () => void
   children: string
 }) {
   return (
-    <button
-      type="button"
-      disabled={loading}
-      onClick={onClick}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-game-accent/50 rounded-md text-game-accent hover:bg-game-accent/10 disabled:opacity-40 transition-all"
-    >
-      {loading ? (
-        <span className="inline-block w-3 h-3 border border-game-accent/30 border-t-game-accent rounded-full animate-spin" />
-      ) : (
-        '✨'
+    <div className="inline-flex items-center gap-1.5">
+      <button
+        type="button"
+        disabled={loading}
+        onClick={onClick}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-game-accent/50 rounded-md text-game-accent hover:bg-game-accent/10 disabled:opacity-40 transition-all"
+      >
+        {loading ? (
+          <span className="inline-block w-3 h-3 border border-game-accent/30 border-t-game-accent rounded-full animate-spin" />
+        ) : error ? (
+          '🔄'
+        ) : (
+          '✨'
+        )}
+        {loading ? '生成中...' : error ? `重试${children}` : children}
+      </button>
+      {error && (
+        <span className="text-[11px] text-game-danger animate-fade-in" title={error}>
+          {error.length > 20 ? error.slice(0, 18) + '…' : error}
+        </span>
       )}
-      {loading ? '生成中...' : children}
-    </button>
+    </div>
   )
 }
 
@@ -168,6 +179,7 @@ function AIButton({
 export default function NewStory() {
   const [aiStatus, setAiStatus] = useState('')
   const [generating, setGenerating] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({})
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -238,8 +250,11 @@ export default function NewStory() {
       if (data.rel_stages) setValue('rel_stages', data.rel_stages)
       if (data.rel_affection != null) setValue('rel_affection', data.rel_affection)
       setAiStatus('✅ 生成完成，可继续修改')
+      setFieldErrors((prev) => ({ ...prev, world: null }))
     } catch (e) {
-      setAiStatus(`❌ ${(e as Error).message}`)
+      const msg = (e as Error).message
+      setAiStatus(`❌ ${msg}`)
+      setFieldErrors((prev) => ({ ...prev, world: msg }))
     }
     setGenerating(null)
   }, [setValue])
@@ -247,6 +262,7 @@ export default function NewStory() {
   const handleFieldGen = useCallback(async (field: string) => {
     setGenerating(field)
     setAiStatus(`正在生成${field === 'title' ? '标题' : field === 'main_goal' ? '主线目标' : field === 'scene' ? '场景' : field === 'world' ? '世界观' : field}…`)
+    setFieldErrors((prev) => ({ ...prev, [field]: null }))
     try {
       const data = await generateField({
         field,
@@ -260,8 +276,11 @@ export default function NewStory() {
       if (field === 'main_goal') setValue('main_goal', (data.main_goal || story).trim())
       if (field === 'scene') setValue('scene', story.trim())
       setAiStatus('✅ 生成完成')
+      setFieldErrors((prev) => ({ ...prev, [field]: null }))
     } catch (e) {
-      setAiStatus(`❌ ${(e as Error).message}`)
+      const msg = (e as Error).message
+      setAiStatus(`❌ ${msg}`)
+      setFieldErrors((prev) => ({ ...prev, [field]: msg }))
     }
     setGenerating(null)
   }, [getValues, setValue])
@@ -269,6 +288,7 @@ export default function NewStory() {
   const handleCharGen = useCallback(async (idx: number) => {
     setGenerating(`char-${idx}`)
     setAiStatus(`正在生成角色…`)
+    setFieldErrors((prev) => ({ ...prev, [`char-${idx}`]: null }))
     try {
       const data = await generateField({
         field: 'character',
@@ -286,8 +306,11 @@ export default function NewStory() {
       if (data.secret) chars[idx].secret = data.secret
       setValue('characters', chars)
       setAiStatus('✅ 角色生成完成')
+      setFieldErrors((prev) => ({ ...prev, [`char-${idx}`]: null }))
     } catch (e) {
-      setAiStatus(`❌ ${(e as Error).message}`)
+      const msg = (e as Error).message
+      setAiStatus(`❌ ${msg}`)
+      setFieldErrors((prev) => ({ ...prev, [`char-${idx}`]: msg }))
     }
     setGenerating(null)
   }, [getValues, setValue])
@@ -295,6 +318,7 @@ export default function NewStory() {
   const handleRulesGen = useCallback(async () => {
     setGenerating('rules')
     setAiStatus('正在生成专属规则…')
+    setFieldErrors((prev) => ({ ...prev, rules: null }))
     try {
       const chars = getValues('characters')
       const data = await generateRules({
@@ -308,8 +332,11 @@ export default function NewStory() {
       })
       if (data.stages?.length) setValue('rel_stages', data.stages)
       setAiStatus('✅ 专属规则生成完成')
+      setFieldErrors((prev) => ({ ...prev, rules: null }))
     } catch (e) {
-      setAiStatus(`❌ ${(e as Error).message}`)
+      const msg = (e as Error).message
+      setAiStatus(`❌ ${msg}`)
+      setFieldErrors((prev) => ({ ...prev, rules: msg }))
     }
     setGenerating(null)
   }, [getValues, setValue])
@@ -374,8 +401,11 @@ export default function NewStory() {
                 onClick={handleWorldGen}
                 className="w-full py-2 bg-game-success/20 text-game-success border border-game-success/30 rounded-md text-sm font-bold hover:bg-game-success/30 disabled:opacity-40 transition-colors"
               >
-                {generating === 'world' ? '⏳ 生成中…' : '✨ 一键生成完整设定'}
+                {generating === 'world' ? '⏳ 生成中…' : fieldErrors.world ? '🔄 重试一键生成' : '✨ 一键生成完整设定'}
               </button>
+              {fieldErrors.world && (
+                <p className="text-[11px] text-game-danger mt-1 animate-fade-in">{fieldErrors.world}</p>
+              )}
             </div>
 
             {/* Presets */}
@@ -414,7 +444,7 @@ export default function NewStory() {
                     placeholder="给你的故事起个名字…"
                     className="flex-1 bg-game-bg border border-game-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-game-primary"
                   />
-                  <AIButton loading={generating === 'title'} onClick={() => handleFieldGen('title')}>
+                  <AIButton loading={generating === 'title'} error={fieldErrors.title} onClick={() => handleFieldGen('title')}>
                     AI生成
                   </AIButton>
                 </div>
@@ -441,7 +471,7 @@ export default function NewStory() {
                     placeholder="如：高二三班教室、回声号舰桥"
                     className="flex-1 bg-game-bg border border-game-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-game-primary"
                   />
-                  <AIButton loading={generating === 'scene'} onClick={() => handleFieldGen('scene')}>
+                  <AIButton loading={generating === 'scene'} error={fieldErrors.scene} onClick={() => handleFieldGen('scene')}>
                     AI生成
                   </AIButton>
                 </div>
@@ -456,7 +486,7 @@ export default function NewStory() {
                     placeholder="如：调查失踪舰队、找到失踪的妹妹…"
                     className="flex-1 bg-game-bg border border-game-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-game-primary"
                   />
-                  <AIButton loading={generating === 'main_goal'} onClick={() => handleFieldGen('main_goal')}>
+                  <AIButton loading={generating === 'main_goal'} error={fieldErrors.main_goal} onClick={() => handleFieldGen('main_goal')}>
                     AI生成
                   </AIButton>
                 </div>
@@ -475,7 +505,7 @@ export default function NewStory() {
                     placeholder="校园恋爱/都市日常可跳过不填…"
                     className="flex-1 bg-game-bg border border-game-border rounded-md px-3 py-2 text-sm resize-y focus:outline-none focus:border-game-primary"
                   />
-                  <AIButton loading={generating === 'world'} onClick={() => handleFieldGen('world')}>
+                  <AIButton loading={generating === 'world'} error={fieldErrors.world} onClick={() => handleFieldGen('world')}>
                     AI生成
                   </AIButton>
                 </div>
@@ -639,6 +669,7 @@ export default function NewStory() {
 
                         <AIButton
                           loading={generating === `char-${idx}`}
+                          error={fieldErrors[`char-${idx}`]}
                           onClick={() => handleCharGen(idx)}
                         >
                           {isMain ? '生成主角' : '生成此角色'}
@@ -657,7 +688,7 @@ export default function NewStory() {
                 专属规则
               </h2>
               <p className="text-xs text-game-dim">📊 默认追踪：好感度（陌生→恋人，7阶段）· 无需生成即可使用</p>
-              <AIButton loading={generating === 'rules'} onClick={handleRulesGen}>
+              <AIButton loading={generating === 'rules'} error={fieldErrors.rules} onClick={handleRulesGen}>
                 AI 生成专属规则
               </AIButton>
             </div>
