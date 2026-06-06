@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Prompt OS Galgame</title>
+<hta:application
+    id="app"
+    applicationname="Prompt OS Galgame"
+    border="none"
+    innerborder="no"
+    caption="no"
+    contextmenu="no"
+    maximizebutton="no"
+    minimizebutton="no"
+    sysmenu="no"
+    singleinstance="yes"
+/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#c9d1d9;font-family:system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+h1{font-size:1.4em;color:#58a6ff;margin-bottom:4px}
+.sub{color:#484f58;font-size:0.8em;margin-bottom:24px}
+.btn{display:inline-block;padding:10px 28px;background:#1a3a5c;border:1px solid #58a6ff;border-radius:8px;color:#58a6ff;font-size:0.95em;cursor:pointer;margin:4px}
+.btn:hover{background:#1f4a7a}
+.btn.stop{background:#3d1a1a;border-color:#da3633;color:#f85149}
+.btn.stop:hover{background:#4d2020}
+.status{color:#8b949e;font-size:0.85em;margin-top:16px;min-height:22px}
+.spinner{display:none;width:22px;height:22px;border:2px solid #21262d;border-top-color:#58a6ff;border-radius:50%;animation:spin 0.7s linear infinite;margin:12px auto 0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.footer{position:fixed;bottom:16px;color:#484f58;font-size:0.7em}
+</style>
+</head>
+<body>
+<h1>🎮 Prompt OS Galgame</h1>
+<div class="sub">AI Interactive Narrative Engine</div>
+<button class="btn" id="btnStart" onclick="startGame()">🚀 开始游戏</button>
+<button class="btn stop" id="btnStop" onclick="stopGame()" style="display:none">⏻ 关闭服务器</button>
+<div class="spinner" id="spinner"></div>
+<div class="status" id="status"></div>
+<div class="footer">关闭此窗口不会停止服务器 — 请用上方按钮</div>
+
+<script language="VBScript">
+Dim objShell, strDir
+
+Sub Window_OnLoad()
+    Set objShell = CreateObject("WScript.Shell")
+    Set objFSO = CreateObject("Scripting.FileSystemObject")
+    strDir = objFSO.GetParentFolderName(objFSO.GetAbsolutePathName("."))
+    objShell.CurrentDirectory = strDir
+
+    ' Check if server already running
+    Dim xhr : Set xhr = CreateObject("MSXML2.XMLHTTP")
+    On Error Resume Next
+    xhr.Open "GET", "http://127.0.0.1:8000/health", False
+    xhr.setRequestHeader "Cache-Control", "no-cache"
+    xhr.Send
+    If Err.Number = 0 And xhr.Status = 200 Then
+        document.getElementById("status").innerText = "Server already running — opening browser..."
+        document.getElementById("status").style.color = "#7ee787"
+        document.getElementById("btnStart").style.display = "none"
+        document.getElementById("btnStop").style.display = "inline-block"
+        objShell.Run "http://127.0.0.1:8000"
+    End If
+    On Error Goto 0
+End Sub
+
+Sub LaunchServer()
+    ' Check Python
+    On Error Resume Next
+    objShell.Run "cmd /c python --version > nul 2>&1", 0, True
+    If Err.Number <> 0 Then
+        document.getElementById("status").innerText = "Python not found. Install Python 3.10+"
+        document.getElementById("status").style.color = "#f85149"
+        Exit Sub
+    End If
+    On Error Goto 0
+
+    ' Install deps
+    objShell.Run "cmd /c pip install -r requirements.txt --quiet > nul 2>&1", 0, True
+
+    ' Start server
+    objShell.Run "python engine\run.py --mode web", 0, False
+End Sub
+
+Sub KillServer()
+    objShell.Run "cmd /c taskkill /f /im python.exe > nul 2>&1", 0, False
+End Sub
+</script>
+
+<script>
+var pollTimer = null, attempts = 0;
+
+function startGame(){
+    document.getElementById('btnStart').style.display = 'none';
+    document.getElementById('spinner').style.display = 'block';
+    document.getElementById('status').innerText = '正在启动服务器...';
+    document.getElementById('status').style.color = '#8b949e';
+
+    try { LaunchServer(); } catch(e){}
+
+    attempts = 0;
+    pollTimer = setInterval(checkReady, 1500);
+}
+
+function checkReady(){
+    attempts++;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'http://127.0.0.1:8000/health', true);
+    xhr.timeout = 2000;
+    xhr.onload = function(){
+        if(xhr.status === 200){
+            clearInterval(pollTimer);
+            document.getElementById('status').innerText = '就绪，正在打开浏览器...';
+            document.getElementById('status').style.color = '#7ee787';
+            document.getElementById('spinner').style.display = 'none';
+            document.getElementById('btnStop').style.display = 'inline-block';
+            setTimeout(function(){ window.open('http://127.0.0.1:8000'); }, 300);
+        }
+    };
+    xhr.onerror = xhr.ontimeout = function(){
+        if(attempts >= 40){
+            clearInterval(pollTimer);
+            document.getElementById('status').innerText = '启动超时 — 请运行 启动.bat 查看错误';
+            document.getElementById('status').style.color = '#f85149';
+            document.getElementById('spinner').style.display = 'none';
+            document.getElementById('btnStart').style.display = 'inline-block';
+        } else {
+            document.getElementById('status').innerText = '等待服务器就绪... (' + attempts + '/40)';
+        }
+    };
+    try { xhr.send(); } catch(e){ clearInterval(pollTimer); }
+}
+
+function stopGame(){
+    if(confirm('确定要关闭服务器？')){
+        try { KillServer(); } catch(e){}
+        document.getElementById('status').innerText = '服务器已关闭';
+        document.getElementById('status').style.color = '#8b949e';
+        document.getElementById('btnStart').style.display = 'inline-block';
+        document.getElementById('btnStop').style.display = 'none';
+    }
+}
+</script>
+</body>
+</html>
