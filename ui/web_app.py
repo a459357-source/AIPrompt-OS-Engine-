@@ -627,22 +627,36 @@ async def index():
         story = last.get("story", last.get("summary", ""))
         options = last.get("options", [])
     else:
-        world_title = _get_world_title()[0] or "Galgame"
-        world_scene = scene or "初始场景"
-        story = f"欢迎来到 **{world_title}**。\n\n当前场景：{world_scene}\n\n点击下方选项开始你的故事。"
-        # Build generic opening options from available characters
-        state_chars = state.get("characters", {})
-        char_names = [c.get("name", "") for c in state_chars.values() if c.get("name")]
-        options = [
-            "调查周围环境，寻找线索",
-            "与同伴交流当前情况",
-            "检查装备和可用资源",
-            "深入探索前方的未知区域",
-        ]
-        if len(char_names) >= 1:
-            options[1] = f"与{char_names[0]}商议接下来的行动"
-        if len(char_names) >= 2:
-            options[2] = f"向{char_names[1]}询问她的看法"
+        # No history — auto-generate the opening scene
+        result = step(None)
+        if result is not None:
+            # Re-read state after step() modified it
+            try:
+                state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+            except Exception:
+                pass
+            turn = state.get("turn", 1)
+            status = state.get("status", "SETUP")
+            scene = state.get("scene", "初始")
+            story = result["story"]
+            options = result["options"]
+        else:
+            # AI generation failed — show static fallback
+            world_title = _get_world_title()[0] or "Galgame"
+            world_scene = scene or "初始场景"
+            story = f"欢迎来到 **{world_title}**。\n\n当前场景：{world_scene}\n\n❌ AI 生成失败，请检查 API Key 后刷新页面。"
+            state_chars = state.get("characters", {})
+            char_names = [c.get("name", "") for c in state_chars.values() if c.get("name")]
+            options = [
+                "调查周围环境，寻找线索",
+                "与同伴交流当前情况",
+                "检查装备和可用资源",
+                "深入探索前方的未知区域",
+            ]
+            if len(char_names) >= 1:
+                options[1] = f"与{char_names[0]}商议接下来的行动"
+            if len(char_names) >= 2:
+                options[2] = f"向{char_names[1]}询问她的看法"
 
     memory = load_memory()
     try:
