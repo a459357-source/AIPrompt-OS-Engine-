@@ -940,58 +940,37 @@ async def story_graph_page():
     graph_html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>剧情分支图 — 星痕纪元</title>
-    <script src="/static/mermaid.min.js"></script>
-    <style>
-        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-        body {{
-            font-family: "Segoe UI", "Noto Sans SC", system-ui, sans-serif;
-            background: #0d1117;
-            color: #c9d1d9;
-            height: 100vh; overflow: auto;
-            display: flex; flex-direction: column; align-items: center;
-        }}
-        .container {{
-            width: 100%; padding: 24px 20px;
-        }}
-        .header {{
-            text-align: center; padding: 24px 0;
-            border-bottom: 1px solid #30363d; margin-bottom: 24px;
-        }}
-        .header h1 {{ font-size: 1.6em; color: #58a6ff; }}
-        .header a {{ color: #8b949e; text-decoration: none; font-size: 0.9em; }}
-        .header a:hover {{ color: #58a6ff; }} .back-btn {{ display:inline-block;padding:5px 14px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.85em;margin-top:8px; }} .back-btn:hover {{ background:#1a3a5c; }}
-        .mermaid {{
-            background: #161b22; border: 1px solid #30363d;
-            border-radius: 8px; padding: 24px; margin-bottom: 24px;
-            overflow-x: auto;
-        }}
-        .info {{
-            background: #161b22; border: 1px solid #30363d;
-            border-radius: 8px; padding: 16px; margin-bottom: 24px;
-            font-size: 0.85em; color: #8b949e; line-height: 1.6;
-        }}
-    </style>
+<meta charset="UTF-8">
+<title>剧情分支图 — 星痕纪元</title>
+<script src="/static/mermaid.min.js"></script>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh}}
+.topbar{{display:flex;align-items:center;justify-content:space-between;padding:10px 24px;border-bottom:1px solid #21262d;background:#0d1117}}
+.topbar h1{{font-size:1.15em;color:#58a6ff}}
+.back-btn{{display:inline-block;padding:5px 14px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.82em}}
+.back-btn:hover{{background:#1a3a5c;color:#79c0ff}}
+.content{{max-width:1100px;margin:0 auto;padding:16px 24px}}
+.info{{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px;margin-bottom:16px;font-size:0.82em;color:#8b949e;line-height:1.6}}
+.mermaid{{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:24px;overflow-x:auto}}
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🌳 剧情分支图</h1>
-            <a href="/" class="back-btn">← 返回游戏</a>
-        </div>
-        <div class="info">
-            📖 每个节点代表一个剧情回合。边上的字母代表玩家在该节点的选择（A/B/C/D）。
-            点击返回游戏继续推进剧情。
-        </div>
-        <div class="mermaid">
-{mermaid_code}
-        </div>
+<div class="topbar">
+    <h1>🌳 剧情分支图</h1>
+    <a href="/" class="back-btn">← 返回游戏</a>
+</div>
+<div class="content">
+    <div class="info">
+        📖 每个节点代表一个剧情回合。边上的字母代表玩家在该节点的选择（A/B/C/D）。
     </div>
-    <script>
-        mermaid.initialize({{ startOnLoad: true, theme: 'dark' }});
-    </script>
+    <div class="mermaid">
+{mermaid_code}
+    </div>
+</div>
+<script>
+    mermaid.initialize({{ startOnLoad: true, theme: 'dark' }});
+</script>
 </body>
 </html>"""
 
@@ -1047,41 +1026,25 @@ async def history_page():
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
     <title>历史回顾 — 星痕纪元</title>
     <style>
-        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-        body {{
-            font-family: "Segoe UI", "Noto Sans SC", system-ui, sans-serif;
-            background: #0d1117; color: #c9d1d9;
-            min-height: 100vh; display: flex; flex-direction: column; align-items: center;
-        }}
-        .hist-container {{
-            width: 100%; min-height: 100vh;
-            display: flex; flex-direction: column; padding: 16px 20px;
-        }}
-        .hist-header {{
-            text-align: center; flex-shrink: 0;
-            padding: 12px 0; border-bottom: 1px solid #30363d; margin-bottom: 12px;
-        }}
-        .hist-header h1 {{ font-size: 1.3em; color: #58a6ff; }}
-        .hist-header a {{ color: #8b949e; text-decoration: none; font-size: 0.8em; }}
-        .hist-header a:hover {{ color: #58a6ff; }} .back-btn {{ display:inline-block;padding:5px 14px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.85em;margin-top:8px; }} .back-btn:hover {{ background:#1a3a5c; }}
-        .hist-body {{
-            flex: 1; overflow-y: auto; min-height: 0;
-            background: #161b22; border: 1px solid #30363d;
-            border-radius: 6px; padding: 16px 20px;
-            line-height: 1.8;
-        }}
+        *{{box-sizing:border-box;margin:0;padding:0}}
+        body{{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh}}
+        .topbar{{display:flex;align-items:center;justify-content:space-between;padding:10px 24px;border-bottom:1px solid #21262d;background:#0d1117}}
+        .topbar h1{{font-size:1.15em;color:#58a6ff}}
+        .back-btn{{display:inline-block;padding:5px 14px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.82em}}
+        .back-btn:hover{{background:#1a3a5c;color:#79c0ff}}
+        .content{{max-width:900px;margin:0 auto;padding:16px 24px}}
+        .hist-body{{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:20px 24px;line-height:1.8}}
     </style>
 </head>
 <body>
-    <div class="hist-container">
-        <div class="hist-header">
-            <h1>📜 历史回顾</h1>
-            <p style="font-size:0.8em;color:#8b949e;">共 {turn} 轮 · 当前场景: {scene}</p>
-            <a href="/" class="back-btn">← 返回游戏</a>
-        </div>
+    <div class="topbar">
+        <h1>📜 历史回顾 · 共 {turn} 轮 · {scene}</h1>
+        <a href="/" class="back-btn">← 返回游戏</a>
+    </div>
+    <div class="content">
         <div class="hist-body">
             {history_html}
         </div>
@@ -1854,66 +1817,39 @@ async def generate_rules(
 _SETTINGS_PAGE = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>设置 — Prompt OS Galgame</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: "Segoe UI", "Noto Sans SC", system-ui, sans-serif;
-            background: #0d1117; color: #c9d1d9;
-            min-height: 100vh; display: flex; flex-direction: column; align-items: center;
-        }
-        .set-container {
-            max-width: 700px; width: 100%; padding: 32px 20px;
-        }
-        .set-header {
-            text-align: center; padding: 12px 0;
-            border-bottom: 1px solid #30363d; margin-bottom: 20px;
-        }
-        .set-header h1 { font-size: 1.3em; color: #58a6ff; margin-bottom: 8px; }
-        .back-btn { display:inline-block;padding:6px 16px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.85em;transition:all 0.15s; }
-        .back-btn:hover { background:#1a3a5c;color:#79c0ff; }
-        .set-card {
-            background: #161b22; border: 1px solid #30363d;
-            border-radius: 8px; padding: 20px 24px; margin-bottom: 16px;
-        }
-        .set-card label {
-            display: block; color: #8b949e; font-size: 0.85em; margin-bottom: 6px;
-        }
-        .set-card input {
-            width: 100%; padding: 10px 14px;
-            background: #0d1117; border: 1px solid #30363d;
-            border-radius: 6px; color: #c9d1d9; font-size: 0.9em;
-            font-family: monospace;
-        }
-        .set-card input:focus { outline: none; border-color: #58a6ff; }
-        .set-card .hint {
-            color: #484f58; font-size: 0.75em; margin-top: 6px;
-        }
-        .set-card .status {
-            margin-top: 8px; font-size: 0.85em;
-        }
-        .set-card .status.ok { color: #7ee787; }
-        .set-card .status.empty { color: #f85149; }
-        .btn-row { display: flex; gap: 10px; margin-top: 12px; }
-        .btn {
-            padding: 8px 20px; border-radius: 6px; font-size: 0.9em;
-            cursor: pointer; border: none; font-weight: bold;
-        }
-        .btn-save { background: #238636; color: #fff; }
-        .btn-save:hover { background: #2ea043; }
-        .btn-clear { background: #3d1a1a; color: #f85149; border: 1px solid #da3633; }
-        .btn-clear:hover { background: #4d2020; }
-    </style>
+<meta charset="UTF-8">
+<title>设置 — Prompt OS Galgame</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 24px;border-bottom:1px solid #21262d;background:#0d1117}
+.topbar h1{font-size:1.15em;color:#58a6ff}
+.back-btn{display:inline-block;padding:5px 14px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.82em}
+.back-btn:hover{background:#1a3a5c;color:#79c0ff}
+.content{max-width:560px;margin:0 auto;padding:20px 24px}
+.set-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px 24px;margin-bottom:16px}
+.set-card label{display:block;color:#8b949e;font-size:0.85em;margin-bottom:6px}
+.set-card input,.set-card select{width:100%;padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.9em;font-family:monospace}
+.set-card input:focus,.set-card select:focus{outline:none;border-color:#58a6ff}
+.set-card .hint{color:#484f58;font-size:0.75em;margin-top:6px}
+.set-card .status{margin-top:8px;font-size:0.85em}
+.set-card .status.ok{color:#7ee787}
+.set-card .status.empty{color:#f85149}
+.btn-row{display:flex;gap:10px;margin-top:12px}
+.btn{padding:8px 20px;border-radius:6px;font-size:0.9em;cursor:pointer;border:none;font-weight:bold}
+.btn-save{background:#238636;color:#fff}
+.btn-save:hover{background:#2ea043}
+.btn-clear{background:#3d1a1a;color:#f85149;border:1px solid #da3633}
+.btn-clear:hover{background:#4d2020}
+</style>
 </head>
 <body>
-    <div class="set-container">
-        <div class="set-header">
-            <h1>⚙️ 设置</h1>
-            <a href="/" class="back-btn">← 返回游戏</a>
-        </div>
-        <form class="set-card" method="post" action="/settings">
+<div class="topbar">
+    <h1>⚙️ 设置</h1>
+    <a href="/" class="back-btn">← 返回游戏</a>
+</div>
+<div class="content">
+    <form class="set-card" method="post" action="/settings">
             <label>🔑 DeepSeek API Key</label>
             <input name="api_key" type="password" id="keyInput"
                    placeholder="sk-xxxxxxxxxxxxxxxx"
