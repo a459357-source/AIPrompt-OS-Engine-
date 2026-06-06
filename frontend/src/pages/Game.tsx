@@ -117,7 +117,7 @@ export default function Game() {
   )
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="w-full">
       <StatusToast
         message={loading ? '正在生成开篇剧情…' : error ? `❌ ${error}` : ''}
         type={loading ? 'loading' : error ? 'error' : 'info'}
