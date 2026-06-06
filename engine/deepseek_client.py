@@ -25,8 +25,8 @@ def call_deepseek(
     system_prompt: str,
     user_prompt: str,
     *,
-    temperature: float = 0.8,
-    max_tokens: int = 2048,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
     skip_validation: bool = False,
 ) -> dict:
     """
@@ -52,8 +52,10 @@ def call_deepseek(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        "temperature": temperature,
-        "max_tokens": max_tokens,
+        "temperature": temperature if temperature is not None else config.TEMPERATURE,
+        "max_tokens": max_tokens if max_tokens is not None else config.MAX_TOKENS,
+        "top_p": config.TOP_P,
+        "stream": config.STREAM,
         "response_format": {"type": "json_object"},  # force JSON output
     }
 

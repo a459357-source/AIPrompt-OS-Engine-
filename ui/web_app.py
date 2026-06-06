@@ -31,6 +31,10 @@ from config import save_api_key, clear_api_key, reload_api_key, APIKEY_PATH
 from config import save_model, reload_model, AVAILABLE_MODELS
 from config import save_story_length, reload_story_length
 from config import save_max_tokens, reload_max_tokens
+from config import save_temperature, reload_temperature
+from config import save_top_p, reload_top_p
+from config import save_stream, reload_stream
+from config import save_context_settings, reload_context_settings
 import config
 
 app = FastAPI(
@@ -2507,6 +2511,32 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
                 {{MAX_TOKENS_OPTIONS}}
             </select>
             <div class="hint">控制 AI 回复长度上限（512–8192），越大回复越完整但越慢。世界观生成会用双倍值。</div>
+            <label style="margin-top:14px;">🌡️ 温度</label>
+            <input name="temperature" type="range" min="0.1" max="2.0" step="0.1"
+                   value="{{TEMPERATURE}}" style="width:100%;accent-color:#d2a8ff;">
+            <div class="hint">当前: {{TEMPERATURE}} — 越高越有创意，越低越保守</div>
+            <label style="margin-top:14px;">🎯 Top P</label>
+            <input name="top_p" type="range" min="0" max="1" step="0.05"
+                   value="{{TOP_P}}" style="width:100%;accent-color:#58a6ff;">
+            <div class="hint">当前: {{TOP_P}} — 核采样参数，0.9 为推荐值</div>
+            <label style="margin-top:14px;">📡 流式输出</label>
+            <select name="stream" id="streamSelect" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.9em;">
+                {{STREAM_OPTIONS}}
+            </select>
+            <div class="hint">启用后 AI 回复会逐字流式展示（实验性）</div>
+            <label style="margin-top:14px;">💬 上下文消息上限</label>
+            <input name="max_context_messages" type="number" min="4" max="100" step="2"
+                   value="{{MAX_CONTEXT_MESSAGES}}" style="width:100px;">
+            <div class="hint">对话历史保留条数（4–100），默认 20。越长消耗 token 越多。</div>
+            <label style="margin-top:14px;">🗜️ 自动压缩</label>
+            <select name="auto_compress" id="autoCompress" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.9em;">
+                {{AUTO_COMPRESS_OPTIONS}}
+            </select>
+            <div class="hint">超过阈值时自动压缩对话历史，减少 token 消耗</div>
+            <label style="margin-top:14px;">📏 压缩阈值 (tokens)</label>
+            <input name="compress_threshold" type="number" min="500" max="32000" step="500"
+                   value="{{COMPRESS_THRESHOLD}}" style="width:120px;">
+            <div class="hint">达到此 token 数时触发自动压缩（500–32000），默认 4000</div>
             <div class="status {{STATUS_CLASS}}">{{STATUS_TEXT}}</div>
             <div class="btn-row">
                 <button class="btn btn-save" type="submit">💾 保存</button>
@@ -2555,6 +2585,18 @@ async def settings_page():
         if val == current_max_tokens:
             max_tokens_hint = f"当前: {val} tokens"
 
+    # Stream options
+    stream_opts = []
+    for val, label in [(0, "关闭"), (1, "开启（实验性）")]:
+        sel = ' selected' if bool(val) == config.STREAM else ''
+        stream_opts.append(f'<option value="{val}"{sel}>{label}</option>')
+
+    # Auto-compress options
+    ac_opts = []
+    for val, label in [(1, "开启"), (0, "关闭")]:
+        sel = ' selected' if bool(val) == config.AUTO_COMPRESS else ''
+        ac_opts.append(f'<option value="{val}"{sel}>{label}</option>')
+
     page = (
         _SETTINGS_PAGE
         .replace("{{CURRENT_KEY}}", key)
@@ -2564,13 +2606,30 @@ async def settings_page():
         .replace("{{MODEL_HINT}}", model_hint)
         .replace("{{STORY_LENGTH}}", str(config.STORY_LENGTH))
         .replace("{{MAX_TOKENS_OPTIONS}}", "\n".join(max_tokens_opts))
+        .replace("{{TEMPERATURE}}", str(config.TEMPERATURE))
+        .replace("{{TOP_P}}", str(config.TOP_P))
+        .replace("{{STREAM_OPTIONS}}", "\n".join(stream_opts))
+        .replace("{{MAX_CONTEXT_MESSAGES}}", str(config.MAX_CONTEXT_MESSAGES))
+        .replace("{{AUTO_COMPRESS_OPTIONS}}", "\n".join(ac_opts))
+        .replace("{{COMPRESS_THRESHOLD}}", str(config.COMPRESS_THRESHOLD))
     )
     return HTMLResponse(page)
 
 
 @app.post("/settings", response_class=HTMLResponse)
-async def save_settings(api_key: str = Form(""), model: str = Form("deepseek-chat"), story_length: int = Form(1500), max_tokens: int = Form(2048)):
-    """Save API key, model, story length, and max tokens."""
+async def save_settings(
+    api_key: str = Form(""),
+    model: str = Form("deepseek-chat"),
+    story_length: int = Form(1500),
+    max_tokens: int = Form(2048),
+    temperature: float = Form(0.8),
+    top_p: float = Form(0.9),
+    stream: int = Form(0),
+    max_context_messages: int = Form(20),
+    auto_compress: int = Form(1),
+    compress_threshold: int = Form(4000),
+):
+    """Save all settings."""
     key = api_key.strip()
     if key:
         save_api_key(key)
@@ -2578,12 +2637,22 @@ async def save_settings(api_key: str = Form(""), model: str = Form("deepseek-cha
     if model in AVAILABLE_MODELS:
         save_model(model)
         reload_model()
-    length = max(300, min(3000, story_length))
-    save_story_length(length)
+    save_story_length(max(300, min(3000, story_length)))
     reload_story_length()
-    tokens = max(512, min(8192, max_tokens))
-    save_max_tokens(tokens)
+    save_max_tokens(max(512, min(8192, max_tokens)))
     reload_max_tokens()
+    save_temperature(max(0.1, min(2.0, temperature)))
+    reload_temperature()
+    save_top_p(max(0.0, min(1.0, top_p)))
+    reload_top_p()
+    save_stream(bool(stream))
+    reload_stream()
+    save_context_settings(
+        max(4, min(100, max_context_messages)),
+        bool(auto_compress),
+        max(500, min(32000, compress_threshold)),
+    )
+    reload_context_settings()
     return await settings_page()
 
 

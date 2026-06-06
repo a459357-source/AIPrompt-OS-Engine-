@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 import {
   Accordion,
   AccordionContent,
@@ -106,6 +107,12 @@ export default function Settings() {
   const [model, setModel] = useState('deepseek-chat')
   const [storyLength, setStoryLength] = useState(1000)
   const [maxTokens, setMaxTokens] = useState(2048)
+  const [temperature, setTemperature] = useState(0.8)
+  const [topP, setTopP] = useState(0.9)
+  const [stream, setStream] = useState(false)
+  const [maxContextMsgs, setMaxContextMsgs] = useState(20)
+  const [autoCompress, setAutoCompress] = useState(true)
+  const [compressThreshold, setCompressThreshold] = useState(4000)
 
   const defaultValues = loadSettings()
   const form = useForm<SettingsForm>({
@@ -147,6 +154,18 @@ export default function Settings() {
         if (maskedMatch) setApiKeyMasked(maskedMatch[1])
         const mtMatch = html.match(/name="max_tokens"[^>]*>.*?value="(\d+)" selected/)
         if (mtMatch) setMaxTokens(parseInt(mtMatch[1]))
+        const tMatch = html.match(/name="temperature"[^>]*value="([\d.]+)"/)
+        if (tMatch) setTemperature(parseFloat(tMatch[1]))
+        const tpMatch = html.match(/name="top_p"[^>]*value="([\d.]+)"/)
+        if (tpMatch) setTopP(parseFloat(tpMatch[1]))
+        const sMatch = html.match(/name="stream"[^>]*>.*?value="(\d)" selected/)
+        if (sMatch) setStream(sMatch[1] === '1')
+        const cmMatch = html.match(/name="max_context_messages"[^>]*value="(\d+)"/)
+        if (cmMatch) setMaxContextMsgs(parseInt(cmMatch[1]))
+        const acMatch = html.match(/name="auto_compress"[^>]*>.*?value="(\d)" selected/)
+        if (acMatch) setAutoCompress(acMatch[1] === '1')
+        const ctMatch = html.match(/name="compress_threshold"[^>]*value="(\d+)"/)
+        if (ctMatch) setCompressThreshold(parseInt(ctMatch[1]))
       })
       .catch(() => {})
   }, [])
@@ -157,10 +176,16 @@ export default function Settings() {
     fd.append('model', model)
     fd.append('story_length', String(storyLength))
     fd.append('max_tokens', String(maxTokens))
+    fd.append('temperature', String(temperature))
+    fd.append('top_p', String(topP))
+    fd.append('stream', stream ? '1' : '0')
+    fd.append('max_context_messages', String(maxContextMsgs))
+    fd.append('auto_compress', autoCompress ? '1' : '0')
+    fd.append('compress_threshold', String(compressThreshold))
     await fetch('/settings', { method: 'POST', body: fd })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
-  }, [apiKey, model, storyLength, maxTokens])
+  }, [apiKey, model, storyLength, maxTokens, temperature, topP, stream, maxContextMsgs, autoCompress, compressThreshold])
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -456,6 +481,78 @@ export default function Settings() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-game-dim">控制 AI 回复长度上限，世界观生成会用双倍值</p>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label>🌡️ 温度</Label>
+                    <Badge variant="outline" size="sm">{temperature.toFixed(1)}</Badge>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-game-dim w-8">保守</span>
+                    <Slider
+                      value={[temperature]}
+                      min={0.1}
+                      max={2.0}
+                      step={0.1}
+                      onValueChange={([v]) => setTemperature(v)}
+                      className="flex-1"
+                    />
+                    <span className="text-xs text-game-dim w-8 text-right">创意</span>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label>🎯 Top P</Label>
+                    <Badge variant="outline" size="sm">{topP.toFixed(2)}</Badge>
+                  </div>
+                  <Slider
+                    value={[topP]}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    onValueChange={([v]) => setTopP(v)}
+                  />
+                  <p className="text-xs text-game-dim">核采样参数，0.9 为推荐值</p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>📡 流式输出</Label>
+                  <Switch checked={stream} onCheckedChange={setStream} />
+                </div>
+                <Separator />
+                <p className="text-xs text-game-accent font-medium">💬 上下文管理</p>
+                <div className="space-y-1.5">
+                  <Label>上下文消息上限</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={4}
+                      max={100}
+                      step={2}
+                      value={maxContextMsgs}
+                      onChange={(e) => setMaxContextMsgs(parseInt(e.target.value) || 20)}
+                      className="w-24"
+                    />
+                    <span className="text-xs text-game-dim">条（4–100）</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>🗜️ 自动压缩</Label>
+                  <Switch checked={autoCompress} onCheckedChange={setAutoCompress} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>📏 压缩阈值 (tokens)</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={500}
+                      max={32000}
+                      step={500}
+                      value={compressThreshold}
+                      onChange={(e) => setCompressThreshold(parseInt(e.target.value) || 4000)}
+                      className="w-28"
+                    />
+                    <span className="text-xs text-game-dim">500–32000</span>
+                  </div>
                 </div>
                 <Button variant="success" className="w-full" onClick={saveApiKey}>
                   💾 保存 API 设置

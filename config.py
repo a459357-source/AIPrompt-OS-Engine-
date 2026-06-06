@@ -201,12 +201,157 @@ def reload_max_tokens() -> int:
     return config.MAX_TOKENS
 
 
+# ── Temperature ─────────────────────────────────────────────────────
+DEFAULT_TEMPERATURE = 0.8
+
+
+def _load_temperature() -> float:
+    if APIKEY_PATH.exists():
+        try:
+            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
+            val = data.get("temperature", DEFAULT_TEMPERATURE)
+            return max(0.1, min(2.0, float(val)))
+        except Exception:
+            pass
+    return DEFAULT_TEMPERATURE
+
+
+def save_temperature(temp: float) -> None:
+    data = {}
+    if APIKEY_PATH.exists():
+        try: data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
+        except Exception: pass
+    data["temperature"] = temp
+    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    APIKEY_PATH.write_text(__import__("json").dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def reload_temperature() -> float:
+    import config
+    config.TEMPERATURE = _load_temperature()
+    return config.TEMPERATURE
+
+
+# ── Top-P ───────────────────────────────────────────────────────────
+DEFAULT_TOP_P = 0.9
+
+
+def _load_top_p() -> float:
+    if APIKEY_PATH.exists():
+        try:
+            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
+            val = data.get("top_p", DEFAULT_TOP_P)
+            return max(0.0, min(1.0, float(val)))
+        except Exception:
+            pass
+    return DEFAULT_TOP_P
+
+
+def save_top_p(val: float) -> None:
+    data = {}
+    if APIKEY_PATH.exists():
+        try: data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
+        except Exception: pass
+    data["top_p"] = val
+    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    APIKEY_PATH.write_text(__import__("json").dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def reload_top_p() -> float:
+    import config
+    config.TOP_P = _load_top_p()
+    return config.TOP_P
+
+
+# ── Streaming ───────────────────────────────────────────────────────
+DEFAULT_STREAM = False
+
+
+def _load_stream() -> bool:
+    if APIKEY_PATH.exists():
+        try:
+            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
+            return bool(data.get("stream", DEFAULT_STREAM))
+        except Exception:
+            pass
+    return DEFAULT_STREAM
+
+
+def save_stream(val: bool) -> None:
+    data = {}
+    if APIKEY_PATH.exists():
+        try: data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
+        except Exception: pass
+    data["stream"] = val
+    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    APIKEY_PATH.write_text(__import__("json").dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def reload_stream() -> bool:
+    import config
+    config.STREAM = _load_stream()
+    return config.STREAM
+
+
+# ── Context management ──────────────────────────────────────────────
+DEFAULT_MAX_CONTEXT_MESSAGES = 20
+DEFAULT_AUTO_COMPRESS = True
+DEFAULT_COMPRESS_THRESHOLD = 4000
+
+
+def _load_context_settings() -> dict:
+    defaults = {
+        "max_context_messages": DEFAULT_MAX_CONTEXT_MESSAGES,
+        "auto_compress": DEFAULT_AUTO_COMPRESS,
+        "compress_threshold": DEFAULT_COMPRESS_THRESHOLD,
+    }
+    if APIKEY_PATH.exists():
+        try:
+            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
+            return {
+                "max_context_messages": max(4, min(100, int(data.get("max_context_messages", defaults["max_context_messages"])))),
+                "auto_compress": bool(data.get("auto_compress", defaults["auto_compress"])),
+                "compress_threshold": max(500, min(32000, int(data.get("compress_threshold", defaults["compress_threshold"])))),
+            }
+        except Exception:
+            pass
+    return defaults
+
+
+def save_context_settings(max_msgs: int, auto_compress: bool, compress_threshold: int) -> None:
+    data = {}
+    if APIKEY_PATH.exists():
+        try: data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
+        except Exception: pass
+    data["max_context_messages"] = max_msgs
+    data["auto_compress"] = auto_compress
+    data["compress_threshold"] = compress_threshold
+    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    APIKEY_PATH.write_text(__import__("json").dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def reload_context_settings() -> dict:
+    import config
+    s = _load_context_settings()
+    config.MAX_CONTEXT_MESSAGES = s["max_context_messages"]
+    config.AUTO_COMPRESS = s["auto_compress"]
+    config.COMPRESS_THRESHOLD = s["compress_threshold"]
+    return s
+
+
 # ── DeepSeek API ────────────────────────────────────────────────────
 DEEPSEEK_API_KEY = _load_api_key()
 DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions"
 DEEPSEEK_MODEL = _load_model()
 STORY_LENGTH = _load_story_length()
 MAX_TOKENS = _load_max_tokens()
+TEMPERATURE = _load_temperature()
+TOP_P = _load_top_p()
+STREAM = _load_stream()
+ctx = _load_context_settings()
+MAX_CONTEXT_MESSAGES = ctx["max_context_messages"]
+AUTO_COMPRESS = ctx["auto_compress"]
+COMPRESS_THRESHOLD = ctx["compress_threshold"]
 
 # ── Obsidian live export ────────────────────────────────────────────
 # Path to an Obsidian vault folder.  When set, the engine writes
