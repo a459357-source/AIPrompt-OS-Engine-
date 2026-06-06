@@ -7,8 +7,8 @@ echo    Prompt OS Galgame Runtime
 echo    AI Narrative Engine
 echo ================================================
 echo.
-echo [Tip] Normal users: double-click "开始游戏.hta"
-echo        This is developer mode (console visible)
+echo [Tip] Double-click start.hta for normal launch
+echo        This console shows server logs
 echo.
 
 python --version >nul 2>&1
