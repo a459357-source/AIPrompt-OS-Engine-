@@ -125,6 +125,37 @@ def get_context_for_prompt(memory: dict) -> str:
         if stages:
             lines.append(f"【关系阶段系统】{' → '.join(stages)}")
 
+    # ── Faction status ────────────────────────────────────────
+    factions = memory.get("factions", {})
+    if factions:
+        lines.append("【势力状态】")
+        for fname, fdata in factions.items():
+            rep = fdata.get("reputation", 0.5)
+            label = _attitude_label(rep)
+            role = fdata.get("role", "")
+            flags = fdata.get("flags", [])
+            line = f"  {fname}: 声望 {rep:.0%}（{label}）"
+            if role:
+                line += f", 定位: {role}"
+            lines.append(line)
+            if flags:
+                lines.append(f"    事件: {', '.join(flags)}")
+
+    # ── Key inter-faction attitudes (non-neutral only) ────────
+    attitudes = memory.get("faction_attitudes", {})
+    if attitudes:
+        significant: list[str] = []
+        for a, targets in attitudes.items():
+            for b, data in targets.items():
+                att = data.get("attitude", 0.5)
+                if abs(att - 0.5) >= 0.15:  # only show non-trivial
+                    label = _attitude_label(att)
+                    significant.append(f"{a}→{b}: {label}({att:.0%})")
+        if significant:
+            lines.append("【势力间关键态度】")
+            for s in significant:
+                lines.append(f"  {s}")
+
     world_flags = memory.get("world_flags", [])
     if world_flags:
         lines.append("【全局事件】")
@@ -199,6 +230,144 @@ def set_faction_flag(memory: dict, faction: str, flag: str) -> None:
     })
     if flag not in entry.setdefault("flags", []):
         entry["flags"].append(flag)
+
+
+# ── Inter-faction attitude tracking ────────────────────────────────
+# Directed graph: Faction A's attitude toward Faction B.
+# Stored as memory["faction_attitudes"][faction_a][faction_b] = {
+#     "attitude": 0.0–1.0 (0=hostile, 0.5=neutral, 1=allied),
+#     "flags": [], "metric_history": {"attitude": [[turn, value]]}
+# }
+
+def init_faction_attitudes(memory: dict) -> None:
+    """Ensure the faction_attitudes dict exists and seed defaults."""
+    attitudes = memory.setdefault("faction_attitudes", {})
+    factions = memory.get("factions", {})
+
+    # Ensure every faction pair has an entry
+    fnames = list(factions.keys())
+    for a in fnames:
+        ad = attitudes.setdefault(a, {})
+        for b in fnames:
+            if a == b:
+                continue
+            if b not in ad:
+                # Default: neutral (0.5), or slightly cooperative if same world
+                ad[b] = {
+                    "attitude": 0.5,
+                    "flags": [],
+                    "metric_history": {"attitude": []},
+                }
+    logger.info("Memory: faction_attitudes initialized for %d factions", len(fnames))
+
+
+def update_faction_attitude(memory: dict, faction_a: str, faction_b: str,
+                            delta: float, turn: int = 0) -> None:
+    """
+    Adjust faction_a's attitude toward faction_b by delta (0.0–1.0).
+    Creates entries if missing.
+    """
+    if faction_a == faction_b:
+        return
+    attitudes = memory.setdefault("faction_attitudes", {})
+    ad = attitudes.setdefault(faction_a, {})
+    entry = ad.setdefault(faction_b, {
+        "attitude": 0.5, "flags": [],
+        "metric_history": {"attitude": []},
+    })
+    old = entry.get("attitude", 0.5)
+    new = round(max(0.0, min(1.0, old + delta)), 2)
+    entry["attitude"] = new
+
+    if turn > 0:
+        mh = entry.setdefault("metric_history", {}).setdefault("attitude", [])
+        if not mh or mh[-1][1] != new:
+            mh.append([turn, new])
+
+    logger.info("Memory: %s → %s attitude %s → %s", faction_a, faction_b, old, new)
+
+
+def set_faction_attitude_flag(memory: dict, faction_a: str, faction_b: str,
+                               flag: str) -> None:
+    """Add a flag to an inter-faction relationship."""
+    if faction_a == faction_b:
+        return
+    attitudes = memory.setdefault("faction_attitudes", {})
+    ad = attitudes.setdefault(faction_a, {})
+    entry = ad.setdefault(faction_b, {
+        "attitude": 0.5, "flags": [],
+        "metric_history": {"attitude": []},
+    })
+    if flag not in entry.setdefault("flags", []):
+        entry["flags"].append(flag)
+
+
+def _attitude_label(attitude: float) -> str:
+    """Human-readable inter-faction attitude label."""
+    if attitude >= 0.8:
+        return "同盟"
+    elif attitude >= 0.6:
+        return "友好"
+    elif attitude >= 0.4:
+        return "中立"
+    elif attitude >= 0.2:
+        return "冷淡"
+    else:
+        return "敌对"
+
+
+def get_faction_attitude_context(memory: dict) -> str:
+    """Build a prompt-ready summary of inter-faction attitudes."""
+    attitudes = memory.get("faction_attitudes", {})
+    if not attitudes:
+        return ""
+
+    lines: list[str] = ["【势力间态度】"]
+    for a, targets in sorted(attitudes.items()):
+        for b, data in sorted(targets.items()):
+            att = data.get("attitude", 0.5)
+            label = _attitude_label(att)
+            flags = data.get("flags", [])
+            flag_str = f" ({', '.join(flags)})" if flags else ""
+            lines.append(f"  {a} → {b}: {label} ({att:.0%}){flag_str}")
+    return "\n".join(lines)
+
+
+def get_faction_stats_for_ui(memory: dict) -> list[dict]:
+    """
+    Return faction data for UI display — similar to get_char_stats_for_ui.
+    Each entry: {name, role, reputation_pct, attitude_label, flags, attitudes}
+    """
+    factions = memory.get("factions", {})
+    attitudes = memory.get("faction_attitudes", {})
+    result: list[dict] = []
+
+    for name, data in factions.items():
+        rep = data.get("reputation", 0.5)
+        rep_pct = round((rep - 0.5) * 200)  # -100..100
+
+        # Build inter-faction attitude summary
+        faction_attitudes: list[dict] = []
+        ad = attitudes.get(name, {})
+        for target, adata in sorted(ad.items()):
+            faction_attitudes.append({
+                "target": target,
+                "attitude": adata.get("attitude", 0.5),
+                "label": _attitude_label(adata.get("attitude", 0.5)),
+                "flags": adata.get("flags", []),
+            })
+
+        result.append({
+            "name": name,
+            "role": data.get("role", ""),
+            "reputation_pct": rep_pct,
+            "reputation": rep,
+            "attitude_label": _attitude_label(rep),
+            "flags": data.get("flags", []),
+            "attitudes": faction_attitudes,
+        })
+
+    return result
 
 
 def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | None]]:

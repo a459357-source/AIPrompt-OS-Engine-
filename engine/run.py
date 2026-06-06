@@ -44,6 +44,7 @@ from engine.memory import (
     parse_option_trust_deltas, detect_new_characters_from_story,
     get_initial_trust,
     init_factions, update_faction_reputation, set_faction_flag,
+    init_faction_attitudes, update_faction_attitude,
     assign_character_tier, degrade_inactive_characters,
     build_character_tier_context, promote_to_core, remove_core_status,
 )
@@ -419,6 +420,7 @@ def _update_memory(response: dict, state: dict, choice: str | None = None) -> No
 
         # ── Initialize factions from world pack (first time) ──────
         init_factions(memory)
+        init_faction_attitudes(memory)
 
         # Load world_pack for tier assignment
         world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
@@ -544,6 +546,34 @@ def _update_memory(response: dict, state: dict, choice: str | None = None) -> No
                     update_faction_reputation(memory, fname, 0.05, turn)
                 elif neg and not pos:
                     update_faction_reputation(memory, fname, -0.05, turn)
+
+        # ── Inter-faction attitude from story ───────────────────
+        # When two factions are mentioned in the same sentence,
+        # adjust their mutual attitudes based on sentiment.
+        mem_factions = memory.get("factions", {})
+        fnames = list(mem_factions.keys())
+        if len(fnames) >= 2:
+            import re
+            sentences = re.split(r'[。！？\n]', story)
+            for sent in sentences:
+                mentioned = [f for f in fnames if f in sent]
+                for i, fa in enumerate(mentioned):
+                    for fb in mentioned[i + 1:]:
+                        # Sentiment in this sentence
+                        pos = any(kw in sent for kw in [
+                            "合作", "结盟", "支援", "友好", "信任", "联手",
+                            "和解", "协议", "共同", "协助",
+                        ])
+                        neg = any(kw in sent for kw in [
+                            "敌对", "攻击", "背叛", "威胁", "警告", "打压",
+                            "冲突", "对抗", "撕毁", "决裂", "宣战",
+                        ])
+                        if pos and not neg:
+                            update_faction_attitude(memory, fa, fb, 0.03, turn)
+                            update_faction_attitude(memory, fb, fa, 0.02, turn)
+                        elif neg and not pos:
+                            update_faction_attitude(memory, fa, fb, -0.05, turn)
+                            update_faction_attitude(memory, fb, fa, -0.04, turn)
 
         save_memory(memory)
     except Exception as exc:

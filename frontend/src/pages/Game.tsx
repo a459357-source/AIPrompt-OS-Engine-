@@ -15,6 +15,18 @@ interface CharInfo {
   relation: string
   level: string
   affection?: number
+  trust_pct?: number
+  tier?: string
+}
+
+interface FactionInfo {
+  name: string
+  role: string
+  reputation_pct: number
+  reputation: number
+  attitude_label: string
+  flags: string[]
+  attitudes: { target: string; attitude: number; label: string; flags: string[] }[]
 }
 
 function AffectionBar({ value }: { value: number; name?: string }) {
@@ -34,6 +46,7 @@ export default function Game() {
   const [status, setStatus] = useState('SETUP')
   const [scene, setScene] = useState('')
   const [characters, setCharacters] = useState<CharInfo[]>([])
+  const [factions, setFactions] = useState<FactionInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [choosing, setChoosing] = useState(false)
@@ -60,9 +73,12 @@ export default function Game() {
       const chars = st.characters as Record<string, CharInfo> | undefined
       if (chars) {
         setCharacters(Object.values(chars).map((c) => ({
-          ...c, affection: 50,
+          ...c,
+          affection: c.affection ?? (c.trust_pct !== undefined ? c.trust_pct + 50 : 50),
         })))
       }
+      const factionsData = st.factions as FactionInfo[] | undefined
+      if (factionsData) setFactions(factionsData)
       logger.info('Game', `Loaded: turn=${st.turn}`)
     } catch (e) {
       const msg = (e as Error).message || String(e)
@@ -86,7 +102,12 @@ export default function Game() {
       setStatus(data.state.status)
       setScene(data.state.scene)
       const chars = data.state.characters as Record<string, CharInfo> | undefined
-      if (chars) setCharacters(Object.values(chars).map((c) => ({ ...c, affection: 50 })))
+      if (chars) setCharacters(Object.values(chars).map((c) => ({
+        ...c,
+        affection: c.affection ?? (c.trust_pct !== undefined ? c.trust_pct + 50 : 50),
+      })))
+      const factionsData = data.state.factions as FactionInfo[] | undefined
+      if (factionsData) setFactions(factionsData)
     } catch (e) {
       const msg = (e as Error).message || String(e)
       logger.error('Game', 'Choice failed', { error: msg })
@@ -102,16 +123,21 @@ export default function Game() {
 
   const hasGame = !loading && !error && story.length > 0
 
-  // Shared character list component
-  const CharacterList = () => (
+  // Shared character + faction list component
+  const StatusList = () => (
     <div className="space-y-4">
-      {characters.length === 0 && (
-        <p className="text-xs text-game-dim text-center py-4">暂无角色数据</p>
+      {/* Characters */}
+      {characters.length === 0 && factions.length === 0 && (
+        <p className="text-xs text-game-dim text-center py-4">暂无数据</p>
       )}
       {characters.map((c) => (
-        <div key={c.name} className="space-y-1.5">
+        <div key={`c-${c.name}`} className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">{c.name}</span>
+            <span className="text-sm font-medium">
+              {c.name}
+              {c.tier === '主角' && <span className="text-game-accent text-xs ml-1">⭐</span>}
+              {c.tier === '核心' && <span className="text-game-primary text-xs ml-1">◆</span>}
+            </span>
             <Badge variant="outline" size="sm">{c.role}</Badge>
           </div>
           {c.relation && <p className="text-xs text-game-muted">{c.relation}</p>}
@@ -119,6 +145,36 @@ export default function Game() {
             <AffectionBar value={c.affection ?? 50} />
             <span className="text-xs text-game-dim tabular-nums">{c.affection ?? 50}%</span>
           </div>
+          <Separator />
+        </div>
+      ))}
+
+      {/* Factions */}
+      {factions.length > 0 && characters.length > 0 && (
+        <p className="text-xs text-game-dim font-bold pt-2">🏛️ 势力</p>
+      )}
+      {factions.map((f) => (
+        <div key={`f-${f.name}`} className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">{f.name}</span>
+            <Badge variant="outline" size="sm" className={f.attitude_label === '敌对' ? 'border-red-500/50 text-red-400' : f.attitude_label === '同盟' ? 'border-green-500/50 text-green-400' : ''}>
+              {f.attitude_label}
+            </Badge>
+          </div>
+          {f.role && <p className="text-xs text-game-muted">{f.role}</p>}
+          <div className="flex items-center gap-2">
+            <AffectionBar value={f.reputation * 100} />
+            <span className="text-xs text-game-dim tabular-nums">{Math.round(f.reputation * 100)}%</span>
+          </div>
+          {/* Inter-faction attitudes (top 3) */}
+          {f.attitudes.filter(a => Math.abs(a.attitude - 0.5) >= 0.15).slice(0, 3).map(a => (
+            <div key={a.target} className="flex items-center gap-1 text-[10px]">
+              <span className="text-game-dim">→ {a.target}</span>
+              <span className={a.label === '敌对' || a.label === '冷淡' ? 'text-red-400' : a.label === '同盟' || a.label === '友好' ? 'text-green-400' : 'text-game-muted'}>
+                {a.label}
+              </span>
+            </div>
+          ))}
           <Separator />
         </div>
       ))}
@@ -206,9 +262,9 @@ export default function Game() {
                   className="gap-1.5 text-game-muted hover:text-game-text"
                   onClick={() => setCharPanelOpen(!charPanelOpen)}
                 >
-                  👥 角色
-                  {characters.length > 0 && (
-                    <Badge variant="accent" size="sm" className="ml-0.5">{characters.length}</Badge>
+                  📊 状态
+                  {(characters.length > 0 || factions.length > 0) && (
+                    <Badge variant="accent" size="sm" className="ml-0.5">{characters.length + factions.length}</Badge>
                   )}
                 </Button>
               </div>
@@ -339,10 +395,10 @@ export default function Game() {
           {charPanelOpen && (
             <div className="w-64 shrink-0 border-l border-game-border bg-game-card p-4 overflow-auto max-h-[calc(100vh-64px)] sticky top-14">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-game-accent">👥 角色状态</h3>
+                <h3 className="text-sm font-bold text-game-accent">📊 状态</h3>
                 <button onClick={() => setCharPanelOpen(false)} className="text-game-muted hover:text-game-text">✕</button>
               </div>
-              <CharacterList />
+              <StatusList />
             </div>
           )}
         </div>

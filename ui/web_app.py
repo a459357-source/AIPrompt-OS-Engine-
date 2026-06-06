@@ -26,7 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from engine.run import step
 from engine import io_utils
 from engine import save_manager
-from engine.memory import get_char_stats_for_ui, load_memory
+from engine.memory import get_char_stats_for_ui, load_memory, get_faction_stats_for_ui
 from config import save_api_key, clear_api_key, reload_api_key, APIKEY_PATH
 from config import save_model, reload_model, AVAILABLE_MODELS
 from config import save_story_length, reload_story_length
@@ -92,6 +92,36 @@ async def api_game_state():
         else:
             return JSONResponse({"error": "AI 生成失败，请检查 API Key 后刷新"}, status_code=500)
 
+    # Merge trust data from memory.json into characters
+    try:
+        memory = load_memory()
+        mem_chars = memory.get("characters", {})
+    except Exception:
+        mem_chars = {}
+
+    chars_with_trust: dict[str, dict] = {}
+    raw_chars = state.get("characters", {})
+    for key, sc in raw_chars.items():
+        name = sc.get("name", key)
+        mem = mem_chars.get(name, {})
+        trust = mem.get("trust", 0.5)
+        trust_pct = round((trust - 0.5) * 200)  # -100..100
+        chars_with_trust[key] = {
+            **sc,
+            "trust": trust,
+            "affection": trust_pct + 50,  # map -100..100 → 0..100 for frontend
+            "trust_pct": trust_pct,
+            "flags": mem.get("flags", []),
+            "tier": mem.get("tier", ""),
+        }
+
+    # Faction data
+    factions_data: list[dict] = []
+    try:
+        factions_data = get_faction_stats_for_ui(memory)
+    except Exception:
+        pass
+
     return JSONResponse({
         "story": story,
         "options": options,
@@ -99,7 +129,8 @@ async def api_game_state():
             "turn": state.get("turn", 0),
             "status": state.get("status", "SETUP"),
             "scene": state.get("scene", ""),
-            "characters": state.get("characters", {}),
+            "characters": chars_with_trust,
+            "factions": factions_data,
             "force_event_pending": state.get("force_event_pending", False),
             "chapter": state.get("chapter", 1),
         },

@@ -11,7 +11,10 @@ import logging
 
 import config
 from engine import io_utils
-from engine.memory import load_memory, get_context_for_prompt, build_character_tier_context
+from engine.memory import (
+    load_memory, get_context_for_prompt,
+    build_character_tier_context, get_faction_attitude_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +138,9 @@ def build_prompt() -> tuple[str, str]:
     # ── Character tier context ────────────────────────────────
     tier_context = build_character_tier_context(memory)
 
+    # ── Faction attitude context ──────────────────────────────
+    faction_attitude_context = get_faction_attitude_context(memory)
+
     # ── Last choice context ────────────────────────────────────
     last_choice = session_state.get("last_choice", "")
     if last_choice:
@@ -155,6 +161,7 @@ def build_prompt() -> tuple[str, str]:
         .replace("{{RELATIONSHIP_SYSTEM}}", relationship_context)
         .replace("{{MEMORY_CONTEXT}}", memory_context)
         .replace("{{TIER_CONTEXT}}", tier_context)
+        .replace("{{FACTION_CONTEXT}}", faction_attitude_context)
     )
 
     logger.info("Prompt built — force_event=%s last_choice=%s", force_triggered, last_choice or "none")
