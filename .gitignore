@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pyo
+_inject_dashboard.py
+data/saves/
+output/
+session_state.yaml
+data/apikey.json
+data/api_usage.jsonl
