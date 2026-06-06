@@ -294,10 +294,13 @@ def parse_option_trust_deltas(options: list[str]) -> list[tuple[str, float]]:
             value = int(match.group(3))
 
             # Determine direction and magnitude
+            # AI outputs trust hints on a 0-100 feel scale (e.g. ↑5 = +5 points).
+            # Divide by 200 so a single turn's change is gradual:
+            #   ↑5  → +0.025    ↑10 → +0.050    ↑20 → +0.100
             if arrow in ('↑', '➕', '+'):
-                delta = value / 100.0  # e.g. 5 → 0.05
+                delta = value / 200.0
             elif arrow in ('↓', '➖', '-'):
-                delta = -value / 100.0
+                delta = -value / 200.0
             else:
                 continue  # shouldn't happen due to regex
 

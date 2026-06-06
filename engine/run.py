@@ -57,6 +57,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("run")
 
+# Store the previous turn's AI response options so we can apply the
+# chosen option's trust deltas when the next turn runs.
+_prev_options: list[str] = []
+
 
 # ── Core step (stateless, for web/cli reuse) ───────────────────────
 
@@ -101,8 +105,8 @@ def step(choice: str | None = None) -> dict | None:
     # 5. Update story graph
     _update_graph(response, new_state, choice)
 
-    # 6. Update character memory
-    _update_memory(response, new_state)
+    # 6. Update character memory (with previous turn's chosen option)
+    _update_memory(response, new_state, choice)
 
     # 7. Write chapter.md
     _write_chapter(response, new_state, choice)
@@ -116,7 +120,11 @@ def step(choice: str | None = None) -> dict | None:
     # 10. Log turn
     _log_turn(response, choice)
 
-    # 11. Autosave
+    # 11. Store current options for next turn's trust delta processing
+    global _prev_options
+    _prev_options = response.get("options", [])
+
+    # 12. Autosave
     do_autosave()
 
     logger.info("═══ TURN COMPLETE ═══")
@@ -394,8 +402,15 @@ def _update_graph(response: dict, state: dict, choice: str | None) -> None:
         logger.warning("Failed to update story graph: %s", exc)
 
 
-def _update_memory(response: dict, state: dict) -> None:
-    """Update character memory based on the new story content."""
+def _update_memory(response: dict, state: dict, choice: str | None = None) -> None:
+    """Update character memory based on the new story content.
+
+    Args:
+        response: Current turn's AI response.
+        state:    Current session state.
+        choice:   The player's choice from the PREVIOUS turn (A/B/C/D),
+                  used to apply trust deltas from the chosen option only.
+    """
     try:
         memory = load_memory()
         story = response.get("story", "")
@@ -449,23 +464,35 @@ def _update_memory(response: dict, state: dict) -> None:
         for msg in degrade_messages:
             logger.info(msg)
 
-        # ── Option trust deltas (AI-explicit, highest priority) ──
-        options = response.get("options", [])
-        option_deltas = parse_option_trust_deltas(options)
-        for char_name, delta in option_deltas:
-            # Match against known characters (fuzzy: name must be in the character key)
-            matched = False
-            for mem_name in list(mem_chars.keys()):
-                if char_name in mem_name or mem_name in char_name:
-                    update_trust(memory, mem_name, delta, turn)
-                    matched = True
-                    logger.info("Memory: option trust delta %s %+.2f (matched '%s')",
-                                mem_name, delta, char_name)
-            if not matched:
-                # Character not in memory yet — register and apply
-                update_trust(memory, char_name, delta, turn)
-                logger.info("Memory: option trust delta %s %+.2f (new char, auto-registered)",
-                            char_name, delta)
+        # ── Option trust deltas from PREVIOUS turn's chosen option ──
+        # Only apply deltas from the option the player actually picked last turn.
+        # Choices are letters A(0)/B(1)/C(2)/D(3) mapping to _prev_options indices.
+        if choice and _prev_options:
+            choice_map = {"A": 0, "B": 1, "C": 2, "D": 3}
+            idx = choice_map.get(choice.upper(), -1)
+            if 0 <= idx < len(_prev_options):
+                chosen_opt = _prev_options[idx]
+                option_deltas = parse_option_trust_deltas([chosen_opt])
+                for char_name, delta in option_deltas:
+                    # Match against known characters (fuzzy)
+                    matched = False
+                    for mem_name in list(mem_chars.keys()):
+                        if char_name in mem_name or mem_name in char_name:
+                            update_trust(memory, mem_name, delta, turn)
+                            matched = True
+                            logger.info(
+                                "Memory: choice %s trust delta %s %+.2f (matched '%s')",
+                                choice, mem_name, delta, char_name,
+                            )
+                    if not matched:
+                        update_trust(memory, char_name, delta, turn)
+                        logger.info(
+                            "Memory: choice %s trust delta %s %+.2f (new char)",
+                            choice, char_name, delta,
+                        )
+            else:
+                logger.debug("Memory: choice '%s' out of range for _prev_options (len=%d)",
+                             choice, len(_prev_options))
 
         # Heuristic trust deltas from story keywords (fallback)
         deltas = guess_trust_delta_from_story(story)
