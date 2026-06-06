@@ -129,6 +129,7 @@ def build_html(data: dict | None = None) -> str:
         mermaid_src=_build_mermaid(nodes, edges, chars),
         node_rows=_build_node_rows(nodes, chars),
         faction_cards=_build_faction_cards(factions),
+        faction_graph=_build_faction_graph(memory),
         bs_nodes=bs.get("total_nodes", 0),
         bs_leaves=bs.get("leaf_count", 0),
         bs_depth=bs.get("max_depth", 0),
@@ -287,6 +288,73 @@ def _build_faction_cards(factions: dict) -> str:
     return "".join(cards)
 
 
+def _build_faction_graph(memory: dict) -> str:
+    """Build Mermaid graph showing inter-faction attitude network."""
+    factions = memory.get("factions", {})
+    attitudes = memory.get("faction_attitudes", {})
+
+    if not factions:
+        return ""
+
+    mm = ["graph LR"]
+
+    # Faction nodes
+    fid_map: dict[str, str] = {}
+    for i, (name, data) in enumerate(factions.items()):
+        fid = f"f{i}"
+        fid_map[name] = fid
+        rep = int(data.get("reputation", 0.5) * 100)
+        label = f"{name}\\n声望 {rep}%".replace('"', "'")
+        # Styling: solid for high rep, dashed for low
+        style = "fill:#161b22,stroke:#58a6ff,color:#c9d1d9"
+        if rep >= 70:
+            style = "fill:#0d3320,stroke:#2ea043,color:#2ea043"
+        elif rep >= 40:
+            style = "fill:#332a14,stroke:#d29922,color:#d29922"
+        else:
+            style = "fill:#331414,stroke:#da3633,color:#da3633"
+        mm.append(f'  {fid}("{label}")')
+        mm.append(f"  style {fid} {style}")
+
+    # Attitude edges (only show non-trivial ones)
+    edge_count = 0
+    for a, targets in attitudes.items():
+        if a not in fid_map:
+            continue
+        for b, data in targets.items():
+            if b not in fid_map:
+                continue
+            att = data.get("attitude", 0.5)
+            if abs(att - 0.5) < 0.1:
+                continue  # skip near-neutral
+            fa = fid_map[a]
+            fb = fid_map[b]
+            label = f"{att:.0%}"
+            # Edge style based on attitude
+            if att >= 0.7:
+                style = "stroke:#2ea043,stroke-width:2px"  # allied - thick green
+            elif att >= 0.55:
+                style = "stroke:#3fb950,stroke-width:1.5px"  # friendly
+            elif att <= 0.3:
+                style = "stroke:#da3633,stroke-width:2px,stroke-dasharray:5"  # hostile - dashed red
+            elif att <= 0.45:
+                style = "stroke:#d29922,stroke-width:1px,stroke-dasharray:3"  # cool
+            else:
+                style = "stroke:#484f58,stroke-width:1px"  # neutral
+            flags_str = " | ".join(data.get("flags", [])[:2])
+            edge_label = f"{label}"
+            if flags_str:
+                edge_label += f"\\n{flags_str}"
+            mm.append(f'  {fa} -- "{edge_label}" --> {fb}')
+            mm.append(f"  linkStyle {edge_count} {style}")
+            edge_count += 1
+
+    if edge_count == 0:
+        mm.append('  note["势力间暂无显著关系"]')
+
+    return "\n".join(mm)
+
+
 # ── HTML Template ───────────────────────────────────────────────────
 
 _HTML_TEMPLATE = """<!DOCTYPE html>
@@ -360,6 +428,7 @@ a{{color:#58a6ff;text-decoration:none}}
 <button class="toggle-btn" onclick="t('charfreq')">👥 角色出场</button>
 <button class="toggle-btn" onclick="t('nodes')">📋 节点详情</button>
 <button class="toggle-btn" onclick="t('factions')">🏛️ 世界势力</button>
+<button class="toggle-btn" onclick="t('factionGraph')">🕸️ 势力关系</button>
 <button class="toggle-btn" onclick="t('branch')">🔀 分支统计</button>
 </div>
 
@@ -391,6 +460,18 @@ a{{color:#58a6ff;text-decoration:none}}
 <h2>🏛️ 世界势力</h2>
 <div id="factionCards">{faction_cards}</div>
 <div id="factionCharts"></div>
+</div>
+
+<div id="sec-factionGraph" class="section">
+<h2>🕸️ 势力关系图谱</h2>
+<div class="graph-wrap"><div class="mermaid">{faction_graph}</div></div>
+<p style="text-align:center;color:#8b949e;font-size:12px;margin-top:8px">
+<span style="color:#2ea043">━━</span> 同盟/友好 &nbsp;
+<span style="color:#d29922">╌╌</span> 冷淡 &nbsp;
+<span style="color:#da3633">┅┅</span> 敌对 &nbsp;
+节点颜色=声望
+</p>
+<div id="factionAttitudeCharts"></div>
 </div>
 
 <div id="sec-branch" class="section"><h2>🔀 分支树统计</h2>
@@ -479,6 +560,26 @@ if(A.character_frequency&&A.character_frequency.labels){{makeChart('charFreqChar
     wrap.appendChild(h3);wrap.appendChild(canvas);
     chartContainer.appendChild(wrap);
     new Chart(canvas,{{type:'line',data:{{labels:f.labels,datasets:[{{label:name,data:f.datasets[0].data,borderColor:c,backgroundColor:c+'22',tension:0.3,fill:false,pointRadius:4}}]}},options:{{responsive:true,maintainAspectRatio:true,plugins:{{legend:{{labels:{{color:'#8b949e'}}}}}},scales:{{x:{{ticks:{{color:'#8b949e'}},grid:{{color:'#21262d'}}}},y:{{ticks:{{color:'#8b949e'}},grid:{{color:'#21262d'}},min:0,max:100}}}}}}}});
+  }});
+}})();
+
+// Faction attitude charts
+(function(){{
+  var fac=A.faction_attitude_curves;if(!fac)return;
+  var chartContainer=document.getElementById('factionAttitudeCharts');
+  var aIdx=0;
+  Object.keys(fac).forEach(function(key){{
+    var f=fac[key];if(!f||!f.datasets||!f.datasets[0])return;
+    var rep=f.datasets[0].data;var lastRep=rep.length?rep[rep.length-1]:50;
+    var c=lastRep>=70?'#2ea043':lastRep>=40?'#d29922':'#da3633';
+    var wrap=document.createElement('div');wrap.className='chart-wrap';wrap.style.marginTop='16px';
+    var h3=document.createElement('h3');
+    h3.style.cssText='color:#8b949e;font-size:14px;margin-bottom:8px;font-weight:400';
+    h3.textContent=f.label;
+    var canvas=document.createElement('canvas');
+    wrap.appendChild(h3);wrap.appendChild(canvas);
+    chartContainer.appendChild(wrap);
+    new Chart(canvas,{{type:'line',data:{{labels:f.labels,datasets:[{{label:key,data:f.datasets[0].data,borderColor:c,backgroundColor:c+'22',tension:0.3,fill:false,pointRadius:4}}]}},options:{{responsive:true,maintainAspectRatio:true,plugins:{{legend:{{labels:{{color:'#8b949e'}}}}}},scales:{{x:{{ticks:{{color:'#8b949e'}},grid:{{color:'#21262d'}}}},y:{{ticks:{{color:'#8b949e'}},grid:{{color:'#21262d'}},min:0,max:100}}}}}}}});
   }});
 }})();
 </script>

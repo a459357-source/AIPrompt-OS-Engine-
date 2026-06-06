@@ -32,6 +32,7 @@ def compute_all() -> dict:
         "metrics_curves": metrics_curves(),  # dynamic: detects all character metrics
         "trust_curve": trust_curve(),        # backward compat alias
         "faction_curves": faction_curves(),  # faction reputation curves
+        "faction_attitude_curves": faction_attitude_curves(),  # inter-faction attitude curves
         "status_timeline": status_timeline(),
         "word_counts": word_counts(),
         "choice_stats": choice_stats(),
@@ -140,6 +141,36 @@ def faction_curves() -> dict:
             "label": f"{name} 声望",
             "role": data.get("role", ""),
         }
+
+    return result
+
+
+def faction_attitude_curves() -> dict:
+    """
+    Inter-faction attitude curves from memory.json faction_attitudes.
+    Returns {f"{a}→{b}": {labels, datasets, label}} for each non-trivial pair.
+    """
+    memory = io_utils.read_json(config.MEMORY_PATH)
+    attitudes = memory.get("faction_attitudes", {})
+
+    result = {}
+    for a, targets in attitudes.items():
+        for b, data in targets.items():
+            att = data.get("attitude", 0.5)
+            mh = data.get("metric_history", {}).get("attitude", [])
+            if mh:
+                turns = [h[0] for h in mh]
+                vals = [int(h[1] * 100) for h in mh]
+            else:
+                turns = [0]
+                vals = [int(att * 100)]
+
+            key = f"{a}→{b}"
+            result[key] = {
+                "labels": turns,
+                "datasets": [{"name": key, "data": vals}],
+                "label": f"{a} 对 {b} 的态度",
+            }
 
     return result
 
