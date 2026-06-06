@@ -2020,7 +2020,7 @@ async def generate_world(keywords: str = Form("")):
 7. 只输出JSON，不要输出markdown代码块或其他文字"""
 
     try:
-        result = call_deepseek(system, user, temperature=0.9, max_tokens=1024, skip_validation=True)
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=4096, skip_validation=True)
         return JSONResponse(result)
     except DeepSeekError as exc:
         return JSONResponse({"error": f"AI 生成失败: {exc}"}, status_code=500)
@@ -2063,7 +2063,7 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
         return JR({"error": f"未知字段类型: {field}"}, status_code=400)
 
     try:
-        result = call_deepseek(system, user, temperature=0.9, max_tokens=512, skip_validation=True)
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=2048, skip_validation=True)
         # For character field, try to parse JSON from response
         if field == "character":
             # The result might already be the character object (skip_validation mode)
@@ -2358,7 +2358,7 @@ async def generate_npc(keywords: str = Form("")):
 要求：角色要符合世界观设定，与已有角色不重复，有独特的性格特点。只输出JSON。"""
 
     try:
-        result = call_deepseek(system, user, temperature=0.9, max_tokens=512)
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=2048)
 
         # Auto-add to state + memory
         state = io_utils.read_yaml(config.SESSION_STATE_PATH)
@@ -2443,7 +2443,7 @@ async def generate_rules(
 5. 只输出 JSON"""
 
     try:
-        result = call_deepseek(system, user, temperature=0.9, max_tokens=512, skip_validation=True)
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=2048, skip_validation=True)
         return JSONResponse(result)
     except DeepSeekError as exc:
         return JSONResponse({"error": f"AI 生成失败: {exc}"}, status_code=500)
