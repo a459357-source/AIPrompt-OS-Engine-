@@ -214,16 +214,16 @@ export default function Game() {
               </div>
             </div>
 
-            {/* Story — scrollable */}
-            <div className="flex-1 overflow-y-auto min-h-0 space-y-4">
-            {/* Generating indicator */}
+            {/* Generating indicator — fixed, always visible */}
             {choosing && (
-              <div className="flex items-center justify-center gap-2 py-3 bg-game-accent/10 border border-game-accent/30 rounded-lg text-sm text-game-accent animate-pulse">
+              <div className="shrink-0 flex items-center justify-center gap-2 py-3 bg-game-accent/10 border border-game-accent/30 rounded-lg text-sm text-game-accent animate-pulse">
                 <span className="inline-block w-3.5 h-3.5 border-2 border-game-accent/30 border-t-game-accent rounded-full animate-spin" />
                 AI 正在生成下一段剧情…
               </div>
             )}
 
+            {/* Story — scrollable */}
+            <div className="flex-1 overflow-y-auto min-h-0 space-y-4">
             <Card>
               <CardContent className="pt-6 md:px-8">
                 <motion.div key={turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
