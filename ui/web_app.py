@@ -1126,9 +1126,9 @@ _NEW_PAGE = """<!DOCTYPE html>
             text-align: center; flex-shrink: 0;
             padding: 12px 0; border-bottom: 1px solid #30363d; margin-bottom: 12px;
         }
-        .new-header h1 { font-size: 1.4em; color: #58a6ff; }
-        .new-header a { color: #8b949e; text-decoration: none; font-size: 0.8em; }
-        .new-header a:hover { color: #58a6ff; }
+        .new-header h1 { font-size: 1.4em; color: #58a6ff; margin-bottom: 8px; }
+        .back-btn { display:inline-block;padding:6px 16px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.85em;transition:all 0.15s; }
+        .back-btn:hover { background:#1a3a5c;color:#79c0ff; }
         .new-body {
             flex: 1; overflow-y: auto; min-height: 0;
         }
@@ -1522,9 +1522,9 @@ _NPC_PAGE = """<!DOCTYPE html>
             text-align: center; flex-shrink: 0;
             padding: 12px 0; border-bottom: 1px solid #30363d; margin-bottom: 12px;
         }
-        .npc-header h1 { font-size: 1.3em; color: #58a6ff; }
-        .npc-header a { color: #8b949e; text-decoration: none; font-size: 0.8em; }
-        .npc-header a:hover { color: #58a6ff; }
+        .npc-header h1 { font-size: 1.3em; color: #58a6ff; margin-bottom: 8px; }
+        .back-btn { display:inline-block;padding:6px 16px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.85em;transition:all 0.15s; }
+        .back-btn:hover { background:#1a3a5c;color:#79c0ff; }
         .npc-body { flex: 1; overflow-y: auto; min-height: 0; }
         .npc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
         .npc-card {
@@ -1878,8 +1878,9 @@ _SETTINGS_PAGE = """<!DOCTYPE html>
             text-align: center; padding: 12px 0;
             border-bottom: 1px solid #30363d; margin-bottom: 20px;
         }
-        .set-header h1 { font-size: 1.3em; color: #58a6ff; }
-        .set-header a { color: #8b949e; text-decoration: none; font-size: 0.8em; }
+        .set-header h1 { font-size: 1.3em; color: #58a6ff; margin-bottom: 8px; }
+        .back-btn { display:inline-block;padding:6px 16px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.85em;transition:all 0.15s; }
+        .back-btn:hover { background:#1a3a5c;color:#79c0ff; }
         .set-card {
             background: #161b22; border: 1px solid #30363d;
             border-radius: 8px; padding: 20px 24px; margin-bottom: 16px;
