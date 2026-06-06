@@ -25,3 +25,4 @@
 2026-06-07 03:03:59 [INFO] engine.dashboard: Dashboard written → D:\AIWriter\PromptOS\prompt-os-engine\output\dashboard.html
 2026-06-07 03:03:59 [INFO] engine.save_manager: 💾 Saved to slot 'autosave' (turn 2)
 2026-06-07 03:03:59 [INFO] run: ═══ TURN COMPLETE ═══
+2026-06-07 03:04:31 [INFO] engine.deepseek_client: Logging initialized — app.log + error.log
