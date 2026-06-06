@@ -32,7 +32,7 @@ h1{font-size:1.4em;color:#58a6ff;margin-bottom:4px}
 .footer{position:fixed;bottom:16px;color:#484f58;font-size:0.7em}
 </style>
 </head>
-<body>
+<body onbeforeunload="if(document.getElementById('btnStop').style.display!=='none'){try{KillServer()}catch(e){}}">
 <h1>🎮 Prompt OS Galgame</h1>
 <div class="sub">AI Interactive Narrative Engine</div>
 <button class="btn" id="btnStart" onclick="startGame()">🚀 启动游戏服务器</button>
