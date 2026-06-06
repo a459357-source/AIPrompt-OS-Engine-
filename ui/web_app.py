@@ -392,7 +392,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             {{ERROR}}
 
-            <div class="state-panel">{{STATE_ROW}}</div>
+            <div class="state-panel">{{STATE_ROW}} <span id="connDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#484f58;margin-left:8px;flex-shrink:0" title="连接状态"></span></div>
 
             <div class="story-block">{{STORY}}</div>
 
@@ -543,6 +543,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         })();
 
 
+
+        // ── Connection indicator ──
+        const connDot = document.getElementById('connDot');
+        if(connDot){
+            setInterval(function(){
+                fetch('/health').then(function(){
+                    connDot.style.background = '#3fb950';
+                    connDot.title = '服务器在线';
+                }).catch(function(){
+                    connDot.style.background = '#f85149';
+                    connDot.title = '服务器断开';
+                });
+            }, 30000);
+        }
 
         // ── Internal nav tracking (suppress shutdown for in-app clicks) ──
         document.addEventListener('click', function(e){
