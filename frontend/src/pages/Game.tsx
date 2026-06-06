@@ -220,18 +220,21 @@ export default function Game() {
                     </button>
                   </div>
                   {options.map((choice, i) => {
-                    // Parse "行动 → 可能发展 | 态度变化"
+                    // Parse "行动 → 可能发展 | 态度 | 人际影响"
                     const parts = choice.split(/\s*[→]\s*/)
                     const action = parts[0] || choice
                     const rest = parts.slice(1).join(' → ')
-                    const [consequence, attitude] = rest.split(/\s*\|\s*/)
+                    const segments = rest.split(/\s*\|\s*/)
+                    const consequence = segments[0] || ''
+                    const attitude = segments[1] || ''
+                    const relation = segments[2] || ''
                     return (
                       <Button key={`${turn}-${i}`} variant="outline" disabled={choosing}
                         onClick={() => handleChoice(action)}
                         className="w-full justify-start text-left h-auto py-3 px-4 hover:bg-game-primary/10 hover:border-game-primary/50 transition-all"
                       >
                         <div className="flex flex-col gap-1 min-w-0">
-                          <div className="flex items-start gap-2">
+                          <div className="flex items-start gap-2 flex-wrap">
                             <span className="text-game-accent font-bold shrink-0 mt-0.5">{String.fromCharCode(65 + i)}.</span>
                             <span className="text-sm font-medium text-game-text">{action}</span>
                             {showConsequences && attitude && (
@@ -240,6 +243,9 @@ export default function Game() {
                           </div>
                           {showConsequences && consequence && (
                             <p className="text-xs text-game-dim ml-5 pl-0.5">{consequence.trim()}</p>
+                          )}
+                          {showConsequences && relation && (
+                            <p className="text-xs text-game-success ml-5 pl-0.5">💞 {relation.trim()}</p>
                           )}
                         </div>
                       </Button>
