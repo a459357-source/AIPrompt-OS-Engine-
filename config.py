@@ -162,11 +162,51 @@ def reload_story_length() -> int:
     return config.STORY_LENGTH
 
 
+# ── Max tokens (AI response length) ─────────────────────────────────
+DEFAULT_MAX_TOKENS = 2048
+
+
+def _load_max_tokens() -> int:
+    """Load max_tokens preference from apikey.json."""
+    if APIKEY_PATH.exists():
+        try:
+            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
+            val = data.get("max_tokens", DEFAULT_MAX_TOKENS)
+            return max(512, min(8192, int(val)))
+        except Exception:
+            pass
+    return DEFAULT_MAX_TOKENS
+
+
+def save_max_tokens(tokens: int) -> None:
+    """Persist max_tokens preference."""
+    data = {}
+    if APIKEY_PATH.exists():
+        try:
+            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    data["max_tokens"] = tokens
+    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    APIKEY_PATH.write_text(
+        __import__("json").dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def reload_max_tokens() -> int:
+    """Re-read and update max_tokens."""
+    import config
+    config.MAX_TOKENS = _load_max_tokens()
+    return config.MAX_TOKENS
+
+
 # ── DeepSeek API ────────────────────────────────────────────────────
 DEEPSEEK_API_KEY = _load_api_key()
 DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions"
 DEEPSEEK_MODEL = _load_model()
 STORY_LENGTH = _load_story_length()
+MAX_TOKENS = _load_max_tokens()
 
 # ── Obsidian live export ────────────────────────────────────────────
 # Path to an Obsidian vault folder.  When set, the engine writes

@@ -105,6 +105,7 @@ export default function Settings() {
   const [apiKeyMasked, setApiKeyMasked] = useState('')
   const [model, setModel] = useState('deepseek-chat')
   const [storyLength, setStoryLength] = useState(1000)
+  const [maxTokens, setMaxTokens] = useState(2048)
 
   const defaultValues = loadSettings()
   const form = useForm<SettingsForm>({
@@ -144,6 +145,8 @@ export default function Settings() {
         if (keyMatch) setApiKey(keyMatch[1])
         const maskedMatch = html.match(/已配置 \((sk[^)]+)\)/)
         if (maskedMatch) setApiKeyMasked(maskedMatch[1])
+        const mtMatch = html.match(/name="max_tokens"[^>]*>.*?value="(\d+)" selected/)
+        if (mtMatch) setMaxTokens(parseInt(mtMatch[1]))
       })
       .catch(() => {})
   }, [])
@@ -153,10 +156,11 @@ export default function Settings() {
     if (apiKey) fd.append('api_key', apiKey)
     fd.append('model', model)
     fd.append('story_length', String(storyLength))
+    fd.append('max_tokens', String(maxTokens))
     await fetch('/settings', { method: 'POST', body: fd })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
-  }, [apiKey, model, storyLength])
+  }, [apiKey, model, storyLength, maxTokens])
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -436,6 +440,22 @@ export default function Settings() {
                     />
                     <span className="text-xs text-game-dim">300–3000</span>
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>AI 最大 Token</Label>
+                  <Select value={String(maxTokens)} onValueChange={(v) => setMaxTokens(parseInt(v))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="512">512 tokens（快速/可能截断）</SelectItem>
+                      <SelectItem value="1024">1024 tokens（较短）</SelectItem>
+                      <SelectItem value="2048">2048 tokens（标准）</SelectItem>
+                      <SelectItem value="4096">4096 tokens（完整/较慢）</SelectItem>
+                      <SelectItem value="8192">8192 tokens（最大/最慢）</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-game-dim">控制 AI 回复长度上限，世界观生成会用双倍值</p>
                 </div>
                 <Button variant="success" className="w-full" onClick={saveApiKey}>
                   💾 保存 API 设置

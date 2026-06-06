@@ -30,6 +30,7 @@ from engine.memory import get_char_stats_for_ui, load_memory
 from config import save_api_key, clear_api_key, reload_api_key, APIKEY_PATH
 from config import save_model, reload_model, AVAILABLE_MODELS
 from config import save_story_length, reload_story_length
+from config import save_max_tokens, reload_max_tokens
 import config
 
 app = FastAPI(
@@ -2020,7 +2021,7 @@ async def generate_world(keywords: str = Form("")):
 7. 只输出JSON，不要输出markdown代码块或其他文字"""
 
     try:
-        result = call_deepseek(system, user, temperature=0.9, max_tokens=4096, skip_validation=True)
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=config.MAX_TOKENS * 2, skip_validation=True)
         return JSONResponse(result)
     except DeepSeekError as exc:
         return JSONResponse({"error": f"AI 生成失败: {exc}"}, status_code=500)
@@ -2063,7 +2064,7 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
         return JR({"error": f"未知字段类型: {field}"}, status_code=400)
 
     try:
-        result = call_deepseek(system, user, temperature=0.9, max_tokens=2048, skip_validation=True)
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=config.MAX_TOKENS, skip_validation=True)
         # For character field, try to parse JSON from response
         if field == "character":
             # The result might already be the character object (skip_validation mode)
@@ -2358,7 +2359,7 @@ async def generate_npc(keywords: str = Form("")):
 要求：角色要符合世界观设定，与已有角色不重复，有独特的性格特点。只输出JSON。"""
 
     try:
-        result = call_deepseek(system, user, temperature=0.9, max_tokens=2048)
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=config.MAX_TOKENS)
 
         # Auto-add to state + memory
         state = io_utils.read_yaml(config.SESSION_STATE_PATH)
@@ -2443,7 +2444,7 @@ async def generate_rules(
 5. 只输出 JSON"""
 
     try:
-        result = call_deepseek(system, user, temperature=0.9, max_tokens=2048, skip_validation=True)
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=config.MAX_TOKENS, skip_validation=True)
         return JSONResponse(result)
     except DeepSeekError as exc:
         return JSONResponse({"error": f"AI 生成失败: {exc}"}, status_code=500)
@@ -2501,6 +2502,11 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
             <input name="story_length" type="number" min="300" max="3000" step="100"
                    value="{{STORY_LENGTH}}" style="width:120px;">
             <div class="hint">AI 每轮生成的文字量（300–3000），默认 1000。对首次开篇也有影响。</div>
+            <label style="margin-top:14px;">📐 AI 最大 Token</label>
+            <select name="max_tokens" id="maxTokens" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.9em;">
+                {{MAX_TOKENS_OPTIONS}}
+            </select>
+            <div class="hint">控制 AI 回复长度上限（512–8192），越大回复越完整但越慢。世界观生成会用双倍值。</div>
             <div class="status {{STATUS_CLASS}}">{{STATUS_TEXT}}</div>
             <div class="btn-row">
                 <button class="btn btn-save" type="submit">💾 保存</button>
@@ -2538,6 +2544,17 @@ async def settings_page():
     if not model_hint:
         model_hint = "当前: V4-Flash（默认）"
 
+    # Max tokens options
+    current_max_tokens = config.MAX_TOKENS
+    max_tokens_opts = []
+    max_tokens_hint = ""
+    for val in [512, 1024, 2048, 4096, 8192]:
+        sel = ' selected' if val == current_max_tokens else ''
+        label = f"{val} tokens（{'快速/可能截断' if val <= 1024 else '标准' if val <= 2048 else '完整/较慢' if val <= 4096 else '最大/最慢'}）"
+        max_tokens_opts.append(f'<option value="{val}"{sel}>{label}</option>')
+        if val == current_max_tokens:
+            max_tokens_hint = f"当前: {val} tokens"
+
     page = (
         _SETTINGS_PAGE
         .replace("{{CURRENT_KEY}}", key)
@@ -2546,13 +2563,14 @@ async def settings_page():
         .replace("{{MODEL_OPTIONS}}", "\n".join(model_opts))
         .replace("{{MODEL_HINT}}", model_hint)
         .replace("{{STORY_LENGTH}}", str(config.STORY_LENGTH))
+        .replace("{{MAX_TOKENS_OPTIONS}}", "\n".join(max_tokens_opts))
     )
     return HTMLResponse(page)
 
 
 @app.post("/settings", response_class=HTMLResponse)
-async def save_settings(api_key: str = Form(""), model: str = Form("deepseek-chat"), story_length: int = Form(1500)):
-    """Save API key, model, and story length."""
+async def save_settings(api_key: str = Form(""), model: str = Form("deepseek-chat"), story_length: int = Form(1500), max_tokens: int = Form(2048)):
+    """Save API key, model, story length, and max tokens."""
     key = api_key.strip()
     if key:
         save_api_key(key)
@@ -2563,6 +2581,9 @@ async def save_settings(api_key: str = Form(""), model: str = Form("deepseek-cha
     length = max(300, min(3000, story_length))
     save_story_length(length)
     reload_story_length()
+    tokens = max(512, min(8192, max_tokens))
+    save_max_tokens(tokens)
+    reload_max_tokens()
     return await settings_page()
 
 
