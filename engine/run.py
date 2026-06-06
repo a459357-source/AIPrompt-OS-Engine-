@@ -38,7 +38,13 @@ from engine.builder import build_prompt
 from engine.deepseek_client import call_deepseek, DeepSeekError
 from engine.state_manager import apply_turn, validate_response
 from engine.router import load_graph, save_graph, get_current_node, append_node
-from engine.memory import load_memory, save_memory, update_trust, set_flag, get_context_for_prompt, guess_trust_delta_from_story, init_factions, update_faction_reputation, set_faction_flag
+from engine.memory import (
+    load_memory, save_memory, update_trust, set_flag,
+    get_context_for_prompt, guess_trust_delta_from_story,
+    init_factions, update_faction_reputation, set_faction_flag,
+    assign_character_tier, degrade_inactive_characters,
+    build_character_tier_context,
+)
 from engine.save_manager import autosave as do_autosave
 from engine import obsidian_live
 
@@ -397,6 +403,9 @@ def _update_memory(response: dict, state: dict) -> None:
         # ── Initialize factions from world pack (first time) ──────
         init_factions(memory)
 
+        # Load world_pack for tier assignment
+        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+
         # ── Auto-register new NPCs from session state ────────────
         state_chars = state.get("characters", {})
         mem_chars = memory.setdefault("characters", {})
@@ -415,6 +424,29 @@ def _update_memory(response: dict, state: dict) -> None:
                     "trust", []
                 ).append([turn, 0.5])
                 logger.info("Memory: auto-registered new NPC '%s' (turn %d)", name, turn)
+
+        # ── Character tier management ─────────────────────────
+        # Assign tiers to newly registered NPCs (and migration for existing unclassified chars)
+        for name in list(mem_chars.keys()):
+            if not mem_chars[name].get("tier"):
+                # Check world_pack for is_main flag
+                is_main = False
+                world_chars = world_pack.get("world", {}).get("characters", [])
+                for wc in world_chars:
+                    if wc.get("name") == name and wc.get("is_main"):
+                        is_main = True
+                        break
+                assign_character_tier(memory, name, world_pack, is_main=is_main)
+
+        # Track last_appearance_turn for characters appearing in this turn's story
+        for name in list(mem_chars.keys()):
+            if name in story:
+                mem_chars[name]["last_appearance_turn"] = turn
+
+        # Degrade inactive characters
+        degrade_messages = degrade_inactive_characters(memory, turn)
+        for msg in degrade_messages:
+            logger.info(msg)
 
         # Heuristic trust deltas from story keywords
         deltas = guess_trust_delta_from_story(story)

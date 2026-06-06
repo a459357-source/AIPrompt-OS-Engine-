@@ -391,3 +391,272 @@ def get_char_stats_for_ui(session_state: dict, memory: dict, world_pack: dict | 
         })
 
     return result
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Character Tier Lifecycle Management
+# ═══════════════════════════════════════════════════════════════════
+#
+#  Four tiers with hard capacity limits:
+#    主角 (max 1)  → 核心 (max 6)  → 重要 (max 15)  → 背景 (unlimited)
+#
+#  Lifecycle:
+#    NEW → tier assigned (respecting caps)
+#        → inactive too long → auto-degrade
+#        → goal complete → retire
+#    Retired/BG chars can be reactivated when capacity frees up.
+# ═══════════════════════════════════════════════════════════════════
+
+def get_tier_counts(memory: dict) -> dict[str, int]:
+    """Return {tier: count} for all active (non-retired) characters."""
+    counts: dict[str, int] = {"主角": 0, "核心": 0, "重要": 0, "背景": 0, "退休": 0}
+    chars = memory.get("characters", {})
+    for _name, data in chars.items():
+        tier = data.get("tier", "")
+        if tier in counts:
+            counts[tier] += 1
+    return counts
+
+
+def assign_character_tier(memory: dict, name: str,
+                          world_pack: dict | None = None,
+                          is_main: bool = False) -> str:
+    """
+    Assign the highest available tier to a character, respecting capacity limits.
+
+    Priority:
+      1. If is_main=True and 主角 slot is free → 主角
+      2. If character exists in world_pack → 核心 (if < 6) else 重要
+      3. New NPC → 重要 (if < 15) else 背景
+
+    Returns the assigned tier string.
+    """
+    chars = memory.setdefault("characters", {})
+    entry = chars.setdefault(name, {"trust": 0.5, "flags": [], "relationship": ""})
+    counts = get_tier_counts(memory)
+
+    # Already has a valid tier? Keep it
+    existing = entry.get("tier", "")
+    if existing and existing in config.TIER_ORDER + ["退休"]:
+        return existing
+
+    # Check if this character is in world_pack
+    in_world_pack = False
+    if world_pack:
+        world_chars = world_pack.get("world", {}).get("characters", [])
+        for wc in world_chars:
+            if wc.get("name") == name:
+                in_world_pack = True
+                if wc.get("is_main"):
+                    is_main = True
+                break
+
+    # ── Assign tier ──────────────────────────────────────────
+    if is_main:
+        if counts.get("主角", 0) < config.CHARACTER_TIER_LIMITS["主角"]:
+            entry["tier"] = "主角"
+            logger.info("Tier: %s → 主角 (main character)", name)
+            return "主角"
+        else:
+            logger.warning("Tier: 主角 slot full, assigning %s as 核心", name)
+
+    if in_world_pack:
+        if counts.get("核心", 0) < config.CHARACTER_TIER_LIMITS["核心"]:
+            entry["tier"] = "核心"
+            logger.info("Tier: %s → 核心 (from world_pack)", name)
+            return "核心"
+        elif counts.get("重要", 0) < config.CHARACTER_TIER_LIMITS["重要"]:
+            entry["tier"] = "重要"
+            logger.info("Tier: %s → 重要 (核心 full, from world_pack)", name)
+            return "重要"
+
+    # NPC / overflow → 重要 if space, else 背景
+    if counts.get("重要", 0) < config.CHARACTER_TIER_LIMITS["重要"]:
+        entry["tier"] = "重要"
+        logger.info("Tier: %s → 重要 (new NPC)", name)
+        return "重要"
+    else:
+        entry["tier"] = "背景"
+        logger.info("Tier: %s → 背景 (重要 full, new NPC)", name)
+        return "背景"
+
+
+def degrade_inactive_characters(memory: dict, current_turn: int) -> list[str]:
+    """
+    Degrade characters that haven't appeared for TIER_DEGRADATION_TURNS.
+    Degradation chain: 核心 → 重要 → 背景.
+    主角 is never degraded. 背景 is the floor.
+
+    Returns list of degradation messages for logging.
+    """
+    chars = memory.get("characters", {})
+    messages: list[str] = []
+    tier_order = config.TIER_ORDER  # ["主角", "核心", "重要", "背景"]
+
+    for name, data in chars.items():
+        tier = data.get("tier", "")
+        if tier in ("主角", "退休", "背景"):
+            continue  # never degrade these
+
+        last_appearance = data.get("last_appearance_turn", 0)
+        if last_appearance == 0:
+            continue  # no appearance data yet
+
+        turns_inactive = current_turn - last_appearance
+        if turns_inactive >= config.TIER_DEGRADATION_TURNS:
+            try:
+                idx = tier_order.index(tier)
+            except ValueError:
+                continue
+            if idx + 1 < len(tier_order):
+                new_tier = tier_order[idx + 1]
+                data["tier"] = new_tier
+                msg = (f"Tier: {name} 降级 {tier} → {new_tier} "
+                       f"(已 {turns_inactive} 轮未出场)")
+                messages.append(msg)
+                logger.info(msg)
+
+    return messages
+
+
+def retire_character(memory: dict, name: str, reason: str = "") -> bool:
+    """
+    Mark a character as retired (剧情目标完成).
+    Retired characters are excluded from active tier counts and AI priority.
+
+    Returns True if retirement was applied, False if character not found.
+    """
+    chars = memory.get("characters", {})
+    if name not in chars:
+        logger.warning("Tier: cannot retire unknown character '%s'", name)
+        return False
+
+    entry = chars[name]
+    old_tier = entry.get("tier", "未知")
+    entry["tier"] = "退休"
+    entry["retired"] = True
+    entry["retirement_reason"] = reason
+    logger.info("Tier: %s 退休 (%s → 退休), reason: %s", name, old_tier, reason or "无")
+    return True
+
+
+def reactivate_character(memory: dict, name: str) -> str | None:
+    """
+    Bring a retired or background character back into active rotation.
+    Assigns the best available tier within capacity limits.
+    Returns the new tier, or None if character not found.
+    """
+    chars = memory.get("characters", {})
+    if name not in chars:
+        return None
+
+    entry = chars[name]
+    old_tier = entry.get("tier", "")
+    if old_tier == "主角":
+        return "主角"  # already highest, nothing to do
+
+    # Clear retirement flags
+    if entry.get("retired"):
+        entry.pop("retired", None)
+        entry.pop("retirement_reason", None)
+
+    # Re-assign tier (temporarily clear old to force re-evaluation)
+    entry.pop("tier", None)
+    world = io_utils.read_yaml(config.WORLD_PACK_PATH)
+    new_tier = assign_character_tier(memory, name, world)
+    logger.info("Tier: %s 重新激活 (%s → %s)", name, old_tier, new_tier)
+    return new_tier
+
+
+def get_priority_characters(memory: dict, story_text: str = "",
+                            limit: int = 3) -> list[dict]:
+    """
+    Return characters sorted by AI selection priority:
+      1. 核心角色  (highest priority)
+      2. 重要角色
+      3. 最近未出场 (longer absence = higher priority)
+      4. 与当前剧情最相关 (name appears in story_text)
+
+    Returns list of {name, tier, last_appearance_turn, in_story}.
+    Excludes retired characters.
+    """
+    chars = memory.get("characters", {})
+    priority_list: list[dict] = []
+
+    for name, data in chars.items():
+        tier = data.get("tier", "")
+        if tier == "退休":
+            continue
+        if data.get("retired"):
+            continue
+
+        last_app = data.get("last_appearance_turn", 0)
+        in_story = name in story_text if story_text else False
+
+        priority_list.append({
+            "name": name,
+            "tier": tier or "未分类",
+            "last_appearance_turn": last_app,
+            "in_story": in_story,
+        })
+
+    # Sort: 主角 > 核心 > 重要 > 背景; then in_story; then longer absence
+    def _sort_key(p: dict) -> tuple[int, int, int]:
+        tier_order = {"主角": 0, "核心": 1, "重要": 2, "背景": 3}
+        tier_rank = tier_order.get(p["tier"], 5)
+        relevance = 0 if p["in_story"] else 1
+        # Negate so longer absence = higher priority
+        absence = -p["last_appearance_turn"]
+        return (tier_rank, relevance, absence)
+
+    priority_list.sort(key=_sort_key)
+    return priority_list[:limit]
+
+
+def build_character_tier_context(memory: dict) -> str:
+    """
+    Build a tier-awareness context block for the AI prompt.
+    Tells the AI about current tier capacities, character roster,
+    and creation rules.
+    """
+    counts = get_tier_counts(memory)
+    limits = config.CHARACTER_TIER_LIMITS
+
+    lines: list[str] = []
+    lines.append("【角色分级制度】")
+    lines.append(f"  主角: {counts['主角']}/{limits['主角']} (上限 {limits['主角']})")
+    lines.append(f"  核心角色: {counts['核心']}/{limits['核心']} (上限 {limits['核心']})")
+    lines.append(f"  重要角色: {counts['重要']}/{limits['重要']} (上限 {limits['重要']})")
+    lines.append(f"  背景角色: {counts['背景']} (无上限)")
+
+    # Capacity warnings
+    if counts["核心"] >= limits["核心"]:
+        lines.append("  ⚠️ 核心角色已满 — 禁止创建新的核心角色，优先复用已有核心角色。")
+    if counts["重要"] >= limits["重要"]:
+        lines.append("  ⚠️ 重要角色已满 — 禁止创建新的重要角色，优先激活旧角色或使用背景角色。")
+
+    # Character roster by tier
+    chars = memory.get("characters", {})
+    for tier in ["主角", "核心", "重要"]:
+        tier_chars = [(n, d) for n, d in chars.items()
+                      if d.get("tier") == tier and not d.get("retired")]
+        if tier_chars:
+            names = [n for n, _ in tier_chars]
+            lines.append(f"  [{tier}] {', '.join(names)}")
+
+    # Background characters available for reactivation
+    background_chars = [(n, d) for n, d in chars.items()
+                        if d.get("tier") == "背景" and not d.get("retired")]
+    if background_chars:
+        bg_sorted = sorted(background_chars,
+                           key=lambda x: x[1].get("last_appearance_turn", 0))
+        top_bg = [n for n, _ in bg_sorted[:5]]
+        lines.append(f"  可激活背景角色: {', '.join(top_bg)}")
+
+    # Retired characters
+    retired = [(n, d) for n, d in chars.items() if d.get("retired")]
+    if retired:
+        names = [n for n, _ in retired]
+        lines.append(f"  已退休: {', '.join(names)}")
+
+    return "\n".join(lines)

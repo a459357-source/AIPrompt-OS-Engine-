@@ -418,6 +418,18 @@ def setup_logging():
     logging.getLogger("engine.deepseek_client").info("Logging initialized — app.log + error.log")
 
 
+# ── Character tier system ───────────────────────────────────────────
+# Four-tier classification with hard capacity limits.
+# Tiers: 主角 > 核心 > 重要 > 背景 > 退休
+CHARACTER_TIER_LIMITS = {
+    "主角": 1,
+    "核心": 6,
+    "重要": 15,
+    # 背景: unlimited
+}
+TIER_ORDER = ["主角", "核心", "重要", "背景"]  # degradation order (skip 退休)
+TIER_DEGRADATION_TURNS = 10  # turns without appearance → degrade one tier
+
 # ── Engine constants ────────────────────────────────────────────────
 STATUS_ORDER = ["SETUP", "BUILD", "TENSION", "CLIMAX", "COOLDOWN"]
 
