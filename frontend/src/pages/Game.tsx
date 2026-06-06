@@ -160,7 +160,7 @@ export default function Game() {
             {/* Top status bar */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2 text-sm">
-                <Badge variant="primary" size="sm">📖 第 {turn} 轮</Badge>
+                <Badge variant="primary">📖 第 {turn} 轮</Badge>
                 <Badge
                   variant={
                     status === 'TENSION' ? 'warning' :
@@ -193,7 +193,7 @@ export default function Game() {
                 <motion.div key={turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
                   {story.split('\n').filter(Boolean).map((paragraph, i) => (
                     <motion.p key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
-                      className="text-game-text leading-relaxed text-[16px] mb-5"
+                      className="text-game-text leading-relaxed text-[17px] mb-5"
                     >
                       {paragraph}
                     </motion.p>
@@ -207,15 +207,15 @@ export default function Game() {
               {options.length > 0 && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-game-muted font-medium">🎯 做出你的选择</p>
+                    <p className="text-sm text-game-muted font-medium">🎯 做出你的选择</p>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-game-muted/80 hidden sm:inline">
+                      <span className="text-xs text-game-muted/80 hidden sm:inline">
                         {showConsequences ? 'AI 预测每个选项的剧情发展和好感影响' : '已隐藏剧情推测'}
                       </span>
                       <button
                         onClick={() => setShowConsequences(!showConsequences)}
                         title={showConsequences ? '点击关闭 AI 剧情推测' : '点击开启 AI 剧情推测'}
-                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
                           showConsequences
                             ? 'border-game-accent/40 bg-game-accent/10 text-game-accent'
                             : 'border-game-border text-game-dim hover:text-game-muted'
@@ -242,16 +242,16 @@ export default function Game() {
                         <div className="flex flex-col gap-1 min-w-0">
                           <div className="flex items-start gap-2 flex-wrap">
                             <span className="text-game-accent font-bold shrink-0 mt-0.5">{String.fromCharCode(65 + i)}.</span>
-                            <span className="text-sm font-medium text-game-text">{action}</span>
+                            <span className="text-base font-medium text-game-text">{action}</span>
                             {showConsequences && attitude && (
                               <Badge variant="accent" size="sm" className="shrink-0 text-[10px]">{attitude.trim()}</Badge>
                             )}
                           </div>
                           {showConsequences && consequence && (
-                            <p className="text-xs text-game-dim ml-5 pl-0.5">{consequence.trim()}</p>
+                            <p className="text-sm text-game-muted ml-5 pl-0.5">{consequence.trim()}</p>
                           )}
                           {showConsequences && relation && (
-                            <p className="text-xs text-game-success ml-5 pl-0.5">💞 {relation.trim()}</p>
+                            <p className="text-sm text-game-success ml-5 pl-0.5">💞 {relation.trim()}</p>
                           )}
                         </div>
                       </Button>
