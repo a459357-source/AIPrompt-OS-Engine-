@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@plugin "tailwindcss-animate";
 
 @theme {
   --color-game-bg: #0d1117;
@@ -15,14 +16,34 @@
   --color-game-dim: #484f58;
   --color-game-secret: #4a3060;
   --radius-game: 0.5rem;
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
 }
 
 body {
   margin: 0;
-  font-family: 'Segoe UI', 'Noto Sans SC', system-ui, sans-serif;
-  background: var(--color-game-bg);
+  font-family: 'Segoe UI', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(88, 166, 255, 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(210, 168, 255, 0.06), transparent),
+    var(--color-game-bg);
   color: var(--color-game-text);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Selection colors */
+::selection {
+  background: var(--color-game-primary);
+  color: white;
+}
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-game-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* Scrollbar styling */
@@ -56,3 +77,38 @@ body {
 .animate-fade-in { animation: fade-in 0.3s ease-out; }
 .animate-slide-up { animation: slide-up 0.4s ease-out; }
 .animate-pulse-glow { animation: pulse-glow 2s infinite; }
+
+/* Game atmosphere effects */
+@keyframes card-glow {
+  0%, 100% { box-shadow: 0 0 0 rgba(210, 168, 255, 0); }
+  50% { box-shadow: 0 0 20px rgba(210, 168, 255, 0.06); }
+}
+@keyframes border-shimmer {
+  0% { border-color: var(--color-game-border); }
+  50% { border-color: rgba(210, 168, 255, 0.3); }
+  100% { border-color: var(--color-game-border); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.hover-card-glow:hover {
+  animation: card-glow 2s ease-in-out infinite;
+}
+
+/* Safe area for mobile bottom nav */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* shadcn accordion */
+@keyframes accordion-down {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-accordion-content-height); opacity: 1; }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+
