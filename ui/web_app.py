@@ -621,13 +621,22 @@ async def index():
         story = last.get("story", last.get("summary", ""))
         options = last.get("options", [])
     else:
-        story = "存档已就绪。点击下方选项开始新的故事。"
+        world_title = _get_world_title()[0] or "Galgame"
+        world_scene = scene or "初始场景"
+        story = f"欢迎来到 **{world_title}**。\n\n当前场景：{world_scene}\n\n点击下方选项开始你的故事。"
+        # Build generic opening options from available characters
+        state_chars = state.get("characters", {})
+        char_names = [c.get("name", "") for c in state_chars.values() if c.get("name")]
         options = [
-            "前往遗迹核心调查异常波动",
-            "先和星联总部通信报告情况",
-            "询问艾琳她对星痕的感知细节",
-            "检查舰船系统，确保安全",
+            "调查周围环境，寻找线索",
+            "与同伴交流当前情况",
+            "检查装备和可用资源",
+            "深入探索前方的未知区域",
         ]
+        if len(char_names) >= 1:
+            options[1] = f"与{char_names[0]}商议接下来的行动"
+        if len(char_names) >= 2:
+            options[2] = f"向{char_names[1]}询问她的看法"
 
     memory = load_memory()
     try:
