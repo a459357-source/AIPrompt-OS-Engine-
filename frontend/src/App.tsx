@@ -144,7 +144,7 @@ function App() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.2 }}
-          className="p-4 md:p-6 max-w-7xl mx-auto"
+          className="p-4 md:p-6"
         >
           <Routes>
             <Route path="/new" element={<NewStory />} />
