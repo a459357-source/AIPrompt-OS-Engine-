@@ -97,6 +97,63 @@ export async function getGameState(): Promise<{ story: string; options: string[]
   return res.json()
 }
 
+// ── NPCs ──
+export interface NpcData {
+  name: string
+  isMain: boolean
+  role_tags: string[]
+  personality_tags: string[]
+  appearance: string
+  relationship: string[]
+  goal: string
+  secret: string
+  background: string
+  special_ability: string
+  trust: number
+  trust_pct: number
+  flags: string[]
+}
+
+export async function getNpcs(): Promise<{ characters: NpcData[]; stats: { total: number; main: number; npc: number; avg_trust: number }; error?: string }> {
+  const res = await fetch('/api/npcs')
+  if (!res.ok) return { characters: [], stats: { total: 0, main: 0, npc: 0, avg_trust: 0 }, error: `HTTP ${res.status}` }
+  return res.json()
+}
+
+export async function generateNpc(roleHint?: string): Promise<NpcData & { error?: string }> {
+  const fd = new FormData()
+  fd.append('role_hint', roleHint || '')
+  const res = await fetch('/api/npcs/generate', { method: 'POST', body: fd })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+    return { ...data, name: '', isMain: false, role_tags: [], personality_tags: [], appearance: '', relationship: [], goal: '', secret: '', background: '', special_ability: '', trust: 0, trust_pct: 0, flags: [] }
+  }
+  return res.json()
+}
+
+// ── Dashboard ──
+export interface DashboardData {
+  turn: number
+  status: string
+  scene: string
+  chapter: number
+  word_count: number
+  character_count: number
+  branch_count: number
+  node_count: number
+  api_calls: number
+  total_tokens: number
+  characters: { name: string; trust_pct: number; relation: string; flags: string[] }[]
+  history: unknown[]
+  error?: string
+}
+
+export async function getDashboard(): Promise<DashboardData> {
+  const res = await fetch('/api/dashboard')
+  if (!res.ok) return { turn: 0, status: '', scene: '', chapter: 0, word_count: 0, character_count: 0, branch_count: 0, node_count: 0, api_calls: 0, total_tokens: 0, characters: [], history: [], error: `HTTP ${res.status}` }
+  return res.json()
+}
+
 export async function nextTurn(choice: string): Promise<GameTurnResponse> {
   const res = await fetch(`/api/next?choice=${encodeURIComponent(choice)}`)
   if (!res.ok) {

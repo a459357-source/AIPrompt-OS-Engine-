@@ -17,22 +17,42 @@
       "scene": "京都西园寺邸，和式客厅内债主散去，皋月独自跪坐于祖父遗像前，窗外暮色沉沉。",
       "status": "BUILD",
       "choices": {
-        "A": null,
+        "A": "2",
         "B": null,
         "C": null,
         "D": null
       },
       "parent": "0",
       "choice_taken": "auto"
+    },
+    "2": {
+      "turn": 2,
+      "text": "债主们散尽后，西园寺邸重归寂静。皋月独自坐在客厅，指尖轻轻敲击着那张日元兑美元走势图。她闭上眼睛，脑海中浮现出前世的记忆碎片：1985年9月22日，纽约广场饭店，五国财长签署协议，日元随后暴涨。她知道，自己只有不到三个月的时间。\n\n她必须尽",
+      "scene": "京都西园寺邸，皋月独自在祖父书房中翻阅旧信，随后决定深夜拜访茶道大师山本。",
+      "status": "BUILD",
+      "choices": {
+        "A": null,
+        "B": null,
+        "C": null,
+        "D": null
+      },
+      "parent": "1",
+      "choice_taken": "A"
     }
   },
-  "current_node": "1",
+  "current_node": "2",
   "edges": [
     {
       "from": "0",
       "to": "1",
       "choice": "auto",
       "turn": 1
+    },
+    {
+      "from": "1",
+      "to": "2",
+      "choice": "A",
+      "turn": 2
     }
   ]
 }

@@ -15,6 +15,8 @@ export default defineConfig({
     proxy: {
       '/api/game-state': 'http://localhost:8000',
       '/api/next': 'http://localhost:8000',
+      '/api/npcs': 'http://localhost:8000',
+      '/api/dashboard': 'http://localhost:8000',
       '/generate-world': 'http://localhost:8000',
       '/generate-field': 'http://localhost:8000',
       '/generate-rules': 'http://localhost:8000',

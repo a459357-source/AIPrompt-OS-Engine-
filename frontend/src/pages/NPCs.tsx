@@ -1,67 +1,63 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
+import { StatusToast } from '@/components/StatusToast'
 import { CharacterCard } from '@/components/CharacterCard'
-
-// ── Mock characters ──
-const MOCK_CHARACTERS = [
-  {
-    id: '1', name: '艾琳·维斯特', isMain: false,
-    role_tags: ['考古语言学家', '学者'],
-    personality_tags: ['热情', '好奇', '冒失'],
-    appearance: '金棕色短发，翡翠绿眼瞳，常戴一副半框眼镜',
-    relationship: ['工作伙伴', '朋友'],
-    goal: '解读上古碑文，揭开失落文明的真相',
-    secret: '她其实是某个古代预言中提到的"钥匙"',
-    background: '帝国中央大学的年轻教授',
-    special_ability: '古文字解读',
-  },
-  {
-    id: '2', name: '林夜', isMain: false,
-    role_tags: ['退役军官', '护卫'],
-    personality_tags: ['冷静', '忠诚', '寡言'],
-    appearance: '黑色短发，锐利的灰色眼瞳，左脸有一道旧伤疤',
-    relationship: ['护卫', '下属'],
-    goal: '保护主角安全，完成最后一次任务',
-    secret: '曾奉命暗中监视主角的一举一动',
-    background: '前帝国第七舰队陆战队长',
-    special_ability: '近身格斗',
-  },
-  {
-    id: '3', name: '雪乃', isMain: false,
-    role_tags: ['神秘少女', '异能者'],
-    personality_tags: ['温柔', '敏感', '内向'],
-    appearance: '银白长发及腰，紫色眼瞳，肤色苍白近乎透明',
-    relationship: ['被保护者', '暗恋对象'],
-    goal: '寻找自己失散多年的亲人',
-    secret: '她的异能来自一次非法基因实验',
-    background: '从研究所逃出的实验体',
-    special_ability: '精神感应',
-  },
-  {
-    id: '0', name: '主角（你）', isMain: true,
-    role_tags: ['冒险者', '自由佣兵'],
-    personality_tags: ['勇敢', '善良', '灵活'],
-    appearance: '',
-    relationship: [],
-    goal: '在这个崩坏的世界中寻找生存的意义',
-    secret: '',
-    background: '',
-    special_ability: '',
-  },
-]
+import { getNpcs, generateNpc, type NpcData } from '@/lib/api'
+import { logger } from '@/lib/logger'
 
 type FilterType = 'all' | 'main' | 'npc'
 
 export default function NPCs() {
+  const [characters, setCharacters] = useState<NpcData[]>([])
+  const [stats, setStats] = useState({ total: 0, main: 0, npc: 0, avg_trust: 0 })
   const [filter, setFilter] = useState<FilterType>('all')
   const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [generating, setGenerating] = useState(false)
 
-  const filtered = MOCK_CHARACTERS.filter((c) => {
+  const loadNpcs = useCallback(async () => {
+    setLoading(true)
+    logger.info('NPCs', 'Loading characters...')
+    try {
+      const data = await getNpcs()
+      if (data.error) { setError(data.error); setLoading(false); return }
+      setCharacters(data.characters)
+      setStats(data.stats)
+    } catch (e) {
+      setError((e as Error).message || String(e))
+      logger.error('NPCs', 'Load failed', { error: String(e) })
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadNpcs() }, [loadNpcs])
+
+  const handleGenerate = useCallback(async () => {
+    setGenerating(true)
+    logger.info('NPCs', 'Generating new NPC...')
+    try {
+      const npc = await generateNpc()
+      if (npc.error) { setError(npc.error); setGenerating(false); return }
+      setCharacters((prev) => [...prev, npc])
+      setStats((prev) => ({
+        total: prev.total + 1,
+        main: prev.main,
+        npc: prev.npc + 1,
+        avg_trust: Math.round((prev.avg_trust * prev.total + npc.trust_pct) / (prev.total + 1)),
+      }))
+    } catch (e) {
+      setError((e as Error).message || String(e))
+      logger.error('NPCs', 'Generate failed', { error: String(e) })
+    }
+    setGenerating(false)
+  }, [])
+
+  const filtered = characters.filter((c) => {
     if (filter === 'main' && !c.isMain) return false
     if (filter === 'npc' && c.isMain) return false
     if (search && !c.name.includes(search) && !c.role_tags.some((t) => t.includes(search))) return false
@@ -70,16 +66,25 @@ export default function NPCs() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      <StatusToast
+        message={loading ? '加载角色数据…' : error ? `❌ ${error}` : ''}
+        type={loading ? 'loading' : error ? 'error' : 'info'}
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-game-accent font-bold text-xl">👥 角色管理</h1>
           <p className="text-game-muted text-sm mt-1">
-            共 {MOCK_CHARACTERS.length} 位角色 · 管理关系、目标和秘密
+            共 {stats.total} 位角色 · {stats.main} 主角 · {stats.npc} NPC · 平均好感 {stats.avg_trust}%
           </p>
         </div>
-        <Button variant="glow" size="sm">
-          ✨ AI生成角色
+        <Button variant="glow" size="sm" onClick={handleGenerate} disabled={generating}>
+          {generating ? (
+            <><span className="inline-block w-3 h-3 border-2 border-game-primary/30 border-t-game-primary rounded-full animate-spin" /> 生成中…</>
+          ) : (
+            '✨ AI生成角色'
+          )}
         </Button>
       </div>
 
@@ -93,10 +98,10 @@ export default function NPCs() {
         />
         <div className="flex gap-1">
           {([
-            { key: 'all', label: '全部' },
-            { key: 'main', label: '⭐ 主角' },
-            { key: 'npc', label: '👤 NPC' },
-          ] as const).map((f) => (
+            { key: 'all' as const, label: '全部' },
+            { key: 'main' as const, label: '⭐ 主角' },
+            { key: 'npc' as const, label: '👤 NPC' },
+          ]).map((f) => (
             <Button
               key={f.key}
               variant={filter === f.key ? 'primary' : 'ghost'}
@@ -110,54 +115,50 @@ export default function NPCs() {
       </div>
 
       {/* Character Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        <AnimatePresence>
-          {filtered.map((c) => (
-            <CharacterCard
-              key={c.id}
-              character={c}
-              index={parseInt(c.id)}
-              isMain={c.isMain}
-            />
-          ))}
-        </AnimatePresence>
-      </div>
-
-      {/* Empty state */}
-      {filtered.length === 0 && (
+      {characters.length === 0 && !loading ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="text-center py-16"
+          className="text-center py-16 space-y-4"
         >
+          <p className="text-game-muted text-lg">还没有角色</p>
+          <p className="text-game-dim text-sm">点击上方「✨ AI生成角色」创建第一个角色，或前往「新故事」创建完整故事</p>
+          <Button variant="outline" onClick={() => window.location.href = '/new'}>
+            前往新故事
+          </Button>
+        </motion.div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <AnimatePresence>
+            {filtered.map((c, i) => (
+              <CharacterCard
+                key={c.name + i}
+                character={{
+                  name: c.name,
+                  isMain: c.isMain,
+                  role_tags: c.role_tags,
+                  personality_tags: c.personality_tags,
+                  appearance: c.appearance,
+                  relationship: c.relationship,
+                  goal: c.goal,
+                  secret: c.secret,
+                  background: c.background,
+                  special_ability: c.special_ability,
+                }}
+                index={i}
+                isMain={c.isMain}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {filtered.length === 0 && characters.length > 0 && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
           <p className="text-game-muted text-lg">未找到匹配的角色</p>
           <p className="text-game-dim text-sm mt-1">试试调整搜索条件</p>
         </motion.div>
       )}
-
-      {/* Stats Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">📊 角色统计</CardTitle>
-          <CardDescription>角色关系与指标概览</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            {[
-              { label: '总角色数', value: MOCK_CHARACTERS.length, icon: '👥' },
-              { label: '主角', value: MOCK_CHARACTERS.filter((c) => c.isMain).length, icon: '⭐' },
-              { label: 'NPC', value: MOCK_CHARACTERS.filter((c) => !c.isMain).length, icon: '👤' },
-              { label: '关系总数', value: '8', icon: '💞' },
-            ].map((stat) => (
-              <div key={stat.label} className="space-y-1">
-                <span className="text-2xl">{stat.icon}</span>
-                <p className="text-2xl font-bold text-game-accent">{stat.value}</p>
-                <p className="text-xs text-game-muted">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

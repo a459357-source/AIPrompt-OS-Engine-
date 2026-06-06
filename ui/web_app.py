@@ -106,6 +106,198 @@ async def api_game_state():
     })
 
 
+@app.get("/api/npcs")
+async def api_npcs():
+    """Return all characters with full data as JSON."""
+    from fastapi.responses import JSONResponse
+    try:
+        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        memory = load_memory()
+    except Exception:
+        return JSONResponse({"characters": [], "stats": {}}, status_code=200)
+
+    chars = world_pack.get("world", {}).get("characters", [])
+    mem_chars = memory.get("characters", {})
+
+    result = []
+    for ch in chars:
+        name = ch.get("name", "")
+        mem = mem_chars.get(name, {})
+        trust_val = mem.get("trust", 0.5)
+        result.append({
+            "name": name,
+            "isMain": ch.get("is_main", False),
+            "role_tags": ch.get("role_tags", []),
+            "personality_tags": ch.get("personality_tags", []),
+            "appearance": ch.get("appearance", ""),
+            "relationship": ch.get("relationship", []),
+            "goal": ch.get("goal", ""),
+            "secret": ch.get("secret", ""),
+            "background": ch.get("background", ""),
+            "special_ability": ch.get("special_ability", ""),
+            "trust": trust_val,
+            "trust_pct": int(trust_val * 100),
+            "flags": mem.get("flags", []),
+        })
+
+    stats = {
+        "total": len(result),
+        "main": sum(1 for c in result if c["isMain"]),
+        "npc": sum(1 for c in result if not c["isMain"]),
+        "avg_trust": int(sum(c["trust_pct"] for c in result) / max(1, len(result))),
+    }
+
+    return JSONResponse({"characters": result, "stats": stats})
+
+
+@app.post("/api/npcs/generate")
+async def api_generate_npc(role_hint: str = Form("")):
+    """AI-generate a new NPC and auto-add to world/state/memory."""
+    from fastapi.responses import JSONResponse
+    from engine.deepseek_client import call_deepseek, DeepSeekError
+
+    system = "你是一个 Galgame 角色生成器。根据已有故事设定，生成一个与现有角色不重复的新NPC。只输出JSON。"
+    user = f"为当前故事生成一个新角色。角色定位参考：{role_hint or '重要配角'}。\n\n输出JSON格式：{{\"name\":\"角色名\",\"role_tags\":[\"身份\"],\"personality_tags\":[\"性格1\",\"性格2\",\"性格3\"],\"appearance\":\"外貌特征（10~30字）\",\"relationship\":[\"与主角关系\"],\"goal\":\"角色目标\",\"secret\":\"隐藏秘密\"}}"
+
+    try:
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=config.MAX_TOKENS, skip_validation=True)
+    except DeepSeekError as exc:
+        return JSONResponse({"error": f"AI 生成失败: {exc}"}, status_code=500)
+
+    # Normalize result
+    name = result.get("name", "新角色")
+    ch = {
+        "name": name,
+        "is_main": False,
+        "role_tags": result.get("role_tags", []) if isinstance(result.get("role_tags"), list) else [result.get("role_tags", "")] if result.get("role_tags") else [],
+        "personality_tags": result.get("personality_tags", []) if isinstance(result.get("personality_tags"), list) else [],
+        "appearance": result.get("appearance", ""),
+        "relationship": result.get("relationship", []) if isinstance(result.get("relationship"), list) else [result.get("relationship", "")] if result.get("relationship") else [],
+        "goal": result.get("goal", ""),
+        "secret": result.get("secret", ""),
+        "background": result.get("background", ""),
+        "special_ability": result.get("special_ability", ""),
+    }
+
+    # Add to world_pack
+    try:
+        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        world_pack.setdefault("world", {}).setdefault("characters", []).append(ch)
+        io_utils.write_yaml(config.WORLD_PACK_PATH, world_pack)
+    except Exception:
+        pass
+
+    # Add to session state
+    try:
+        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+        chars = state.get("characters", {})
+        letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        key = letters[len(chars)] if len(chars) < 26 else f"X{len(chars)}"
+        chars[key] = {
+            "name": name,
+            "role": " / ".join(ch["role_tags"]) if ch["role_tags"] else "",
+            "level": "L0",
+            "relation": ch["relationship"][0] if ch["relationship"] else "陌生人",
+            "note": f"外貌：{ch['appearance']}" if ch.get("appearance") else "",
+        }
+        io_utils.write_yaml(config.SESSION_STATE_PATH, state)
+    except Exception:
+        pass
+
+    # Add to memory
+    try:
+        memory = load_memory()
+        memory.setdefault("characters", {})[name] = {
+            "trust": 0.5,
+            "flags": [],
+            "relationship": ch["relationship"][0] if ch["relationship"] else "",
+        }
+        if ch.get("secret"):
+            memory["characters"][name].setdefault("flags", []).append(f"隐藏秘密：{ch['secret']}")
+        save_memory(memory)
+    except Exception:
+        pass
+
+    return JSONResponse(ch)
+
+
+@app.get("/api/dashboard")
+async def api_dashboard():
+    """Return dashboard stats as JSON."""
+    from fastapi.responses import JSONResponse
+    try:
+        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+        memory = load_memory()
+        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        graph = io_utils.read_json(config.STORY_GRAPH_PATH)
+    except Exception:
+        return JSONResponse({"error": "暂无数据"}, status_code=200)
+
+    # Basic stats
+    turn = state.get("turn", 0)
+    status = state.get("status", "SETUP")
+    scene = state.get("scene", "")
+    chapter = state.get("chapter", 1)
+
+    # Characters
+    chars = world_pack.get("world", {}).get("characters", [])
+    mem_chars = memory.get("characters", {})
+
+    # Word count estimate from chapter.md
+    word_count = 0
+    try:
+        text = config.CHAPTER_PATH.read_text(encoding="utf-8")
+        word_count = len(text)
+    except Exception:
+        pass
+
+    # Graph stats
+    nodes = graph.get("nodes", {})
+    edges = graph.get("edges", [])
+    branch_count = len(edges)
+
+    # Character trust
+    char_trust = []
+    for ch in chars:
+        name = ch.get("name", "")
+        mem = mem_chars.get(name, {})
+        char_trust.append({
+            "name": name,
+            "trust_pct": int(mem.get("trust", 0.5) * 100),
+            "relation": ch.get("relationship", [""])[0] if ch.get("relationship") else "",
+            "flags": mem.get("flags", []),
+        })
+
+    # API usage
+    api_calls = 0
+    total_tokens = 0
+    try:
+        if config.API_USAGE_PATH.exists():
+            for line in config.API_USAGE_PATH.read_text(encoding="utf-8").strip().split("\n"):
+                if line.strip():
+                    import json as _json
+                    entry = _json.loads(line)
+                    api_calls += 1
+                    total_tokens += entry.get("total_tokens", 0)
+    except Exception:
+        pass
+
+    return JSONResponse({
+        "turn": turn,
+        "status": status,
+        "scene": scene,
+        "chapter": chapter,
+        "word_count": word_count,
+        "character_count": len(chars),
+        "branch_count": branch_count,
+        "node_count": len(nodes),
+        "api_calls": api_calls,
+        "total_tokens": total_tokens,
+        "characters": char_trust,
+        "history": state.get("history", [])[-5:],  # last 5 turns
+    })
+
+
 @app.get("/api/next")
 async def api_next_turn(choice: str = "A"):
     """Advance the game with a choice and return new state as JSON."""
