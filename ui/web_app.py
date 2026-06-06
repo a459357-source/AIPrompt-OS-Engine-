@@ -546,8 +546,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             setInterval(checkConn, 30000);
         }
 
-        // ── Warn before closing / refreshing ──
+        // ── Internal nav tracking (suppress warning for in-app clicks) ──
+        document.addEventListener('click', function(e){
+            var a = e.target.closest('a');
+            if(a && a.href && a.origin === location.origin && !a.target){
+                window._internalNav = true;
+                setTimeout(function(){ window._internalNav = false; }, 100);
+            }
+        });
+        // Also track form submissions and toolbar buttons
+        document.addEventListener('submit', function(){ window._internalNav = true; setTimeout(function(){ window._internalNav = false; }, 100); });
+
+        // ── Warn before closing / refreshing (skip for in-app navigation) ──
         window.addEventListener('beforeunload', function(e){
+            if(window._internalNav) return;
             e.preventDefault();
             e.returnValue = '剧情进度可能丢失，确定离开？';
             return e.returnValue;
