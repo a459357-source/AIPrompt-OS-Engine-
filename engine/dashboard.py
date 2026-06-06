@@ -269,21 +269,39 @@ def _build_faction_cards(factions: dict) -> str:
     cards = []
     for name, data in factions.items():
         rep = int(data.get("reputation", 0.5) * 100)
-        role = data.get("role", "")
+        ftype = data.get("type", "other")
+        goals = data.get("goals", [])
+        resources = data.get("resources", [])
+        influence = data.get("influence", 50)
+        leader = data.get("leader", "")
+        rel_player = data.get("relation_to_player", "neutral")
         if rep >= 70:
             color = "#2ea043"
         elif rep >= 40:
             color = "#d29922"
         else:
             color = "#da3633"
+        rel_badge = {
+            "ally": "#2ea043", "friendly": "#3fb950",
+            "neutral": "#8b949e", "hostile": "#d29922", "enemy": "#da3633",
+        }.get(rel_player, "#8b949e")
+        goals_html = "".join(f'<li style="font-size:11px;color:#8b949e">{g}</li>' for g in goals[:3])
+        res_html = ", ".join(resources[:4])
         cards.append(
             f'<div style="display:inline-block;background:#161b22;border:1px solid #21262d;'
-            f'border-radius:8px;padding:14px;margin:6px;min-width:200px;vertical-align:top">'
-            f'<div style="font-size:16px;font-weight:700;margin-bottom:4px">{name}</div>'
-            f'<div style="color:#8b949e;font-size:12px;margin-bottom:6px">{role}</div>'
+            f'border-radius:8px;padding:14px;margin:6px;min-width:220px;vertical-align:top">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+            f'<div style="font-size:16px;font-weight:700">{name}</div>'
+            f'<span style="background:{rel_badge}22;color:{rel_badge};border:1px solid {rel_badge}44;'
+            f'border-radius:10px;padding:2px 8px;font-size:10px">{rel_player}</span>'
+            f'</div>'
+            f'<div style="color:#8b949e;font-size:11px;margin-bottom:2px">{ftype}</div>'
             f'<div style="background:{color}22;border-radius:4px;height:8px;margin-bottom:4px">'
             f'<div style="background:{color};border-radius:4px;height:100%;width:{rep}%"></div></div>'
-            f'<div style="font-size:12px;color:{color}">声望 {rep}%</div></div>'
+            f'<div style="font-size:11px;color:{color};margin-bottom:4px">声望 {rep}% &nbsp;|&nbsp; 影响力 {influence}</div>'
+            f'<div style="font-size:10px;color:#8b949e">资源: {res_html or "无"}</div>'
+            f'<ul style="margin:4px 0 0 14px;padding:0">{goals_html or ""}</ul>'
+            f'</div>'
         )
     return "".join(cards)
 

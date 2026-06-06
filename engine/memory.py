@@ -132,12 +132,17 @@ def get_context_for_prompt(memory: dict) -> str:
         for fname, fdata in factions.items():
             rep = fdata.get("reputation", 0.5)
             label = _attitude_label(rep)
-            role = fdata.get("role", "")
+            ftype = fdata.get("type", "other")
+            goals = fdata.get("goals", [])
+            resources = fdata.get("resources", [])
+            influence = fdata.get("influence", 50)
             flags = fdata.get("flags", [])
-            line = f"  {fname}: 声望 {rep:.0%}（{label}）"
-            if role:
-                line += f", 定位: {role}"
+            line = f"  {fname}（{ftype}）: 声望 {rep:.0%}（{label}）, 影响力 {influence}"
             lines.append(line)
+            if goals:
+                lines.append(f"    目标: {'; '.join(goals[:3])}")
+            if resources:
+                lines.append(f"    资源: {', '.join(resources[:5])}")
             if flags:
                 lines.append(f"    事件: {', '.join(flags)}")
 
@@ -192,13 +197,28 @@ def init_factions(memory: dict) -> None:
         if not name:
             continue
         if name not in mem_factions:
+            # Compute initial reputation from relation_to_player
+            rel_map = {
+                "ally": 0.70, "friendly": 0.60, "neutral": 0.50,
+                "hostile": 0.25, "enemy": 0.10,
+            }
+            rel = faction.get("relation_to_player", "neutral")
+            init_rep = rel_map.get(rel, 0.50)
+            influence = faction.get("influence", 50)
             mem_factions[name] = {
-                "reputation": 0.5,
+                "reputation": init_rep,
                 "flags": [],
                 "role": faction.get("role", ""),
-                "metric_history": {"reputation": []},
+                "type": faction.get("type", "other"),
+                "goals": faction.get("goals", []),
+                "resources": faction.get("resources", []),
+                "influence": influence,
+                "leader": faction.get("leader", ""),
+                "relation_to_player": rel,
+                "metric_history": {"reputation": [[0, init_rep]]},
             }
-            logger.info("Memory: auto-registered faction '%s'", name)
+            logger.info("Memory: auto-registered faction '%s' (type=%s, rep=%.2f, influence=%d)",
+                        name, faction.get("type", "?"), init_rep, influence)
 
 
 def update_faction_reputation(memory: dict, faction: str, delta: float,
@@ -230,6 +250,21 @@ def set_faction_flag(memory: dict, faction: str, flag: str) -> None:
     })
     if flag not in entry.setdefault("flags", []):
         entry["flags"].append(flag)
+
+
+def update_faction_influence(memory: dict, faction: str, delta: int) -> None:
+    """Adjust a faction's influence by delta (0-100 scale)."""
+    factions = memory.setdefault("factions", {})
+    entry = factions.setdefault(faction, {
+        "reputation": 0.5, "flags": [], "role": "",
+        "type": "other", "goals": [], "resources": [],
+        "influence": 50, "leader": "", "relation_to_player": "neutral",
+        "metric_history": {"reputation": []},
+    })
+    old = entry.get("influence", 50)
+    new = max(0, min(100, old + delta))
+    entry["influence"] = new
+    logger.info("Memory: faction %s influence %d → %d", faction, old, new)
 
 
 # ── Inter-faction attitude tracking ────────────────────────────────
@@ -360,6 +395,12 @@ def get_faction_stats_for_ui(memory: dict) -> list[dict]:
         result.append({
             "name": name,
             "role": data.get("role", ""),
+            "type": data.get("type", "other"),
+            "goals": data.get("goals", []),
+            "resources": data.get("resources", []),
+            "influence": data.get("influence", 50),
+            "leader": data.get("leader", ""),
+            "relation_to_player": data.get("relation_to_player", "neutral"),
             "reputation_pct": rep_pct,
             "reputation": rep,
             "attitude_label": _attitude_label(rep),

@@ -433,11 +433,18 @@ def _update_memory(response: dict, state: dict, choice: str | None = None) -> No
             if name not in mem_chars:
                 # New NPC discovered — auto-register with relationship-based trust
                 init_trust = get_initial_trust(name, world_pack)
+                # Find faction from world_pack
+                char_faction = ""
+                for wc in world_pack.get("world", {}).get("characters", []):
+                    if wc.get("name") == name:
+                        char_faction = wc.get("faction", "")
+                        break
                 mem_chars[name] = {
                     "trust": init_trust,
                     "flags": [],
                     "relationship": sc.get("relation", ""),
                     "role": sc.get("role", ""),
+                    "faction": char_faction,
                 }
                 # Record first appearance in metric_history
                 mem_chars[name].setdefault("metric_history", {}).setdefault(
@@ -472,6 +479,7 @@ def _update_memory(response: dict, state: dict, choice: str | None = None) -> No
                 "flags": [],
                 "relationship": "",
                 "role": "story-detected",
+                "faction": "",
             }
             mem_chars[name].setdefault("metric_history", {}).setdefault(
                 "trust", []
