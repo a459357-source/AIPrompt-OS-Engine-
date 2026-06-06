@@ -398,12 +398,19 @@ export default function Game() {
                     <div className="text-sm text-game-text leading-relaxed whitespace-pre-wrap">
                       {h.story}
                     </div>
-                    {h.choice && (
-                      <div className="bg-game-surface border border-game-border rounded-md px-3 py-2 text-sm">
-                        <span className="text-game-accent font-medium">👉 选择：</span>
-                        <span className="text-game-text">{h.choice}</span>
-                      </div>
-                    )}
+                    {h.choice && (() => {
+                      // Resolve choice: if letter, map to option text; otherwise show as custom
+                      const idx = h.choice.charCodeAt(0) - 65
+                      const isLetter = /^[A-D]$/.test(h.choice)
+                      const choiceText = isLetter && h.options[idx] ? h.options[idx].split('→')[0].trim() : h.choice
+                      const isCustom = !isLetter
+                      return (
+                        <div className={`border rounded-md px-3 py-2 text-sm ${isCustom ? 'bg-game-secret/10 border-game-accent/30' : 'bg-game-surface border-game-border'}`}>
+                          <span className="text-game-accent font-medium">{isCustom ? '✏️ 自定义：' : '👉 选择：'}</span>
+                          <span className="text-game-text">{choiceText}</span>
+                        </div>
+                      )
+                    })()}
                     {h.options.length > 0 && !h.choice && (
                       <div className="text-xs text-game-dim space-y-0.5">
                         <span className="text-game-muted">可选项：</span>
