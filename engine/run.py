@@ -41,7 +41,7 @@ from engine.router import load_graph, save_graph, get_current_node, append_node
 from engine.memory import (
     load_memory, save_memory, update_trust, set_flag,
     get_context_for_prompt, guess_trust_delta_from_story,
-    parse_option_trust_deltas,
+    parse_option_trust_deltas, detect_new_characters_from_story,
     init_factions, update_faction_reputation, set_faction_flag,
     assign_character_tier, degrade_inactive_characters,
     build_character_tier_context, promote_to_core, remove_core_status,
@@ -453,6 +453,24 @@ def _update_memory(response: dict, state: dict, choice: str | None = None) -> No
                         is_main = True
                         break
                 assign_character_tier(memory, name, world_pack, is_main=is_main)
+
+        # ── Detect new characters from story text (fallback) ──
+        # If the AI introduced a character in the narrative but forgot to
+        # register it in state.characters, catch it from the story text.
+        known = set(mem_chars.keys())
+        story_newcomers = detect_new_characters_from_story(story, known)
+        for name in story_newcomers:
+            mem_chars[name] = {
+                "trust": 0.4,  # lower confidence than state- registered (0.5)
+                "flags": [],
+                "relationship": "",
+                "role": "story-detected",
+            }
+            mem_chars[name].setdefault("metric_history", {}).setdefault(
+                "trust", []
+            ).append([turn, 0.4])
+            assign_character_tier(memory, name, world_pack)
+            logger.info("Memory: story-detected new character '%s' (turn %d)", name, turn)
 
         # Track last_appearance_turn for characters appearing in this turn's story
         for name in list(mem_chars.keys()):

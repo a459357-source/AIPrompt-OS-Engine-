@@ -249,6 +249,67 @@ def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | Non
     return results
 
 
+def detect_new_characters_from_story(story: str,
+                                     known_names: set[str]) -> list[str]:
+    """
+    Scan story text for likely Chinese character names that aren't
+    already in memory.  Used as a fallback when the AI forgets to
+    register a new character in state.characters.
+
+    Heuristic:
+      - Find 2-4 char Chinese sequences that appear near introduction
+        patterns: "名叫", "自称", "一位…的", "来了", "出现", "走进"
+      - Filter out anything already known.
+      - Only return names that appear multiple times or near verbs.
+
+    Returns list of candidate names (may include false positives).
+    """
+    import re
+
+    candidates: list[str] = []
+
+    # Pattern: explicit character introduction phrases.
+    # Only use high-precision patterns to avoid false positives.
+    #   "名叫X" / "叫做X" / "自称X" / "一位叫X的Y"
+    # X is 2-3 chars; the trailing particle (的/，/。) acts as a boundary.
+    _NC = r'[\u4e00-\u9fff]'  # name char
+    intro_patterns = [
+        # "名叫X" / "叫做X" / "称为X" — explicit naming
+        rf'(?:名叫|叫做|称为)\s*({_NC}{{2,3}})',
+        # Bare "叫X" — but NOT "名叫" or "叫做" (already covered above)
+        rf'(?<!名)(?<!做)叫\s*({_NC}{{2,3}})',
+        # "自称X" — but NOT "自称是…" (which means "claimed that…")
+        rf'自称\s*(?!是)({_NC}{{2,3}})',
+        # "一位叫X" / "一个叫X" / "名为X" / "姓X"
+        rf'(?:一位叫|一个叫|名为|姓)\s*({_NC}{{2,3}})',
+    ]
+
+    for pat in intro_patterns:
+        for m in re.finditer(pat, story):
+            name = m.group(1).strip()
+            if not name or name in known_names or len(name) < 2:
+                continue
+            # Strip trailing particle if greedy match overshot
+            while len(name) > 2 and name[-1] in '的了是出到来去说看':
+                name = name[:-1]
+            if len(name) < 2:
+                continue
+            # Reject if all high-frequency particles
+            if all(c in '的了是我也就不这人一个来去说看' for c in name):
+                continue
+            candidates.append(name)
+
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    unique: list[str] = []
+    for c in candidates:
+        if c not in seen:
+            seen.add(c)
+            unique.append(c)
+
+    return unique
+
+
 def parse_option_trust_deltas(options: list[str]) -> list[tuple[str, float]]:
     """
     Parse AI-generated trust hints from option strings.
