@@ -1,54 +1,75 @@
 world:
-  title: 星痕纪元
-  genre: 科幻 / 冒险 / 情感
+  title: 重生昭和千金：金融帝国的崛起
+  genre: 金融 / 复仇 / 女性向 / 商战
   era: 故事开端
-  setting: 公元2247年，人类已进入星际殖民时代。在银河系边缘的「碎星带」，一艘名为「回声号」的调查船发现了一处远古外星遗迹。遗迹中封存着名为「星痕」的神秘能量。
-  main_goal: 调查星痕遗迹的真相
+  setting: 1985年日本京都，华族西园寺家没落，大小姐皋月因前世华尔街对冲基金经理记忆重生。彼时广场协议将签，泡沫经济前夕，她凭金融知识逆天改命，在政商两界布局，对抗西方资本与本土旧势力，于泡沫破裂前攫取财富，建立跨国财阀。
+  main_goal: 带领家族摆脱千亿债务，建立横跨日美的金融帝国，揭露前世陷害阴谋。
   factions: []
   locations:
-  - name: 回声号 — 舰桥
+  - name: 京都西园寺家老宅客厅，债主围坐，管家呈上负债清单与拍卖通知
     desc: 初始场景
   tone: 聚焦人物情感与选择
   themes: []
   characters:
-  - name: 林夜
+  - name: 西园寺皋月
     is_main: true
     role_tags:
-    - 调查船船长
-    - 退役军人
+    - 华族大小姐
+    - 重生者
+    - 对冲基金经理
     personality_tags:
-    - 冷静
-    - 理性
-    - 内敛
-    - 有责任感
-    appearance: 短发，眼神锐利，常穿深色作战服
-    relationship: []
-    goal: 寻找星痕背后的真相
-    secret: ''
-    background: 曾参与第七远征舰队
-    special_ability: 星痕感知
-  - name: 艾琳
+    - 冷静果断
+    - 城府深沉
+    - 外柔内刚
+    appearance: 黑发齐肩，紫色眼眸，常着和服或干练西装，身高165cm，气质清冷高贵。
+    relationship:
+    - 主角
+    goal: 积累资本，掌控日本金融命脉，复仇西方资本。
+    secret: 曾为华尔街对冲基金CEO，因拒绝做空中国产业被谋杀重生。
+    background: 前世林月，华裔金融天才；今生西园寺家独女，父母早逝，家道中落。
+    special_ability: 过目不忘的金融数据记忆，精准预判经济周期。
+  - name: 西园寺绫乃
     is_main: false
     role_tags:
-    - 考古语言学家
+    - 华族表妹
+    - 京都艺伎
     personality_tags:
-    - 热情
-    - 好奇
-    - 冲动
-    - 敏锐
-    appearance: 金色长发，碧绿色眼睛
+    - 温柔内敛
+    - 敏感自卑
+    - 暗藏野心
+    appearance: 及腰黑发，柳眉杏眼，常着淡雅和服，身高158cm，楚楚可怜。
     relationship:
-    - 工作伙伴
-    goal: 破解星痕文字
-    secret: 能够听见遗迹中的低语
-    background: ''
-    special_ability: ''
+    - 表姐
+    goal: 夺回被皋月占有的家族继承权，证明自己能力。
+    secret: 已暗中与三菱财阀继承人订婚，计划利用对方势力打压皋月。
+    background: 皋月表妹，因家道中落寄住西园寺家，表面顺从实则嫉妒。
+    special_ability: 精通茶道、花道，擅长利用社交场合获取情报。
   relationship_system:
     stages:
-    - 陌生
-    - 熟悉
-    - 朋友
-    - 信赖
-    - 暧昧
-    - 恋人
+    - 疏远
+    - 试探
+    - 合作
+    - 同盟
+    - 信任
+    - 依赖
+    - 羁绊
     affection: 0
+custom:
+  stats:
+  - key: trust
+    label: 信任度
+    max: 100
+  - key: power
+    label: 权势值
+    max: 100
+  - key: fortune
+    label: 财富值
+    max: 100
+  stages:
+  - 疏远
+  - 试探
+  - 合作
+  - 同盟
+  - 信任
+  - 依赖
+  - 羁绊

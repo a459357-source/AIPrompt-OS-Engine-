@@ -2,37 +2,14 @@
   "nodes": {
     "0": {
       "turn": 0,
-      "text": "初始场景：回声号 — 舰桥",
-      "scene": "回声号 — 舰桥",
+      "text": "初始场景：京都西园寺家老宅客厅，债主围坐，管家呈上负债清单与拍卖通知",
+      "scene": "京都西园寺家老宅客厅，债主围坐，管家呈上负债清单与拍卖通知",
       "status": "SETUP",
-      "choices": {
-        "auto": "1"
-      },
+      "choices": {},
       "parent": null,
       "choice_taken": null
-    },
-    "1": {
-      "turn": 1,
-      "text": "# 第一章：星痕的回响\n\n公元2247年，回声号静静地悬浮在碎星带的星空中。舰桥的灯光柔和而稳定，林夜站在全息投影前，凝视着那个被标记为“星痕遗迹”的坐标点。他的手指无意识地在控制台上轻敲，脑海中回荡着第七远征舰队覆灭前最后的通讯——那些混",
-      "scene": "回声号 — 舰桥",
-      "status": "SETUP",
-      "choices": {
-        "A": null,
-        "B": null,
-        "C": null,
-        "D": null
-      },
-      "parent": "0",
-      "choice_taken": "auto"
     }
   },
-  "current_node": "1",
-  "edges": [
-    {
-      "from": "0",
-      "to": "1",
-      "choice": "auto",
-      "turn": 1
-    }
-  ]
+  "current_node": "0",
+  "edges": []
 }

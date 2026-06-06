@@ -1484,8 +1484,8 @@ function renderCharacters(){
             '<div id=\"ch_'+i+'_relationship_sug\" style=\"max-height:48px;overflow-y:auto;line-height:1.6\"></div></div>':'')+
             '<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#8b949e\">当前目标</span>'+
             '<input placeholder=\"角色想要达成的事…\" value=\"'+esc(c.goal||'')+'\" onchange=\"updateChar('+i+',&quot;goal&quot;,this.value)\" style=\"font-size:0.8em;padding:3px 8px;margin-top:2px\"></div>'+
-            (!c.isMain?'<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#d2a8ff\">🔒 隐藏秘密</span>'+
-            '<input placeholder=\"用于制造剧情爆点的秘密…\" value=\"'+esc(c.secret||'')+'\" onchange=\"updateChar('+i+',&quot;secret&quot;,this.value)\" style=\"font-size:0.8em;padding:3px 8px;margin-top:2px;background:#1a121f;border-color:#4a3060;color:#d2a8ff\"></div>':'')+
+            '<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#d2a8ff\">🔒 隐藏秘密</span>'+
+            '<input placeholder=\"用于制造剧情爆点的秘密…\" value=\"'+esc(c.secret||'')+'\" onchange=\"updateChar('+i+',&quot;secret&quot;,this.value)\" style=\"font-size:0.8em;padding:3px 8px;margin-top:2px;background:#1a121f;border-color:#4a3060;color:#d2a8ff\"></div>'+
             '<div style=\"margin-top:4px\"><span style=\"font-size:0.7em;color:#8b949e\">自由设定</span>'+
             '<textarea placeholder=\"任何你想补充的角色细节…\" onchange=\"updateChar('+i+',&quot;notes&quot;,this.value)\" style=\"width:100%;font-size:0.8em;padding:3px 8px;margin-top:2px;resize:vertical;min-height:36px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-family:inherit\">'+esc(c.notes||'')+'</textarea></div>'+
             '<button type=\"button\" class=\"ch-ai-btn\" onclick=\"genCharacter('+i+')\">✨ 生成此角色</button>'+
