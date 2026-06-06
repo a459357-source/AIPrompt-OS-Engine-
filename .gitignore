@@ -6,3 +6,11 @@ output/
 session_state.yaml
 data/apikey.json
 data/api_usage.jsonl
+
+# ── 游戏进度（个人数据，不提交）──
+data/story_graph.json
+data/memory.json
+data/world_init.json
+data/app.log
+data/error.log
+world_pack.yaml
