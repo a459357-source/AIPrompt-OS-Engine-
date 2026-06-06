@@ -342,4 +342,39 @@ def get_char_stats_for_ui(session_state: dict, memory: dict, world_pack: dict | 
             "custom_stats": custom_stat_values,
         })
 
+    # Include memory-only characters (auto-registered NPCs not in session state)
+    names_seen = {r["name"] for r in result}
+    for name, mem in mem_chars.items():
+        if name in names_seen:
+            continue
+        trust = mem.get("trust", 0.5)
+        trust_pct = round((trust - 0.5) * 200)
+        if custom_stages:
+            normalized = (trust_pct + 100) / 200
+            stage_idx = min(len(custom_stages) - 1, max(0, int(normalized * len(custom_stages))))
+            stage = custom_stages[stage_idx]
+        else:
+            stages_list = _AFFECTION_STAGES if trust_pct >= 0 else _BAD_STAGES
+            stage = stages_list[0][1]
+            for threshold, label in stages_list:
+                if trust_pct >= threshold:
+                    stage = label
+                else:
+                    break
+        filled = min(5, max(0, round(abs(trust_pct) / 20)))
+        hearts = "♥" * filled + "♡" * (5 - filled)
+        if trust_pct < 0:
+            hearts = "💔" * filled + "♡" * (5 - filled) if filled > 0 else "♡♡♡♡♡"
+        result.append({
+            "name": name,
+            "role": mem.get("role", ""),
+            "level": "L0",
+            "trust_pct": trust_pct,
+            "stage": stage,
+            "hearts": hearts,
+            "flags": mem.get("flags", []),
+            "relationship": mem.get("relationship", ""),
+            "custom_stats": [],
+        })
+
     return result

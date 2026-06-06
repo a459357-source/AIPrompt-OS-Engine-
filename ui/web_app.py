@@ -501,18 +501,27 @@ def _render_template(
         dot_parts.append(f'<span class="{cls}" title="{s}">{status_symbols[s]}</span>')
     dots_html = "".join(dot_parts)
 
-    # Character inline: 林夜 L2·初步信任  |  艾琳 L2·初步信任
+    # Character inline: protagonist + important chars from char_stats
     char_parts = []
-    if characters:
-        for key, char in characters.items():
-            name = char.get("name", key)
-            level = char.get("level", "L0")
-            rel = char.get("relation", "")
+    if char_stats:
+        for cs in char_stats:
+            name = cs.get("name", "")
+            level = cs.get("level", "L0")
+            stage = cs.get("stage", "")
+            trust_pct = cs.get("trust_pct", 0)
+            if trust_pct >= 70:
+                trust_color = "#7ee787"
+            elif trust_pct >= 40:
+                trust_color = "#ffa657"
+            elif trust_pct >= 0:
+                trust_color = "#8b949e"
+            else:
+                trust_color = "#f85149"
             char_parts.append(
                 f'<span class="char-inline">'
                 f'<span class="cname">{name}</span> '
                 f'<span class="clevel">{level}</span>'
-                f'{"·" + rel if rel else ""}'
+                f'<span class="ctrust" style="color:{trust_color}">{"·" + stage if stage else ""}</span>'
                 f'</span>'
             )
 
