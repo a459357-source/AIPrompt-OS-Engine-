@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import { StatusToast } from '@/components/StatusToast'
 import { getGameState, nextTurn } from '@/lib/api'
 import { logger } from '@/lib/logger'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+
 
 interface CharInfo {
   name: string
@@ -39,6 +39,7 @@ export default function Game() {
   const [choosing, setChoosing] = useState(false)
   const [customInput, setCustomInput] = useState('')
   const [showCustomInput, setShowCustomInput] = useState(false)
+  const [charPanelOpen, setCharPanelOpen] = useState(false)
 
   const loadGame = useCallback(async () => {
     setLoading(true)
@@ -170,25 +171,18 @@ export default function Game() {
               {scene && <span className="text-game-dim text-xs truncate max-w-[200px]">📍 {scene}</span>}
             </div>
 
-            {/* Character drawer trigger */}
-            <Sheet>
-              <SheetTrigger className="cursor-pointer">
-                <Button variant="ghost" size="sm" className="gap-1.5 text-game-muted hover:text-game-text pointer-events-none">
-                  👥 角色
-                  {characters.length > 0 && (
-                    <Badge variant="accent" size="sm" className="ml-0.5">{characters.length}</Badge>
-                  )}
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-72">
-                <SheetHeader>
-                  <SheetTitle>👥 角色状态</SheetTitle>
-                </SheetHeader>
-                <div className="mt-6">
-                  <CharacterList />
-                </div>
-              </SheetContent>
-            </Sheet>
+            {/* Character panel trigger */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-game-muted hover:text-game-text"
+              onClick={() => setCharPanelOpen(true)}
+            >
+              👥 角色
+              {characters.length > 0 && (
+                <Badge variant="accent" size="sm" className="ml-0.5">{characters.length}</Badge>
+              )}
+            </Button>
           </div>
 
           {/* Story */}
@@ -298,6 +292,20 @@ export default function Game() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Character side panel */}
+      {charPanelOpen && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setCharPanelOpen(false)} />
+          <div className="fixed right-0 top-0 h-full w-72 z-50 bg-game-card border-l border-game-border shadow-xl p-6 overflow-auto animate-in slide-in-from-right">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-game-accent">👥 角色状态</h3>
+              <button onClick={() => setCharPanelOpen(false)} className="text-game-muted hover:text-game-text text-lg">✕</button>
+            </div>
+            <CharacterList />
+          </div>
+        </>
       )}
     </div>
   )
