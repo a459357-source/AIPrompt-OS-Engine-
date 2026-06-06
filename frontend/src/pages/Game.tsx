@@ -208,16 +208,22 @@ export default function Game() {
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-game-muted font-medium">🎯 做出你的选择</p>
-                    <button
-                      onClick={() => setShowConsequences(!showConsequences)}
-                      className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                        showConsequences
-                          ? 'border-game-accent/40 bg-game-accent/10 text-game-accent'
-                          : 'border-game-border text-game-dim hover:text-game-muted'
-                      }`}
-                    >
-                      {showConsequences ? '🔮 推测 ON' : '🔮 推测 OFF'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-game-dim hidden sm:inline">
+                        {showConsequences ? 'AI 预测每个选项的剧情发展和好感影响' : '已隐藏剧情推测'}
+                      </span>
+                      <button
+                        onClick={() => setShowConsequences(!showConsequences)}
+                        title={showConsequences ? '点击关闭 AI 剧情推测' : '点击开启 AI 剧情推测'}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                          showConsequences
+                            ? 'border-game-accent/40 bg-game-accent/10 text-game-accent'
+                            : 'border-game-border text-game-dim hover:text-game-muted'
+                        }`}
+                      >
+                        {showConsequences ? '🔮 推测 ON' : '🔮 推测 OFF'}
+                      </button>
+                    </div>
                   </div>
                   {options.map((choice, i) => {
                     // Parse "行动 → 可能发展 | 态度 | 人际影响"
