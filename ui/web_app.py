@@ -1250,28 +1250,12 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
         </div>
 
         <div class="field-group">
-            <div class="fg-header"><label>🎭 类型 / 风格</label><span class="desc">选择故事的类型和基调</span></div>
+            <div class="fg-header"><label>🎭 类型 / 风格</label><span class="desc">点击下方标签选中，或自行输入后回车添加</span></div>
+            <div id="genreTags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
             <div class="fg-row">
-                <select name="genre" id="f_genre">
-                    <option value="科幻 / 冒险 / 情感">🚀 科幻 / 冒险 / 情感</option>
-                    <option value="校园 / 恋爱 / 日常">🌸 校园 / 恋爱 / 日常</option>
-                    <option value="奇幻 / 冒险 / 成长">⚔️ 奇幻 / 冒险 / 成长</option>
-                    <option value="悬疑 / 推理 / 都市">🔍 悬疑 / 推理 / 都市</option>
-                    <option value="修仙 / 玄幻 / 热血">🏔️ 修仙 / 玄幻 / 热血</option>
-                    <option value="恐怖 / 惊悚 / 生存">👻 恐怖 / 惊悚 / 生存</option>
-                    <option value="历史 / 权谋 / 战争">🏯 历史 / 权谋 / 战争</option>
-                    <option value="赛博朋克 / 反乌托邦">🤖 赛博朋克 / 反乌托邦</option>
-                    <option value="自定义">✏️ 自定义（在下方输入）</option>
-                </select>
-                <input name="genre_custom" id="f_genre_custom" placeholder="自定义风格" style="display:none;flex:1">
+                <input id="genreInput" placeholder="输入自定义风格后按回车添加…" style="flex:1" onkeydown="addGenreTag(event)">
             </div>
-            <script>
-                document.getElementById('f_genre').onchange=function(){
-                    var c=document.getElementById('f_genre_custom');
-                    c.style.display=this.value==='自定义'?'block':'none';
-                    if(this.value!=='自定义')c.value='';
-                };
-            </script>
+            <input type="hidden" name="genre" id="f_genre" value="科幻 / 冒险 / 情感">
         </div>
 
         <div class="field-group">
@@ -1336,8 +1320,52 @@ function removeChar(i){
 }
 function prepareSubmit(){
     document.getElementById('charsJson').value=JSON.stringify(characters);
+    document.getElementById('f_genre').value=selectedGenres.join(' / ');
 }
 renderCharacters();
+
+// ── Genre tag management ──
+var genrePresets=['科幻','冒险','情感','校园','恋爱','日常','奇幻','成长','悬疑','推理','都市','修仙','玄幻','热血','恐怖','惊悚','生存','历史','权谋','战争','赛博朋克','反乌托邦'];
+var selectedGenres=['科幻','冒险','情感'];
+function renderGenreTags(){
+    var html='';
+    genrePresets.forEach(function(g){
+        var active=selectedGenres.indexOf(g)>=0;
+        html+='<span class="genre-tag'+(active?' active':'')+'" onclick="toggleGenre(\''+g+'\')" style="display:inline-block;padding:4px 12px;background:'+(active?'#1a3a5c':'#1c2333')+';border:1px solid '+(active?'#58a6ff':'#30363d')+';border-radius:14px;color:'+(active?'#58a6ff':'#8b949e')+';font-size:0.78em;cursor:pointer;transition:all 0.12s;user-select:none">'+g+'</span>';
+    });
+    // Show selected custom tags
+    selectedGenres.forEach(function(g){
+        if(genrePresets.indexOf(g)<0){
+            html+='<span class="genre-tag active" onclick="removeGenre(\''+g+'\')" style="display:inline-block;padding:4px 12px;background:#1a3a5c;border:1px solid #58a6ff;border-radius:14px;color:#58a6ff;font-size:0.78em;cursor:pointer;transition:all 0.12s;user-select:none">'+g+' ×</span>';
+        }
+    });
+    document.getElementById('genreTags').innerHTML=html;
+    document.getElementById('f_genre').value=selectedGenres.join(' / ');
+}
+function toggleGenre(g){
+    var idx=selectedGenres.indexOf(g);
+    if(idx>=0) selectedGenres.splice(idx,1);
+    else selectedGenres.push(g);
+    renderGenreTags();
+}
+function removeGenre(g){
+    var idx=selectedGenres.indexOf(g);
+    if(idx>=0) selectedGenres.splice(idx,1);
+    renderGenreTags();
+}
+function addGenreTag(e){
+    if(e.key!=='Enter')return;
+    e.preventDefault();
+    var val=document.getElementById('genreInput').value.trim();
+    if(!val)return;
+    if(selectedGenres.indexOf(val)<0){
+        selectedGenres.push(val);
+        if(genrePresets.indexOf(val)<0) genrePresets.push(val);
+        renderGenreTags();
+    }
+    document.getElementById('genreInput').value='';
+}
+renderGenreTags();
 
 // ── Load preset ──
 function loadPreset(key,btn){
@@ -1349,7 +1377,11 @@ function loadPreset(key,btn){
     }
     var p=presets[key];
     document.getElementById('f_title').value=p.title;document.getElementById('f_world').value=p.world;
-    document.getElementById('f_genre').value=p.genre;document.getElementById('f_scene').value=p.scene;
+    document.getElementById('f_scene').value=p.scene;
+    // Parse genre into tags
+    selectedGenres=p.genre.split('/').map(function(s){return s.trim();}).filter(Boolean);
+    selectedGenres.forEach(function(g){if(genrePresets.indexOf(g)<0)genrePresets.push(g);});
+    renderGenreTags();
     characters=[
         {name:p.char1_name,role:p.char1_role,note:p.char1_note,isMain:true},
         {name:p.char2_name,role:p.char2_role,note:p.char2_note,isMain:false}
@@ -1470,14 +1502,9 @@ async def create_new_story(
     scene: str = Form(...),
     chars_json: str = Form(""),
     custom_rules: str = Form(""),
-    genre_custom: str = Form(""),
 ):
     """Process the new story form and initialize all state."""
     import yaml
-
-    # Use custom genre if selected
-    if genre == "自定义" and genre_custom.strip():
-        genre = genre_custom.strip()
 
     # Parse characters from JSON
     chars = []
