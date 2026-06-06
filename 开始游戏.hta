@@ -33,11 +33,11 @@ h1{font-size:1.4em;color:#58a6ff;margin-bottom:4px}
 <body>
 <h1>🎮 Prompt OS Galgame</h1>
 <div class="sub">AI Interactive Narrative Engine</div>
-<button class="btn" id="btnStart" onclick="startGame()">🚀 开始游戏</button>
+<button class="btn" id="btnStart" onclick="startGame()">🚀 启动游戏服务器</button>
 <button class="btn stop" id="btnStop" onclick="stopGame()" style="display:none">⏻ 关闭服务器</button>
 <div class="spinner" id="spinner"></div>
-<div class="status" id="status"></div>
-<div class="footer">关闭此窗口不会停止服务器 — 请用上方按钮</div>
+<div class="status" id="status">点击上方按钮启动</div>
+<div class="footer" id="footer">关闭此窗口不会停止服务器</div>
 
 <script language="VBScript">
 Dim objShell, strDir
@@ -47,38 +47,32 @@ Sub Window_OnLoad()
     Set objFSO = CreateObject("Scripting.FileSystemObject")
     strDir = objFSO.GetParentFolderName(objFSO.GetAbsolutePathName("."))
     objShell.CurrentDirectory = strDir
-
-    ' Check if server already running
+    ' Check if already running
     Dim xhr : Set xhr = CreateObject("MSXML2.XMLHTTP")
     On Error Resume Next
     xhr.Open "GET", "http://127.0.0.1:8000/health", False
-    xhr.setRequestHeader "Cache-Control", "no-cache"
     xhr.Send
     If Err.Number = 0 And xhr.Status = 200 Then
-        document.getElementById("status").innerText = "Server already running — opening browser..."
+        document.getElementById("status").innerText = "服务器已在运行，正在打开浏览器..."
         document.getElementById("status").style.color = "#7ee787"
         document.getElementById("btnStart").style.display = "none"
         document.getElementById("btnStop").style.display = "inline-block"
+        document.getElementById("footer").innerText = "游戏已打开 | 点上方按钮关闭服务器"
         objShell.Run "http://127.0.0.1:8000"
     End If
     On Error Goto 0
 End Sub
 
 Sub LaunchServer()
-    ' Check Python
     On Error Resume Next
     objShell.Run "cmd /c python --version > nul 2>&1", 0, True
     If Err.Number <> 0 Then
-        document.getElementById("status").innerText = "Python not found. Install Python 3.10+"
+        document.getElementById("status").innerText = "未找到 Python，请安装 Python 3.10+"
         document.getElementById("status").style.color = "#f85149"
         Exit Sub
     End If
     On Error Goto 0
-
-    ' Install deps
     objShell.Run "cmd /c pip install -r requirements.txt --quiet > nul 2>&1", 0, True
-
-    ' Start server
     objShell.Run "python engine\run.py --mode web", 0, False
 End Sub
 
@@ -88,16 +82,15 @@ End Sub
 </script>
 
 <script>
-var pollTimer = null, attempts = 0;
+var pollTimer = null, attempts = 0, gameWindow = null;
 
 function startGame(){
     document.getElementById('btnStart').style.display = 'none';
     document.getElementById('spinner').style.display = 'block';
     document.getElementById('status').innerText = '正在启动服务器...';
     document.getElementById('status').style.color = '#8b949e';
-
+    document.getElementById('footer').innerText = '首次启动可能需要安装依赖，请耐心等待';
     try { LaunchServer(); } catch(e){}
-
     attempts = 0;
     pollTimer = setInterval(checkReady, 1500);
 }
@@ -114,16 +107,18 @@ function checkReady(){
             document.getElementById('status').style.color = '#7ee787';
             document.getElementById('spinner').style.display = 'none';
             document.getElementById('btnStop').style.display = 'inline-block';
-            setTimeout(function(){ window.open('http://127.0.0.1:8000'); }, 300);
+            document.getElementById('footer').innerText = '游戏浏览器已打开 | 点上方按钮关闭服务器';
+            gameWindow = window.open('http://127.0.0.1:8000', 'galgame');
         }
     };
     xhr.onerror = xhr.ontimeout = function(){
         if(attempts >= 40){
             clearInterval(pollTimer);
-            document.getElementById('status').innerText = '启动超时 — 请运行 启动.bat 查看错误';
+            document.getElementById('status').innerText = '超时 — 请运行 启动.bat 查看错误日志';
             document.getElementById('status').style.color = '#f85149';
             document.getElementById('spinner').style.display = 'none';
             document.getElementById('btnStart').style.display = 'inline-block';
+            document.getElementById('footer').innerText = '关闭此窗口不会停止服务器';
         } else {
             document.getElementById('status').innerText = '等待服务器就绪... (' + attempts + '/40)';
         }
@@ -132,12 +127,17 @@ function checkReady(){
 }
 
 function stopGame(){
-    if(confirm('确定要关闭服务器？')){
+    if(confirm('确定要关闭服务器？浏览器中的游戏页面将无法访问。')){
         try { KillServer(); } catch(e){}
-        document.getElementById('status').innerText = '服务器已关闭';
+        if(gameWindow && !gameWindow.closed){
+            try { gameWindow.close(); } catch(e){}
+        }
+        gameWindow = null;
+        document.getElementById('status').innerText = '服务器已关闭 — 可重新启动';
         document.getElementById('status').style.color = '#8b949e';
         document.getElementById('btnStart').style.display = 'inline-block';
         document.getElementById('btnStop').style.display = 'none';
+        document.getElementById('footer').innerText = '关闭此窗口不会停止服务器';
     }
 }
 </script>
