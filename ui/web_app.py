@@ -45,8 +45,12 @@ app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 @app.get("/health")
 async def health():
-    """Lightweight health-check endpoint."""
-    return {"status": "ok"}
+    """Lightweight health-check endpoint (CORS-friendly for splash loader)."""
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        content={"status": "ok"},
+        headers={"Access-Control-Allow-Origin": "*"},
+    )
 
 
 @app.post("/shutdown")
@@ -568,8 +572,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         // ── Warn before closing / refreshing (skip for in-app navigation) ──
         window.addEventListener('beforeunload', function(e){
             if(window._internalNav) return;
+            // Try to shut down server when leaving
+            try { navigator.sendBeacon('/shutdown'); } catch(ex) {}
             e.preventDefault();
-            e.returnValue = '剧情进度可能丢失，确定离开？';
+            e.returnValue = '确定离开？请使用页面底部红色 ⏻ 按钮正常关闭服务器。';
             return e.returnValue;
         });
     </script>

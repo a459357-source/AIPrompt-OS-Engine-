@@ -1,5 +1,5 @@
 ' Prompt OS Galgame Launcher v2
-' Double-click to start - no console, no setup needed
+' Starts server in background, opens splash screen that auto-connects
 
 Set objShell = CreateObject("WScript.Shell")
 Set objFSO = CreateObject("Scripting.FileSystemObject")
@@ -22,11 +22,8 @@ End If
 ' --- Install deps ---
 objShell.Run "%comspec% /c pip install -r requirements.txt --quiet", 0, True
 
-' --- Start server ---
+' --- Start server (hidden) ---
 objShell.Run "python engine\run.py --mode web", 0, False
 
-' --- Wait for server ---
-WScript.Sleep 3000
-
-' --- Open browser ---
-objShell.Run "http://127.0.0.1:8000"
+' --- Open splash screen immediately ---
+objShell.Run """" & strDir & "\启动.html"""
