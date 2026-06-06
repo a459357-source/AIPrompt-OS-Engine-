@@ -1054,10 +1054,10 @@ async def history_page():
         body {{
             font-family: "Segoe UI", "Noto Sans SC", system-ui, sans-serif;
             background: #0d1117; color: #c9d1d9;
-            height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; display: flex; flex-direction: column; align-items: center;
         }}
         .hist-container {{
-            width: 100%; height: 100%;
+            width: 100%; min-height: 100vh;
             display: flex; flex-direction: column; padding: 16px 20px;
         }}
         .hist-header {{
@@ -1189,7 +1189,7 @@ _NEW_PAGE = """<!DOCTYPE html>
         body {
             font-family: "Segoe UI", "Noto Sans SC", system-ui, sans-serif;
             background: #0d1117; color: #c9d1d9;
-            height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; display: flex; flex-direction: column; align-items: center;
         }
         .new-container {
             width: 100%; height: 100%;
@@ -1585,7 +1585,7 @@ _NPC_PAGE = """<!DOCTYPE html>
         body {
             font-family: "Segoe UI", "Noto Sans SC", system-ui, sans-serif;
             background: #0d1117; color: #c9d1d9;
-            height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; display: flex; flex-direction: column; align-items: center;
         }
         .npc-container {
             width: 100%; height: 100%;
@@ -1942,7 +1942,7 @@ _SETTINGS_PAGE = """<!DOCTYPE html>
         body {
             font-family: "Segoe UI", "Noto Sans SC", system-ui, sans-serif;
             background: #0d1117; color: #c9d1d9;
-            height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; display: flex; flex-direction: column; align-items: center;
         }
         .set-container {
             max-width: 700px; width: 100%; padding: 32px 20px;
