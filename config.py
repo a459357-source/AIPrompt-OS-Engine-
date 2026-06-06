@@ -25,6 +25,7 @@ DATA_DIR             = ROOT / "data"
 STORY_GRAPH_PATH     = DATA_DIR / "story_graph.json"
 MEMORY_PATH          = DATA_DIR / "memory.json"
 SAVES_DIR            = DATA_DIR / "saves"
+WORLD_INIT_PATH      = DATA_DIR / "world_init.json"
 API_USAGE_PATH       = DATA_DIR / "api_usage.jsonl"
 
 # ── Save system ────────────────────────────────────────────────────

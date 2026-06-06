@@ -1021,70 +1021,50 @@ async def history_page():
 
 @app.get("/reset", response_class=HTMLResponse)
 async def reset():
-    """Reset the session state to initial values."""
+    """Reset the session state to the world's factory defaults."""
     from engine import io_utils
-    import yaml
+    from fastapi.responses import RedirectResponse
 
+    # Try to restore from factory snapshot (saved at world creation)
+    if config.WORLD_INIT_PATH.exists():
+        try:
+            init = io_utils.read_json(config.WORLD_INIT_PATH)
+            io_utils.write_yaml(config.SESSION_STATE_PATH, init["state"])
+            io_utils.write_json(config.STORY_GRAPH_PATH, init["graph"])
+            io_utils.write_json(config.MEMORY_PATH, init["memory"])
+            config.CHAPTER_PATH.write_text("", encoding="utf-8")
+            return RedirectResponse(url="/", status_code=303)
+        except Exception:
+            pass
+
+    # Fallback: hardcoded defaults (only used if no world_init.json exists)
     initial_state = {
         "scene": "回声号 — 舰桥",
         "status": "SETUP",
         "turn": 0,
         "characters": {
-            "A": {
-                "name": "林夜",
-                "role": "调查船船长",
-                "level": "L0",
-                "relation": "初识",
-                "note": "冷静、理性，背负过去的秘密",
-            },
-            "B": {
-                "name": "艾琳",
-                "role": "考古语言学家",
-                "level": "L0",
-                "relation": "初识",
-                "note": "热情、好奇，对星痕有特殊的感知力",
-            },
+            "A": {"name": "林夜", "role": "调查船船长", "level": "L0", "relation": "初识", "note": "冷静、理性，背负过去的秘密"},
+            "B": {"name": "艾琳", "role": "考古语言学家", "level": "L0", "relation": "初识", "note": "热情、好奇，对星痕有特殊的感知力"},
         },
         "history": [],
         "force_event_pending": False,
         "chapter": 1,
     }
     io_utils.write_yaml(config.SESSION_STATE_PATH, initial_state)
-
-    # Reset chapter
-    config.CHAPTER_PATH.write_text("", encoding="utf-8")
-
-    # Reset story graph
     initial_graph = {
-        "nodes": {
-            "0": {
-                "turn": 0,
-                "text": "初始场景：回声号舰桥",
-                "scene": "回声号 — 舰桥",
-                "status": "SETUP",
-                "choices": {},
-                "parent": None,
-                "choice_taken": None,
-            }
-        },
-        "current_node": "0",
-        "edges": [],
+        "nodes": {"0": {"turn": 0, "text": "初始场景：回声号舰桥", "scene": "回声号 — 舰桥", "status": "SETUP", "choices": {}, "parent": None, "choice_taken": None}},
+        "current_node": "0", "edges": [],
     }
     io_utils.write_json(config.STORY_GRAPH_PATH, initial_graph)
-
-    # Reset memory
     initial_memory = {
         "characters": {
             "林夜": {"trust": 0.5, "flags": [], "relationship": "船长，初识"},
             "艾琳": {"trust": 0.5, "flags": [], "relationship": "考古语言学家，初识"},
         },
-        "world_flags": [],
-        "global_trust": 0.5,
+        "world_flags": [], "global_trust": 0.5,
     }
     io_utils.write_json(config.MEMORY_PATH, initial_memory)
-
-    # Redirect to index so it picks up the fresh state properly
-    from fastapi.responses import RedirectResponse
+    config.CHAPTER_PATH.write_text("", encoding="utf-8")
     return RedirectResponse(url="/", status_code=303)
 
 
@@ -1460,6 +1440,13 @@ async def create_new_story(
         "global_trust": 0.5,
     }
     io_utils.write_json(config.MEMORY_PATH, initial_memory)
+
+    # Save factory-reset snapshot so reset() can restore the user's world
+    io_utils.write_json(config.WORLD_INIT_PATH, {
+        "state": initial_state,
+        "graph": initial_graph,
+        "memory": initial_memory,
+    })
 
     # Redirect to main page
     from fastapi.responses import RedirectResponse
