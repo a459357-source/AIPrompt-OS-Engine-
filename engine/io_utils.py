@@ -31,6 +31,7 @@ RUNTIME_STATIC_PATHS = frozenset({
     str(_config.WORLD_PACK_PATH),
     str(_config.ENGINE_CONFIG_PATH),
     str(_config.PROMPT_TEMPLATE_PATH),
+    str(_config.PROMPT_TEMPLATE_ADULT_EXTREME_PATH),
 })
 
 _FILE_CACHE: dict = {}

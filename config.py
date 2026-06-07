@@ -43,6 +43,7 @@ def required_bundle_files() -> tuple[Path, ...]:
     return (
         bundle_path("engine.yaml"),
         bundle_path("prompt_template.yaml"),
+        bundle_path("prompt_template_adult_extreme.yaml"),
         bundle_path("frontend", "dist", "index.html"),
         bundle_path("packaging", "defaults", "apikey.json"),
     )
@@ -59,6 +60,19 @@ WORLD_PACK_PATH      = ROOT / "world_pack.yaml"
 SESSION_STATE_PATH   = ROOT / "session_state.yaml"
 ENGINE_CONFIG_PATH   = bundled_asset("engine.yaml")
 PROMPT_TEMPLATE_PATH = bundled_asset("prompt_template.yaml")
+PROMPT_TEMPLATE_ADULT_EXTREME_PATH = bundled_asset("prompt_template_adult_extreme.yaml")
+
+
+def use_adult_extreme_template() -> bool:
+    """True when adult_mode is on and intensity tier is extreme."""
+    return bool(ADULT_MODE) and adult_intensity_tier() == "extreme"
+
+
+def resolve_prompt_template_path() -> Path:
+    """Pick default or adult-extreme prompt template."""
+    if use_adult_extreme_template() and PROMPT_TEMPLATE_ADULT_EXTREME_PATH.is_file():
+        return PROMPT_TEMPLATE_ADULT_EXTREME_PATH
+    return PROMPT_TEMPLATE_PATH
 
 OUTPUT_DIR           = ROOT / "output"
 CHAPTER_PATH         = OUTPUT_DIR / "chapter.md"
@@ -1032,6 +1046,8 @@ def adult_options_hint_text() -> str:
 def adult_task_hint_text() -> str:
     if not ADULT_MODE:
         return ""
+    if use_adult_extreme_template():
+        return adult_extreme_task_hint_text()
     profile = ADULT_PROFILE if ADULT_PROFILE in ADULT_PROFILE_OPTIONS else DEFAULT_ADULT_PROFILE
     tier = _adult_intensity_tier(CONTENT_WEIGHTS.get("adult", 0), profile)
     if tier in ("extreme", "high"):
@@ -1081,6 +1097,8 @@ def adult_intensity_tier() -> str:
 def adult_system_override_text() -> str:
     """Highest-priority adult directives at the top of the system prompt."""
     if not ADULT_MODE:
+        return ""
+    if use_adult_extreme_template():
         return ""
     tier = adult_intensity_tier()
     if tier == "extreme":
@@ -1143,6 +1161,203 @@ def intimate_option_count(options: list) -> int:
 def explicit_option_count(options: list) -> int:
     """Options with 2+ intimate markers = likely explicit."""
     return sum(1 for o in options if count_intimate_markers(str(o)) >= 2)
+
+
+_ORGASM_MARKERS = (
+    "高潮", "绝顶", "去了", "痉挛", "颤抖着释放", "潮吹", "泄身", "攀上顶峰",
+    "身体绷紧", "一阵酥麻", "软倒", "余韵", "瘫软",
+)
+
+
+def count_orgasm_markers(text: str) -> int:
+    t = str(text or "")
+    return sum(1 for kw in _ORGASM_MARKERS if kw in t)
+
+
+def adult_story_intimacy_threshold() -> int:
+    """Minimum intimate keyword hits expected in story body."""
+    if not ADULT_MODE:
+        return 0
+    tier = adult_intensity_tier()
+    if tier == "extreme":
+        return 4
+    if tier == "high":
+        return 2
+    if tier == "medium":
+        return 1
+    return 0
+
+
+def infer_intimacy_level(story: str, prev: int = 0) -> int:
+    """Heuristic intimacy escalation level (0–10) from story text."""
+    markers = count_intimate_markers(story)
+    orgasm = count_orgasm_markers(story)
+    level = prev
+    if markers >= 6 or orgasm >= 2:
+        level = max(level, prev + 2)
+    elif markers >= 3 or orgasm >= 1:
+        level = max(level, prev + 1)
+    elif markers >= 1:
+        level = max(level, prev)
+    return min(10, level)
+
+
+def vocabulary_domain_text(world_pack: dict | None) -> str:
+    """World-specific vocabulary domain from world_pack.custom."""
+    pack = world_pack or {}
+    custom = pack.get("custom") or {}
+    world = pack.get("world") or {}
+    domain = custom.get("vocabulary_domain") or world.get("vocabulary_domain") or ""
+    domain = str(domain).strip()
+    if domain:
+        return domain
+    return "使用符合世界观与时代的客观描写词汇；禁止使用与时代/设定不符的现代网络 slang。"
+
+
+def normalized_intimacy_block(world_pack: dict | None) -> str:
+    """Optional per-world normalized intimacy mode block."""
+    pack = world_pack or {}
+    custom = pack.get("custom") or {}
+    mode = custom.get("normalized_intimacy_mode") or {}
+    if not isinstance(mode, dict) or not mode.get("enabled"):
+        return ""
+    desc = str(mode.get("description") or "").strip()
+    lines = [
+        "【常态操法模式 — 本世界观已启用】",
+        "- 核心女性角色可维持世界观定义的默认亲热姿势/状态作为常态化实操基础。",
+        "- 静态（日常事务）、缓动（行走/站立）、猛动（私密场景）三种子模式均计入当轮实操指标。",
+        "- 需要大幅动作时换到私密空间；对外人通过衣袍或环境遮蔽。",
+    ]
+    if desc:
+        lines.append(f"- 世界观定义：{desc}")
+    return "\n".join(lines)
+
+
+def sample_char_a_name(world_pack: dict | None, session_state: dict | None) -> str:
+    """First suitable female/core NPC name for options example placeholder."""
+    names: list[str] = []
+    session = session_state or {}
+    for ch in (session.get("characters") or {}).values():
+        if isinstance(ch, dict):
+            n = str(ch.get("name") or "").strip()
+            if n:
+                names.append(n)
+    pack = world_pack or {}
+    for ch in pack.get("world", {}).get("characters") or []:
+        if not isinstance(ch, dict) or ch.get("is_main"):
+            continue
+        n = str(ch.get("name") or "").strip()
+        if n and n not in names:
+            names.append(n)
+    return names[0] if names else "她"
+
+
+def intimacy_escalation_hint(session_state: dict | None) -> str:
+    """Cross-turn intimacy escalation hint for extreme template."""
+    if not use_adult_extreme_template():
+        return ""
+    session = session_state or {}
+    status = str(session.get("status") or "SETUP")
+    history = session.get("history") or []
+    prev = 0
+    if history and isinstance(history[-1], dict):
+        prev = int(history[-1].get("intimacy_level") or 0)
+    if status == "COOLDOWN":
+        return (
+            f"【性内容进度】当前 COOLDOWN：维持亲密等级 ≥ {prev}，须有实质性接触；"
+            "不要求比上轮升级，也不要求本轮高潮。"
+        )
+    return (
+        f"【性内容进度】上轮等级 {prev}，本轮须推进至 ≥ {prev + 1} "
+        "（动作深度/参与人数/强度至少一项升级）。"
+    )
+
+
+def adult_extreme_content_rules_text() -> str:
+    """Hard adult content rules injected into extreme template only."""
+    if not use_adult_extreme_template():
+        return ""
+    return "\n".join([
+        "【成人内容规则 — 强制】",
+        "",
+        "## 每轮性内容铁律",
+        "- 每轮须有实质性性接触；非 COOLDOWN 轮至少让一个女性角色达到高潮。",
+        "  不一定要插入，但须有明确身体接触与高潮描写。",
+        "- 正常剧情压缩到 2–3 句交代背景；剩余篇幅用于色情描写（70%+）。",
+        "- 非 COOLDOWN 轮：性关系须比上一轮更进一步；严禁连续多轮只聊天不操。",
+        "- COOLDOWN 轮：可维持或略降强度，仍须有实质性接触；不要求升级或高潮。",
+        "",
+        "## 剧情服务于性内容铁律",
+        "- 每个剧情发展须回答：与谁发生性关系？怎么发生？三轮内能否实现？",
+        "- 若某目标铺垫超过三轮，每轮须用其他女性角色填补实操缺口。",
+        "- 禁绝无指向性推进的纯剧情过渡。",
+        "",
+        "## 常态操法（若世界观已启用见行为规则）",
+        "- 在该姿势下发生的抽送/高潮/射精均计入当轮实操指标。",
+    ])
+
+
+def adult_extreme_behavior_rules_text(
+    *,
+    vocabulary_domain: str = "",
+    normalized_block: str = "",
+) -> str:
+    """Behavior rules for extreme template (replaces generic AI_BEHAVIOR_RULES)."""
+    if not use_adult_extreme_template():
+        return ""
+    vocab = vocabulary_domain.strip() or vocabulary_domain_text(None)
+    lines = [
+        "【行为规则 — 强制】",
+        "",
+        "## 世界真实性规则",
+        "- 世界不围绕玩家运转。NPC 有独立意志、自身利益，不会无条件配合玩家。",
+        "- 核心女性角色均有敏感体质设定，任何行为都有后果。",
+        f"- 所有性描写使用符合世界观设定的语境词汇：{vocab}",
+        "- 严禁修仙、神明、系统、游戏化提示（经验值、等级提升等），除非世界观本身包含这些元素。",
+        "",
+        "## 称呼规范",
+        "- 正式场合：每个角色有对应尊称/官称，须按身份正确使用。",
+        "- 亲密语境（独处时）：可使用亲密称呼，但不可在正式场合混用。",
+        "- 禁止使用不符合世界观设定的称呼指代角色。",
+        "",
+        "## 角色认知与信息差",
+        "- 角色对性事的认知程度各不相同，须根据角色设定决定其性词汇使用方式。",
+        "- 若世界观需要，可设定旁观者对性事场景的认知偏移机制。",
+        "- 角色之间的信息差是制造戏剧张力的核心工具，须保持一致性。",
+        f"【选项数量】必须输出恰好 {OPTION_COUNT} 个 options。",
+        f"【反重复】{REPETITION_PROMPT_INSTRUCTIONS[REPETITION_CHECK]}",
+    ]
+    if normalized_block:
+        lines.extend(["", normalized_block])
+    return "\n".join(lines)
+
+
+def adult_extreme_task_hint_text() -> str:
+    """Supplementary task hint for extreme template user prompt."""
+    if not use_adult_extreme_template():
+        return ""
+    return (
+        " 若玩家选择含亲密/色情意味，须在本轮写满具体过程（动作、触感、对话、生理反应）；"
+        "禁止 fade to black 或角色无理由拒绝。"
+        " options 须含多个可执行的色情行动。"
+    )
+
+
+def validate_adult_story_content(story: str, *, status: str = "") -> list[str]:
+    """Return warnings when adult story body does not meet tier thresholds."""
+    if not ADULT_MODE:
+        return []
+    tier = adult_intensity_tier()
+    warnings: list[str] = []
+    threshold = adult_story_intimacy_threshold()
+    markers = count_intimate_markers(story)
+    if threshold and markers < threshold:
+        warnings.append(
+            f"story 亲密标记不足：{markers} < {threshold}（tier={tier}）"
+        )
+    if tier == "extreme" and status != "COOLDOWN" and count_orgasm_markers(story) < 1:
+        warnings.append("extreme 非 COOLDOWN 轮缺少高潮相关描写")
+    return warnings
 
 
 def content_preference_rules_text() -> str:

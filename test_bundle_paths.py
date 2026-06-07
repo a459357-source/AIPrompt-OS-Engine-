@@ -17,6 +17,7 @@ def bundle_layout(tmp_path: Path, monkeypatch):
     internal.mkdir(parents=True)
     (internal / "engine.yaml").write_text("engine: test\n", encoding="utf-8")
     (internal / "prompt_template.yaml").write_text("template: test\n", encoding="utf-8")
+    (internal / "prompt_template_adult_extreme.yaml").write_text("template: extreme\n", encoding="utf-8")
     defaults = internal / "packaging" / "defaults"
     defaults.mkdir(parents=True)
     (defaults / "apikey.json").write_text("{}", encoding="utf-8")
@@ -54,6 +55,11 @@ def bundle_layout(tmp_path: Path, monkeypatch):
         config,
         "PROMPT_TEMPLATE_PATH",
         config.bundled_asset("prompt_template.yaml"),
+    )
+    monkeypatch.setattr(
+        config,
+        "PROMPT_TEMPLATE_ADULT_EXTREME_PATH",
+        config.bundled_asset("prompt_template_adult_extreme.yaml"),
     )
     monkeypatch.setattr(
         config,

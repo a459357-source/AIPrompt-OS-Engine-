@@ -62,6 +62,10 @@ def apply_turn(
 
     # Append history entry
     full_story = ai_response.get("story", "")
+    prev_intimacy = 0
+    if current.get("history"):
+        prev_intimacy = int(current["history"][-1].get("intimacy_level") or 0)
+    intimacy_level = config.infer_intimacy_level(full_story, prev_intimacy)
     history_entry = {
         "turn": snapshot["turn"],
         "scene": snapshot["scene"],
@@ -71,6 +75,7 @@ def apply_turn(
         "summary": full_story[:120],
         "options": ai_response.get("options", []),
         "choice": choice,
+        "intimacy_level": intimacy_level,
     }
     new_state.setdefault("history", []).append(history_entry)
 

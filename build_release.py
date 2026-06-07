@@ -74,6 +74,7 @@ def build_exe() -> Path:
         f"frontend/dist{sep}frontend/dist",
         f"packaging/defaults{sep}packaging/defaults",
         f"prompt_template.yaml{sep}.",
+        f"prompt_template_adult_extreme.yaml{sep}.",
         f"engine.yaml{sep}.",
     ]
 
@@ -118,6 +119,7 @@ def verify_bundle(exe_dir: Path) -> None:
     required = [
         internal / "engine.yaml",
         internal / "prompt_template.yaml",
+        internal / "prompt_template_adult_extreme.yaml",
         internal / "frontend" / "dist" / "index.html",
         internal / "packaging" / "defaults" / "apikey.json",
     ]

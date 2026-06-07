@@ -98,6 +98,7 @@ def _regenerate_options(
     )
     system = (
         config.adult_system_override_text()
+        + config.adult_extreme_content_rules_text()
         + "\n"
         + config.content_preference_rules_text()
         + f"\n只输出合法 JSON：{{\"options\": [...]}}，恰好 {count} 个字符串。"
@@ -144,37 +145,39 @@ def ensure_adult_turn_content(
     options = list(out.get("options") or [])
     story = str(out.get("story") or "")
 
-    if config.intimate_option_count(options) >= need:
-        return out
+    if config.intimate_option_count(options) < need:
+        partners = _partner_names(characters or {})
+        logger.warning(
+            "成人模式 options 露骨不足：intimate=%d need=%d tier=%s scene=%s",
+            config.intimate_option_count(options),
+            need,
+            tier,
+            scene,
+        )
 
-    partners = _partner_names(characters or {})
-    logger.warning(
-        "成人模式 options 露骨不足：intimate=%d need=%d tier=%s scene=%s",
-        config.intimate_option_count(options),
-        need,
-        tier,
-        scene,
-    )
+        regen = _regenerate_options(story=story, scene=scene, partners=partners, tier=tier)
+        if regen and config.intimate_option_count(regen) >= need:
+            out["options"] = regen
+            logger.info("成人 options 已通过补生成满足要求")
+        else:
+            merged = _merge_adult_options(
+                options,
+                partners=partners,
+                need=need,
+                count=config.OPTION_COUNT,
+            )
+            out["options"] = merged
+            logger.info(
+                "成人 options 已本地注入 fallback（intimate=%d）",
+                config.intimate_option_count(merged),
+            )
 
-    regen = _regenerate_options(story=story, scene=scene, partners=partners, tier=tier)
-    if regen and config.intimate_option_count(regen) >= need:
-        out["options"] = regen
-        logger.info("成人 options 已通过补生成满足要求")
-        return out
-
-    merged = _merge_adult_options(
-        options,
-        partners=partners,
-        need=need,
-        count=config.OPTION_COUNT,
-    )
-    out["options"] = merged
-    logger.info(
-        "成人 options 已本地注入 fallback（intimate=%d）",
-        config.intimate_option_count(merged),
-    )
-
+    story = str(out.get("story") or "")
     if tier in ("extreme", "high") and config.count_intimate_markers(story) < 2:
         logger.warning("成人模式 story 亲密标记偏少，建议下轮选择色情向 option")
+
+    status = str((out.get("state") or {}).get("status") or scene or "")
+    for warn in config.validate_adult_story_content(story, status=status):
+        logger.warning("成人 story 校验：%s", warn)
 
     return out

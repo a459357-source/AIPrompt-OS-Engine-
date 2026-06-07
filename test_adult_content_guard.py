@@ -8,9 +8,10 @@ def test_adult_system_override_extreme():
     config.save_adult_profile("adult_first")
     config.save_content_weights({"story": 0, "romance": 0, "adult": 100})
     config.reload_app_behavior()
-    text = config.adult_system_override_text()
-    assert "最高优先级" in text
-    assert "禁止全部选项" in text
+    assert config.use_adult_extreme_template()
+    assert config.adult_system_override_text() == ""
+    text = config.adult_extreme_content_rules_text()
+    assert "每轮性内容铁律" in text
 
 
 def test_merge_adult_options_replaces_mission():

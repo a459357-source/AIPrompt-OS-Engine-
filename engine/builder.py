@@ -75,7 +75,9 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
     world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
     session_state = io_utils.read_yaml(config.SESSION_STATE_PATH)
     engine_config = io_utils.read_yaml(config.ENGINE_CONFIG_PATH)
-    template = io_utils.read_yaml(config.PROMPT_TEMPLATE_PATH)
+    template_path = config.resolve_prompt_template_path()
+    template = io_utils.read_yaml(template_path)
+    extreme = config.use_adult_extreme_template()
 
     # ── Force-event detection ──────────────────────────────────
     # Priority 1: explicit flag set by state_manager last turn
@@ -178,7 +180,18 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
     target_len = config.STORY_LENGTH
     min_len = config.min_story_length_for_target(target_len)
     max_len = config.max_story_length_for_target(target_len)
+    vocab_domain = config.vocabulary_domain_text(world_pack)
+    norm_block = config.normalized_intimacy_block(world_pack)
+    char_a = config.sample_char_a_name(world_pack, session_state)
     system_raw = template.get("system", "")
+    behavior_rules = (
+        config.adult_extreme_behavior_rules_text(
+            vocabulary_domain=vocab_domain,
+            normalized_block=norm_block,
+        )
+        if extreme
+        else config.ai_behavior_rules_text()
+    )
     system_prompt = (
         system_raw
         .replace("{{ADULT_SYSTEM_OVERRIDE}}", config.adult_system_override_text())
@@ -186,7 +199,11 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
         .replace("{{STORY_LENGTH}}", str(target_len))
         .replace("{{STORY_LENGTH_MIN}}", str(min_len))
         .replace("{{STORY_LENGTH_MAX}}", str(max_len))
-        .replace("{{AI_BEHAVIOR_RULES}}", config.ai_behavior_rules_text())
+        .replace("{{AI_BEHAVIOR_RULES}}", behavior_rules)
+        .replace("{{ADULT_EXTREME_BEHAVIOR_RULES}}", behavior_rules)
+        .replace("{{ADULT_EXTREME_CONTENT_RULES}}", config.adult_extreme_content_rules_text())
+        .replace("{{VOCABULARY_DOMAIN}}", vocab_domain)
+        .replace("{{CHAR_A}}", char_a)
         .replace("{{OPTION_COUNT}}", str(config.OPTION_COUNT))
         .replace("{{ADULT_OPTIONS_HINT}}", config.adult_options_hint_text())
         .replace("{{CUSTOM_RULES}}", custom_rules_text)
@@ -214,6 +231,7 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
         .replace("{{LONG_TERM_MEMORY}}", long_term)
         .replace("{{RECENT_SUMMARIES}}", recent_summaries)
         .replace("{{HOT_CONTEXT}}", hot_context)
+        .replace("{{INTIMACY_ESCALATION_HINT}}", config.intimacy_escalation_hint(session_state))
         .replace("{{ENGINE_RULES}}", compact_engine_rules(engine_config))
         .replace("{{FORCE_EVENT_PROMPT}}", force_prompt)
         .replace("{{LAST_CHOICE}}", last_choice_text)
@@ -232,8 +250,9 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
     _warn_if_approaching_limit(system_prompt, user_prompt)
 
     logger.info(
-        "Prompt built — force_event=%s current_choice=%s story_length=%d max_tokens=%d "
+        "Prompt built — template=%s force_event=%s current_choice=%s story_length=%d max_tokens=%d "
         "hot_turns=%d long_term_chars=%d",
+        template_path.name,
         force_triggered,
         current_choice or "none",
         target_len,
