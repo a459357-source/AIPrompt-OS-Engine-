@@ -18,6 +18,7 @@ from engine.memory_layers import (
     load_world_summary_text,
 )
 from engine.plot_director import build_director_advice, ensure_plot_state
+from engine.objective_system import build_objectives_context, ensure_objectives
 from engine.prompt_compact import (
     compact_engine_rules,
     compact_world_for_prompt,
@@ -232,6 +233,13 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
         plot_state = ensure_plot_state(world_pack)
         director_advice = build_director_advice(plot_state, session_state)
 
+    objectives_context = ""
+    if config.OBJECTIVE_SYSTEM_ENABLED:
+        ensure_objectives(session_state, world_pack)
+        objectives_context = build_objectives_context(session_state)
+        if objectives_context:
+            objectives_context = objectives_context + "\n"
+
     # ── Interpolate user prompt ────────────────────────────────
     user_raw = template.get("user", "")
     user_prompt = (
@@ -240,6 +248,7 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
         .replace("{{LONG_TERM_MEMORY}}", long_term)
         .replace("{{RECENT_SUMMARIES}}", recent_summaries)
         .replace("{{HOT_CONTEXT}}", hot_context)
+        .replace("{{OBJECTIVES_CONTEXT}}", objectives_context)
         .replace("{{DIRECTOR_ADVICE}}", director_advice)
         .replace("{{INTIMACY_ESCALATION_HINT}}", config.intimacy_escalation_hint(session_state))
         .replace("{{ENGINE_RULES}}", compact_engine_rules(engine_config))

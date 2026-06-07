@@ -380,6 +380,7 @@ def step(
 
     # 4. Apply to state (record choice with the story we just generated)
     prev_chapter = pre_state.get("chapter", 1)
+    old_status = pre_state.get("status", "SETUP")
     try:
         new_state = apply_turn(response, choice, session=runtime.session, persist=False)
         runtime.session = new_state
@@ -388,6 +389,8 @@ def step(
         _last_step_error = f"写入游戏状态失败: {exc}"
         logger.error("Failed to apply turn: %s", exc)
         return None
+
+    _safe_call(_apply_objectives, "objective updates", response, old_status, runtime)
 
     # 5-12. Non-critical post-turn steps — each wrapped so one failure
     #       doesn't crash the whole turn.  Full tracebacks go to error.log.
@@ -752,20 +755,33 @@ def _maybe_chapter_summary(state: dict, memory: dict) -> None:
     maybe_update_chapter_summary(state, memory)
 
 
+def _apply_objectives(response: dict, old_status: str, runtime) -> None:
+    from engine.objective_system import process_turn_objectives
+
+    world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+    process_turn_objectives(runtime.session, response, old_status, world_pack)
+
+
 def _maybe_plot_director(state: dict, memory: dict) -> None:
     from engine.plot_director import (
         ensure_plot_state,
         maybe_analyze_plot,
         save_plot_state,
     )
+    from engine.objective_system import ensure_objectives, sync_main_objective_progress
 
     turn = int(state.get("turn", 0) or 0)
-    if turn <= 0 or turn % config.PLOT_DIRECTOR_ANALYSIS_INTERVAL != 0:
+    if turn <= 0:
         return
     world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
     plot_state = ensure_plot_state(world_pack)
-    updated = maybe_analyze_plot(plot_state, state, memory, world_pack)
-    save_plot_state(updated)
+    if turn % config.PLOT_DIRECTOR_ANALYSIS_INTERVAL == 0:
+        updated = maybe_analyze_plot(plot_state, state, memory, world_pack)
+        save_plot_state(updated)
+        plot_state = updated
+    ensure_objectives(state, world_pack, plot_state)
+    sync_main_objective_progress(state, plot_state)
+    io_utils.write_yaml(config.SESSION_STATE_PATH, state)
 
 
 def _update_graph(

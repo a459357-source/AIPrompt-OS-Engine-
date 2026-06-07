@@ -341,6 +341,28 @@ export interface PlotDirectorData {
   stall_turns: number
 }
 
+export interface ObjectiveItem {
+  id: string
+  title: string
+  progress: number
+  status: string
+  scope?: string
+}
+
+export interface ObjectivesGameData {
+  main: ObjectiveItem[]
+  side: ObjectiveItem[]
+  side_extra?: number
+}
+
+export interface ObjectivesDashboardData {
+  main: ObjectiveItem[]
+  side: ObjectiveItem[]
+  completed: ObjectiveItem[]
+  failed: ObjectiveItem[]
+  hidden: ObjectiveItem[]
+}
+
 export interface DashboardData {
   turn: number
   status: string
@@ -373,6 +395,7 @@ export interface DashboardData {
     current_node?: string
   }
   plot_director?: PlotDirectorData
+  objectives?: ObjectivesDashboardData
   error?: string
 }
 

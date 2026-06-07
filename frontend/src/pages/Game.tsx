@@ -13,7 +13,7 @@ import { StatusToast } from '@/components/StatusToast'
 import { InspectorPanel } from '@/components/layout/InspectorPanel'
 import { usePageShell } from '@/components/layout/usePageShell'
 import { GlassPanel } from '@/components/neural/GlassPanel'
-import { getGameState, startGameOnce, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, cancelGeneration, getGenerationStatus, waitForGameReady, supplementLore, type HistoryTurn, type GameGenSettings, type ContentWeights } from '@/lib/api'
+import { getGameState, startGameOnce, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, cancelGeneration, getGenerationStatus, waitForGameReady, supplementLore, type HistoryTurn, type GameGenSettings, type ContentWeights, type ObjectivesGameData } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { parseOptionEffects, parseGameOption, formatOptionStatusMetrics } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
@@ -297,6 +297,7 @@ export default function Game() {
   const [scene, setScene] = useState('')
   const [characters, setCharacters] = useState<CharInfo[]>([])
   const [factions, setFactions] = useState<FactionInfo[]>([])
+  const [objectives, setObjectives] = useState<ObjectivesGameData>({ main: [], side: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [choosing, setChoosing] = useState(false)
@@ -456,6 +457,8 @@ export default function Game() {
     }
     const factionsData = st.factions as FactionInfo[] | undefined
     if (factionsData) setFactions(factionsData)
+    const objData = st.objectives as ObjectivesGameData | undefined
+    if (objData) setObjectives(objData)
   }, [])
 
   const loadGame = useCallback(async () => {
@@ -1129,6 +1132,7 @@ export default function Game() {
       }))))
       const factionsData = data.state.factions as FactionInfo[] | undefined
       if (factionsData) setFactions(factionsData)
+      if (data.state.objectives) setObjectives(data.state.objectives)
       void getHistory().then((hist) => {
         if (!hist.error) setTimelineCache(hist.turns)
       })
@@ -1326,7 +1330,8 @@ export default function Game() {
           {/* Main content */}
           <div className="flex-1 min-w-0 flex flex-col">
             {/* Top status bar */}
-            <div className={cn('flex items-center justify-between gap-3 flex-wrap shrink-0', readingMode && 'game-chrome-hidden')}>
+            <div className={cn('shrink-0', readingMode && 'game-chrome-hidden')}>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2 text-sm">
                 <Badge variant="primary">📖 第 {isViewingPast && viewingTurn ? viewingTurn : turn} 轮</Badge>
                 {isViewingPast && (
@@ -1408,6 +1413,36 @@ export default function Game() {
                   </Button>
                 )}
               </div>
+              </div>
+
+              {!isViewingPast && !readingMode && turn > 0 && (objectives.main.length > 0 || objectives.side.length > 0) && (
+                <div className="flex flex-col gap-1.5 px-1 py-2 border-b border-game-border/30">
+                  <span className="text-[11px] text-game-dim uppercase tracking-wide">🎯 {t('game.objectives', lang)}</span>
+                  {objectives.main.map((obj) => (
+                    <div key={obj.id} className="flex flex-col gap-0.5 min-w-0">
+                      <div className="flex justify-between gap-2 text-xs">
+                        <span className="text-game-text truncate font-medium">主线 · {obj.title}</span>
+                        <span className="text-game-muted shrink-0">{obj.progress}%</span>
+                      </div>
+                      <div className="h-1 rounded-full bg-game-border/40 overflow-hidden">
+                        <div
+                          className="h-full bg-game-accent/80"
+                          style={{ width: `${Math.min(100, Math.max(0, obj.progress))}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {objectives.side.map((obj) => (
+                    <div key={obj.id} className="flex justify-between gap-2 text-xs text-game-muted min-w-0">
+                      <span className="truncate">支线 · {obj.title}</span>
+                      <span className="shrink-0">{obj.progress}%</span>
+                    </div>
+                  ))}
+                  {(objectives.side_extra ?? 0) > 0 && (
+                    <span className="text-[11px] text-game-dim">+{objectives.side_extra} 条活跃支线</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Story — scrollable */}

@@ -496,6 +496,9 @@ async def create_new_story(
         "force_event_pending": False,
         "chapter": 1,
     }
+    from engine.objective_system import default_objectives
+
+    initial_state["objectives"] = default_objectives(main_goal_text)
     from engine.state_store import commit_bundle
 
     initial_graph = {

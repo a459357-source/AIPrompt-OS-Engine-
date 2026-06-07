@@ -128,6 +128,11 @@ export interface GameState {
   history: unknown[]
   force_event_pending: boolean
   chapter: number
+  objectives?: {
+    main: { id: string; title: string; progress: number; status: string }[]
+    side: { id: string; title: string; progress: number; status: string }[]
+    side_extra?: number
+  }
 }
 
 export interface StateCharacter {

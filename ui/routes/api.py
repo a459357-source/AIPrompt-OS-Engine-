@@ -52,6 +52,20 @@ def _merge_characters_with_memory(raw_chars: dict, mem_chars: dict, faction_map:
     return result
 
 
+def _objectives_for_game(state: dict, *, persist_migrate: bool = False) -> dict:
+    from engine.objective_system import ensure_objectives, visible_for_game
+
+    try:
+        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+    except Exception:
+        world_pack = {}
+    needs_migrate = not state.get("objectives") or not isinstance(state.get("objectives"), dict)
+    ensure_objectives(state, world_pack)
+    if persist_migrate and needs_migrate:
+        io_utils.write_yaml(config.SESSION_STATE_PATH, state)
+    return visible_for_game(state)
+
+
 def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
     """Build JSON payload for GET /api/game-state and idempotent POST /api/start."""
     if not_started or not state.get("history"):
@@ -72,6 +86,7 @@ def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
                 "factions": [],
                 "force_event_pending": state.get("force_event_pending", False),
                 "chapter": state.get("chapter", 1),
+                "objectives": _objectives_for_game(state, persist_migrate=True),
             },
         }
         if not_started:
@@ -115,6 +130,7 @@ def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
             "factions": factions_data,
             "force_event_pending": state.get("force_event_pending", False),
             "chapter": state.get("chapter", 1),
+            "objectives": _objectives_for_game(state, persist_migrate=True),
         },
     }
     if not config.ADULT_MODE:
@@ -409,11 +425,14 @@ async def api_dashboard():
     analytics = compute_all()
 
     from engine.dashboard import _build_mermaid
-    from engine.plot_director import dashboard_payload, ensure_plot_state
+    from engine.plot_director import dashboard_payload as plot_dashboard_payload, ensure_plot_state
+    from engine.objective_system import dashboard_payload as objectives_dashboard_payload, ensure_objectives
 
     mermaid_src = _build_mermaid(nodes, edges, mem_chars)
     plot_state = ensure_plot_state(world_pack)
-    plot_director = dashboard_payload(plot_state, state, world_pack)
+    plot_director = plot_dashboard_payload(plot_state, state, world_pack)
+    ensure_objectives(state, world_pack, plot_state)
+    objectives = objectives_dashboard_payload(state)
 
     return JSONResponse({
         "turn": turn,
@@ -436,6 +455,7 @@ async def api_dashboard():
             "current_node": graph.get("current_node"),
         },
         "plot_director": plot_director,
+        "objectives": objectives,
     })
 
 

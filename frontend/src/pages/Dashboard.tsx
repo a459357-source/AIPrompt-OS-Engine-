@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import mermaid from 'mermaid'
 import { motion } from 'framer-motion'
-import { Activity, BarChart3, GitBranch, Network, Clock, Clapperboard } from 'lucide-react'
+import { Activity, BarChart3, GitBranch, Network, Clock, Clapperboard, Target } from 'lucide-react'
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement, PointElement,
@@ -24,7 +24,7 @@ import { useAppSettings } from '@/hooks/useAppSettings'
 import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
 import { t, tTheme } from '@/lib/i18n'
 
-type DashSection = 'overview' | 'timeline' | 'network' | 'branch' | 'factions' | 'director'
+type DashSection = 'overview' | 'timeline' | 'network' | 'branch' | 'factions' | 'director' | 'objectives'
 
 const CHART_COLORS = [
   '#00f0ff', '#7b5cff', '#ff2d95', '#ffb870',
@@ -111,6 +111,7 @@ export default function Dashboard() {
     activeSection === 'branch' ? GitBranch :
     activeSection === 'factions' ? BarChart3 :
     activeSection === 'director' ? Clapperboard :
+    activeSection === 'objectives' ? Target :
     Activity
 
   const navItems = useMemo(() => [
@@ -120,6 +121,7 @@ export default function Dashboard() {
     { id: 'branch', label: t('dashboard.branch', lang), icon: <GitBranch className="w-4 h-4" /> },
     { id: 'factions', label: t('dashboard.factions', lang), icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'director', label: t('dashboard.director', lang), icon: <Clapperboard className="w-4 h-4" /> },
+    { id: 'objectives', label: t('dashboard.objectives', lang), icon: <Target className="w-4 h-4" /> },
   ], [lang])
 
   const graphInput = useMemo(() => {
@@ -203,6 +205,12 @@ export default function Dashboard() {
         {activeSection === 'director' && data.plot_director && (
           <p className="text-xs text-game-muted mt-3">
             {data.plot_director.main_plot.progress}% · {data.plot_director.unresolved_hooks.length} 伏笔
+          </p>
+        )}
+        {activeSection === 'objectives' && data.objectives && (
+          <p className="text-xs text-game-muted mt-3">
+            {data.objectives.main.length + data.objectives.side.length} 活跃 ·{' '}
+            {data.objectives.completed.length} 已完成
           </p>
         )}
       </InspectorPanel>
@@ -723,6 +731,64 @@ export default function Dashboard() {
             </>
           ) : (
             <Card><CardContent className="py-8 text-center text-game-dim text-sm">暂无剧情导演数据，开局后会自动初始化</CardContent></Card>
+          )}
+        </>
+      )}
+
+      {activeSection === 'objectives' && (
+        <>
+          {data.objectives ? (
+            <>
+              {([
+                { key: 'main', title: t('dashboard.objectives.main', lang), items: data.objectives.main },
+                { key: 'side', title: t('dashboard.objectives.side', lang), items: data.objectives.side },
+                { key: 'completed', title: t('dashboard.objectives.completed', lang), items: data.objectives.completed },
+                { key: 'failed', title: t('dashboard.objectives.failed', lang), items: data.objectives.failed },
+                { key: 'hidden', title: t('dashboard.objectives.hidden', lang), items: data.objectives.hidden },
+              ] as const).map(({ key, title, items }) => (
+                <Card key={key}>
+                  <CardHeader>
+                    <CardTitle className="text-sm">{title}</CardTitle>
+                    <CardDescription>{items.length} 项</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {items.length > 0 ? (
+                      <div className="space-y-2">
+                        {items.map((obj) => (
+                          <div
+                            key={obj.id || obj.title}
+                            className="border border-game-border/40 rounded-lg p-3 space-y-2"
+                          >
+                            <div className="flex justify-between gap-2 text-sm">
+                              <span className="font-medium">{obj.title}</span>
+                              <Badge variant="outline" size="sm">{obj.status}</Badge>
+                            </div>
+                            <div className="flex justify-between text-xs text-game-muted">
+                              <span className="font-mono text-game-dim">{obj.id}</span>
+                              <span>{obj.progress}%</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-game-border/40 overflow-hidden">
+                              <div
+                                className="h-full bg-neural-cyan/70 transition-all"
+                                style={{ width: `${Math.min(100, Math.max(0, obj.progress))}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-game-dim text-center py-4">{t('dashboard.objectives.empty', lang)}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-game-dim text-sm">
+                暂无任务数据，开局后会自动初始化
+              </CardContent>
+            </Card>
           )}
         </>
       )}

@@ -229,3 +229,52 @@ def test_prompt_includes_director_advice_placeholder():
         assert "{{DIRECTOR_ADVICE}}" not in user
         assert "剧情导演建议" in user
         assert "测试" in user
+
+
+def test_prompt_includes_objectives_context():
+    session = {
+        "turn": 5,
+        "scene": "场景",
+        "status": "BUILD",
+        "chapter": 1,
+        "characters": {},
+        "history": [{"turn": 4, "options": ["a", "b", "c", "d"]}],
+        "objectives": {
+            "main": [{"id": "main_001", "title": "调查灭门案", "progress": 40, "status": "active"}],
+            "side": [{"id": "side_001", "title": "参加诗会", "progress": 10, "status": "active"}],
+        },
+    }
+    world = {"world": {"title": "T", "main_goal": "调查灭门案", "characters": []}}
+
+    with patch("engine.builder.io_utils.read_yaml") as ry, \
+         patch("engine.builder.load_memory", return_value={}), \
+         patch("engine.builder.ensure_plot_state", return_value={}), \
+         patch("engine.builder.build_director_advice", return_value=""), \
+         patch("engine.builder.build_hot_context", return_value="HOT"), \
+         patch("engine.builder.build_long_term_memory", return_value=""), \
+         patch("engine.builder.build_recent_summaries", return_value=""), \
+         patch("engine.builder.load_world_summary_text", return_value="世界"), \
+         patch("engine.memory_layers.load_chapter_summaries", return_value=[]):
+        template = {
+            "system": "sys {{FORCE_EVENT_NOTICE}} {{STORY_LENGTH}} {{STORY_LENGTH_MIN}} {{STORY_LENGTH_MAX}} {{AI_BEHAVIOR_RULES}} {{OPTION_COUNT}} {{CUSTOM_RULES}} {{MAIN_GOAL}}",
+            "user": "{{WORLD}}\n{{HOT_CONTEXT}}\n{{OBJECTIVES_CONTEXT}}\n{{DIRECTOR_ADVICE}}\n{{LAST_CHOICE}}",
+        }
+
+        def _yaml(path, use_cache=True):
+            p = str(path).replace("\\", "/")
+            if "session_state" in p:
+                return session
+            if "world_pack" in p:
+                return world
+            if p.endswith("engine.yaml"):
+                return {"rules": []}
+            if "prompt_template" in p:
+                return template
+            return template
+        ry.side_effect = _yaml
+
+        _, user = build_prompt(current_choice="A")
+        assert "{{OBJECTIVES_CONTEXT}}" not in user
+        assert "当前目标" in user
+        assert "调查灭门案" in user
+        assert "参加诗会" in user

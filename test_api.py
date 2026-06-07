@@ -97,6 +97,8 @@ def test_game_state_readonly():
     # No history → should return not_started=True
     assert data.get("not_started") is True
     assert data["state"]["turn"] == 0
+    assert "objectives" in data["state"]
+    assert len(data["state"]["objectives"]["main"]) >= 1
     print("✅ game-state 只读: PASS")
 
 
@@ -127,6 +129,8 @@ def test_dashboard_endpoint():
     assert "analytics" in data  # should include analytics now
     assert "plot_director" in data
     assert "main_plot" in data["plot_director"]
+    assert "objectives" in data
+    assert "main" in data["objectives"]
     print("✅ 仪表盘端点: PASS")
 
 
