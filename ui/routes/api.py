@@ -481,7 +481,7 @@ async def api_get_settings():
 async def api_save_settings(
     api_key: str = Form(""),
     model: str = Form("deepseek-chat"),
-    story_length: int = Form(1500),
+    story_length: int | None = Form(default=None),
     max_tokens: int = Form(2048),
     temperature: float = Form(0.8),
     top_p: float = Form(0.9),
@@ -518,4 +518,35 @@ async def api_clear_settings_key():
     reload_api_key()
     from ui.routes.settings import settings_payload
     return JSONResponse(settings_payload())
+
+
+@router.get("/story-length")
+async def api_get_story_length():
+    """Current target length for generated story text (chars per turn)."""
+    return JSONResponse({"story_length": config.STORY_LENGTH})
+
+
+@router.post("/story-length")
+async def api_set_story_length(story_length: int = Form(...)):
+    """Update story length; applies from the next AI generation."""
+    from config import (
+        save_story_length,
+        reload_story_length,
+        save_max_tokens,
+        reload_max_tokens,
+        MAX_TOKENS,
+    )
+    length = max(300, min(3000, story_length))
+    save_story_length(length)
+    reload_story_length()
+    # JSON 回复含 state/options，需留出比正文字数更大的 token 预算
+    needed_tokens = min(16384, max(512, int(length * 1.8)))
+    if MAX_TOKENS < needed_tokens:
+        save_max_tokens(needed_tokens)
+        reload_max_tokens()
+    return JSONResponse({
+        "ok": True,
+        "story_length": config.STORY_LENGTH,
+        "max_tokens": config.MAX_TOKENS,
+    })
 

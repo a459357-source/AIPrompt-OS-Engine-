@@ -107,7 +107,6 @@ export default function Settings() {
   const [apiKey, setApiKey] = useState('')
   const [apiKeyMasked, setApiKeyMasked] = useState('')
   const [model, setModel] = useState('deepseek-chat')
-  const [storyLength, setStoryLength] = useState(1000)
   const [maxTokens, setMaxTokens] = useState(2048)
   const [temperature, setTemperature] = useState(0.8)
   const [topP, setTopP] = useState(0.9)
@@ -151,7 +150,6 @@ export default function Settings() {
       .then((data) => {
         if (data.api_key_masked) setApiKeyMasked(data.api_key_masked)
         setModel(data.model)
-        setStoryLength(data.story_length)
         setMaxTokens(data.max_tokens)
         setTemperature(data.temperature)
         setTopP(data.top_p)
@@ -173,7 +171,6 @@ export default function Settings() {
       const data = await saveEngineSettings({
         apiKey: apiKey || undefined,
         model,
-        storyLength,
         maxTokens,
         temperature,
         topP,
@@ -191,7 +188,7 @@ export default function Settings() {
       logger.error('Settings', 'Save API failed', { error: String(e) })
     }
     setApiSaving(false)
-  }, [apiKey, model, storyLength, maxTokens, temperature, topP, stream, maxContextMsgs, autoCompress, compressThreshold])
+  }, [apiKey, model, maxTokens, temperature, topP, stream, maxContextMsgs, autoCompress, compressThreshold])
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -456,21 +453,6 @@ export default function Settings() {
                       <SelectItem value="deepseek-reasoner">V4-Pro（深度思考）</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>每轮字数</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min={300}
-                      max={3000}
-                      step={100}
-                      value={storyLength}
-                      onChange={(e) => setStoryLength(parseInt(e.target.value) || 1000)}
-                      className="w-32"
-                    />
-                    <span className="text-xs text-game-dim">300–3000</span>
-                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label>AI 最大 Token</Label>

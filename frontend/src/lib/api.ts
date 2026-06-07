@@ -255,7 +255,7 @@ export async function getEngineSettings(): Promise<EngineSettings> {
 export async function saveEngineSettings(params: {
   apiKey?: string
   model: string
-  storyLength: number
+  storyLength?: number
   maxTokens: number
   temperature: number
   topP: number
@@ -267,7 +267,7 @@ export async function saveEngineSettings(params: {
   const fd = new FormData()
   if (params.apiKey) fd.append('api_key', params.apiKey)
   fd.append('model', params.model)
-  fd.append('story_length', String(params.storyLength))
+  if (params.storyLength != null) fd.append('story_length', String(params.storyLength))
   fd.append('max_tokens', String(params.maxTokens))
   fd.append('temperature', String(params.temperature))
   fd.append('top_p', String(params.topP))
@@ -281,4 +281,20 @@ export async function saveEngineSettings(params: {
     throw new Error(data.error || `HTTP ${res.status}`)
   }
   return res.json()
+}
+
+export async function getStoryLength(): Promise<number> {
+  const res = await fetch('/api/story-length')
+  if (!res.ok) return 1000
+  const data = await res.json() as { story_length: number }
+  return data.story_length ?? 1000
+}
+
+export async function updateStoryLength(length: number): Promise<number> {
+  const fd = new FormData()
+  fd.append('story_length', String(length))
+  const res = await fetch('/api/story-length', { method: 'POST', body: fd })
+  const data = await res.json().catch(() => ({})) as { story_length?: number; error?: string }
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+  return data.story_length ?? length
 }

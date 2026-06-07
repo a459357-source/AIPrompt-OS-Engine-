@@ -3,9 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { StatusToast } from '@/components/StatusToast'
-import { getGameState, startGame, nextTurn, getHistory, type HistoryTurn } from '@/lib/api'
+import { getGameState, startGame, nextTurn, getHistory, getStoryLength, updateStoryLength, type HistoryTurn } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { parseRelationHints } from '@/lib/relationHints'
 
@@ -104,7 +106,10 @@ export default function Game() {
   const [showConsequences, setShowConsequences] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState<HistoryTurn[]>([])
+  const [storyLength, setStoryLength] = useState(1000)
+  const [storyLengthSaved, setStoryLengthSaved] = useState(false)
   const storyScrollRef = useRef<HTMLDivElement>(null)
+  const storyLengthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const applyTurnData = useCallback((data: {
     story: string
@@ -169,6 +174,34 @@ export default function Game() {
   }, [applyTurnData])
 
   useEffect(() => { loadGame() }, [loadGame])
+
+  useEffect(() => {
+    getStoryLength()
+      .then(setStoryLength)
+      .catch((e) => logger.warn('Game', 'Load story length failed', { error: String(e) }))
+  }, [])
+
+  const queueStoryLengthSave = useCallback((value: number) => {
+    const clamped = Math.max(300, Math.min(3000, value))
+    setStoryLength(clamped)
+    if (storyLengthTimerRef.current) clearTimeout(storyLengthTimerRef.current)
+    storyLengthTimerRef.current = setTimeout(async () => {
+      try {
+        const saved = await updateStoryLength(clamped)
+        setStoryLength(saved)
+        setStoryLengthSaved(true)
+        setTimeout(() => setStoryLengthSaved(false), 1500)
+      } catch (e) {
+        logger.error('Game', 'Save story length failed', { error: String(e) })
+      }
+    }, 600)
+  }, [])
+
+  useEffect(() => () => {
+    if (storyLengthTimerRef.current) clearTimeout(storyLengthTimerRef.current)
+  }, [])
+
+  const currentStoryChars = story.replace(/\s/g, '').length
 
   // 新正文生成后滚回顶部，方便从开头阅读
   useEffect(() => {
@@ -373,6 +406,36 @@ export default function Game() {
 
             {/* Story — scrollable */}
             <div ref={storyScrollRef} className="flex-1 overflow-y-auto min-h-0 space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-3 px-1">
+              <p className="text-sm font-medium text-game-muted">📖 正文</p>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="story-length" className="text-xs text-game-dim whitespace-nowrap">目标字数</Label>
+                  <Input
+                    id="story-length"
+                    type="number"
+                    min={300}
+                    max={3000}
+                    step={100}
+                    value={storyLength}
+                    disabled={choosing}
+                    onChange={(e) => queueStoryLengthSave(parseInt(e.target.value, 10) || 1000)}
+                    className="w-24 h-8 text-sm"
+                  />
+                </div>
+                <Badge
+                  variant={currentStoryChars >= storyLength * 0.85 ? 'default' : 'outline'}
+                  size="sm"
+                  className="tabular-nums"
+                >
+                  当前 {currentStoryChars} 字
+                </Badge>
+                {storyLengthSaved && (
+                  <span className="text-xs text-game-success">已保存</span>
+                )}
+                <span className="text-xs text-game-dim hidden md:inline">下一轮生成生效</span>
+              </div>
+            </div>
             <Card>
               <CardContent className="pt-6 md:px-8">
                 <motion.div key={turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
