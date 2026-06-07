@@ -79,6 +79,10 @@ export default function NewStory() {
   const [aiStatusType, setAiStatusType] = useState<'info' | 'success' | 'error' | 'loading'>('info')
   const [generating, setGenerating] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({})
+  const [characterRelations, setCharacterRelations] = useState<Record<string, {
+    relationshipType: string; affection: number; trust: number; respect: number;
+    dependence: number; hostility: number; attraction: number; tags: string[];
+  }>>({})
   const kwRef = useRef<HTMLTextAreaElement>(null)
 
   const form = useForm<FormValues>({
@@ -106,10 +110,6 @@ export default function NewStory() {
       artifacts: [] as { name: string; type: 'personal'|'faction'|'world'; description: string; ownerType: 'character'|'faction'|'location'|'none'; ownerId: string; importance: number; abilities: string[]; tags: string[] }[],
       factions: [] as { name: string; type: string; description: string; goals: string[]; resources: string[]; controlledTerritories: string[]; subordinateOrganizations: string[]; keyAssets: string[]; power: { military: number; economic: number; political: number; technology: number }; influence: number; relation_to_player: string; leader: string }[],
       customStats: [] as { key: string; label: string; max: number }[],
-      characterRelations: {} as Record<string, {
-        relationshipType: string; affection: number; trust: number; respect: number;
-        dependence: number; hostility: number; attraction: number; tags: string[];
-      }>,
     },
   })
 
@@ -272,7 +272,7 @@ export default function NewStory() {
     fd.append('main_goal', data.main_goal)
     fd.append('chars_json', JSON.stringify(data.characters))
     fd.append('rel_system', JSON.stringify({ stages: data.rel_stages, affection: data.rel_affection }))
-    fd.append('custom_rules', JSON.stringify({ stats: data.customStats || [], stages: data.rel_stages, characterRelations: data.characterRelations || {} }))
+    fd.append('custom_rules', JSON.stringify({ stats: data.customStats || [], stages: data.rel_stages, characterRelations: characterRelations }))
     fd.append('artifacts_json', JSON.stringify(data.artifacts || []))
     fd.append('factions_json', JSON.stringify(data.factions || []))
     showStatus('正在创建故事…', 'loading')
@@ -601,7 +601,6 @@ export default function NewStory() {
                   const allChars = watch('characters') || []
                   const mainChar = allChars.find((c: { isMain?: boolean }) => c.isMain) || allChars[0]
                   const npcs = allChars.filter((c: { isMain?: boolean }) => !c.isMain && c.name)
-                  const rels = getValues('characterRelations') || {}
                   const DIMS = [
                     ['❤️好感', 'affection'], ['🤝信任', 'trust'], ['🙏尊重', 'respect'],
                     ['🔗依赖', 'dependence'], ['⚔️敌意', 'hostility'], ['💫吸引', 'attraction'],
@@ -614,11 +613,12 @@ export default function NewStory() {
                   return (
                     <div className="space-y-3">
                       {npcs.map((c: { name: string }) => {
-                        const r = rels[c.name] || { relationshipType:'friend', affection:50, trust:50, respect:50, dependence:50, hostility:30, attraction:50, tags:[] as string[] }
-                        const update = (k: string, v: unknown) => {
-                          const current = getValues('characterRelations') || {}
-                          current[c.name] = { ...(current[c.name] || r), [k]: v }
-                          setValue('characterRelations', {...current})
+                        const r = characterRelations[c.name] || { relationshipType:'friend', affection:50, trust:50, respect:50, dependence:50, hostility:30, attraction:50, tags:[] as string[] }
+                        const updateRel = (k: string, v: unknown) => {
+                          setCharacterRelations(prev => ({
+                            ...prev,
+                            [c.name]: { ...(prev[c.name] || r), [k]: v }
+                          }))
                         }
                         return (
                           <div key={c.name} className="bg-game-surface border border-game-border rounded-md p-3 space-y-2">
@@ -630,7 +630,7 @@ export default function NewStory() {
                               </div>
                               <select
                                 value={r.relationshipType}
-                                onChange={(e) => update('relationshipType', e.target.value)}
+                                onChange={(e) => updateRel('relationshipType', e.target.value)}
                                 className="bg-game-bg border border-game-border rounded-md px-2 py-0.5 text-[10px] text-game-text"
                               >
                                 {REL_TYPES.map(t => <option key={t} value={t}>{REL_LABELS[t]}</option>)}
@@ -646,7 +646,7 @@ export default function NewStory() {
                                     <input
                                       type="number"
                                       min={0} max={100} value={val}
-                                      onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) update(key, Math.max(0, Math.min(100, v))) }}
+                                      onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) updateRel(key, Math.max(0, Math.min(100, v))) }}
                                       onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
                                       className="w-12 text-center text-[11px] h-6 bg-game-bg border border-game-border rounded text-game-text"
                                       style={{minWidth: '36px'}}
@@ -663,7 +663,7 @@ export default function NewStory() {
                               <input
                                 type="text"
                                 defaultValue={(r.tags || []).join('、')}
-                                onBlur={(e) => update('tags', e.target.value.split(/[、,，]/).map(s => s.trim()).filter(Boolean))}
+                                onBlur={(e) => updateRel('tags', e.target.value.split(/[、,，]/).map(s => s.trim()).filter(Boolean))}
                                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur() } }}
                                 placeholder="青梅竹马、救命恩人…"
                                 className="flex-1 text-[11px] h-6 bg-game-bg border border-game-border rounded px-2 text-game-text"
