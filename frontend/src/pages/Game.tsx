@@ -127,12 +127,14 @@ export default function Game() {
   const [storyLengthMin, setStoryLengthMin] = useState(300)
   const [storyLengthMax, setStoryLengthMax] = useState(213333)
   const [storyLengthRecommended, setStoryLengthRecommended] = useState(1000)
+  const [storyLengthDraft, setStoryLengthDraft] = useState('1000')
   const [maxTokens, setMaxTokens] = useState(1800)
   const [maxOutputTokens, setMaxOutputTokens] = useState(384000)
   const [contextTokens, setContextTokens] = useState(1000000)
   const [temperature, setTemperature] = useState(0.8)
   const [topP, setTopP] = useState(0.9)
   const [compressThreshold, setCompressThreshold] = useState(4000)
+  const [compressThresholdDraft, setCompressThresholdDraft] = useState('4000')
   const [genSettingsOpen, setGenSettingsOpen] = useState(true)
   const [genSettingsSaved, setGenSettingsSaved] = useState(false)
   const storyScrollRef = useRef<HTMLDivElement>(null)
@@ -210,6 +212,7 @@ export default function Game() {
 
   const applyGenSettings = useCallback((data: GameGenSettings) => {
     setStoryLength(data.story_length)
+    setStoryLengthDraft(String(data.story_length))
     setStoryLengthMin(data.min)
     setStoryLengthMax(data.max)
     setStoryLengthRecommended(data.recommended)
@@ -219,6 +222,7 @@ export default function Game() {
     setTemperature(data.temperature)
     setTopP(data.top_p)
     setCompressThreshold(data.compress_threshold)
+    setCompressThresholdDraft(String(data.compress_threshold))
   }, [])
 
   useEffect(() => {
@@ -261,6 +265,35 @@ export default function Game() {
       }
     }, 600)
   }, [storyLengthMin, storyLengthMax, contextTokens, applyGenSettings])
+
+  const commitStoryLengthDraft = useCallback(() => {
+    const parsed = parseInt(storyLengthDraft, 10)
+    if (!Number.isFinite(parsed)) {
+      setStoryLengthDraft(String(storyLength))
+      return
+    }
+    const clamped = Math.max(storyLengthMin, Math.min(storyLengthMax, parsed))
+    setStoryLengthDraft(String(clamped))
+    if (clamped !== storyLength) queueGenSettingsSave({ storyLength: clamped })
+  }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, queueGenSettingsSave])
+
+  const commitCompressThresholdDraft = useCallback(() => {
+    const parsed = parseInt(compressThresholdDraft, 10)
+    if (!Number.isFinite(parsed)) {
+      setCompressThresholdDraft(String(compressThreshold))
+      return
+    }
+    const clamped = Math.max(500, Math.min(contextTokens, parsed))
+    setCompressThresholdDraft(String(clamped))
+    if (clamped !== compressThreshold) queueGenSettingsSave({ compressThreshold: clamped })
+  }, [compressThresholdDraft, compressThreshold, contextTokens, queueGenSettingsSave])
+
+  const handleNumericFieldKeyDown = useCallback((e: React.KeyboardEvent, commit: () => void) => {
+    if (e.key === 'Enter') {
+      commit()
+      ;(e.target as HTMLInputElement).blur()
+    }
+  }, [])
 
   useEffect(() => () => {
     if (genSettingsTimerRef.current) clearTimeout(genSettingsTimerRef.current)
@@ -490,19 +523,23 @@ export default function Game() {
                     hint="每轮正文目标长度，修改后下一轮生成生效"
                   >
                     <Input
-                      type="number"
-                      min={storyLengthMin}
-                      max={storyLengthMax}
-                      step={100}
-                      value={storyLength}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={storyLengthDraft}
                       disabled={choosing}
-                      onChange={(e) => queueGenSettingsSave({ storyLength: parseInt(e.target.value, 10) || storyLengthRecommended })}
-                      className="w-24 h-8 text-sm"
+                      onChange={(e) => setStoryLengthDraft(e.target.value.replace(/\D/g, ''))}
+                      onBlur={commitStoryLengthDraft}
+                      onKeyDown={(e) => handleNumericFieldKeyDown(e, commitStoryLengthDraft)}
+                      className="w-24 h-8 text-sm tabular-nums"
                     />
                     <button
                       type="button"
                       disabled={choosing}
-                      onClick={() => queueGenSettingsSave({ storyLength: storyLengthRecommended })}
+                      onClick={() => {
+                        setStoryLengthDraft(String(storyLengthRecommended))
+                        queueGenSettingsSave({ storyLength: storyLengthRecommended })
+                      }}
                       className="text-xs text-game-accent hover:underline disabled:opacity-50"
                     >
                       建议 {storyLengthRecommended.toLocaleString()}
@@ -556,14 +593,15 @@ export default function Game() {
                     hint={`对话 token 超过此值时触发压缩；范围 500–${contextTokens.toLocaleString()}`}
                   >
                     <Input
-                      type="number"
-                      min={500}
-                      max={contextTokens}
-                      step={500}
-                      value={compressThreshold}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={compressThresholdDraft}
                       disabled={choosing}
-                      onChange={(e) => queueGenSettingsSave({ compressThreshold: parseInt(e.target.value, 10) || 4000 })}
-                      className="w-28 h-8 text-sm"
+                      onChange={(e) => setCompressThresholdDraft(e.target.value.replace(/\D/g, ''))}
+                      onBlur={commitCompressThresholdDraft}
+                      onKeyDown={(e) => handleNumericFieldKeyDown(e, commitCompressThresholdDraft)}
+                      className="w-28 h-8 text-sm tabular-nums"
                     />
                   </QuickGenRow>
                 </CardContent>
