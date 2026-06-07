@@ -521,7 +521,7 @@ export default function NewStory() {
       ))
     }
     setNodePositions({})
-    showStatus('✅ 已加载示例连线（核心→势力→角色→物品）', 'success')
+    showStatus('✅ 已加载示例图（含多势力明/暗隶属与全部连线类型）', 'success')
   }, [getValues, setValue])
 
   const relayoutGraph = useCallback(() => {

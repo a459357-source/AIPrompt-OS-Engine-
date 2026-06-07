@@ -17,6 +17,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import { buildWorldGraph, extractNodePositions, handleNewConnection, type WorldGraphInput } from '@/lib/worldGraphAdapter'
 import { worldNodeTypes, worldEdgeTypes } from './nodes'
+import { WorldGraphLegend } from './WorldGraphLegend'
 
 interface WorldGraphCanvasProps {
   input: WorldGraphInput
@@ -155,11 +156,14 @@ function WorldGraphCanvasInner({
                 onClick={onApplyDemo}
                 className="glass-panel px-3 py-1.5 text-xs text-neural-cyan border border-neural-cyan/30 hover:bg-neural-cyan/10 transition-colors rounded-md"
               >
-                🔗 加载示例连线
+                📐 加载示例图
               </button>
             )}
           </Panel>
         )}
+        <Panel position="bottom-right" className="m-12 md:m-4 pointer-events-auto">
+          <WorldGraphLegend defaultCollapsed={readOnly} />
+        </Panel>
         {readOnly && (
           <Panel position="top-right" className="glass-panel px-2 py-1 text-[10px] font-neural-mono text-neural-cyan/60">
             READ ONLY
