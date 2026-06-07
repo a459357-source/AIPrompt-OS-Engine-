@@ -58,6 +58,7 @@ from engine.events import (
 from engine.world_driver import passive_faction_drift
 from engine.save_manager import autosave as do_autosave
 from engine import obsidian_live
+from engine.state_store import load_runtime, commit_runtime, begin_transaction, end_transaction
 
 # ── Logging ────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -170,13 +171,14 @@ def step(choice: str | None = None) -> dict | None:
     if settings_note:
         logger.info("📌 本轮使用刚修改的快捷设置: %s", settings_note)
 
-    # Clear the IO cache so every turn starts with fresh disk state
-    io_utils.clear_cache()
+    runtime = load_runtime(clear_cache=True)
+    begin_transaction()
 
     # 1. Build prompt
     try:
         system_prompt, user_prompt = build_prompt(current_choice=choice)
     except Exception as exc:
+        end_transaction()
         _last_step_error = f"构建提示词失败: {exc}"
         logger.error("Failed to build prompt: %s", exc)
         return None
@@ -199,6 +201,7 @@ def step(choice: str | None = None) -> dict | None:
     try:
         response = call_deepseek(system_prompt, user_prompt)
     except DeepSeekError as exc:
+        end_transaction()
         _last_step_error = str(exc)
         logger.error("DeepSeek API error: %s", exc)
         return None
@@ -230,7 +233,7 @@ def step(choice: str | None = None) -> dict | None:
         except DeepSeekError as exc:
             logger.warning("字数重试失败，保留首轮结果: %s", exc)
 
-    pre_state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+    pre_state = runtime.session
     response = _maybe_retry_repetition(
         response, system_prompt, user_prompt, pre_state.get("history", []),
     )
@@ -243,8 +246,10 @@ def step(choice: str | None = None) -> dict | None:
     # 4. Apply to state (record choice with the story we just generated)
     prev_chapter = pre_state.get("chapter", 1)
     try:
-        new_state = apply_turn(response, choice)
+        new_state = apply_turn(response, choice, session=runtime.session, persist=False)
+        runtime.session = new_state
     except Exception as exc:
+        end_transaction()
         _last_step_error = f"写入游戏状态失败: {exc}"
         logger.error("Failed to apply turn: %s", exc)
         return None
@@ -252,9 +257,19 @@ def step(choice: str | None = None) -> dict | None:
     # 5-12. Non-critical post-turn steps — each wrapped so one failure
     #       doesn't crash the whole turn.  Full tracebacks go to error.log.
     _safe_call(_update_graph, "story graph update",
-               response, new_state, choice)
+               response, new_state, choice, runtime.graph)
     _safe_call(_update_memory, "character memory update",
-               response, new_state, choice)
+               response, new_state, choice, runtime.memory)
+
+    try:
+        commit_runtime(runtime)
+    except Exception as exc:
+        end_transaction()
+        _last_step_error = f"提交游戏状态失败: {exc}"
+        logger.error("Failed to commit runtime: %s", exc)
+        return None
+    end_transaction()
+
     _safe_call(_write_chapter, "chapter.md write",
                response, new_state, choice)
     _safe_call(_write_dashboard_html, "dashboard HTML write")
@@ -580,13 +595,17 @@ def _get_prev_options(state: dict) -> list[str]:
     return []
 
 
-def _update_graph(response: dict, state: dict, choice: str | None) -> None:
-    """Append the current turn as a node in the story graph."""
+def _update_graph(
+    response: dict,
+    state: dict,
+    choice: str | None,
+    graph: dict | None = None,
+) -> None:
+    """Append the current turn as a node in the story graph (in-memory; commit via state_store)."""
     try:
-        graph = load_graph()
+        graph = graph if graph is not None else load_graph()
         current_node = get_current_node(graph)
 
-        # If the player made a choice last turn, route through it
         effective_choice = choice or "auto"
 
         new_id = append_node(
@@ -599,54 +618,34 @@ def _update_graph(response: dict, state: dict, choice: str | None) -> None:
             status=state.get("status", "?"),
             options=response.get("options", []),
         )
-        save_graph(graph)
+        save_graph(graph, persist=False)
         logger.info("Graph: node %s added (parent=%s, choice=%s)", new_id, current_node, effective_choice)
     except Exception:
         logger.error("Failed to update story graph:\n%s", traceback.format_exc())
 
 
-def _update_memory(response: dict, state: dict, choice: str | None = None) -> None:
-    """Update character memory based on the new story content.
-
-    Delegates to focused helpers in memory_updater.py — each helper
-    saves memory incrementally so a mid-function exception only loses
-    the failed step's changes, not everything from the current turn.
-
-    Args:
-        response: Current turn's AI response.
-        state:    Current session state.
-        choice:   The player's choice from the PREVIOUS turn (A/B/C/D),
-                  used to apply trust deltas from the chosen option only.
-    """
+def _update_memory(
+    response: dict,
+    state: dict,
+    choice: str | None = None,
+    memory: dict | None = None,
+) -> None:
+    """Update character memory in-place; persisted by commit_runtime()."""
     try:
         from engine.memory_updater import (
             init_world_state, auto_register_npcs,
             apply_trust_deltas, update_factions,
         )
-        memory = load_memory()
+        memory = memory if memory is not None else load_memory()
         story = response.get("story", "")
         turn = state.get("turn", 0)
-
-        # Load world_pack (used by multiple helpers)
         world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
 
-        # 1. One-time world state initialization (factions, events)
-        init_world_state(memory, world_pack, turn)
-        # Reload after save
-        memory = load_memory()
-
-        # 2. Auto-register NPCs + tier assignment + migration
-        auto_register_npcs(memory, state, world_pack, turn, story)
-        memory = load_memory()
-
-        # 3. Apply trust deltas (option-based + keyword heuristic)
-        # Read prev_options from session history (thread-safe, no global)
+        init_world_state(memory, world_pack, turn, persist=False)
+        auto_register_npcs(memory, state, world_pack, turn, story, persist=False)
         prev_options = _get_prev_options(state)
-        apply_trust_deltas(memory, story, choice, turn, prev_options)
-        memory = load_memory()
-
-        # 4. Update faction dynamics (reputation + attitudes + drift)
-        update_factions(memory, story, turn)
+        apply_trust_deltas(memory, story, choice, turn, prev_options, persist=False)
+        update_factions(memory, story, turn, persist=False)
 
     except Exception:
         logger.error("Failed to update memory:\n%s", traceback.format_exc())

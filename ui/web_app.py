@@ -1,7 +1,7 @@
 """
 web_app.py — FastAPI Web UI for the Galgame Runtime
 =====================================================
-React SPA is the primary UI. Legacy HTML pages live under /legacy/* only.
+React SPA is the primary UI. Backend also exposes save/load/export utilities.
 """
 
 from pathlib import Path
@@ -42,7 +42,7 @@ _static_dir = config.OUTPUT_DIR
 _static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
-# React client routes — must win over removed legacy HTML GET handlers
+# React client routes — explicit GET handlers before SPA fallback
 REACT_CLIENT_ROUTES = ("new", "game", "npcs", "dashboard", "settings")
 
 
@@ -85,7 +85,7 @@ if config.has_bundled_frontend():
     from fastapi import HTTPException
 
     _dist = config.FRONTEND_DIST
-    _SPA_EXCLUDE_PREFIXES = ("api/", "static/", "legacy/", "generate-")
+    _SPA_EXCLUDE_PREFIXES = ("api/", "static/", "generate-")
     _SPA_EXCLUDE_EXACT = frozenset({
         "health", "export", "save", "load", "saves", "reset", "shutdown",
         "new", "game", "npcs", "dashboard", "settings",

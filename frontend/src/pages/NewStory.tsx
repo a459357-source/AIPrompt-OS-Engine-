@@ -1168,6 +1168,24 @@ export default function NewStory() {
                                 />
                               </div>
 
+                              <div>
+                                <Label className="text-[11px]">📜 背景故事</Label>
+                                <Textarea
+                                  {...register(`characters.${idx}.background`)}
+                                  placeholder="成长经历、过往事件…"
+                                  className="text-xs min-h-[56px] resize-y"
+                                />
+                              </div>
+
+                              <div>
+                                <Label className="text-[11px]">✨ 特殊能力</Label>
+                                <Input
+                                  {...register(`characters.${idx}.special_ability`)}
+                                  placeholder="如：读心术、剑术天赋…"
+                                  className="text-xs h-8"
+                                />
+                              </div>
+
                               <Separator />
 
                               <AIButton
@@ -1196,6 +1214,42 @@ export default function NewStory() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                <div className="space-y-2 rounded-md border border-game-border/60 bg-game-bg/30 p-3">
+                  <Label className="text-xs text-game-muted">关系阶段（全局）</Label>
+                  <TagInput
+                    value={relStages || []}
+                    onChange={(tags) => setValue('rel_stages', tags, { shouldValidate: true })}
+                    presets={DEFAULT_STAGES}
+                    placeholder="如：初识、试探、信任…"
+                    color="primary"
+                  />
+                  {errors.rel_stages && (
+                    <p className="text-[11px] text-game-danger">{errors.rel_stages.message}</p>
+                  )}
+                  <div className="flex items-center gap-3 pt-1">
+                    <Label className="text-xs text-game-muted shrink-0">初始好感度</Label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={watch('rel_affection') ?? 0}
+                      onChange={(e) => setValue('rel_affection', parseInt(e.target.value, 10))}
+                      className="flex-1 accent-game-primary"
+                    />
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={watch('rel_affection') ?? 0}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10)
+                        if (!isNaN(v)) setValue('rel_affection', Math.max(0, Math.min(100, v)))
+                      }}
+                      className="w-16 h-7 text-xs text-center tabular-nums"
+                    />
+                  </div>
+                </div>
+
                 {/* Who's involved — 每个NPC与主角的独立多维关系 */}
                 {(() => {
                   const allChars = watch('characters') || []

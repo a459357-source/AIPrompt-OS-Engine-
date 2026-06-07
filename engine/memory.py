@@ -37,9 +37,10 @@ def load_memory() -> dict:
     return io_utils.read_json(config.MEMORY_PATH)
 
 
-def save_memory(memory: dict) -> None:
-    """Persist memory to disk."""
-    io_utils.write_json(config.MEMORY_PATH, memory)
+def save_memory(memory: dict, *, persist: bool = True) -> None:
+    """Persist memory to disk (skipped when persist=False)."""
+    if persist:
+        io_utils.write_json(config.MEMORY_PATH, memory)
 
 
 def update_trust(memory: dict, character: str, delta: float, turn: int = 0,

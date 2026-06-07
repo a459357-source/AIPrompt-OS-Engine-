@@ -123,6 +123,86 @@ export async function createStory(formData: FormData): Promise<void> {
   }
 }
 
+/** Reset session to world_init snapshot (or factory defaults). */
+export async function resetGame(): Promise<void> {
+  const res = await apiFetch('/reset', { method: 'GET', redirect: 'manual' })
+  if (res.type === 'opaqueredirect' || res.status === 303 || res.status === 302) {
+    return
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(text || `重置游戏失败 (HTTP ${res.status})`)
+  }
+}
+
+// ── Save / Load / Export / Server ──
+
+export interface SaveSlotInfo {
+  slot: string
+  turn: number
+  status: string
+  scene: string
+  saved_at: string
+}
+
+export async function listSaves(): Promise<SaveSlotInfo[]> {
+  const res = await apiFetch('/saves')
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(data.error || `读取存档列表失败 (HTTP ${res.status})`)
+  }
+  return res.json() as Promise<SaveSlotInfo[]>
+}
+
+export async function saveGameSlot(slot: string): Promise<SaveSlotInfo> {
+  const res = await apiFetch(`/save?slot=${encodeURIComponent(slot)}`)
+  const data = await res.json().catch(() => ({})) as SaveSlotInfo & { error?: string }
+  if (!res.ok) throw new Error(data.error || `存档失败 (HTTP ${res.status})`)
+  return data
+}
+
+/** Load a save slot; backend redirects to /game on success. */
+export async function loadGameSlot(slot: string): Promise<void> {
+  const res = await apiFetch(`/load?slot=${encodeURIComponent(slot)}`, { redirect: 'manual' })
+  if (res.type === 'opaqueredirect' || res.status === 303 || res.status === 302) {
+    return
+  }
+  const data = await res.json().catch(() => ({})) as { error?: string }
+  if (!res.ok) throw new Error(data.error || `读档失败 (HTTP ${res.status})`)
+}
+
+export async function downloadStoryExport(): Promise<void> {
+  const res = await apiFetch('/export')
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(text || `导出失败 (HTTP ${res.status})`)
+  }
+  const blob = await res.blob()
+  const disposition = res.headers.get('Content-Disposition') || ''
+  const match = disposition.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i)
+  const filename = match ? decodeURIComponent(match[1].replace(/"/g, '')) : '星痕纪元_完整叙事.md'
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export async function checkHealth(): Promise<{ status: string; engine?: string }> {
+  const res = await apiFetch('/health')
+  if (!res.ok) throw new Error(`后端无响应 (HTTP ${res.status})`)
+  return res.json() as Promise<{ status: string; engine?: string }>
+}
+
+export async function shutdownServer(): Promise<void> {
+  const res = await apiFetch('/shutdown', { method: 'POST' })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(text || `关服失败 (HTTP ${res.status})`)
+  }
+}
+
 export async function getGameState(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; not_started?: boolean; error?: string }> {
   const res = await apiFetch('/api/game-state')
   if (!res.ok) {
@@ -192,6 +272,12 @@ export interface DashboardData {
     faction_curves?: Record<string, { labels: number[]; datasets: { name: string; data: number[] }[]; label: string }>
     summary?: { turns: number; status: string; characters: number; total_words: number; nodes: number; edges: number }
   }
+  story_graph?: {
+    nodes: Record<string, unknown>
+    edges: { from: string; to: string; choice?: string }[]
+    mermaid: string
+    current_node?: string
+  }
   error?: string
 }
 
@@ -245,6 +331,13 @@ export async function getSettingsStatus(): Promise<{ configured: boolean; error?
   } catch {
     return { configured: false, error: 'network' }
   }
+}
+
+export async function clearApiKey(): Promise<EngineSettings> {
+  const res = await apiFetch('/api/settings/clear', { method: 'POST' })
+  const data = await res.json().catch(() => ({})) as EngineSettings & { error?: string }
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+  return data
 }
 
 export async function saveApiKey(key: string): Promise<{ ok?: boolean; error?: string }> {
@@ -345,8 +438,6 @@ export interface GameGenSettings {
   }
 }
 
-export type StoryLengthSettings = GameGenSettings
-
 const GAME_GEN_FALLBACK: GameGenSettings = {
   story_length: 1000,
   min: 300,
@@ -402,10 +493,6 @@ export async function getGameGenSettings(): Promise<GameGenSettings> {
   return parseGameGenSettings(await res.json() as Partial<GameGenSettings>)
 }
 
-export async function getStoryLengthSettings(): Promise<GameGenSettings> {
-  return getGameGenSettings()
-}
-
 export async function updateGameGenSettings(patch: {
   storyLength?: number
   temperature?: number
@@ -441,10 +528,6 @@ export async function updateGameGenSettings(patch: {
     if (res.status !== 405 && res.status !== 404) break
   }
   throw new Error(lastError)
-}
-
-export async function updateStoryLength(length: number): Promise<GameGenSettings> {
-  return updateGameGenSettings({ storyLength: length })
 }
 
 export interface BackendAppSettings {

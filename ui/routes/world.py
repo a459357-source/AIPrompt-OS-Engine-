@@ -393,12 +393,8 @@ async def create_new_story(
         "force_event_pending": False,
         "chapter": 1,
     }
-    io_utils.write_yaml(config.SESSION_STATE_PATH, initial_state)
+    from engine.state_store import commit_bundle
 
-    # Reset chapter
-    config.CHAPTER_PATH.write_text("", encoding="utf-8")
-
-    # Reset story graph
     initial_graph = {
         "nodes": {
             "0": {
@@ -414,16 +410,13 @@ async def create_new_story(
         "current_node": "0",
         "edges": [],
     }
-    io_utils.write_json(config.STORY_GRAPH_PATH, initial_graph)
-
-    # Reset memory
     initial_memory = {
         "characters": mem_chars,
         "world_flags": [],
         "global_trust": 0.5,
         "relationship_system": rel_config,
     }
-    io_utils.write_json(config.MEMORY_PATH, initial_memory)
+    commit_bundle(initial_state, initial_memory, initial_graph, chapter="")
 
     # Save factory-reset snapshot so reset() can restore the user's world
     io_utils.write_json(config.WORLD_INIT_PATH, {

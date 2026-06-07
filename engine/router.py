@@ -22,9 +22,10 @@ def load_graph() -> dict:
     return io_utils.read_json(config.STORY_GRAPH_PATH)
 
 
-def save_graph(graph: dict) -> None:
-    """Persist the story graph to disk."""
-    io_utils.write_json(config.STORY_GRAPH_PATH, graph)
+def save_graph(graph: dict, *, persist: bool = True) -> None:
+    """Persist the story graph to disk (skipped when persist=False)."""
+    if persist:
+        io_utils.write_json(config.STORY_GRAPH_PATH, graph)
 
 
 def get_current_node(graph: dict) -> str:

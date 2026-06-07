@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 # ── 1. World State Initialization ──────────────────────────────────
 
-def init_world_state(memory: dict, world_pack: dict, turn: int = 0) -> None:
+def init_world_state(memory: dict, world_pack: dict, turn: int = 0, *, persist: bool = True) -> None:
     """
     One-time world state setup: register factions, attitudes, events.
     Idempotent — factions/attitudes/events are only created once.
@@ -55,19 +55,19 @@ def init_world_state(memory: dict, world_pack: dict, turn: int = 0) -> None:
     existing_factions = memory.get("factions", {})
     init_factions(memory)
     if memory.get("factions", {}) != existing_factions:
-        save_memory(memory)
+        save_memory(memory, persist=persist)
 
     # Inter-faction attitudes
     existing_attitudes = memory.get("faction_attitudes", {})
     init_faction_attitudes(memory)
     if memory.get("faction_attitudes", {}) != existing_attitudes:
-        save_memory(memory)
+        save_memory(memory, persist=persist)
 
     # Events
     init_events(memory)
     if not memory.get("world_events"):
         seed_default_events(memory, world_pack)
-        save_memory(memory)
+        save_memory(memory, persist=persist)
         logger.info("Memory updater: seeded default events (turn %d)", turn)
 
     # Check triggers
@@ -79,13 +79,13 @@ def init_world_state(memory: dict, world_pack: dict, turn: int = 0) -> None:
     existing_artifacts = memory.get("artifacts", {})
     init_artifacts(memory)
     if memory.get("artifacts", {}) != existing_artifacts:
-        save_memory(memory)
+        save_memory(memory, persist=persist)
 
 
 # ── 2. NPC Auto-Registration ───────────────────────────────────────
 
 def auto_register_npcs(memory: dict, state: dict, world_pack: dict,
-                        turn: int = 0, story: str = "") -> None:
+                        turn: int = 0, story: str = "", *, persist: bool = True) -> None:
     """
     Discover and register NPCs from session state and story text.
 
@@ -147,7 +147,7 @@ def auto_register_npcs(memory: dict, state: dict, world_pack: dict,
                         name, old_trust, new_trust,
                     )
         memory["_trust_migrated"] = True
-        save_memory(memory)
+        save_memory(memory, persist=persist)
 
     # (d) Detect new characters from story text (fallback)
     known = set(mem_chars.keys())
@@ -180,7 +180,7 @@ def auto_register_npcs(memory: dict, state: dict, world_pack: dict,
     for msg in degrade_messages:
         logger.info(msg)
 
-    save_memory(memory)
+    save_memory(memory, persist=persist)
 
 
 # ── 3. Trust Delta Application ─────────────────────────────────────
@@ -228,7 +228,7 @@ def _apply_metric_deltas(memory: dict, deltas: list[tuple[str, str, float]], tur
 
 
 def apply_trust_deltas(memory: dict, story: str, choice: str | None,
-                        turn: int, prev_options: list[str]) -> None:
+                        turn: int, prev_options: list[str], *, persist: bool = True) -> None:
     """
     Apply trust changes from two sources:
       a) Player's chosen option from the *previous* turn (explicit deltas)
@@ -266,12 +266,12 @@ def apply_trust_deltas(memory: dict, story: str, choice: str | None,
                 if not applied:
                     set_flag(memory, None, flag)
 
-    save_memory(memory)
+    save_memory(memory, persist=persist)
 
 
 # ── 4. Faction Dynamics ────────────────────────────────────────────
 
-def update_factions(memory: dict, story: str, turn: int) -> None:
+def update_factions(memory: dict, story: str, turn: int, *, persist: bool = True) -> None:
     """
     Update faction reputation, inter-faction attitudes, and passive drift
     based on the current turn's story content.
@@ -321,7 +321,7 @@ def update_factions(memory: dict, story: str, turn: int) -> None:
     # (d) Artifact transfer detection
     detect_artifact_transfers(memory, story, turn)
 
-    save_memory(memory)
+    save_memory(memory, persist=persist)
 
 
 # ── 5. Artifact Transfer Detection ─────────────────────────────────

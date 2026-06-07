@@ -26,6 +26,7 @@ export default function NPCs() {
     try {
       const data = await getNpcs()
       if (data.error) { setError(data.error); setLoading(false); return }
+      setError('')
       setCharacters(data.characters)
       setStats(data.stats)
     } catch (e) {
@@ -43,6 +44,7 @@ export default function NPCs() {
     try {
       const npc = await generateNpc()
       if (npc.error) { setError(npc.error); setGenerating(false); return }
+      setError('')
       setCharacters((prev) => [...prev, npc])
       setStats((prev) => ({
         total: prev.total + 1,

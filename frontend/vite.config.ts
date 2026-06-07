@@ -6,7 +6,7 @@ import type { IncomingMessage } from 'http'
 
 const API = 'http://localhost:8000'
 
-/** Browser refresh on SPA routes must not hit legacy HTML on :8000. */
+/** Browser refresh on SPA routes must serve index.html from Vite, not :8000. */
 function spaPageBypass(req: IncomingMessage | undefined) {
   const accept = req?.headers?.accept || ''
   if (req?.method === 'GET' && accept.includes('text/html')) {
@@ -42,7 +42,6 @@ export default defineConfig({
       '/reset': API,
       '/export': API,
       '/shutdown': API,
-      '/legacy': API,
     },
   },
 })

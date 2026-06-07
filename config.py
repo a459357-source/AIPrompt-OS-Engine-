@@ -71,7 +71,7 @@ def ensure_runtime_files() -> None:
             dest.write_bytes(src.read_bytes())
 
 # ── Frontend (React Vite dev server) ───────────────────────────────
-# :8000 = API + 遗留路由；日常 UI 请打开 FRONTEND_DEV_URL（默认 :5173）
+# :8000 = API + 工具端点；日常 UI 请打开 FRONTEND_DEV_URL（默认 :5173）
 FRONTEND_DEV_URL = os.environ.get("PROMPTOS_FRONTEND_URL", "http://127.0.0.1:5173").rstrip("/")
 
 

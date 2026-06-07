@@ -24,20 +24,28 @@ logger = logging.getLogger(__name__)
 
 # ── Public API ─────────────────────────────────────────────────────
 
-def apply_turn(ai_response: dict, choice: str | None = None) -> dict:
+def apply_turn(
+    ai_response: dict,
+    choice: str | None = None,
+    *,
+    session: dict | None = None,
+    persist: bool = True,
+) -> dict:
     """
-    Apply one turn's AI output to session_state.yaml.
+    Apply one turn's AI output to session state.
 
     Args:
         ai_response: The parsed JSON dict from DeepSeek containing
                      "story", "state", and "options".
         choice:      The player's choice for this turn (A/B/C/D), or None
                      for auto-continue mode.
+        session:     Existing session dict; reads from disk if omitted.
+        persist:     Write session_state.yaml when True (default).
 
     Returns:
-        The updated session_state dict (also persisted to disk).
+        The updated session_state dict.
     """
-    current = io_utils.read_yaml(config.SESSION_STATE_PATH)
+    current = session if session is not None else io_utils.read_yaml(config.SESSION_STATE_PATH)
 
     # Snapshot before mutation for history
     snapshot = _snapshot(current)
@@ -73,8 +81,8 @@ def apply_turn(ai_response: dict, choice: str | None = None) -> dict:
     if triggered:
         logger.warning("⚡ FORCE_EVENT flagged for next turn: %s", reason)
 
-    # Persist
-    io_utils.write_yaml(config.SESSION_STATE_PATH, new_state)
+    if persist:
+        io_utils.write_yaml(config.SESSION_STATE_PATH, new_state)
 
     return new_state
 

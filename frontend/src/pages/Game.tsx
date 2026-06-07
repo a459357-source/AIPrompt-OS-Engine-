@@ -179,6 +179,8 @@ export default function Game() {
   const [showConsequences, setShowConsequences] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState<HistoryTurn[]>([])
+  const [historyError, setHistoryError] = useState('')
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [storyLength, setStoryLength] = useState(1000)
   const [storyLengthMin, setStoryLengthMin] = useState(300)
   const [storyLengthMax, setStoryLengthMax] = useState(281851)
@@ -541,6 +543,7 @@ export default function Game() {
       const data = await nextTurn(choice)
       if (!mountedRef.current) return
       if (data.error) { setError(data.error); setChoosing(false); return }
+      setError('')
       setStory(data.story)
       setOptions(data.options || [])
       setTurn(data.state.turn)
@@ -565,7 +568,8 @@ export default function Game() {
       logger.error('Game', 'Choice failed', { error: msg })
       // Detect truncation errors and add settings link
       if (msg.includes('截断') || msg.includes('Token') || msg.includes('unparseable')) {
-        setError(`${msg}。建议前往设置调高「AI 最大 Token」。`)
+        setError(`${msg}。建议在本页展开「⚡ 快捷设置」调高输出 Token。`)
+        setGenSettingsOpen(true)
       } else {
         setError(msg)
       }
@@ -762,8 +766,20 @@ export default function Game() {
                   className="gap-1 text-game-muted hover:text-game-text"
                   onClick={async () => {
                     setHistoryOpen(true)
-                    const data = await getHistory()
-                    if (!data.error) setHistory(data.turns)
+                    setHistoryError('')
+                    setHistory([])
+                    setHistoryLoading(true)
+                    try {
+                      const data = await getHistory()
+                      if (data.error) {
+                        setHistoryError(data.error)
+                      } else {
+                        setHistory(data.turns)
+                      }
+                    } catch (e) {
+                      setHistoryError(formatFetchError(e))
+                    }
+                    setHistoryLoading(false)
                   }}
                 >
                   📜 回顾
@@ -802,6 +818,9 @@ export default function Game() {
               </button>
               {genSettingsOpen && (
                 <CardContent className="pt-0 pb-3 px-4">
+                  <p className="text-[11px] text-game-dim mb-3 rounded-md border border-game-border/50 bg-game-bg/40 px-2.5 py-1.5">
+                    模型与压缩开关在 <strong className="text-game-muted">设置 → API</strong> 中配置
+                  </p>
                   {(genSettingsSaved || genSettingsSaveError) && (
                     <div className="mb-2 text-xs">
                       {genSettingsSaved && (
@@ -1241,7 +1260,31 @@ export default function Game() {
 
             {/* Content */}
             <div className="overflow-y-auto p-5 space-y-6 flex-1">
-              {history.length === 0 ? (
+              {historyLoading ? (
+                <p className="text-game-muted text-center py-8">加载历史记录…</p>
+              ) : historyError ? (
+                <div className="text-center py-8 space-y-3">
+                  <p className="text-game-danger text-sm">{historyError}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      setHistoryError('')
+                      setHistoryLoading(true)
+                      try {
+                        const data = await getHistory()
+                        if (data.error) setHistoryError(data.error)
+                        else setHistory(data.turns)
+                      } catch (e) {
+                        setHistoryError(formatFetchError(e))
+                      }
+                      setHistoryLoading(false)
+                    }}
+                  >
+                    🔄 重试
+                  </Button>
+                </div>
+              ) : history.length === 0 ? (
                 <p className="text-game-muted text-center py-8">暂无剧情记录</p>
               ) : (
                 history.map((h, i) => (

@@ -30,6 +30,12 @@ export function ApiKeyPrompt() {
     checkStatus()
   }, [checkStatus])
 
+  useEffect(() => {
+    const onCleared = () => { checkStatus() }
+    window.addEventListener('promptos:apikey-cleared', onCleared)
+    return () => window.removeEventListener('promptos:apikey-cleared', onCleared)
+  }, [checkStatus])
+
   const handleSave = async () => {
     const trimmed = key.trim()
     if (!trimmed) {
@@ -46,6 +52,7 @@ export function ApiKeyPrompt() {
     }
     setKey('')
     setOpen(false)
+    window.dispatchEvent(new Event('promptos:settings-changed'))
   }
 
   return (

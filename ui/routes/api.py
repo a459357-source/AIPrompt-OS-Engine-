@@ -252,9 +252,11 @@ async def api_generate_npc(role_hint: str = Form("")):
     except Exception:
         pass
 
-    # Add to session state
+    # Add to session state + memory (single commit; world_pack stays separate)
     try:
-        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+        from engine.state_store import load_runtime, commit_runtime
+        runtime = load_runtime(clear_cache=True)
+        state = runtime.session
         chars = state.get("characters", {})
         letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         key = letters[len(chars)] if len(chars) < 26 else f"X{len(chars)}"
@@ -265,13 +267,8 @@ async def api_generate_npc(role_hint: str = Form("")):
             "relation": ch["relationship"][0] if ch["relationship"] else "陌生人",
             "note": f"外貌：{ch['appearance']}" if ch.get("appearance") else "",
         }
-        io_utils.write_yaml(config.SESSION_STATE_PATH, state)
-    except Exception:
-        pass
-
-    # Add to memory
-    try:
-        memory = load_memory()
+        runtime.session = state
+        memory = runtime.memory
         memory.setdefault("characters", {})[name] = {
             "trust": 0.5,
             "flags": [],
@@ -279,7 +276,8 @@ async def api_generate_npc(role_hint: str = Form("")):
         }
         if ch.get("secret"):
             memory["characters"][name].setdefault("flags", []).append(f"隐藏秘密：{ch['secret']}")
-        save_memory(memory)
+        runtime.memory = memory
+        commit_runtime(runtime)
     except Exception:
         pass
 
@@ -378,6 +376,10 @@ async def api_dashboard():
     # Full analytics from analytics engine
     analytics = compute_all()
 
+    from engine.dashboard import _build_mermaid
+
+    mermaid_src = _build_mermaid(nodes, edges, mem_chars)
+
     return JSONResponse({
         "turn": turn,
         "status": status,
@@ -392,6 +394,12 @@ async def api_dashboard():
         "characters": char_trust,
         "history": state.get("history", [])[-5:],
         "analytics": analytics,
+        "story_graph": {
+            "nodes": nodes,
+            "edges": edges,
+            "mermaid": mermaid_src,
+            "current_node": graph.get("current_node"),
+        },
     })
 
 
@@ -596,22 +604,5 @@ async def api_set_app_settings(
         export_format=export_format,
         auto_export=auto_export,
     )
-    return JSONResponse({"ok": True, **payload})
-
-
-@router.get("/story-length")
-@router.get("/story-length/")
-async def api_get_story_length():
-    """Current target length for generated story text (chars per turn)."""
-    from ui.routes.settings import game_settings_payload
-    return JSONResponse(game_settings_payload())
-
-
-@router.post("/story-length")
-@router.post("/story-length/")
-async def api_set_story_length(story_length: int = Form(...)):
-    """Update story length; applies from the next AI generation."""
-    from ui.routes.settings import apply_game_gen_settings
-    payload = apply_game_gen_settings(story_length=story_length)
     return JSONResponse({"ok": True, **payload})
 

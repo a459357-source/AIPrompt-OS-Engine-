@@ -21,6 +21,7 @@ from pathlib import Path
 
 import config
 from engine import io_utils
+from engine.state_store import commit_bundle
 
 logger = logging.getLogger(__name__)
 
@@ -115,11 +116,11 @@ def load(slot: str) -> dict | None:
         return None
 
     try:
-        io_utils.write_yaml(config.SESSION_STATE_PATH, snapshot.get("session_state", {}))
-        io_utils.write_json(config.MEMORY_PATH, snapshot.get("memory", {}))
-        io_utils.write_json(config.STORY_GRAPH_PATH, snapshot.get("story_graph", {}))
-        config.CHAPTER_PATH.write_text(
-            snapshot.get("chapter", ""), encoding="utf-8"
+        commit_bundle(
+            snapshot.get("session_state", {}),
+            snapshot.get("memory", {}),
+            snapshot.get("story_graph", {}),
+            chapter=snapshot.get("chapter", ""),
         )
     except Exception as exc:
         logger.error("Failed to restore save '%s': %s", slot, exc)

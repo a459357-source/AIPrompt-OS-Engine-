@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import mermaid from 'mermaid'
 import { motion } from 'framer-motion'
 import {
   Chart as ChartJS,
@@ -43,10 +44,13 @@ const CHART_OPTIONS_DARK = {
   },
 }
 
+mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' })
+
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const graphRef = useRef<HTMLDivElement>(null)
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
@@ -54,6 +58,7 @@ export default function Dashboard() {
     try {
       const d = await getDashboard()
       if (d.error) { setError(d.error); setLoading(false); return }
+      setError('')
       setData(d)
     } catch (e) {
       setError((e as Error).message || String(e))
@@ -64,6 +69,19 @@ export default function Dashboard() {
 
   useEffect(() => { loadDashboard() }, [loadDashboard])
 
+  useEffect(() => {
+    const src = data?.story_graph?.mermaid
+    const el = graphRef.current
+    if (!src || !el || Object.keys(data?.story_graph?.nodes ?? {}).length === 0) return
+    el.innerHTML = ''
+    const id = `mermaid-graph-${Date.now()}`
+    mermaid.render(id, src).then(({ svg }) => {
+      if (graphRef.current) graphRef.current.innerHTML = svg
+    }).catch((e) => {
+      logger.warn('Dashboard', 'Mermaid render failed', { error: String(e) })
+    })
+  }, [data?.story_graph?.mermaid, data?.story_graph?.nodes])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[40vh]">
@@ -72,7 +90,7 @@ export default function Dashboard() {
     )
   }
 
-  if (!data || error) {
+  if (error && !data) {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         className="flex flex-col items-center justify-center min-h-[40vh] gap-6 text-center"
@@ -242,6 +260,25 @@ export default function Dashboard() {
           </motion.div>
         ))}
       </div>
+
+      {/* Story branch graph */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">🔀 剧情分支图</CardTitle>
+          <CardDescription>
+            故事节点与角色关联（当前节点：{data.story_graph?.current_node ?? '—'}）
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {data.node_count === 0 ? (
+            <p className="text-game-dim text-sm text-center py-6">暂无分支节点，进行游戏后将自动生成</p>
+          ) : (
+            <div className="overflow-x-auto rounded-md border border-game-border/60 bg-game-bg/40 p-4">
+              <div ref={graphRef} className="min-w-[320px] flex justify-center" />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Char Trust + Story Info */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -1,11 +1,24 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
 import { logger } from '@/lib/logger'
-import { getEngineSettings, saveEngineSettings, getAppSettings } from '@/lib/api'
+import {
+  getEngineSettings,
+  saveEngineSettings,
+  getAppSettings,
+  clearApiKey,
+  resetGame,
+  listSaves,
+  saveGameSlot,
+  loadGameSlot,
+  downloadStoryExport,
+  checkHealth,
+  shutdownServer,
+  type SaveSlotInfo,
+} from '@/lib/api'
 import {
   loadSettings,
   saveSettings,
@@ -102,6 +115,7 @@ function SelectRow({
 
 // ── Main Page ──
 export default function Settings() {
+  const navigate = useNavigate()
   const { language } = useAppSettings()
   const lang = language as 'zh' | 'en' | 'ja'
   const [saved, setSaved] = useState(false)
@@ -177,12 +191,143 @@ export default function Settings() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [loadEngineSettings])
 
+  useEffect(() => {
+    const onSettingsChanged = () => loadEngineSettings()
+    window.addEventListener('promptos:settings-changed', onSettingsChanged)
+    return () => window.removeEventListener('promptos:settings-changed', onSettingsChanged)
+  }, [loadEngineSettings])
+
   const [apiSaving, setApiSaving] = useState(false)
   const [apiSaved, setApiSaved] = useState(false)
+  const [apiClearing, setApiClearing] = useState(false)
+  const [apiCleared, setApiCleared] = useState(false)
+  const [apiError, setApiError] = useState('')
+  const [resetting, setResetting] = useState(false)
+  const [dataError, setDataError] = useState('')
+  const [saves, setSaves] = useState<SaveSlotInfo[]>([])
+  const [savesLoading, setSavesLoading] = useState(false)
+  const [slotBusy, setSlotBusy] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [exportSuccess, setExportSuccess] = useState(false)
+  const [healthOk, setHealthOk] = useState<boolean | null>(null)
+  const [shuttingDown, setShuttingDown] = useState(false)
+
+  const refreshSaves = useCallback(async () => {
+    setSavesLoading(true)
+    try {
+      const list = await listSaves()
+      setSaves(list)
+    } catch (e) {
+      logger.warn('Settings', 'Load saves failed', { error: String(e) })
+    }
+    setSavesLoading(false)
+  }, [])
+
+  useEffect(() => {
+    refreshSaves()
+  }, [refreshSaves, values.maxSaveSlots])
+
+  useEffect(() => {
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const h = await checkHealth()
+        if (!cancelled) setHealthOk(h.status === 'ok')
+      } catch {
+        if (!cancelled) setHealthOk(false)
+      }
+    }
+    poll()
+    const id = setInterval(poll, 15000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [])
+
+  const manualSlots = Array.from({ length: values.maxSaveSlots }, (_, i) => `slot${i + 1}`)
+
+  const getSlotMeta = (slot: string) => saves.find((s) => s.slot === slot)
+
+  const handleSaveSlot = useCallback(async (slot: string) => {
+    if (!confirm(`确定将当前进度保存到 ${slot}？`)) return
+    setSlotBusy(slot)
+    setDataError('')
+    setSaveSuccess('')
+    try {
+      await saveGameSlot(slot)
+      await refreshSaves()
+      setSaveSuccess(`${slot} 已保存`)
+      setTimeout(() => setSaveSuccess(''), 2500)
+    } catch (e) {
+      setDataError((e as Error).message || String(e))
+    }
+    setSlotBusy(null)
+  }, [refreshSaves])
+
+  const handleLoadSlot = useCallback(async (slot: string) => {
+    const meta = getSlotMeta(slot)
+    if (!meta) {
+      setDataError(`存档槽 ${slot} 为空`)
+      return
+    }
+    if (!confirm(`确定从 ${slot} 读档？\n回合 ${meta.turn} · ${meta.scene || '未知场景'}\n当前未保存进度将丢失。`)) return
+    setSlotBusy(slot)
+    setDataError('')
+    try {
+      await loadGameSlot(slot)
+      navigate('/game')
+    } catch (e) {
+      setDataError((e as Error).message || String(e))
+    }
+    setSlotBusy(null)
+  }, [navigate, saves])
+
+  const handleExport = useCallback(async () => {
+    setExporting(true)
+    setDataError('')
+    setExportSuccess(false)
+    try {
+      await downloadStoryExport()
+      setExportSuccess(true)
+      setTimeout(() => setExportSuccess(false), 2500)
+    } catch (e) {
+      setDataError((e as Error).message || String(e))
+    }
+    setExporting(false)
+  }, [])
+
+  const handleShutdown = useCallback(async () => {
+    if (!confirm('确定要关闭后端服务？\n游戏将无法继续直到重新启动。')) return
+    if (!confirm('再次确认：关闭后需重新运行「启动.bat」。')) return
+    setShuttingDown(true)
+    setDataError('')
+    try {
+      await shutdownServer()
+      setHealthOk(false)
+    } catch (e) {
+      setDataError((e as Error).message || String(e))
+    }
+    setShuttingDown(false)
+  }, [])
+
+  const handleResetGame = useCallback(async () => {
+    if (!confirm('确定要重置当前游戏进度？\n\n将恢复到创建故事时的初始状态（回合、历史、章节输出会清空），此操作不可撤销。')) return
+    setResetting(true)
+    setDataError('')
+    try {
+      await resetGame()
+      navigate('/game')
+    } catch (e) {
+      const msg = (e as Error).message || String(e)
+      setDataError(msg)
+      logger.error('Settings', 'Reset game failed', { error: msg })
+    }
+    setResetting(false)
+  }, [navigate])
 
   const saveApiKey = useCallback(async () => {
     setApiSaving(true)
     setApiSaved(false)
+    setApiError('')
     try {
       const data = await saveEngineSettings({
         apiKey: apiKey || undefined,
@@ -196,10 +341,32 @@ export default function Settings() {
       setSaved(true)
       setTimeout(() => { setSaved(false); setApiSaved(false) }, 2500)
     } catch (e) {
-      logger.error('Settings', 'Save API failed', { error: String(e) })
+      const msg = (e as Error).message || String(e)
+      setApiError(msg)
+      logger.error('Settings', 'Save API failed', { error: msg })
     }
     setApiSaving(false)
   }, [apiKey, model, maxContextMsgs, autoCompress])
+
+  const clearStoredApiKey = useCallback(async () => {
+    if (!confirm('确定要清除本机已保存的 API Key？清除后需重新填写才能调用 AI。')) return
+    setApiClearing(true)
+    setApiError('')
+    setApiCleared(false)
+    try {
+      const data = await clearApiKey()
+      setApiKey('')
+      setApiKeyMasked(data.api_key_masked || '')
+      setApiCleared(true)
+      window.dispatchEvent(new Event('promptos:apikey-cleared'))
+      setTimeout(() => setApiCleared(false), 2500)
+    } catch (e) {
+      const msg = (e as Error).message || String(e)
+      setApiError(msg)
+      logger.error('Settings', 'Clear API key failed', { error: msg })
+    }
+    setApiClearing(false)
+  }, [])
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -288,28 +455,122 @@ export default function Settings() {
                 </p>
                 <Separator />
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <Label className="text-sm text-game-muted">存档管理</Label>
-                    <Badge variant="outline" size="sm" className="text-[10px] shrink-0">V2 即将推出</Badge>
-                  </div>
-                  <Button type="button" variant="outline" size="sm" className="w-full" disabled>
-                    💾 读档 / 存档 / 重置
+                  <Label className="text-sm text-game-muted">游戏进度</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-game-danger border-game-danger/40 hover:bg-game-danger/10"
+                    onClick={handleResetGame}
+                    disabled={resetting}
+                  >
+                    {resetting ? '⏳ 重置中…' : '🔄 重置游戏进度'}
                   </Button>
                   <p className="text-[11px] text-game-dim">
-                    后端已支持 <code className="text-game-muted">/save</code>、<code className="text-game-muted">/load</code>，React 界面将在 V2 提供。
+                    从 <code className="text-game-muted">world_init.json</code> 恢复初始状态，清空当前回合与历史；世界观设定（world_pack）不变。
                   </p>
+                  {dataError && (
+                    <p className="text-xs text-game-danger rounded-md border border-game-danger/30 bg-game-danger/10 px-3 py-2">
+                      {dataError}
+                    </p>
+                  )}
                 </div>
-                <Separator />
+                <p className="text-[11px] text-game-dim">
+                  引擎每回合仍会自动 autosave；手动槽位与 autosave 独立存储。
+                </p>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <Label className="text-sm text-game-muted">Obsidian 导出</Label>
-                    <Badge variant="outline" size="sm" className="text-[10px] shrink-0">V2 即将推出</Badge>
+                    <Label className="text-sm text-game-muted">手动存档</Label>
+                    <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={refreshSaves} disabled={savesLoading}>
+                      {savesLoading ? '刷新中…' : '🔄 刷新'}
+                    </Button>
                   </div>
-                  <Button type="button" variant="outline" size="sm" className="w-full" disabled>
-                    📓 导出完整叙事到 Obsidian
+                  {saveSuccess && (
+                    <p className="text-xs text-game-success">{saveSuccess}</p>
+                  )}
+                  <div className="space-y-2">
+                    {manualSlots.map((slot) => {
+                      const meta = getSlotMeta(slot)
+                      const busy = slotBusy === slot
+                      return (
+                        <div key={slot} className="rounded-md border border-game-border/60 bg-game-bg/30 px-3 py-2 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-medium text-game-muted">{slot}</span>
+                            {meta ? (
+                              <span className="text-[10px] text-game-dim truncate">
+                                回合 {meta.turn} · {meta.scene || '—'} · {meta.saved_at?.slice(0, 16).replace('T', ' ')}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-game-dim">空槽</span>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 h-7 text-xs"
+                              onClick={() => handleSaveSlot(slot)}
+                              disabled={busy || savesLoading}
+                            >
+                              {busy ? '…' : '💾 存档'}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 h-7 text-xs"
+                              onClick={() => handleLoadSlot(slot)}
+                              disabled={busy || savesLoading || !meta}
+                            >
+                              {busy ? '…' : '📂 读档'}
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm text-game-muted">Obsidian 导出</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleExport}
+                    disabled={exporting}
+                  >
+                    {exporting ? '⏳ 导出中…' : exportSuccess ? '✅ 已下载' : '📓 导出完整叙事'}
                   </Button>
                   <p className="text-[11px] text-game-dim">
-                    后端 <code className="text-game-muted">GET /export</code> 已可用；一键下载入口将在 V2 加入。
+                    下载 Markdown 文件，可导入 Obsidian 等笔记软件。
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm text-game-muted">后端服务</Label>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full shrink-0 ${
+                        healthOk === null ? 'bg-game-dim animate-pulse' : healthOk ? 'bg-game-success' : 'bg-game-danger'
+                      }`}
+                    />
+                    <span className="text-game-muted">
+                      {healthOk === null ? '检测中…' : healthOk ? '已连接' : '未连接'}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-game-danger border-game-danger/40 hover:bg-game-danger/10"
+                    onClick={handleShutdown}
+                    disabled={shuttingDown}
+                  >
+                    {shuttingDown ? '⏳ 关闭中…' : '⏻ 关闭后端服务'}
+                  </Button>
+                  <p className="text-[11px] text-game-dim">
+                    关闭后需重新运行启动脚本；开发模式下 Vite 代理也会失效。
                   </p>
                 </div>
               </CardContent>
@@ -391,6 +652,9 @@ export default function Settings() {
             </AccordionTrigger>
             <AccordionContent>
               <CardContent className="space-y-4 pt-2">
+                <p className="text-xs text-game-dim rounded-md border border-game-border/60 bg-game-bg/50 px-3 py-2">
+                  与首次启动弹窗写入同一 <code className="text-game-muted">data/apikey.json</code>；清除后弹窗会再次出现。
+                </p>
                 <div className="space-y-1.5">
                   <Label>DeepSeek API Key</Label>
                   <Input
@@ -425,7 +689,7 @@ export default function Settings() {
                     <p className="text-xs text-game-dim">逐字显示 AI 回复（SSE）</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant="outline" size="sm" className="text-[10px]">V2 即将推出</Badge>
+                    <Badge variant="outline" size="sm" className="text-[10px]">V2</Badge>
                     <Switch checked={false} disabled aria-readonly />
                   </div>
                 </div>
@@ -453,9 +717,25 @@ export default function Settings() {
                   </div>
                   <Switch checked={autoCompress} onCheckedChange={setAutoCompress} />
                 </div>
-                <Button variant={apiSaved ? 'success' : 'success'} className="w-full" onClick={saveApiKey} disabled={apiSaving}>
+                {apiError && (
+                  <p className="text-xs text-game-danger rounded-md border border-game-danger/30 bg-game-danger/10 px-3 py-2">
+                    {apiError}
+                  </p>
+                )}
+                <Button variant={apiSaved ? 'success' : 'success'} className="w-full" onClick={saveApiKey} disabled={apiSaving || apiClearing}>
                   {apiSaving ? '⏳ 保存中…' : apiSaved ? '✅ 已保存' : '💾 保存 API 设置'}
                 </Button>
+                {apiKeyMasked && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-game-danger border-game-danger/40 hover:bg-game-danger/10"
+                    onClick={clearStoredApiKey}
+                    disabled={apiSaving || apiClearing}
+                  >
+                    {apiClearing ? '⏳ 清除中…' : apiCleared ? '✅ 已清除' : '🗑️ 清除已存 API Key'}
+                  </Button>
+                )}
               </CardContent>
             </AccordionContent>
           </Card>
