@@ -204,13 +204,27 @@ export async function shutdownServer(): Promise<void> {
   }
 }
 
-export async function getGameState(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; not_started?: boolean; error?: string }> {
+export async function getGameState(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; not_started?: boolean; generating?: boolean; error?: string }> {
   const res = await apiFetch('/api/game-state')
   if (!res.ok) {
     const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
     return { story: '', options: [], state: {}, error: (data as { error?: string }).error || 'Failed to load game' }
   }
   return res.json()
+}
+
+/** Poll until opening turn is persisted (history written). */
+export async function waitForGameReady(timeoutMs = 120_000): Promise<{ story: string; options: string[]; state: Record<string, unknown> }> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const data = await getGameState()
+    if (data.error) throw new Error(data.error)
+    if (!data.not_started && data.story) {
+      return { story: data.story, options: data.options, state: data.state }
+    }
+    await new Promise((r) => setTimeout(r, 1500))
+  }
+  throw new Error('等待游戏加载超时，请稍后重试')
 }
 
 // ── NPCs ──
@@ -489,6 +503,20 @@ export async function startGame(
   handlers?: TurnStreamHandlers,
 ): Promise<GameTurnResponse> {
   return postGameTurn('/api/start', undefined, handlers)
+}
+
+let openingGamePromise: Promise<GameTurnResponse> | null = null
+
+/** Dedupe concurrent opening requests when Game page remounts during first generation. */
+export function startGameOnce(
+  handlers?: TurnStreamHandlers,
+): Promise<GameTurnResponse> {
+  if (!openingGamePromise) {
+    openingGamePromise = startGame(handlers).finally(() => {
+      openingGamePromise = null
+    })
+  }
+  return openingGamePromise
 }
 
 export async function getSettingsStatus(): Promise<{ configured: boolean; error?: string }> {

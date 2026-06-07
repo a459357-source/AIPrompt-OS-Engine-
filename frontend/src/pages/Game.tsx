@@ -12,7 +12,7 @@ import { StatusToast } from '@/components/StatusToast'
 import { InspectorPanel } from '@/components/layout/InspectorPanel'
 import { usePageShell } from '@/components/layout/usePageShell'
 import { GlassPanel } from '@/components/neural/GlassPanel'
-import { getGameState, startGame, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, cancelGeneration, type HistoryTurn, type GameGenSettings, type ContentWeights } from '@/lib/api'
+import { getGameState, startGameOnce, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, cancelGeneration, getGenerationStatus, waitForGameReady, type HistoryTurn, type GameGenSettings, type ContentWeights } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { parseOptionEffects, deltaArrow, type RelationHint } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
@@ -333,6 +333,7 @@ export default function Game() {
   const genSettingsSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const mountedRef = useRef(true)
+  const loadSeqRef = useRef(0)
   const typewriterBufRef = useRef('')
   const typewriterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const flushTypewriter = useCallback(() => {
@@ -414,18 +415,37 @@ export default function Game() {
   }, [])
 
   const loadGame = useCallback(async () => {
+    const loadSeq = ++loadSeqRef.current
     setLoading(true)
     setError('')
     logger.info('Game', 'Loading game state...')
     try {
       const data = await getGameState()
+      if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
       if (data.error) { setError(data.error); setLoading(false); return }
 
       if (data.not_started) {
-        logger.info('Game', 'Game not started — calling startGame()')
+        const gen = await getGenerationStatus()
+        if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
+        if (gen.active && gen.story) {
+          logger.info('Game', 'Opening generation in flight — waiting')
+          setStory(gen.story)
+          setLoading(false)
+          try {
+            const ready = await waitForGameReady()
+            if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
+            applyTurnData(ready)
+          } catch (e) {
+            if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
+            setError(formatFetchError(e))
+          }
+          return
+        }
+
+        logger.info('Game', 'Game not started — calling startGameOnce()')
         setStory('')
         let firstDelta = false
-        const started = await startGame({
+        const started = await startGameOnce({
           onStoryDelta: (delta) => {
             appendStoryDelta(delta)
             if (!firstDelta && mountedRef.current) {
@@ -438,6 +458,7 @@ export default function Game() {
             if (mountedRef.current) setGenProgress(phase)
           },
         })
+        if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
         if (started.error || !started.story) {
           setError(started.error || '开篇生成失败')
           setLoading(false)
@@ -448,7 +469,7 @@ export default function Game() {
           options: started.options,
           state: started.state as unknown as Record<string, unknown>,
         })
-        logger.info('Game', 'Opening scene generated')
+        logger.info('Game', 'Opening scene ready')
         setLoading(false)
         return
       }
@@ -460,11 +481,12 @@ export default function Game() {
       })
       logger.info('Game', `Loaded: turn=${(data.state as Record<string, unknown>).turn}`)
     } catch (e) {
+      if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
       const msg = formatFetchError(e)
       logger.error('Game', 'Load failed', { error: msg })
       setError(msg)
     }
-    setLoading(false)
+    if (loadSeq === loadSeqRef.current && mountedRef.current) setLoading(false)
   }, [applyTurnData, appendStoryDelta, resetStreamStory])
 
   useEffect(() => { loadGame() }, [loadGame])
@@ -793,9 +815,9 @@ export default function Game() {
       setAutoAdvanceRemaining(0)
       return
     }
-    const rounds = clampAutoAdvanceRounds(appSettings.autoAdvanceRounds)
-    setAutoAdvanceRemaining(rounds)
-    setAutoAdvancePaused(false)
+    setAutoAdvanceRemaining((r) =>
+      r > 0 ? r : clampAutoAdvanceRounds(appSettings.autoAdvanceRounds),
+    )
   }, [appSettings.autoAdvance, appSettings.autoAdvanceRounds])
 
   const autoAdvanceRunning =

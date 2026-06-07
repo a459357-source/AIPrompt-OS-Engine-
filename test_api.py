@@ -139,6 +139,40 @@ def test_history_endpoint():
     print("✅ 历史记录: PASS")
 
 
+def test_start_is_idempotent(monkeypatch):
+    """POST /api/start must not regenerate when history already exists."""
+    from ui.web_app import app
+    from fastapi.testclient import TestClient
+
+    io_utils.write_yaml(config.SESSION_STATE_PATH, {
+        "scene": "舰桥", "status": "BUILD", "turn": 1,
+        "characters": {},
+        "history": [{
+            "turn": 1,
+            "story": "已有正文",
+            "options": ["A", "B", "C", "D"],
+            "choice": None,
+        }],
+        "chapter": 1,
+    })
+
+    called = {"step": 0}
+
+    def _fake_step(*_args, **_kwargs):
+        called["step"] += 1
+        return {"story": "不应生成", "options": [], "state": {}}
+
+    monkeypatch.setattr("engine.run.step", _fake_step)
+
+    client = TestClient(app)
+    resp = client.post("/api/start")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["story"] == "已有正文"
+    assert called["step"] == 0
+    print("✅ /api/start 幂等: PASS")
+
+
 def test_next_is_post_only():
     """POST /api/next 接受 POST，拒绝 GET（因为已改为 POST-only）"""
     from ui.web_app import app
@@ -192,7 +226,7 @@ if __name__ == "__main__":
     tests = [
         test_health_endpoint, test_game_state_readonly,
         test_dashboard_endpoint, test_npcs_endpoint,
-        test_history_endpoint, test_next_is_post_only,
+        test_history_endpoint, test_start_is_idempotent, test_next_is_post_only,
         test_game_settings_post,
         test_saves_endpoints,
     ]

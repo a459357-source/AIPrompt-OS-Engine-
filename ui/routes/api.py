@@ -39,48 +39,36 @@ def _merge_characters_with_memory(raw_chars: dict, mem_chars: dict, faction_map:
     return result
 
 
-@router.get("/game-state")
-async def api_game_state():
-    """Return current game state as JSON (read-only, no side effects).
-
-    If the game has not started yet (no history), returns a 'not_started'
-    flag so the frontend can prompt the user to call POST /api/start.
-    """
-    from fastapi.responses import JSONResponse
-
-    try:
-        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
-    except Exception:
-        return JSONResponse({"error": "没有活动中的游戏，请先创建故事"}, status_code=404)
-
-    history = state.get("history", [])
-    if not history:
-        # Game not started — return minimal state, no AI call
+def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
+    """Build JSON payload for GET /api/game-state and idempotent POST /api/start."""
+    if not_started or not state.get("history"):
         chars_with_trust: dict[str, dict] = {}
         raw_chars = state.get("characters", {})
         for key, sc in raw_chars.items():
             chars_with_trust[key] = {**sc, "trust": 0.5, "trust_pct": 50, "flags": [], "tier": ""}
-        return JSONResponse({
-            "not_started": True,
+        payload = {
             "story": "",
             "options": [],
             "state": {
-                "turn": 0,
+                "turn": state.get("turn", 0),
                 "status": state.get("status", "SETUP"),
                 "scene": state.get("scene", ""),
                 "characters": chars_with_trust,
                 "factions": [],
-                "force_event_pending": False,
+                "force_event_pending": state.get("force_event_pending", False),
                 "chapter": state.get("chapter", 1),
             },
-        })
+        }
+        if not_started:
+            payload["not_started"] = True
+        return payload
 
+    history = state.get("history", [])
     last = history[-1]
     story = last.get("story", last.get("summary", ""))
     options = last.get("options", [])
     raw_chars = state.get("characters", {})
 
-    # Merge trust data from memory.json into characters
     try:
         memory = load_memory()
         mem_chars = memory.get("characters", {})
@@ -88,19 +76,19 @@ async def api_game_state():
         world_chars = world_pack.get("world", {}).get("characters", [])
         faction_map = {wc["name"]: wc.get("faction", "") for wc in world_chars if "name" in wc}
     except Exception:
+        memory = {}
         mem_chars = {}
         faction_map = {}
 
     chars_with_trust = _merge_characters_with_memory(raw_chars, mem_chars, faction_map)
 
-    # Faction data
     factions_data: list[dict] = []
     try:
         factions_data = get_faction_stats_for_ui(memory)
     except Exception:
         pass
 
-    return JSONResponse({
+    return {
         "story": story,
         "options": options,
         "state": {
@@ -112,13 +100,53 @@ async def api_game_state():
             "force_event_pending": state.get("force_event_pending", False),
             "chapter": state.get("chapter", 1),
         },
-    })
+    }
+
+
+@router.get("/game-state")
+async def api_game_state():
+    """Return current game state as JSON (read-only, no side effects).
+
+    If the game has not started yet (no history), returns a 'not_started'
+    flag so the frontend can prompt the user to call POST /api/start.
+    """
+    from fastapi.responses import JSONResponse
+
+    try:
+        state = io_utils.read_yaml(config.SESSION_STATE_PATH, use_cache=False)
+    except Exception:
+        return JSONResponse({"error": "没有活动中的游戏，请先创建故事"}, status_code=404)
+
+    if not state.get("history"):
+        return JSONResponse(_game_state_payload(state, not_started=True))
+
+    return JSONResponse(_game_state_payload(state))
 
 
 @router.post("/start")
 async def api_start_game():
-    """Generate the opening scene (POST — has side effects)."""
-    from ui.turn_stream import turn_response
+    """Generate the opening scene (POST — has side effects).
+
+    Idempotent: if history already exists, returns current state without a new AI call.
+    If opening generation is already in flight, returns partial story + generating flag.
+    """
+    from ui.turn_stream import turn_response, get_generation_status
+
+    try:
+        state = io_utils.read_yaml(config.SESSION_STATE_PATH, use_cache=False)
+    except Exception:
+        return JSONResponse({"error": "没有活动中的游戏，请先创建故事"}, status_code=404)
+
+    if state.get("history"):
+        return JSONResponse(_game_state_payload(state))
+
+    gen = get_generation_status()
+    if gen.get("active"):
+        payload = _game_state_payload(state, not_started=True)
+        payload["generating"] = True
+        if gen.get("story"):
+            payload["story"] = gen["story"]
+        return JSONResponse(payload)
 
     return turn_response(None, opening=True)
 

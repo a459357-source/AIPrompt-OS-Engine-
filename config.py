@@ -904,6 +904,25 @@ def content_preference_rules_text() -> str:
         # adult_mode 关闭 → 不出现成人相关内容边界
         parts.append("禁止成人题材与露骨描写。感情表达限于牵手、拥抱等纯爱范畴。")
 
+    # ── 选项生成约束 ──
+    if ADULT_MODE:
+        if adult_w >= 50:
+            parts.append("【选项】至少 1 个选项应涉及亲密互动或成人情境，与当前角色关系阶段匹配。")
+        elif adult_w >= 25:
+            parts.append("【选项】可包含暧昧或亲密互动的选项，但应提供同等数量的剧情/探索选项作为替代。")
+        elif adult_w > 0:
+            parts.append("【选项】成人相关选项作为点缀（约每 3-4 轮出现 1 次），多数选项仍以剧情和角色发展为主。")
+        else:
+            parts.append("【选项】所有选项应以剧情推进、角色成长、世界观探索为主，不提供成人倾向选项。")
+    else:
+        parts.append("【选项】所有选项必须是全年龄向。禁止出现暧昧邀约、亲密接触、成人暗示等选项。感情选项限于关心、鼓励、合作等友谊范畴。")
+
+    # 剧情/感情选项比例约束
+    if story_w >= 60:
+        parts.append("【选项】过半数选项应围绕主线剧情推进、世界观探索、冲突解决。")
+    if romance_w >= 50:
+        parts.append("【选项】每轮至少 1 个选项涉及角色感情互动或关系发展。")
+
     return "【内容节奏】\n" + "\n".join(f"- {p}" for p in parts)
 
 
