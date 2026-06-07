@@ -12,6 +12,7 @@ from config import (
     AVAILABLE_MODELS,
     save_story_length,
     reload_story_length,
+    clamp_story_length,
     save_max_tokens,
     reload_max_tokens,
     save_temperature,
@@ -76,7 +77,7 @@ def apply_engine_settings(
         save_model(model)
         reload_model()
     if story_length is not None:
-        save_story_length(max(300, min(3000, story_length)))
+        save_story_length(clamp_story_length(story_length))
         reload_story_length()
     save_max_tokens(max(512, min(16384, max_tokens)))
     reload_max_tokens()

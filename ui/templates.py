@@ -1486,9 +1486,9 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
             </select>
             <div class="hint">{{MODEL_HINT}}</div>
             <label style="margin-top:14px;">📝 每轮字数</label>
-            <input name="story_length" type="number" min="300" max="3000" step="100"
+            <input name="story_length" type="number" min="{{STORY_LENGTH_MIN}}" max="{{STORY_LENGTH_MAX}}" step="100"
                    value="{{STORY_LENGTH}}" style="width:120px;">
-            <div class="hint">AI 每轮生成的文字量（300–3000），默认 1000。对首次开篇也有影响。</div>
+            <div class="hint">AI 每轮生成的文字量（{{STORY_LENGTH_MIN}}–{{STORY_LENGTH_MAX}}，建议 {{STORY_LENGTH_RECOMMENDED}}），默认 1000。对首次开篇也有影响。</div>
             <label style="margin-top:14px;">📐 AI 最大 Token</label>
             <select name="max_tokens" id="maxTokens" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.9em;">
                 {{MAX_TOKENS_OPTIONS}}

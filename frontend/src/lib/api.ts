@@ -283,11 +283,35 @@ export async function saveEngineSettings(params: {
   return res.json()
 }
 
-export async function getStoryLength(): Promise<number> {
+export interface StoryLengthSettings {
+  story_length: number
+  min: number
+  max: number
+  recommended: number
+}
+
+export async function getStoryLengthSettings(): Promise<StoryLengthSettings> {
   const res = await fetch('/api/story-length')
-  if (!res.ok) return 1000
-  const data = await res.json() as { story_length: number }
-  return data.story_length ?? 1000
+  const fallback: StoryLengthSettings = {
+    story_length: 1000,
+    min: 300,
+    max: 9102,
+    recommended: 1000,
+  }
+  if (!res.ok) return fallback
+  const data = await res.json() as Partial<StoryLengthSettings>
+  return {
+    story_length: data.story_length ?? fallback.story_length,
+    min: data.min ?? fallback.min,
+    max: data.max ?? fallback.max,
+    recommended: data.recommended ?? fallback.recommended,
+  }
+}
+
+/** @deprecated use getStoryLengthSettings */
+export async function getStoryLength(): Promise<number> {
+  const data = await getStoryLengthSettings()
+  return data.story_length
 }
 
 export async function updateStoryLength(length: number): Promise<number> {

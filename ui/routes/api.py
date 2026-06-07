@@ -523,7 +523,9 @@ async def api_clear_settings_key():
 @router.get("/story-length")
 async def api_get_story_length():
     """Current target length for generated story text (chars per turn)."""
-    return JSONResponse({"story_length": config.STORY_LENGTH})
+    payload = config.story_length_limits()
+    payload["story_length"] = config.STORY_LENGTH
+    return JSONResponse(payload)
 
 
 @router.post("/story-length")
@@ -535,12 +537,14 @@ async def api_set_story_length(story_length: int = Form(...)):
         save_max_tokens,
         reload_max_tokens,
         MAX_TOKENS,
+        clamp_story_length,
+        STORY_LENGTH_TOKEN_RATIO,
     )
-    length = max(300, min(3000, story_length))
+    length = clamp_story_length(story_length)
     save_story_length(length)
     reload_story_length()
     # JSON 回复含 state/options，需留出比正文字数更大的 token 预算
-    needed_tokens = min(16384, max(512, int(length * 1.8)))
+    needed_tokens = min(16384, max(512, int(length * STORY_LENGTH_TOKEN_RATIO)))
     if MAX_TOKENS < needed_tokens:
         save_max_tokens(needed_tokens)
         reload_max_tokens()

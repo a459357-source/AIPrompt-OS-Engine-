@@ -212,13 +212,31 @@ def reload_model() -> str:
 
 
 # ── Story length ────────────────────────────────────────────────────
+MIN_STORY_LENGTH = 300
 DEFAULT_STORY_LENGTH = 1000
+RECOMMENDED_STORY_LENGTH = DEFAULT_STORY_LENGTH
+# 与 api 保存字数时的 max_tokens 估算一致：needed ≈ length × ratio，上限受 MAX_TOKENS 顶格约束
+STORY_LENGTH_TOKEN_RATIO = 1.8
+MAX_STORY_LENGTH = int(16384 / STORY_LENGTH_TOKEN_RATIO)  # 9102
+
+
+def clamp_story_length(length: int) -> int:
+    """Clamp target story length to values the engine can honor."""
+    return max(MIN_STORY_LENGTH, min(MAX_STORY_LENGTH, int(length)))
+
+
+def story_length_limits() -> dict[str, int]:
+    return {
+        "min": MIN_STORY_LENGTH,
+        "max": MAX_STORY_LENGTH,
+        "recommended": RECOMMENDED_STORY_LENGTH,
+    }
 
 
 def _load_story_length() -> int:
     """Load story length preference from settings."""
     val = _read_settings().get("story_length", DEFAULT_STORY_LENGTH)
-    return max(300, min(3000, int(val)))
+    return clamp_story_length(val)
 
 
 def save_story_length(length: int) -> None:

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { StatusToast } from '@/components/StatusToast'
-import { getGameState, startGame, nextTurn, getHistory, getStoryLength, updateStoryLength, type HistoryTurn } from '@/lib/api'
+import { getGameState, startGame, nextTurn, getHistory, getStoryLengthSettings, updateStoryLength, type HistoryTurn } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { parseRelationHints } from '@/lib/relationHints'
 
@@ -107,6 +107,9 @@ export default function Game() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState<HistoryTurn[]>([])
   const [storyLength, setStoryLength] = useState(1000)
+  const [storyLengthMin, setStoryLengthMin] = useState(300)
+  const [storyLengthMax, setStoryLengthMax] = useState(9102)
+  const [storyLengthRecommended, setStoryLengthRecommended] = useState(1000)
   const [storyLengthSaved, setStoryLengthSaved] = useState(false)
   const storyScrollRef = useRef<HTMLDivElement>(null)
   const storyLengthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -176,13 +179,18 @@ export default function Game() {
   useEffect(() => { loadGame() }, [loadGame])
 
   useEffect(() => {
-    getStoryLength()
-      .then(setStoryLength)
+    getStoryLengthSettings()
+      .then((data) => {
+        setStoryLength(data.story_length)
+        setStoryLengthMin(data.min)
+        setStoryLengthMax(data.max)
+        setStoryLengthRecommended(data.recommended)
+      })
       .catch((e) => logger.warn('Game', 'Load story length failed', { error: String(e) }))
   }, [])
 
   const queueStoryLengthSave = useCallback((value: number) => {
-    const clamped = Math.max(300, Math.min(3000, value))
+    const clamped = Math.max(storyLengthMin, Math.min(storyLengthMax, value))
     setStoryLength(clamped)
     if (storyLengthTimerRef.current) clearTimeout(storyLengthTimerRef.current)
     storyLengthTimerRef.current = setTimeout(async () => {
@@ -195,7 +203,7 @@ export default function Game() {
         logger.error('Game', 'Save story length failed', { error: String(e) })
       }
     }, 600)
-  }, [])
+  }, [storyLengthMin, storyLengthMax])
 
   useEffect(() => () => {
     if (storyLengthTimerRef.current) clearTimeout(storyLengthTimerRef.current)
@@ -414,14 +422,25 @@ export default function Game() {
                   <Input
                     id="story-length"
                     type="number"
-                    min={300}
-                    max={3000}
+                    min={storyLengthMin}
+                    max={storyLengthMax}
                     step={100}
                     value={storyLength}
                     disabled={choosing}
-                    onChange={(e) => queueStoryLengthSave(parseInt(e.target.value, 10) || 1000)}
+                    onChange={(e) => queueStoryLengthSave(parseInt(e.target.value, 10) || storyLengthRecommended)}
                     className="w-24 h-8 text-sm"
                   />
+                  <span className="text-xs text-game-dim whitespace-nowrap">
+                    上限 {storyLengthMax.toLocaleString()} ·{' '}
+                    <button
+                      type="button"
+                      disabled={choosing}
+                      onClick={() => queueStoryLengthSave(storyLengthRecommended)}
+                      className="text-game-accent hover:underline disabled:opacity-50"
+                    >
+                      建议 {storyLengthRecommended.toLocaleString()}
+                    </button>
+                  </span>
                 </div>
                 <Badge
                   variant={currentStoryChars >= storyLength * 0.85 ? 'default' : 'outline'}
