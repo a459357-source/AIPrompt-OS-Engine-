@@ -1,0 +1,17 @@
+world:
+  title: ""
+  genre: ""
+  era: 故事开端
+  setting: ""
+  main_goal: ""
+  factions: []
+  locations:
+    - name: 待创建
+      desc: 请通过「新故事」创建你的世界观
+  tone: 聚焦人物情感与选择
+  themes: []
+  characters: []
+  relationship_system:
+    stages: [崩坏, 敌视, 对立, 冷漠, 疏远, 陌生, 认识, 信赖, 盟友, 羁绊]
+    affection: 0
+  artifacts: []
