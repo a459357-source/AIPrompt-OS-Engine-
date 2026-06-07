@@ -63,7 +63,11 @@ function CharacterNode({ data, selected }: NodeProps) {
         {d.isMain ? 'Protagonist' : 'Character'}
       </div>
       <div className="text-xs font-bold truncate">{d.name}</div>
-      {d.faction && <div className="text-[10px] text-game-muted">{d.faction}</div>}
+      {d.faction && (
+        <div className="text-[10px] text-game-muted truncate max-w-[100px]" title={d.faction}>
+          {d.faction}
+        </div>
+      )}
       <Handle type="source" position={Position.Bottom} className={cn(handleClass, '!bg-neural-magenta')} />
     </div>
   )

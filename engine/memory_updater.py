@@ -106,9 +106,11 @@ def auto_register_npcs(memory: dict, state: dict, world_pack: dict,
         if name not in mem_chars:
             init_trust = get_initial_trust(name, world_pack)
             char_faction = ""
+            char_memberships: list = []
             for wc in world_chars:
                 if wc.get("name") == name:
                     char_faction = wc.get("faction", "")
+                    char_memberships = wc.get("faction_memberships") or wc.get("factionMemberships") or []
                     break
             mem_chars[name] = {
                 "trust": init_trust,
@@ -117,6 +119,8 @@ def auto_register_npcs(memory: dict, state: dict, world_pack: dict,
                 "role": sc.get("role", ""),
                 "faction": char_faction,
             }
+            if char_memberships:
+                mem_chars[name]["faction_memberships"] = char_memberships
             mem_chars[name].setdefault("metric_history", {}).setdefault(
                 "trust", []
             ).append([turn, init_trust])

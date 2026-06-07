@@ -1,4 +1,5 @@
 import type { WorldGraphInput } from './worldGraphAdapter'
+import { normalizeFactionMemberships, primaryPublicFaction } from './factionMembership'
 
 const CORE_ID = 'world-core'
 
@@ -85,7 +86,11 @@ function resolveOverlaps(nodes: LayoutNode[], iterations = 48) {
 export function graphStructureKey(input: WorldGraphInput): string {
   return JSON.stringify({
     factions: input.factions.map((f) => `${f.name}|${f.leader}`),
-    characters: input.characters.map((c) => `${c.name}|${c.isMain}|${c.faction || ''}`),
+    characters: input.characters.map((c) => {
+      const ms = normalizeFactionMemberships(c, input.factions)
+      const msKey = ms.map((m) => `${m.faction}:${m.visibility}`).join(',')
+      return `${c.name}|${c.isMain}|${msKey}`
+    }),
     artifacts: input.artifacts.map((a) => `${a.name}|${a.ownerId}`),
     relations: Object.keys(input.characterRelations).sort(),
     network: (input.networkEdges || []).map((e) => `${e.from}->${e.to}:${e.kind}`),
@@ -147,10 +152,13 @@ export function computeRelationLayout(input: WorldGraphInput): Record<string, { 
   const relatedToMain: number[] = []
 
   for (const { c, i } of npcIndices) {
-    if (c.faction && factionCenters.has(c.faction)) {
-      const list = byFaction.get(c.faction) || []
+    const layoutFaction = primaryPublicFaction(normalizeFactionMemberships(c, input.factions))
+      || normalizeFactionMemberships(c, input.factions)[0]?.faction
+      || ''
+    if (layoutFaction && factionCenters.has(layoutFaction)) {
+      const list = byFaction.get(layoutFaction) || []
       list.push(i)
-      byFaction.set(c.faction, list)
+      byFaction.set(layoutFaction, list)
     } else if (c.name && input.characterRelations[c.name]) {
       relatedToMain.push(i)
     } else {

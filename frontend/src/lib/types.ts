@@ -4,6 +4,7 @@ export interface Character {
   name: string
   isMain: boolean
   faction?: string
+  factionMemberships?: Array<{ faction: string; visibility: 'public' | 'hidden' }>
   role_tags: string[]
   personality_tags: string[]
   appearance: string
@@ -104,6 +105,7 @@ export interface FieldGenResponse {
   secret?: string
   isMain?: boolean
   faction?: string
+  factionMemberships?: Array<{ faction: string; visibility: 'public' | 'hidden' }>
   relationshipType?: string
   affection?: number
   trust?: number

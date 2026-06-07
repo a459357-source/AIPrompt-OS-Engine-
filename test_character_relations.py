@@ -47,8 +47,29 @@ def test_link_character_factions_by_leader():
     ]
     out = _link_character_factions(characters, factions)
     assert out[0]["faction"] == "银翼商会"
+    assert out[0]["factionMemberships"] == [{"faction": "银翼商会", "visibility": "public"}]
     assert out[1]["faction"] == "夜鸦团"
     assert out[2]["faction"] == ""
+
+
+def test_link_character_factions_multi_membership():
+    factions = [
+        {"name": "星穹学院", "leader": "苏浅"},
+        {"name": "暗域议会", "leader": ""},
+    ]
+    characters = [
+        {
+            "name": "陈默",
+            "factionMemberships": [
+                {"faction": "暗域议会", "visibility": "public"},
+                {"faction": "星穹学院", "visibility": "hidden"},
+            ],
+        },
+    ]
+    out = _link_character_factions(characters, factions)
+    assert len(out[0]["factionMemberships"]) == 2
+    assert out[0]["factionMemberships"][1]["visibility"] == "hidden"
+    assert out[0]["faction"] == "暗域议会"
 
 
 def test_remap_relation_keys_fuzzy():

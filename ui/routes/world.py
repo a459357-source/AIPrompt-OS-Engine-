@@ -58,8 +58,60 @@ def _parse_json_object_from_story(story: str) -> dict | None:
         return None
 
 
+def _resolve_faction_name(raw: str, name_map: dict) -> str:
+    """Match a faction name against known factions (exact or fuzzy)."""
+    raw = str(raw or "").strip()
+    if not raw:
+        return ""
+    if raw in name_map:
+        return raw
+    for fname in name_map:
+        if raw in fname or fname in raw:
+            return fname
+    return ""
+
+
+def _primary_public_faction(memberships: list) -> str:
+    for item in memberships:
+        if not isinstance(item, dict):
+            continue
+        if item.get("visibility", "public") == "public":
+            return str(item.get("faction", "")).strip()
+    if memberships and isinstance(memberships[0], dict):
+        return str(memberships[0].get("faction", "")).strip()
+    return ""
+
+
+def _normalize_faction_memberships(entry: dict, factions: list, name_map: dict, leader_map: dict) -> list:
+    """Normalize factionMemberships / legacy faction into [{faction, visibility}]."""
+    cname = str(entry.get("name", "")).strip()
+    raw_list = entry.get("factionMemberships") or entry.get("faction_memberships")
+    out: list[dict] = []
+    if isinstance(raw_list, list) and raw_list:
+        seen: set[str] = set()
+        for item in raw_list:
+            if not isinstance(item, dict):
+                continue
+            fname = _resolve_faction_name(item.get("faction", ""), name_map)
+            if not fname or fname in seen:
+                continue
+            vis = item.get("visibility", "public")
+            if vis not in ("public", "hidden"):
+                vis = "public"
+            out.append({"faction": fname, "visibility": vis})
+            seen.add(fname)
+    if not out:
+        raw = str(entry.get("faction", "")).strip()
+        resolved = _resolve_faction_name(raw, name_map)
+        if not resolved and cname in leader_map:
+            resolved = leader_map[cname]
+        if resolved:
+            out.append({"faction": resolved, "visibility": "public"})
+    return out
+
+
 def _link_character_factions(characters, factions) -> list:
-    """Ensure each character.faction matches a generated faction name."""
+    """Ensure each character has factionMemberships and primary faction."""
     if not isinstance(characters, list) or not characters:
         return characters or []
     if not isinstance(factions, list) or not factions:
@@ -85,17 +137,9 @@ def _link_character_factions(characters, factions) -> list:
             linked.append(ch)
             continue
         entry = dict(ch)
-        raw = str(entry.get("faction", "")).strip()
-        cname = str(entry.get("name", "")).strip()
-        resolved = raw if raw in name_map else ""
-        if not resolved and cname in leader_map:
-            resolved = leader_map[cname]
-        if not resolved and raw:
-            for fname in name_map:
-                if raw in fname or fname in raw:
-                    resolved = fname
-                    break
-        entry["faction"] = resolved
+        memberships = _normalize_faction_memberships(entry, factions, name_map, leader_map)
+        entry["factionMemberships"] = memberships
+        entry["faction"] = _primary_public_faction(memberships)
         linked.append(entry)
     return linked
 
@@ -193,6 +237,30 @@ async def create_new_story(
     if not chars:
         chars = [{"name": "主角", "role_tags": [], "appearance": "", "personality_tags": [], "relationship": [], "goal": "", "secret": "", "background": "", "special_ability": "", "isMain": True}]
 
+    # Parse factions (needed before linking character memberships)
+    factions = []
+    if factions_json.strip():
+        try:
+            raw_factions = json.loads(factions_json.strip())
+            for f in raw_factions:
+                f.setdefault("type", "organization")
+                f.setdefault("goals", [])
+                f.setdefault("resources", [])
+                f.setdefault("controlledTerritories", [])
+                f.setdefault("subordinateOrganizations", [])
+                f.setdefault("keyAssets", [])
+                f.setdefault("power", {"military": 0, "economic": 0, "political": 0, "technology": 0})
+                f.setdefault("influence", 50)
+                f.setdefault("relation_to_player", "neutral")
+                f.setdefault("leader", "")
+                f.setdefault("description", "")
+                factions.append(f)
+        except Exception:
+            pass
+
+    if factions:
+        chars = _link_character_factions(chars, factions)
+
     # Parse custom rules if provided
     custom = {}
     if custom_rules.strip():
@@ -245,9 +313,8 @@ async def create_new_story(
         except Exception:
             pass
 
-    # Parse factions
-    factions = []
-    if factions_json.strip():
+    # Parse factions — already parsed above for character linking; skip duplicate block if empty retry
+    if not factions and factions_json.strip():
         try:
             raw_factions = json.loads(factions_json.strip())
             for f in raw_factions:
@@ -290,10 +357,25 @@ async def create_new_story(
 
     # Build rich character data for world_pack
     for ch in chars:
+        memberships = ch.get("factionMemberships") or ch.get("faction_memberships") or []
+        if not isinstance(memberships, list):
+            memberships = []
+        memberships = [
+            {
+                "faction": str(m.get("faction", "")).strip(),
+                "visibility": m.get("visibility", "public")
+                if m.get("visibility") in ("public", "hidden")
+                else "public",
+            }
+            for m in memberships
+            if isinstance(m, dict) and str(m.get("faction", "")).strip()
+        ]
+        primary_faction = _primary_public_faction(memberships) or str(ch.get("faction", "")).strip()
         char_data = {
             "name": ch.get("name", ""),
             "is_main": ch.get("isMain", False),
-            "faction": ch.get("faction", ""),
+            "faction": primary_faction,
+            "faction_memberships": memberships,
             "role_tags": ch.get("role_tags", []),
             "personality_tags": ch.get("personality_tags", []),
             "appearance": ch.get("appearance", ""),
@@ -497,7 +579,11 @@ async def generate_world(keywords: str = Form("")):
     {{
       "name": "角色姓名",
       "isMain": true,
-      "faction": "势力名（必须与 factions 中某一项 name 完全一致）",
+      "faction": "势力名（必须与 factions 中某一项 name 完全一致，兼容旧字段）",
+      "factionMemberships": [
+        {{"faction": "明面所属势力名", "visibility": "public"}},
+        {{"faction": "暗中隶属势力名（可选）", "visibility": "hidden"}}
+      ],
       "role_tags": ["身份标签"],
       "personality_tags": ["性格标签1", "性格标签2", "性格标签3"],
       "appearance": "外貌特征（10~30字）",
@@ -540,8 +626,8 @@ async def generate_world(keywords: str = Form("")):
 }}
 
 要求：
-1. 先设计 factions（至少2个互相对立的势力），再为 characters 分配 faction；每个角色都必须有所属势力，faction 必须与 factions[].name 完全一致
-2. factions[].leader 应填写该势力首领的角色姓名，且该角色 faction 指向本势力
+1. 先设计 factions（至少2个互相对立的势力），再为 characters 分配隶属；优先用 factionMemberships（可多个，visibility 为 public 或 hidden）；至少有一个 public 隶属；faction 字段可填主要明面势力名
+2. factions[].leader 应填写该势力首领的角色姓名；首领通常 public 隶属本势力，也可有 hidden 双重身份
 3. characters 必须包含 1 名主角（isMain:true）和至少 1 名 NPC（isMain:false）
 4. 角色要有个性，包含外貌、性格标签、目标、隐藏秘密
 5. 主角和至少1个NPC之间要有潜在的戏剧冲突或情感张力
@@ -621,9 +707,9 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
 已有势力：{faction_ctx}
 角色定位：{char_role or '重要NPC'}
 
-输出格式：{{"name":"角色名","isMain":false,"faction":"势力名（必须与已有势力 name 一致，无则留空）","role_tags":["身份"],"personality_tags":["性格1","性格2","性格3"],"appearance":"外貌特征（10~30字）","relationship":["与主角关系"],"goal":"角色目标","secret":"隐藏秘密"}}
+输出格式：{{"name":"角色名","isMain":false,"faction":"主要明面势力（可选，与 factionMemberships 一致）","factionMemberships":[{{"faction":"势力名","visibility":"public|hidden"}}],"role_tags":["身份"],"personality_tags":["性格1","性格2","性格3"],"appearance":"外貌特征（10~30字）","relationship":["与主角关系"],"goal":"角色目标","secret":"隐藏秘密"}}
 
-要求：角色要有个性、有目标、有秘密；若已有势力列表，必须为角色指定合适的 faction。只输出JSON。"""
+要求：角色要有个性、有目标、有秘密；若已有势力列表，用 factionMemberships 指定隶属（可多个，hidden 表示暗中）；只输出JSON。"""
     elif field == "rel_system":
         ctx = f"标题：{title}，世界观：{world[:200] if world else context[:200]}"
         user = f"为以下 Galgame 推荐关系阶段系统（必须是双向的！包含正面和负面阶段，共6-10个）：\n{ctx}\n\n关系应有正反两面，例如：崩坏←敌视←对立←冷漠←疏远←陌生→认识→信赖→盟友→羁绊\n\n输出JSON：{{\"rel_stages\":[\"负面阶段\",...,\"陌生\",...,\"正面阶段\"],\"rel_affection\":0}}"
@@ -673,12 +759,14 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
                     result.setdefault("goal", "")
                     result.setdefault("secret", "")
                     result.setdefault("faction", "")
+                    result.setdefault("factionMemberships", [])
                     if context.strip():
                         try:
                             fac_list = json.loads(context)
                             if isinstance(fac_list, list):
                                 linked = _link_character_factions([result], fac_list)
                                 if linked:
+                                    result["factionMemberships"] = linked[0].get("factionMemberships", [])
                                     result["faction"] = linked[0].get("faction", result.get("faction", ""))
                         except json.JSONDecodeError:
                             pass

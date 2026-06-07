@@ -1,5 +1,15 @@
 import type { Node, Edge } from '@xyflow/react'
+import {
+  belongsToEdgeStyle,
+  formatMembershipsSummary,
+  normalizeFactionMemberships,
+  syncCharacterFactions,
+  toggleOrAddMembership,
+  type FactionMembership,
+} from './factionMembership'
 import { computeRelationLayout, graphStructureKey } from './worldGraphLayout'
+
+export type { FactionMembership, FactionVisibility } from './factionMembership'
 
 export { graphStructureKey, computeRelationLayout } from './worldGraphLayout'
 
@@ -26,6 +36,7 @@ export interface CharacterNodeData {
   name: string
   isMain: boolean
   faction?: string
+  factionMemberships?: FactionMembership[]
 }
 
 export interface ArtifactNodeData {
@@ -47,7 +58,7 @@ export interface WorldGraphInput {
   genre: string[]
   scene: string
   main_goal: string
-  characters: Array<{ name: string; isMain: boolean; faction?: string }>
+  characters: Array<{ name: string; isMain: boolean; faction?: string; factionMemberships?: FactionMembership[] }>
   factions: Array<{ name: string; type: string; leader: string; influence: number }>
   artifacts: Array<{ name: string; type: string; ownerId: string }>
   characterRelations: Record<string, unknown>
@@ -118,6 +129,7 @@ export function buildWorldGraph(input: WorldGraphInput): { nodes: Node[]; edges:
 
   input.characters.forEach((c, i) => {
     const id = `character-${i}`
+    const memberships = normalizeFactionMemberships(c, input.factions)
     nodes.push({
       id,
       type: 'character',
@@ -127,22 +139,22 @@ export function buildWorldGraph(input: WorldGraphInput): { nodes: Node[]; edges:
         index: i,
         name: c.name || (c.isMain ? '主角' : 'NPC'),
         isMain: c.isMain,
-        faction: c.faction,
+        faction: formatMembershipsSummary(memberships),
+        factionMemberships: memberships,
       },
     })
-
-    if (c.faction) {
-      const fi = input.factions.findIndex((f) => f.name === c.faction)
-      if (fi >= 0) {
-        edges.push({
-          id: `belongs-${id}`,
-          source: id,
-          target: `faction-${fi}`,
-          type: 'relation',
-          data: { edgeType: 'belongsTo' },
-          animated: true,
-        })
-      }
+    for (const m of memberships) {
+      const fi = input.factions.findIndex((f) => f.name === m.faction)
+      if (fi < 0) continue
+      edges.push({
+        id: `belongs-${id}-${fi}`,
+        source: id,
+        target: `faction-${fi}`,
+        type: 'relation',
+        data: { edgeType: 'belongsTo', visibility: m.visibility },
+        animated: m.visibility === 'public',
+        style: belongsToEdgeStyle(m.visibility),
+      })
     }
   })
 
@@ -293,8 +305,15 @@ function setCharacterFaction(
 ): WorldGraphUpdate | null {
   if (charIndex < 0 || factionIndex < 0) return null
   const factionName = input.factions[factionIndex]?.name || ''
+  if (!factionName.trim()) return null
+  const char = input.characters[charIndex]
+  const current = normalizeFactionMemberships(char, input.factions)
+  const memberships = toggleOrAddMembership(current, factionName)
   const characters = [...input.characters]
-  characters[charIndex] = { ...characters[charIndex], faction: factionName }
+  characters[charIndex] = syncCharacterFactions({
+    ...char,
+    factionMemberships: memberships,
+  })
   return { characters }
 }
 
@@ -418,9 +437,24 @@ export function createDemoGraphSeed(): WorldGraphUpdate & {
     { name: '暗域议会', type: 'organization', leader: '', influence: 58 },
   ]
   const characters: WorldGraphInput['characters'] = [
-    { name: '林远', isMain: true, faction: '' },
-    { name: '苏浅', isMain: false, faction: '星穹学院' },
-    { name: '陈默', isMain: false, faction: '暗域议会' },
+    syncCharacterFactions({
+      name: '林远',
+      isMain: true,
+      factionMemberships: [{ faction: '暗域议会', visibility: 'hidden' as const }],
+    }),
+    syncCharacterFactions({
+      name: '苏浅',
+      isMain: false,
+      factionMemberships: [{ faction: '星穹学院', visibility: 'public' as const }],
+    }),
+    syncCharacterFactions({
+      name: '陈默',
+      isMain: false,
+      factionMemberships: [
+        { faction: '暗域议会', visibility: 'public' as const },
+        { faction: '星穹学院', visibility: 'hidden' as const },
+      ],
+    }),
   ]
   return {
     title: '星痕纪元',

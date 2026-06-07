@@ -24,6 +24,12 @@ import { usePageShell } from '@/components/layout/usePageShell'
 import { SectionHeader } from '@/components/neural/SectionHeader'
 import { GlowDivider } from '@/components/neural/GlowDivider'
 import { parseNodeSelection, createDemoGraphSeed, graphStructureKey } from '@/lib/worldGraphAdapter'
+import {
+  normalizeFactionMemberships,
+  syncCharacterFactions,
+  type FactionMembership,
+  type FactionVisibility,
+} from '@/lib/factionMembership'
 import { t, tTheme } from '@/lib/i18n'
 import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
 import type { Character, WorldGenResponse } from '@/lib/types'
@@ -38,11 +44,17 @@ const WORLD_GEN_CONFIRM_MSG =
 const START_STORY_CONFIRM_MSG =
   '开始新故事将初始化全新对局，当前游戏进度、剧情记录与相关存档将被覆盖，此操作不可撤销。\n\n确定继续？'
 
+const factionMembershipSchema = z.object({
+  faction: z.string(),
+  visibility: z.enum(['public', 'hidden']),
+})
+
 // ── Schema ──
 const characterSchema = z.object({
   name: z.string().min(1, '必填'),
   isMain: z.boolean(),
   faction: z.string().optional(),
+  factionMemberships: z.array(factionMembershipSchema).optional(),
   role_tags: z.array(z.string()),
   personality_tags: z.array(z.string()),
   appearance: z.string(),
@@ -216,6 +228,39 @@ function mapGeneratedFactions(raw: Array<Record<string, unknown>>): FactionRow[]
     relation_to_player: (f.relation_to_player as string) || 'neutral',
     leader: (f.leader as string) || '',
   }))
+}
+
+function resolveCharacterMemberships(
+  char: {
+    faction?: string
+    factionMemberships?: Array<{ faction: string; visibility?: string }>
+  },
+  charName: string,
+  factions: FactionRow[],
+): FactionMembership[] {
+  const rawList = char.factionMemberships
+  if (Array.isArray(rawList) && rawList.length) {
+    const resolved = rawList
+      .map((m) => ({
+        faction: resolveCharacterFaction(m.faction, charName, factions),
+        visibility: (m.visibility === 'hidden' ? 'hidden' : 'public') as FactionVisibility,
+      }))
+      .filter((m) => m.faction)
+    if (resolved.length) return normalizeFactionMemberships({ factionMemberships: resolved }, factions)
+  }
+  const legacy = resolveCharacterFaction(char.faction, charName, factions)
+  if (legacy) return [{ faction: legacy, visibility: 'public' }]
+  return []
+}
+
+function mapFormCharacter(
+  c: FormValues['characters'][number],
+  factions: FactionRow[],
+): FormValues['characters'][number] {
+  return syncCharacterFactions({
+    ...c,
+    factionMemberships: resolveCharacterMemberships(c, c.name || '', factions),
+  })
 }
 
 function resolveCharacterFaction(
@@ -526,19 +571,22 @@ export default function NewStory() {
     setFactions(facs)
 
     let charNames: string[] = []
-    const chars = data.characters.map((c, i) => ({
-      name: c.name || '',
-      isMain: c.isMain ?? i === 0,
-      faction: resolveCharacterFaction(c.faction, c.name || '', facs),
-      role_tags: Array.isArray(c.role_tags) ? c.role_tags : (c.role_tags ? [c.role_tags] : []),
-      personality_tags: Array.isArray(c.personality_tags) ? c.personality_tags : [],
-      appearance: c.appearance || '',
-      relationship: Array.isArray(c.relationship) ? c.relationship : [],
-      goal: c.goal || '',
-      secret: c.secret || '',
-      background: c.background || '',
-      special_ability: c.special_ability || '',
-    }))
+    const chars = data.characters.map((c, i) =>
+      mapFormCharacter({
+        name: c.name || '',
+        isMain: c.isMain ?? i === 0,
+        faction: c.faction,
+        factionMemberships: (c as { factionMemberships?: FactionMembership[] }).factionMemberships,
+        role_tags: Array.isArray(c.role_tags) ? c.role_tags : (c.role_tags ? [c.role_tags] : []),
+        personality_tags: Array.isArray(c.personality_tags) ? c.personality_tags : [],
+        appearance: c.appearance || '',
+        relationship: Array.isArray(c.relationship) ? c.relationship : [],
+        goal: c.goal || '',
+        secret: c.secret || '',
+        background: c.background || '',
+        special_ability: c.special_ability || '',
+      }, facs),
+    )
     setValue('characters', chars)
     charNames = chars.map((c) => c.name).filter(Boolean)
     const npcNames = chars.filter((c) => !c.isMain && c.name).map((c) => c.name)
@@ -672,8 +720,17 @@ export default function NewStory() {
       })
       const chars = getValues('characters')
       if (data.name) chars[idx].name = data.name
-      if (data.faction !== undefined) {
-        chars[idx].faction = resolveCharacterFaction(data.faction, data.name || chars[idx].name || '', factions || [])
+      const genMemberships = (data as { factionMemberships?: FactionMembership[] }).factionMemberships
+      if (Array.isArray(genMemberships) && genMemberships.length) {
+        Object.assign(chars[idx], mapFormCharacter({
+          ...chars[idx],
+          factionMemberships: genMemberships,
+        }, factions || []))
+      } else if (data.faction !== undefined) {
+        Object.assign(chars[idx], mapFormCharacter({
+          ...chars[idx],
+          faction: resolveCharacterFaction(data.faction, data.name || chars[idx].name || '', factions || []),
+        }, factions || []))
       }
       if (data.role_tags) chars[idx].role_tags = Array.isArray(data.role_tags) ? data.role_tags : [data.role_tags]
       if (data.personality_tags) chars[idx].personality_tags = Array.isArray(data.personality_tags) ? data.personality_tags : [data.personality_tags]
@@ -740,7 +797,7 @@ export default function NewStory() {
     fd.append('genre', data.genre.join(' / '))
     fd.append('scene', data.scene)
     fd.append('main_goal', data.main_goal)
-    fd.append('chars_json', JSON.stringify(data.characters))
+    fd.append('chars_json', JSON.stringify(data.characters.map((c) => mapFormCharacter(c, factions))))
     fd.append('rel_system', JSON.stringify({ stages: data.rel_stages, affection: data.rel_affection }))
     fd.append('custom_rules', JSON.stringify({ stats: customStats, stages: data.rel_stages, characterRelations: characterRelations }))
     fd.append('artifacts_json', JSON.stringify(artifacts))
@@ -766,11 +823,15 @@ export default function NewStory() {
     genre: watchAll.genre || [],
     scene: watchAll.scene || '',
     main_goal: watchAll.main_goal || '',
-    characters: (watchAll.characters || []).map((c) => ({
-      name: c.name,
-      isMain: c.isMain,
-      faction: c.faction,
-    })),
+    characters: (watchAll.characters || []).map((c) => {
+      const synced = mapFormCharacter(c, factions)
+      return {
+        name: synced.name,
+        isMain: synced.isMain,
+        faction: synced.faction,
+        factionMemberships: synced.factionMemberships,
+      }
+    }),
     factions: factions.map((f) => ({
       name: f.name,
       type: f.type,
@@ -793,11 +854,15 @@ export default function NewStory() {
       genre: watchAll.genre || [],
       scene: watchAll.scene || '',
       main_goal: watchAll.main_goal || '',
-      characters: (watchAll.characters || []).map((c) => ({
-        name: c.name,
-        isMain: c.isMain,
-        faction: c.faction,
-      })),
+      characters: (watchAll.characters || []).map((c) => {
+        const synced = mapFormCharacter(c, factions)
+        return {
+          name: synced.name,
+          isMain: synced.isMain,
+          faction: synced.faction,
+          factionMemberships: synced.factionMemberships,
+        }
+      }),
       factions: factions.map((f) => ({
         name: f.name,
         type: f.type,
@@ -1342,19 +1407,80 @@ export default function NewStory() {
                                 />
                               </div>
 
-                              {/* Faction */}
+                              {/* Faction memberships */}
                               <div>
-                                <Label className="text-[11px]">🏛️ 所属势力</Label>
-                                <select
-                                  value={c?.faction || ''}
-                                  onChange={(e) => setValue(`characters.${idx}.faction`, e.target.value)}
-                                  className="w-full bg-game-bg border border-game-border rounded-md px-2 py-2 text-sm text-game-text mt-0.5"
+                                <Label className="text-[11px]">🏛️ 势力隶属</Label>
+                                <p className="text-[10px] text-game-muted mt-0.5 mb-1">
+                                  可多个；明面实线、暗中虚线。图谱拖线可追加或切换明/暗。
+                                </p>
+                                {(normalizeFactionMemberships(c || {}, factions)).map((m, mi) => (
+                                  <div key={`${idx}-fac-${mi}-${m.faction}`} className="flex gap-1.5 mt-1 items-center">
+                                    <select
+                                      value={m.faction}
+                                      onChange={(e) => {
+                                        const list = [...normalizeFactionMemberships(c || {}, factions)]
+                                        list[mi] = { ...list[mi], faction: e.target.value }
+                                        const chars = getValues('characters')
+                                        chars[idx] = mapFormCharacter({ ...chars[idx], factionMemberships: list }, factions)
+                                        setValue('characters', chars)
+                                      }}
+                                      className="flex-1 bg-game-bg border border-game-border rounded-md px-2 py-1.5 text-xs text-game-text"
+                                    >
+                                      <option value="">选择势力</option>
+                                      {(factions || []).map((f: { name: string }) => (
+                                        <option key={f.name} value={f.name}>{f.name}</option>
+                                      ))}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      className={`shrink-0 px-2 py-1 text-[10px] rounded border ${
+                                        m.visibility === 'hidden'
+                                          ? 'border-game-muted/50 text-game-muted bg-game-bg'
+                                          : 'border-neural-cyan/40 text-neural-cyan bg-neural-cyan/5'
+                                      }`}
+                                      onClick={() => {
+                                        const list = [...normalizeFactionMemberships(c || {}, factions)]
+                                        list[mi] = {
+                                          ...list[mi],
+                                          visibility: list[mi].visibility === 'public' ? 'hidden' : 'public',
+                                        }
+                                        const chars = getValues('characters')
+                                        chars[idx] = mapFormCharacter({ ...chars[idx], factionMemberships: list }, factions)
+                                        setValue('characters', chars)
+                                      }}
+                                    >
+                                      {m.visibility === 'hidden' ? '暗' : '明'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="shrink-0 text-game-muted hover:text-game-accent text-xs px-1"
+                                      onClick={() => {
+                                        const list = normalizeFactionMemberships(c || {}, factions)
+                                          .filter((_, j) => j !== mi)
+                                        const chars = getValues('characters')
+                                        chars[idx] = mapFormCharacter({ ...chars[idx], factionMemberships: list }, factions)
+                                        setValue('characters', chars)
+                                      }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  className="mt-1.5 text-[11px] text-neural-cyan hover:underline"
+                                  onClick={() => {
+                                    const list = [...normalizeFactionMemberships(c || {}, factions)]
+                                    const used = new Set(list.map((x) => x.faction))
+                                    const nextFac = (factions || []).find((f) => f.name && !used.has(f.name))?.name || ''
+                                    list.push({ faction: nextFac, visibility: 'public' })
+                                    const chars = getValues('characters')
+                                    chars[idx] = mapFormCharacter({ ...chars[idx], factionMemberships: list }, factions)
+                                    setValue('characters', chars)
+                                  }}
                                 >
-                                  <option value="">无</option>
-                                  {(factions || []).map((f: { name: string }) => (
-                                    <option key={f.name} value={f.name}>{f.name}</option>
-                                  ))}
-                                </select>
+                                  + 添加隶属
+                                </button>
                               </div>
 
                               {/* Goal (原关系字段已合并到Part3多维关系) */}
@@ -1838,10 +1964,12 @@ export default function NewStory() {
               const current = getValues('characters')
               setValue(
                 'characters',
-                update.characters.map((c, i) => ({
-                  ...(current[i] || {}),
-                  ...c,
-                })) as FormValues['characters'],
+                update.characters.map((c, i) =>
+                  mapFormCharacter({
+                    ...(current[i] || {}),
+                    ...c,
+                  } as FormValues['characters'][number], factions),
+                ) as FormValues['characters'],
               )
             }
             if (update.artifacts) {
