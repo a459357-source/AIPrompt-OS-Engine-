@@ -2,7 +2,8 @@ PromptOS 发布包使用说明
 ====================
 
 【完整图文手册】
-  打开 release\PromptOS-用户手册.html（浏览器即可，无需联网）
+  打开 release\PromptOS-用户手册.html（浏览器即可；配图在 manual-screenshots\）
+  UI 大改后可在源码目录运行: python scripts\capture_manual_screenshots.py
 
 【给别人用】
 1. 只发送 release\PromptOS-win64-v{版本}.zip（不要附带 data 文件夹）

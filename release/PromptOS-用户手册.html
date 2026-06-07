@@ -168,6 +168,12 @@
       border-top: 1px solid var(--border);
     }
     .fig svg { display: block; width: 100%; height: auto; }
+    .fig img {
+      display: block;
+      width: 100%;
+      height: auto;
+      vertical-align: middle;
+    }
     .steps { counter-reset: step; list-style: none; padding: 0; }
     .steps li {
       counter-increment: step;
@@ -330,17 +336,8 @@ cd frontend && npm install && npm run dev   # → http://localhost:5173</code></
     <section id="apikey">
       <h2>3. 配置 API Key</h2>
       <div class="fig">
-        <svg viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg" aria-label="API Key 配置示意">
-          <rect width="640" height="220" class="screen"/>
-          <rect x="120" y="20" width="400" height="180" rx="12" class="panel-accent"/>
-          <text x="320" y="52" text-anchor="middle" fill="#c4b5fd" font-size="14" font-weight="600">🔑 欢迎使用 PromptOS</text>
-          <text x="320" y="78" text-anchor="middle" fill="#9399b0" font-size="11">请填写 DeepSeek API Key 以开始生成</text>
-          <rect x="160" y="95" width="320" height="32" rx="6" fill="#0a0c12" stroke="#3d4460"/>
-          <text x="175" y="115" fill="#6b7289" font-size="11">sk-xxxxxxxxxxxxxxxx</text>
-          <rect x="260" y="145" width="120" height="32" rx="6" class="btn"/>
-          <text x="320" y="165" text-anchor="middle" class="btn-text">保存并继续</text>
-        </svg>
-        <div class="fig-caption">图 3-1　首次启动时的 API Key 引导弹窗</div>
+        <img src="manual-screenshots/01-api-key.png" alt="首次启动时的 DeepSeek API Key 引导弹窗" loading="lazy" width="1280" height="800" />
+        <div class="fig-caption">图 3-1　首次启动时的 API Key 引导弹窗（实际界面截图）</div>
       </div>
       <h4>获取 Key</h4>
       <p>在 <a href="https://platform.deepseek.com/" target="_blank" rel="noopener">DeepSeek 开放平台</a> 注册并创建 API Key（格式 <code>sk-...</code>）。</p>
@@ -358,30 +355,10 @@ cd frontend && npm install && npm run dev   # → http://localhost:5173</code></
     <!-- 4 导航 -->
     <section id="nav">
       <h2>4. 界面导航</h2>
-      <p>顶部（桌面）或底部（手机）主导航共五个入口：</p>
+      <p>顶栏品牌为 <strong>World Builder</strong>（成人模式下为 Desire+），桌面端为顶栏 Tab，手机端为底部 Dock：</p>
       <div class="fig">
-        <svg viewBox="0 0 640 120" class="nav-mock" xmlns="http://www.w3.org/2000/svg" aria-label="主导航示意">
-          <rect width="640" height="120" class="screen"/>
-          <rect x="0" y="0" width="640" height="48" class="bar"/>
-          <text x="24" y="30" fill="#863bff" font-size="14" font-weight="700">PromptOS</text>
-          <rect x="130" y="10" width="72" height="28" rx="6" class="tab"/>
-          <text x="166" y="28" text-anchor="middle" class="tab-active-text">🏰 世界</text>
-          <rect x="210" y="10" width="72" height="28" rx="6" class="tab-active"/>
-          <text x="246" y="28" text-anchor="middle" class="tab-active-text">🎮 模拟</text>
-          <rect x="290" y="10" width="72" height="28" rx="6" class="tab"/>
-          <text x="326" y="28" text-anchor="middle">👤 角色</text>
-          <rect x="370" y="10" width="72" height="28" rx="6" class="tab"/>
-          <text x="406" y="28" text-anchor="middle">⚔ 势力</text>
-          <rect x="450" y="10" width="72" height="28" rx="6" class="tab"/>
-          <text x="486" y="28" text-anchor="middle">⚙ 设置</text>
-          <rect x="0" y="72" width="640" height="48" class="footer-nav"/>
-          <text x="64" y="102" text-anchor="middle" fill="#7c6cf0" font-size="10">世界</text>
-          <text x="192" y="102" text-anchor="middle" fill="#9399b0" font-size="10">模拟</text>
-          <text x="320" y="102" text-anchor="middle" fill="#9399b0" font-size="10">角色</text>
-          <text x="448" y="102" text-anchor="middle" fill="#9399b0" font-size="10">势力</text>
-          <text x="576" y="102" text-anchor="middle" fill="#9399b0" font-size="10">设置</text>
-        </svg>
-        <div class="fig-caption">图 4-1　桌面顶栏导航（上）与移动端底栏导航（下）</div>
+        <img src="manual-screenshots/02-nav-world.png" alt="顶栏导航：世界、模拟、角色、势力、设置" loading="lazy" width="1280" height="800" />
+        <div class="fig-caption">图 4-1　实际顶栏导航与世界构建页（🏰 世界 · 模拟 · 👤 角色 · ⚔ 势力 · 设置）</div>
       </div>
       <table>
         <tr><th>入口</th><th>路径</th><th>用途</th></tr>
@@ -397,29 +374,8 @@ cd frontend && npm install && npm run dev   # → http://localhost:5173</code></
     <section id="world">
       <h2>5. 世界 / 新故事</h2>
       <div class="fig">
-        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg" aria-label="世界构建页示意">
-          <rect width="640" height="320" class="screen"/>
-          <rect x="0" y="0" width="140" height="320" class="panel"/>
-          <text x="20" y="40" fill="#7c6cf0" font-size="10" font-weight="600">侧栏导航</text>
-          <text x="20" y="65" fill="#c4b5fd" font-size="10">● 核心设定</text>
-          <text x="20" y="85" fill="#9399b0" font-size="10">○ 势力</text>
-          <text x="20" y="105" fill="#9399b0" font-size="10">○ 角色</text>
-          <text x="20" y="125" fill="#9399b0" font-size="10">○ 关系</text>
-          <text x="20" y="145" fill="#9399b0" font-size="10">○ 关键物品</text>
-          <rect x="155" y="15" width="470" height="290" rx="8" class="panel"/>
-          <text x="175" y="42" fill="#e8eaf2" font-size="12" font-weight="600">故事标题 · 类型标签 · 开局地点</text>
-          <rect x="175" y="55" width="430" height="50" rx="4" fill="#0a0c12" stroke="#2a3045"/>
-          <text x="185" y="85" class="story-text">世界观描述（最多 300 字）…</text>
-          <rect x="175" y="120" width="100" height="28" rx="4" class="btn"/>
-          <text x="225" y="138" text-anchor="middle" class="btn-text" font-size="10">✨ 一键生成</text>
-          <rect x="285" y="120" width="100" height="28" rx="4" fill="#1c2030" stroke="#7c6cf0"/>
-          <text x="335" y="138" text-anchor="middle" fill="#c4b5fd" font-size="10">▶ 开始故事</text>
-          <rect x="175" y="165" width="200" height="120" rx="6" fill="#121520" stroke="#2a3045"/>
-          <text x="185" y="185" fill="#9399b0" font-size="10">角色卡片 × N</text>
-          <rect x="390" y="165" width="215" height="120" rx="6" fill="#121520" stroke="#2a3045"/>
-          <text x="400" y="185" fill="#9399b0" font-size="10">关系图谱预览</text>
-        </svg>
-        <div class="fig-caption">图 5-1　世界构建页：左侧分节导航 + 右侧表单与关系图</div>
+        <img src="manual-screenshots/02-nav-world.png" alt="世界构建页：侧栏分节、表单与关系图" loading="lazy" width="1280" height="800" />
+        <div class="fig-caption">图 5-1　世界构建页：左侧 🏰 世界 / ⚔ 势力 / 👤 角色 分节，右侧表单与关系图（实际界面）</div>
       </div>
       <h3>推荐流程</h3>
       <ol class="steps">
@@ -445,30 +401,8 @@ cd frontend && npm install && npm run dev   # → http://localhost:5173</code></
     <section id="game">
       <h2>6. 模拟（游戏）</h2>
       <div class="fig">
-        <svg viewBox="0 0 640 390" xmlns="http://www.w3.org/2000/svg" aria-label="游戏页示意">
-          <rect width="640" height="390" class="screen"/>
-          <rect x="0" y="0" width="160" height="390" class="panel"/>
-          <text x="15" y="30" fill="#9399b0" font-size="10">角色状态 / 关系</text>
-          <rect x="10" y="40" width="140" height="45" rx="4" fill="#121520" stroke="#2a3045"/>
-          <rect x="175" y="10" width="455" height="200" rx="8" class="panel"/>
-          <text x="190" y="35" fill="#e8eaf2" font-size="11" font-weight="600">第 3 轮 · TENSION · 📍 图书馆</text>
-          <text x="190" y="60" class="story-text">月光透过彩色玻璃，在书页上投下斑驳的影子。</text>
-          <text x="190" y="78" class="story-text">她合上手中的古籍，抬眼望向你——</text>
-          <text x="190" y="96" class="story-text">「你确定要打开那扇门吗？」</text>
-          <rect x="190" y="230" width="210" height="36" rx="6" class="option-box"/>
-          <text x="200" y="252" fill="#c4b5fd" font-size="10">A. 推开门，一探究竟</text>
-          <rect x="410" y="230" width="210" height="36" rx="6" class="option-box"/>
-          <text x="420" y="252" fill="#9399b0" font-size="10">B. 先询问她的来历</text>
-          <rect x="190" y="275" width="210" height="36" rx="6" class="option-box"/>
-          <text x="200" y="297" fill="#9399b0" font-size="10">C. 转身离开</text>
-          <rect x="410" y="275" width="210" height="36" rx="6" class="option-box"/>
-          <text x="420" y="297" fill="#9399b0" font-size="10">D. 观察周围环境</text>
-          <rect x="190" y="322" width="430" height="34" rx="6" fill="none" stroke="#3d4460" stroke-dasharray="6 4"/>
-          <text x="200" y="343" fill="#863bff" font-size="10">✏️ 自定义输入… → 「输入你想做的事…」</text>
-          <rect x="520" y="10" width="110" height="28" rx="4" fill="#1c2030" stroke="#fbbf24"/>
-          <text x="575" y="28" text-anchor="middle" fill="#fbbf24" font-size="10">⚡ 快捷设置</text>
-        </svg>
-        <div class="fig-caption">图 6-1　模拟页：预设选项（A–D）或底部「自定义输入」均可推进回合</div>
+        <img src="manual-screenshots/03-game.png" alt="模拟页：叙事正文、选项与快捷设置" loading="lazy" width="1280" height="800" />
+        <div class="fig-caption">图 6-1　模拟页实际界面（无对局时提示创建新故事；有对局时显示正文、选项与 ⚡ 快捷设置）</div>
       </div>
       <h3>基本操作</h3>
       <ul>
@@ -508,6 +442,10 @@ cd frontend && npm install && npm run dev   # → http://localhost:5173</code></
     <!-- 7 NPCs -->
     <section id="npcs">
       <h2>7. 角色页</h2>
+      <div class="fig">
+        <img src="manual-screenshots/06-npcs.png" alt="角色页：角色列表与筛选" loading="lazy" width="1280" height="800" />
+        <div class="fig-caption">图 7-1　角色页实际界面（未开局时为空状态提示）</div>
+      </div>
       <ul>
         <li>列出对局中所有角色（主角 / NPC），显示出场次数、平均信任等统计</li>
         <li>支持按类型筛选、名称搜索</li>
@@ -521,27 +459,8 @@ cd frontend && npm install && npm run dev   # → http://localhost:5173</code></
     <section id="dashboard">
       <h2>8. 势力 / 仪表盘</h2>
       <div class="fig">
-        <svg viewBox="0 0 640 240" xmlns="http://www.w3.org/2000/svg" aria-label="仪表盘示意">
-          <rect width="640" height="240" class="screen"/>
-          <rect x="10" y="10" width="120" height="220" rx="6" class="panel"/>
-          <text x="25" y="35" fill="#c4b5fd" font-size="10">● 概览</text>
-          <text x="25" y="55" fill="#9399b0" font-size="10">○ 时间线</text>
-          <text x="25" y="75" fill="#9399b0" font-size="10">○ 关系网</text>
-          <text x="25" y="95" fill="#9399b0" font-size="10">○ 分支图</text>
-          <text x="25" y="115" fill="#9399b0" font-size="10">○ 势力</text>
-          <rect x="145" y="10" width="485" height="100" rx="6" class="panel"/>
-          <text x="160" y="35" fill="#9399b0" font-size="10">回合 · 字数 · 状态分布</text>
-          <circle cx="220" cy="70" r="25" fill="none" stroke="#7c6cf0" stroke-width="8" stroke-dasharray="100 60"/>
-          <rect x="145" y="120" width="235" height="110" rx="6" fill="#121520" stroke="#2a3045"/>
-          <text x="160" y="145" fill="#9399b0" font-size="10">关系网络图</text>
-          <circle cx="220" cy="185" r="8" fill="#7c6cf0"/>
-          <circle cx="260" cy="175" r="6" fill="#863bff"/>
-          <line x1="220" y1="185" x2="260" y2="175" stroke="#3d4460"/>
-          <rect x="390" y="120" width="240" height="110" rx="6" fill="#121520" stroke="#2a3045"/>
-          <text x="405" y="145" fill="#9399b0" font-size="10">Mermaid 分支图</text>
-          <text x="405" y="170" fill="#6b7289" font-size="9">节点 · 分支路径</text>
-        </svg>
-        <div class="fig-caption">图 8-1　仪表盘：概览统计 + 关系网 + 剧情分支图</div>
+        <img src="manual-screenshots/05-dashboard.png" alt="势力仪表盘：概览与时间线等分节" loading="lazy" width="1280" height="800" />
+        <div class="fig-caption">图 8-1　势力 / 仪表盘实际界面（未开局时的空状态）</div>
       </div>
       <table>
         <tr><th>分节</th><th>内容</th></tr>
@@ -556,6 +475,10 @@ cd frontend && npm install && npm run dev   # → http://localhost:5173</code></
     <!-- 9 Settings -->
     <section id="settings">
       <h2>9. 设置</h2>
+      <div class="fig">
+        <img src="manual-screenshots/04-settings.png" alt="设置页：阅读、数据、界面、API 四个折叠面板" loading="lazy" width="1280" height="800" />
+        <div class="fig-caption">图 9-1　设置页实际界面（📖 阅读 · 💾 数据 · 🎨 界面 · 🔑 API）</div>
+      </div>
       <div class="grid-2">
         <div class="card">
           <h4>📖 阅读</h4>
@@ -697,7 +620,8 @@ cd frontend && npm install && npm run dev   # → http://localhost:5173</code></
     </section>
 
     <footer style="margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border);text-align:center;color:var(--dim);font-size:0.82rem">
-      <p>PromptOS v2 · 用户手册 · 随发布包附带 · 更新日期 2026-06-08</p>
+      <p>PromptOS v2 · 用户手册 · 界面截图为项目实际运行截图 · 更新日期 2026-06-08</p>
+      <p style="margin-top:0.5rem">截图更新：<code>python scripts/capture_manual_screenshots.py</code>（需 playwright）</p>
       <p style="margin-top:0.5rem">版本规则见仓库 <code>RELEASE_VERSIONING.md</code></p>
     </footer>
   </main>

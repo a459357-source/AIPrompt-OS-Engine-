@@ -208,6 +208,10 @@ def make_zip(exe_dir: Path, version: str) -> Path:
         if src.is_file():
             shutil.copy2(src, staging / name)
             print(f"  bundled {name}")
+    shots_dir = RELEASE / "manual-screenshots"
+    if shots_dir.is_dir():
+        shutil.copytree(shots_dir, staging / "manual-screenshots", dirs_exist_ok=True)
+        print(f"  bundled manual-screenshots/ ({len(list(shots_dir.glob('*.png')))} png)")
     zip_base = RELEASE / config.release_zip_basename(version)
     zip_path = zip_base.with_suffix(".zip")
     if zip_path.exists():
