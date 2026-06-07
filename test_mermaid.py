@@ -6,7 +6,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from engine.dashboard import _build_mermaid, _build_faction_graph, _sanitize_mermaid
+from engine.dashboard import _build_mermaid, _build_faction_graph, _format_mermaid_edge, _sanitize_mermaid
 
 
 def test_sanitize_brackets_and_pipes():
@@ -34,6 +34,20 @@ def test_build_mermaid_no_round_char_nodes():
     assert "n0 -- " not in src
 
 
+def test_empty_choice_edge_omits_pipes():
+    line = _format_mermaid_edge("0", "1", "")
+    assert "-->||" not in line
+    assert line == "  n0 --> n1"
+
+
+def test_build_mermaid_no_empty_pipe_edges():
+    nodes = {"0": {"turn": 1, "text": "start"}, "1": {"turn": 2, "text": "next"}}
+    edges = [{"from": "0", "to": "1", "choice": ""}]
+    src = _build_mermaid(nodes, edges, {})
+    assert "-->||" not in src
+    assert "n0 --> n1" in src
+
+
 def test_build_faction_graph_square_nodes():
     memory = {
         "factions": {"北方[联盟]": {"reputation": 0.8}},
@@ -45,6 +59,12 @@ def test_build_faction_graph_square_nodes():
 
 
 if __name__ == "__main__":
-    for fn in (test_sanitize_brackets_and_pipes, test_build_mermaid_no_round_char_nodes, test_build_faction_graph_square_nodes):
+    for fn in (
+        test_sanitize_brackets_and_pipes,
+        test_empty_choice_edge_omits_pipes,
+        test_build_mermaid_no_empty_pipe_edges,
+        test_build_mermaid_no_round_char_nodes,
+        test_build_faction_graph_square_nodes,
+    ):
         fn()
         print(f"✅ {fn.__name__}")

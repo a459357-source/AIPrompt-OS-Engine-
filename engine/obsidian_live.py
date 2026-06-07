@@ -290,7 +290,7 @@ def _update_characters(vault: Path) -> None:
 
 def _update_graph_view(vault: Path) -> None:
     """Write a Mermaid flowchart of the story graph."""
-    from engine.dashboard import _sanitize_mermaid
+    from engine.dashboard import _format_mermaid_edge, _sanitize_mermaid
 
     graph = load_graph()
     nodes = graph.get("nodes", {})
@@ -315,10 +315,7 @@ def _update_graph_view(vault: Path) -> None:
         lines.append(f'  n{nid}["{label}"]')
 
     for edge in edges:
-        frm = edge["from"]
-        to = edge["to"]
-        choice = _sanitize_mermaid(edge.get("choice", ""))
-        lines.append(f'  n{frm} -->|{choice}| n{to}')
+        lines.append(_format_mermaid_edge(edge["from"], edge["to"], edge.get("choice", "")))
 
     lines.append("```")
     lines.append("")

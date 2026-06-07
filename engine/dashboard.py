@@ -56,6 +56,14 @@ def _sanitize_mermaid(text: str) -> str:
     return text
 
 
+def _format_mermaid_edge(frm: str, to: str, choice: str) -> str:
+    """Format a story-graph edge. Mermaid 11 rejects empty pipe labels (``-->||``)."""
+    label = _sanitize_mermaid(choice or "")
+    if label.strip():
+        return f"  n{frm} -->|{label}| n{to}"
+    return f"  n{frm} --> n{to}"
+
+
 def _sanitize_html(text: str) -> str:
     """Minimal HTML escape for inline text in dashboard HTML."""
     if not isinstance(text, str):
@@ -223,10 +231,7 @@ def _build_mermaid(nodes: dict, edges: list, chars: dict) -> str:
 
     # Story edges
     for edge in edges:
-        frm = edge["from"]
-        to = edge["to"]
-        choice = _sanitize_mermaid(edge.get("choice", ""))
-        mm.append(f'  n{frm} -->|{choice}| n{to}')
+        mm.append(_format_mermaid_edge(edge["from"], edge["to"], edge.get("choice", "")))
 
     # Styles
     mm.append("")
@@ -419,7 +424,7 @@ def _build_faction_graph(memory: dict) -> str:
             edge_count += 1
 
     if edge_count == 0:
-        mm.append('  note["势力间暂无显著关系"]')
+        mm.append('  f_empty["势力间暂无显著关系"]')
 
     return "\n".join(mm)
 

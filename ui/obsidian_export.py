@@ -149,7 +149,7 @@ def export_graph_view(output_path: Path | None = None) -> Path:
 
 def _generate_mermaid() -> list[str]:
     """Build Mermaid flowchart lines from the story graph."""
-    from engine.dashboard import _sanitize_mermaid
+    from engine.dashboard import _format_mermaid_edge, _sanitize_mermaid
 
     graph = load_graph()
     nodes = graph.get("nodes", {})
@@ -166,10 +166,7 @@ def _generate_mermaid() -> list[str]:
 
     # Define edges
     for edge in edges:
-        frm = edge["from"]
-        to = edge["to"]
-        choice = _sanitize_mermaid(edge.get("choice", ""))
-        mm.append(f'  n{frm} -->|{choice}| n{to}')
+        mm.append(_format_mermaid_edge(edge["from"], edge["to"], edge.get("choice", "")))
 
     return mm
 
