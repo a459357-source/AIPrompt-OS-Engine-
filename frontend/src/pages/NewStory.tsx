@@ -71,7 +71,7 @@ const ROLE_PRESETS = [
   '炼丹师', '掌门', '外门弟子', '转学生', '学生会长',
 ]
 
-const DEFAULT_STAGES = ['陌生', '熟悉', '朋友', '信赖', '暧昧', '恋人']
+const DEFAULT_STAGES = ['崩坏', '敌视', '对立', '冷漠', '疏远', '陌生', '认识', '信赖', '盟友', '羁绊']
 
 // ── Main Page ──
 export default function NewStory() {
@@ -446,13 +446,13 @@ export default function NewStory() {
                   <span className="font-bold text-game-accent">
                     {watch('characters.0.name') || '主角'}
                   </span>
-                  <span className="text-game-accent text-lg">💞</span>
+                  <span className="text-game-accent text-lg">↔</span>
                   <span className="font-bold text-game-primary">
                     {watch('characters.1.name') || 'NPC'}
                   </span>
                 </div>
                 <p className="text-xs text-game-muted">
-                  设置主角与核心 NPC 之间的关系阶段递进路径。AI 会根据此路径推进角色关系发展。
+                  双向关系系统——正面（陌生→信赖→羁绊）和负面（陌生→疏远→崩坏）。AI 会根据剧情推进关系向任意方向发展。
                 </p>
 
                 {/* Stage chain with descriptions */}
@@ -493,11 +493,11 @@ export default function NewStory() {
                     className="w-full accent-game-accent h-1.5"
                   />
                   <div className="flex justify-between text-[10px] text-game-dim">
-                    <span>陌生人</span>
-                    <span>初识</span>
-                    <span>朋友</span>
-                    <span>亲密</span>
-                    <span>灵魂伴侣</span>
+                    <span className="text-game-danger">崩坏</span>
+                    <span>疏远</span>
+                    <span className="text-game-muted">陌生</span>
+                    <span>信赖</span>
+                    <span className="text-game-success">羁绊</span>
                   </div>
                 </div>
 
