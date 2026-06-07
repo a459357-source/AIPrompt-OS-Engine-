@@ -1334,7 +1334,7 @@ export default function Game() {
                     <Label className="text-xs text-game-accent font-semibold">🎭 内容偏好</Label>
                   </div>
 
-                  <QuickGenRow label="成人模式" hint="开启后切换私人故事视觉主题，并启用内容强度调节">
+                  <QuickGenRow label="Desire+ 主题" hint="开启后切换成人视觉小说界面，并启用内容强度调节">
                     <Switch
                       checked={adultMode}
                       disabled={choosing}
