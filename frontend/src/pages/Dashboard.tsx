@@ -111,26 +111,52 @@ export default function Dashboard() {
     { id: 'factions', label: t('dashboard.factions', lang), icon: <BarChart3 className="w-4 h-4" /> },
   ], [lang])
 
-  const graphInput = useMemo(() => ({
-    title: data?.scene || 'World State',
-    world: data?.analytics?.world_state_v2?.location || '',
-    genre: [] as string[],
-    scene: data?.scene || '',
-    main_goal: '',
-    characters: (data?.characters || []).map((c, i) => ({
-      name: c.name,
-      isMain: i === 0,
-      faction: '',
-    })),
-    factions: (data?.analytics?.world_state_v2?.factions || []).map((f) => ({
-      name: f.name,
-      type: 'organization',
-      leader: '',
-      influence: Math.abs(f.reputation_pct) + 50,
-    })),
-    artifacts: [] as { name: string; type: string; ownerId: string }[],
-    characterRelations: {} as Record<string, unknown>,
-  }), [data])
+  const graphInput = useMemo(() => {
+    const ws = data?.analytics?.world_state_v2
+    const net = ws?.relationship_network
+    const netNodes = net?.nodes ?? []
+    const netEdges = net?.edges ?? []
+
+    const characterRelations: Record<string, unknown> = {}
+    for (const e of netEdges) {
+      if (e.kind === 'relation') {
+        characterRelations[e.to] = { relationshipType: e.label || 'friend' }
+      }
+    }
+    for (const n of netNodes) {
+      if (!n.is_main && n.relationship_type && !characterRelations[n.name]) {
+        characterRelations[n.name] = { relationshipType: n.relationship_type }
+      }
+    }
+
+    return {
+      title: data?.scene || 'World State',
+      world: ws?.location || data?.scene || '',
+      genre: [] as string[],
+      scene: data?.scene || '',
+      main_goal: '',
+      characters: netNodes.length > 0
+        ? netNodes.map((n) => ({
+            name: n.name,
+            isMain: n.is_main,
+            faction: n.faction || '',
+          }))
+        : (data?.characters || []).map((c, i) => ({
+            name: c.name,
+            isMain: i === 0,
+            faction: '',
+          })),
+      factions: (ws?.factions || []).map((f) => ({
+        name: f.name,
+        type: f.type || 'organization',
+        leader: f.leader || '',
+        influence: Math.abs(f.reputation_pct) + 50,
+      })),
+      artifacts: [] as { name: string; type: string; ownerId: string }[],
+      characterRelations,
+      networkEdges: netEdges,
+    }
+  }, [data])
 
   usePageShell({
     navItems,
@@ -430,20 +456,36 @@ export default function Dashboard() {
               {ws.relationship_network.nodes.length === 0 ? (
                 <p className="text-game-dim text-xs">暂无关系数据</p>
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {ws.relationship_network.nodes.map((n) => (
-                    <Badge
-                      key={n.name}
-                      variant={n.is_main ? 'accent' : 'primary'}
-                      size="sm"
-                      className="text-[11px]"
-                    >
-                      {n.name}
-                      {n.relationship_type ? ` · ${n.relationship_type}` : ''}
-                      {' '}({n.trust_pct}%)
-                    </Badge>
-                  ))}
-                </div>
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {ws.relationship_network.nodes.map((n) => (
+                      <Badge
+                        key={n.name}
+                        variant={n.is_main ? 'accent' : 'primary'}
+                        size="sm"
+                        className="text-[11px]"
+                      >
+                        {n.name}
+                        {n.relationship_type ? ` · ${n.relationship_type}` : ''}
+                        {' '}({n.trust_pct}%)
+                      </Badge>
+                    ))}
+                  </div>
+                  {ws.relationship_network.edges.length > 0 ? (
+                    <div className="mt-3 space-y-1 max-h-40 overflow-y-auto pr-1">
+                      {ws.relationship_network.edges.map((e, i) => (
+                        <p key={`${e.from}-${e.to}-${e.kind}-${i}`} className="text-[11px] text-game-muted">
+                          <span className="text-game-text">{e.from}</span>
+                          <span className="text-game-dim mx-1">→</span>
+                          <span className="text-game-text">{e.to}</span>
+                          <span className="text-game-dim ml-1">· {e.label}</span>
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-game-dim text-xs mt-2">暂无关联边（推进对局或完善角色关系设定后会自动生成）</p>
+                  )}
+                </>
               )}
               {ws.faction_links.length > 0 && (
                 <p className="text-[11px] text-game-dim mt-2">

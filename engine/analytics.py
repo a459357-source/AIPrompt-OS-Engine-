@@ -546,6 +546,47 @@ def summary_stats() -> dict:
     }
 
 
+def _remap_relation_keys(raw: dict, npc_names: list[str]) -> dict:
+    """Match characterRelations keys to canonical NPC names (fuzzy)."""
+    if not isinstance(raw, dict):
+        return {}
+    remapped: dict = {}
+    used_keys: set[str] = set()
+    for npc in npc_names:
+        if not npc:
+            continue
+        if npc in raw and isinstance(raw.get(npc), dict):
+            remapped[npc] = raw[npc]
+            used_keys.add(npc)
+            continue
+        for key, val in raw.items():
+            if key in used_keys or not isinstance(val, dict):
+                continue
+            key_str = str(key)
+            if key_str == npc or key_str in npc or npc in key_str:
+                remapped[npc] = val
+                used_keys.add(key_str)
+                break
+    return remapped
+
+
+def _append_relationship_edge(
+    edges: list[dict],
+    seen: set[tuple[str, str, str]],
+    frm: str,
+    to: str,
+    kind: str,
+    label: str,
+) -> None:
+    if not frm or not to or frm == to:
+        return
+    key = (frm, to, kind)
+    if key in seen:
+        return
+    seen.add(key)
+    edges.append({"from": frm, "to": to, "kind": kind, "label": label or kind})
+
+
 def world_state_v2() -> dict:
     """
     Dashboard V2 — 世界状态快照：势力、事件、关系网、世界时间、地点。
@@ -588,18 +629,29 @@ def world_state_v2() -> dict:
             custom = json.loads(custom)
         except Exception:
             custom = {}
-    rel_seed = custom.get("characterRelations") or world.get("characterRelations") or {}
 
     canonical = set(_canonical_character_names(memory))
     nodes: list[dict] = []
     edges: list[dict] = []
+    edge_seen: set[tuple[str, str, str]] = set()
 
     wp_chars = {c.get("name"): c for c in world.get("characters", []) if c.get("name")}
     mem_chars = memory.get("characters", {})
+    session_chars = state.get("characters", {})
     protagonist = next(
         (c.get("name") for c in world.get("characters", []) if c.get("isMain")),
         None,
-    ) or next((c.get("name") for c in state.get("characters", {}).values() if "主角" in (c.get("role") or "")), "主角")
+    ) or next(
+        (c.get("name") for c in session_chars.values() if isinstance(c, dict) and "主角" in (c.get("role") or "")),
+        "主角",
+    )
+
+    rel_seed_raw = custom.get("characterRelations") or world.get("characterRelations") or {}
+    npc_names = [
+        n for n in sorted(canonical)
+        if n != protagonist and not wp_chars.get(n, {}).get("isMain")
+    ]
+    rel_seed = _remap_relation_keys(rel_seed_raw if isinstance(rel_seed_raw, dict) else {}, npc_names)
 
     for name in sorted(canonical):
         wp = wp_chars.get(name, {})
@@ -610,7 +662,7 @@ def world_state_v2() -> dict:
             trust /= 100.0
         nodes.append({
             "name": name,
-            "is_main": bool(wp.get("isMain")),
+            "is_main": bool(wp.get("isMain")) or name == protagonist,
             "faction": wp.get("faction") or mem.get("faction", ""),
             "relationship_type": mem.get("relationship_type") or seed.get("relationshipType", ""),
             "trust_pct": round(max(0, min(1, trust)) * 100),
@@ -618,29 +670,48 @@ def world_state_v2() -> dict:
             "tier": mem.get("tier", ""),
         })
 
-    # 关系网边：角色↔势力 + 角色↔角色（同势力/关系类型）
+    if protagonist and protagonist not in canonical and _is_valid_character_name(protagonist):
+        nodes.insert(0, {
+            "name": protagonist,
+            "is_main": True,
+            "faction": "",
+            "relationship_type": "",
+            "trust_pct": 100,
+            "tags": [],
+            "tier": "",
+        })
+
+    # 关系网边：主角↔NPC、角色↔势力、势力↔势力
     faction_names = {f["name"] for f in factions}
     for n in nodes:
         fac = n.get("faction")
         if fac and fac in faction_names:
-            edges.append({
-                "from": n["name"],
-                "to": fac,
-                "kind": "member_of",
-                "label": "所属",
-            })
+            _append_relationship_edge(edges, edge_seen, n["name"], fac, "member_of", "所属")
 
     for name, seed in (rel_seed.items() if isinstance(rel_seed, dict) else []):
-        if name not in canonical:
+        if name not in canonical and name not in {n["name"] for n in nodes}:
             continue
         rtype = seed.get("relationshipType", "")
         if rtype:
-            edges.append({
-                "from": protagonist,
-                "to": name,
-                "kind": "relation",
-                "label": rtype,
-            })
+            _append_relationship_edge(edges, edge_seen, protagonist, name, "relation", rtype)
+
+    for n in nodes:
+        if n.get("is_main") or n["name"] == protagonist:
+            continue
+        rtype = (n.get("relationship_type") or "").strip()
+        if rtype:
+            _append_relationship_edge(edges, edge_seen, protagonist, n["name"], "relation", rtype)
+            continue
+        sc = session_chars.get(n["name"], {})
+        if isinstance(sc, dict):
+            rel_list = sc.get("relationship") or []
+            if rel_list and isinstance(rel_list[0], str) and rel_list[0].strip():
+                _append_relationship_edge(edges, edge_seen, protagonist, n["name"], "relation", rel_list[0].strip())
+                continue
+        if n.get("trust_pct") is not None:
+            _append_relationship_edge(
+                edges, edge_seen, protagonist, n["name"], "relation", f"信任 {n['trust_pct']}%",
+            )
 
     # 势力间态度
     faction_links: list[dict] = []
@@ -658,6 +729,11 @@ def world_state_v2() -> dict:
                 "attitude": att,
                 "label": "友好" if att >= 0.65 else "敌对" if att <= 0.35 else "中立",
             })
+            if abs(att - 0.5) >= 0.1:
+                _append_relationship_edge(
+                    edges, edge_seen, src, tgt, "faction_attitude",
+                    "友好" if att >= 0.65 else "敌对" if att <= 0.35 else "中立",
+                )
 
     locations = world.get("locations") or []
     loc_list = [

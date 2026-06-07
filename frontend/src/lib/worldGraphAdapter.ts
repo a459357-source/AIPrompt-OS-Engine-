@@ -48,6 +48,8 @@ export interface WorldGraphInput {
   factions: Array<{ name: string; type: string; leader: string; influence: number }>
   artifacts: Array<{ name: string; type: string; ownerId: string }>
   characterRelations: Record<string, unknown>
+  /** 来自 world_state_v2 的显式边，用于仪表盘只读图谱 */
+  networkEdges?: Array<{ from: string; to: string; kind: string; label: string }>
   nodePositions?: Record<string, { x: number; y: number }>
 }
 
@@ -157,6 +159,28 @@ export function buildWorldGraph(input: WorldGraphInput): { nodes: Node[]; edges:
         })
       }
     })
+  }
+
+  if (input.networkEdges?.length) {
+    const charIdByName = new Map(input.characters.map((c, i) => [c.name, `character-${i}`]))
+    const factionIdByName = new Map(input.factions.map((f, i) => [f.name, `faction-${i}`]))
+    for (const e of input.networkEdges) {
+      const src = charIdByName.get(e.from) ?? factionIdByName.get(e.from)
+      const tgt = charIdByName.get(e.to) ?? factionIdByName.get(e.to)
+      if (!src || !tgt || src === tgt) continue
+      const edgeId = `net-${src}-${tgt}-${e.kind}`
+      if (edges.some((edge) => edge.id === edgeId)) continue
+      edges.push({
+        id: edgeId,
+        source: src,
+        target: tgt,
+        type: 'relation',
+        data: { edgeType: e.kind, label: e.label },
+        label: e.label,
+        animated: e.kind === 'relation',
+        style: e.kind === 'relation' ? { stroke: '#ff2d95' } : undefined,
+      })
+    }
   }
 
   input.artifacts.forEach((a, i) => {
