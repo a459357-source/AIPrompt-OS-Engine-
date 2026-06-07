@@ -4,6 +4,7 @@ __pycache__/
 data/saves/
 output/
 session_state.yaml
+!packaging/defaults/session_state.yaml
 data/apikey.json
 data/api_usage.jsonl
 
@@ -14,3 +15,10 @@ data/world_init.json
 data/app.log
 data/error.log
 world_pack.yaml
+!packaging/defaults/world_pack.yaml
+
+# ── 打包产物 ──
+dist/
+build_pyinstaller/
+PromptOS.spec
+release/*.zip
