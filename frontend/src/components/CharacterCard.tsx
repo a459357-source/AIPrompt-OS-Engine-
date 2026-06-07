@@ -108,23 +108,40 @@ export function CharacterCard({ character, index, isMain, onRemove, className, t
 
           <Separator className="my-1" />
 
-          {/* Affinity — uses real trust_pct from memory.json. 主角对自己没有好感度 */}
-          {!isMain && (
-            <div>
-              <span className="text-[10px] text-game-muted">好感度</span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <div className="flex-1 h-2 bg-game-border rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-game-primary to-game-accent rounded-full transition-all"
-                    style={{ width: `${Math.max(0, Math.min(100, affinity))}%` }}
-                  />
+          {/* Affinity — bidirectional bar: 左红(敌意) 右绿(好感)，50%中性 */}
+          {!isMain && (() => {
+            const isHostile = affinity < 50
+            const barWidth = Math.abs(affinity - 50) * 2  // 0~100
+            const barColor = isHostile ? '#da3633' : '#3fb950'
+            const label = affinity <= 35 ? '敌视' : affinity <= 45 ? '疏远' : affinity >= 65 ? '信赖' : affinity >= 55 ? '友好' : '中立'
+            const labelColor = affinity <= 35 ? 'text-game-danger' : affinity <= 45 ? 'text-game-warning' : affinity >= 65 ? 'text-game-success' : 'text-game-muted'
+            return (
+              <div>
+                <span className="text-[10px] text-game-muted">关系</span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex-1 h-2 bg-game-border rounded-full overflow-hidden relative">
+                    {/* center line at 50% */}
+                    <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 0 }}>
+                      <div className="h-full w-px bg-game-border/50" />
+                    </div>
+                    {/* filled bar — grows from center */}
+                    <div
+                      className="h-full rounded-full transition-all absolute top-0"
+                      style={{
+                        width: barWidth > 0 ? `${barWidth}%` : '0',
+                        [isHostile ? 'right' : 'left']: '50%',
+                        background: barColor,
+                        zIndex: 1,
+                      }}
+                    />
+                  </div>
+                  <span className={`text-[10px] tabular-nums ${labelColor}`}>
+                    {affinity}% {label}
+                  </span>
                 </div>
-                <span className="text-[10px] text-game-muted tabular-nums">
-                  {affinity}%
-                </span>
               </div>
-            </div>
-          )}
+            )
+          })()}
         </CardContent>
       </Card>
     </motion.div>

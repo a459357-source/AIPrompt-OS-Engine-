@@ -33,11 +33,17 @@ interface FactionInfo {
 function AffectionBar({ value }: { value: number; name?: string }) {
   // 防御 NaN / undefined / 负数（避免 '█'.repeat(NaN) 崩溃）
   const safe = Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 50
-  const filled = Math.floor(safe / 10)
-  const empty = 10 - filled
+  // 双向条：左5格=敌意(红)，右5格=好感(绿)，50%为中性
+  const hostility = Math.max(0, Math.min(5, Math.round((50 - safe) / 10)))  // 0~5 红色
+  const affection = Math.max(0, Math.min(5, Math.round((safe - 50) / 10)))  // 0~5 绿色
+  const neutral = 10 - hostility - affection  // 中间灰色
+  const label = safe <= 35 ? '敌视' : safe <= 45 ? '疏远' : safe >= 65 ? '信赖' : safe >= 55 ? '友好' : '中立'
   return (
-    <span className="text-xs text-game-accent tracking-[2px] select-none">
-      {'█'.repeat(filled)}{'░'.repeat(empty)}
+    <span className="text-xs tracking-[2px] select-none leading-none">
+      <span className="text-game-danger">{'█'.repeat(hostility)}</span>
+      <span className="text-game-dim">{'░'.repeat(neutral)}</span>
+      <span className="text-game-success">{'█'.repeat(affection)}</span>
+      <span className="text-game-muted ml-1">{label}</span>
     </span>
   )
 }
@@ -151,10 +157,7 @@ export default function Game() {
           {c.relation && <p className="text-xs text-game-muted">{c.relation}</p>}
           {/* 主角对自己没有好感度，只显示 NPC 对主角的好感 */}
           {c.tier !== '主角' && (
-            <div className="flex items-center gap-2">
-              <AffectionBar value={c.affection ?? 50} />
-              <span className="text-xs text-game-dim tabular-nums">{c.affection ?? 50}%</span>
-            </div>
+            <AffectionBar value={c.affection ?? 50} />
           )}
           <Separator />
         </div>
