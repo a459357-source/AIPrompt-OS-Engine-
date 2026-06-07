@@ -38,6 +38,15 @@
       font-size: 0.88em;
       color: #b8a9ff;
     }
+    kbd {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 0.82em;
+      font-family: inherit;
+      color: var(--text);
+    }
     .hero {
       background: linear-gradient(135deg, #12152a 0%, #1a1040 50%, #0c0e14 100%);
       border-bottom: 1px solid var(--border);
@@ -435,9 +444,9 @@ cd frontend && npm install && npm run dev   # → http://localhost:5173</code></
     <section id="game">
       <h2>6. 模拟（游戏）</h2>
       <div class="fig">
-        <svg viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg" aria-label="游戏页示意">
-          <rect width="640" height="360" class="screen"/>
-          <rect x="0" y="0" width="160" height="360" class="panel"/>
+        <svg viewBox="0 0 640 390" xmlns="http://www.w3.org/2000/svg" aria-label="游戏页示意">
+          <rect width="640" height="390" class="screen"/>
+          <rect x="0" y="0" width="160" height="390" class="panel"/>
           <text x="15" y="30" fill="#9399b0" font-size="10">角色状态 / 关系</text>
           <rect x="10" y="40" width="140" height="45" rx="4" fill="#121520" stroke="#2a3045"/>
           <rect x="175" y="10" width="455" height="200" rx="8" class="panel"/>
@@ -453,18 +462,30 @@ cd frontend && npm install && npm run dev   # → http://localhost:5173</code></
           <text x="200" y="297" fill="#9399b0" font-size="10">C. 转身离开</text>
           <rect x="410" y="275" width="210" height="36" rx="6" class="option-box"/>
           <text x="420" y="297" fill="#9399b0" font-size="10">D. 观察周围环境</text>
+          <rect x="190" y="322" width="430" height="34" rx="6" fill="none" stroke="#3d4460" stroke-dasharray="6 4"/>
+          <text x="200" y="343" fill="#863bff" font-size="10">✏️ 自定义输入… → 「输入你想做的事…」</text>
           <rect x="520" y="10" width="110" height="28" rx="4" fill="#1c2030" stroke="#fbbf24"/>
           <text x="575" y="28" text-anchor="middle" fill="#fbbf24" font-size="10">⚡ 快捷设置</text>
         </svg>
-        <div class="fig-caption">图 6-1　模拟页：左侧关系面板 · 中央叙事正文 · 底部四选项 · 快捷设置</div>
+        <div class="fig-caption">图 6-1　模拟页：预设选项（A–D）或底部「自定义输入」均可推进回合</div>
       </div>
       <h3>基本操作</h3>
       <ul>
-        <li>阅读 AI 生成的 Markdown 正文（支持打字机效果，可在设置中关闭动画）</li>
-        <li>点击 <strong>A / B / C / D</strong> 选项推进下一回合</li>
+        <li>阅读 AI 生成的 Markdown 正文（支持打字机效果，可在<strong>设置 → 界面</strong>中关闭动画）</li>
+        <li><strong>推进回合（二选一）</strong>
+          <ul>
+            <li>点击 AI 给出的 <strong>A / B / C / D</strong> 预设选项（选项数量可在快捷设置中设为 3–5 个）</li>
+            <li>或点击选项下方的 <strong>「✏️ 自定义输入…」</strong>，在输入框中写下你想做的行动，按 <kbd>Enter</kbd> 或点「确定」提交</li>
+          </ul>
+        </li>
+        <li>自定义内容与预设选项等效：引擎会把你的文字作为「玩家选择」交给 AI 续写，历史中会标记为「✏️ 自定义」</li>
+        <li>若当前没有可用选项（例如生成延迟），也可直接使用自定义输入继续推进</li>
         <li>左侧面板显示当前角色关系指标（信任、好感、敌意等）</li>
         <li>顶栏显示当前回合数、剧情状态机（SETUP → BUILD → TENSION → CLIMAX → COOLDOWN）、场景</li>
       </ul>
+      <div class="callout">
+        <strong>自定义输入提示：</strong>尽量写清楚具体行动（如「悄悄跟踪她到后院」），比单字描述更容易得到连贯剧情。按 <kbd>Esc</kbd> 可取消输入框。若内容与成人向相关，非成人模式下可能出现开启成人模式的提示横幅。
+      </div>
       <h3 id="game-quick">⚡ 快捷设置（游戏页）</h3>
       <p>展开「⚡ 快捷设置」可调整<strong>下一回合生效</strong>的生成参数：</p>
       <table>
