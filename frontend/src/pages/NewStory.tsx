@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -23,7 +23,7 @@ import { InspectorPanel } from '@/components/layout/InspectorPanel'
 import { usePageShell } from '@/components/layout/usePageShell'
 import { SectionHeader } from '@/components/neural/SectionHeader'
 import { GlowDivider } from '@/components/neural/GlowDivider'
-import { parseNodeSelection } from '@/lib/worldGraphAdapter'
+import { parseNodeSelection, createDemoGraphSeed } from '@/lib/worldGraphAdapter'
 import { t, tTheme } from '@/lib/i18n'
 import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
 import type { Character, WorldGenResponse } from '@/lib/types'
@@ -446,6 +446,51 @@ export default function NewStory() {
     setAiStatus(msg)
     setAiStatusType(type)
   }
+
+  const applyDemoGraph = useCallback(() => {
+    const seed = createDemoGraphSeed()
+    setValue('title', seed.title.slice(0, 20))
+    setValue('scene', seed.scene)
+    setValue('main_goal', seed.main_goal)
+    setFactions(mapGeneratedFactions(seed.factions as unknown as Array<Record<string, unknown>>))
+    const base = getValues('characters')
+    const emptyChar = (): FormValues['characters'][number] => ({
+      name: '', isMain: false, role_tags: [], personality_tags: [],
+      appearance: '', relationship: [], goal: '', secret: '',
+      background: '', special_ability: '',
+    })
+    const merged = (seed.characters || []).map((c, i) => ({
+      ...(base[i] || emptyChar()),
+      ...c,
+    }))
+    setValue('characters', merged)
+    if (seed.characterRelations) {
+      setCharacterRelations(seed.characterRelations as typeof characterRelations)
+    }
+    if (seed.artifacts?.length) {
+      const facRows = mapGeneratedFactions(seed.factions as unknown as Array<Record<string, unknown>>)
+      setArtifacts(mapGeneratedArtifacts(
+        seed.artifacts as unknown as Array<Record<string, unknown>>,
+        (seed.characters || []).map((c) => c.name),
+        facRows,
+      ))
+    }
+    showStatus('✅ 已加载示例连线（核心→势力→角色→物品）', 'success')
+  }, [getValues, setValue])
+
+  const demoGraphLoadedRef = useRef(false)
+  useEffect(() => {
+    if (demoGraphLoadedRef.current) return
+    const timer = setTimeout(() => {
+      if (demoGraphLoadedRef.current) return
+      if (factions.length > 0) return
+      const chars = getValues('characters')
+      if (chars.some((c) => c.name.trim())) return
+      demoGraphLoadedRef.current = true
+      applyDemoGraph()
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [factions.length, getValues, applyDemoGraph])
 
   const applyWorldGenResult = useCallback((data: WorldGenResponse): string[] => {
     if (!data.characters?.length) {
@@ -1738,6 +1783,7 @@ export default function NewStory() {
           selectedNodeId={selectedNodeId}
           onSelectNode={setSelectedNodeId}
           onPositionsChange={setNodePositions}
+          onApplyDemo={applyDemoGraph}
           onGraphUpdate={(update) => {
             if (update.factions) {
               setFactions((prev) =>

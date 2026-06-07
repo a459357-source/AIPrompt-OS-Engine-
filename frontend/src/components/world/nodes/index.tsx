@@ -2,6 +2,9 @@ import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { cn } from '@/lib/utils'
 import type { WorldNodeData } from '@/lib/worldGraphAdapter'
+import { RelationEdge } from './RelationEdge'
+
+const handleClass = '!w-3.5 !h-3.5 !border-2 !border-white/80 !shadow-md'
 
 function WorldCoreNode({ data, selected }: NodeProps) {
   const d = data as unknown as WorldNodeData & { nodeType: 'worldCore' }
@@ -12,7 +15,7 @@ function WorldCoreNode({ data, selected }: NodeProps) {
         selected && 'ring-2 ring-neural-cyan shadow-[0_0_32px_rgba(0,240,255,0.3)]',
       )}
     >
-      <Handle type="target" position={Position.Top} className="!bg-neural-cyan !w-2 !h-2" />
+      <Handle type="target" position={Position.Top} className={cn(handleClass, '!bg-neural-cyan')} />
       <span className="text-[10px] font-neural-mono text-neural-cyan/70 uppercase">Core</span>
       <span className="text-sm font-neural-display text-neural-cyan neural-text-glow truncate w-full">
         {d.title || '世界核心'}
@@ -20,7 +23,7 @@ function WorldCoreNode({ data, selected }: NodeProps) {
       {d.genre?.length > 0 && (
         <span className="text-[9px] text-game-muted mt-1 truncate w-full">{d.genre.slice(0, 2).join(' · ')}</span>
       )}
-      <Handle type="source" position={Position.Bottom} className="!bg-neural-violet !w-2 !h-2" />
+      <Handle type="source" position={Position.Bottom} className={cn(handleClass, '!bg-neural-violet')} />
     </div>
   )
 }
@@ -35,12 +38,12 @@ function FactionNode({ data, selected }: NodeProps) {
       )}
       style={{ clipPath: 'polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%)' }}
     >
-      <Handle type="target" position={Position.Top} id="core-in" className="!bg-neural-cyan !w-2 !h-2" />
-      <Handle type="target" position={Position.Left} className="!bg-neural-violet !w-2 !h-2" />
+      <Handle type="target" position={Position.Top} id="core-in" className={cn(handleClass, '!bg-neural-cyan')} />
+      <Handle type="target" position={Position.Left} className={cn(handleClass, '!bg-neural-violet')} />
       <div className="text-[9px] font-neural-mono text-neural-violet uppercase">Faction</div>
       <div className="text-xs font-bold text-game-text truncate">{d.name}</div>
       {d.leader && <div className="text-[10px] text-game-muted">首领: {d.leader}</div>}
-      <Handle type="source" position={Position.Right} className="!bg-neural-violet !w-2 !h-2" />
+      <Handle type="source" position={Position.Right} className={cn(handleClass, '!bg-neural-violet')} />
     </div>
   )
 }
@@ -55,13 +58,13 @@ function CharacterNode({ data, selected }: NodeProps) {
         selected && 'ring-2 ring-neural-cyan',
       )}
     >
-      <Handle type="target" position={Position.Top} className="!bg-neural-cyan !w-2 !h-2" />
+      <Handle type="target" position={Position.Top} className={cn(handleClass, '!bg-neural-cyan')} />
       <div className="text-[9px] font-neural-mono text-neural-cyan uppercase">
         {d.isMain ? 'Protagonist' : 'Character'}
       </div>
       <div className="text-xs font-bold truncate">{d.name}</div>
       {d.faction && <div className="text-[10px] text-game-muted">{d.faction}</div>}
-      <Handle type="source" position={Position.Bottom} className="!bg-neural-magenta !w-2 !h-2" />
+      <Handle type="source" position={Position.Bottom} className={cn(handleClass, '!bg-neural-magenta')} />
     </div>
   )
 }
@@ -79,14 +82,10 @@ function ArtifactNode({ data, selected }: NodeProps) {
         <div className="text-[8px] font-neural-mono text-neural-magenta">ITEM</div>
         <div className="text-[10px] font-bold truncate max-w-[70px]">{d.name}</div>
       </div>
-      <Handle type="target" position={Position.Left} className="!bg-neural-magenta !w-2 !h-2" />
-      <Handle type="source" position={Position.Right} className="!bg-neural-magenta !w-2 !h-2" />
+      <Handle type="target" position={Position.Left} className={cn(handleClass, '!bg-neural-magenta')} />
+      <Handle type="source" position={Position.Right} className={cn(handleClass, '!bg-neural-magenta')} />
     </div>
   )
-}
-
-function RelationEdge() {
-  return null
 }
 
 export const worldNodeTypes = {

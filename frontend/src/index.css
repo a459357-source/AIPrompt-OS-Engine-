@@ -115,3 +115,18 @@ body {
   to { height: 0; opacity: 0; }
 }
 
+/* React Flow — 图谱连线可见性 */
+.react-flow__edge-path {
+  stroke-width: 2;
+}
+.react-flow__edge.animated path {
+  stroke-dasharray: 6 4;
+  animation: rf-edge-dash 0.6s linear infinite;
+}
+@keyframes rf-edge-dash {
+  to { stroke-dashoffset: -10; }
+}
+.react-flow__handle {
+  min-width: 14px;
+  min-height: 14px;
+}

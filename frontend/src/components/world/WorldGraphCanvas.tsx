@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import {
   ReactFlow,
+  ReactFlowProvider,
   Background,
   Controls,
   MiniMap,
@@ -22,17 +23,19 @@ interface WorldGraphCanvasProps {
   onSelectNode: (nodeId: string | null) => void
   onPositionsChange?: (positions: Record<string, { x: number; y: number }>) => void
   onGraphUpdate?: (update: Partial<WorldGraphInput>) => void
+  onApplyDemo?: () => void
   readOnly?: boolean
   focusSection?: string | null
   className?: string
 }
 
-export function WorldGraphCanvas({
+function WorldGraphCanvasInner({
   input,
   selectedNodeId,
   onSelectNode,
   onPositionsChange,
   onGraphUpdate,
+  onApplyDemo,
   readOnly = false,
   className,
 }: WorldGraphCanvasProps) {
@@ -41,10 +44,14 @@ export function WorldGraphCanvas({
   const [edges, setEdges, onEdgesChange] = useEdgesState(graph.edges)
 
   useEffect(() => {
-    setNodes(graph.nodes.map((n) => ({
-      ...n,
-      selected: n.id === selectedNodeId,
-    })))
+    setNodes((prev) => {
+      const prevById = new Map(prev.map((n) => [n.id, n]))
+      return graph.nodes.map((n) => ({
+        ...n,
+        position: prevById.get(n.id)?.position ?? n.position,
+        selected: n.id === selectedNodeId,
+      }))
+    })
     setEdges(graph.edges)
   }, [graph, selectedNodeId, setNodes, setEdges])
 
@@ -57,7 +64,6 @@ export function WorldGraphCanvas({
       )
       if (!update) return
       onGraphUpdate(update)
-      // 数据更新后 buildWorldGraph 会重建边；先乐观追加避免连线闪灭
       setEdges((eds) =>
         addEdge(
           {
@@ -98,6 +104,8 @@ export function WorldGraphCanvas({
         onNodeDragStop={onNodeDragStop}
         nodeTypes={worldNodeTypes}
         edgeTypes={worldEdgeTypes}
+        defaultEdgeOptions={{ type: 'relation' }}
+        connectionLineStyle={{ stroke: '#58a6ff', strokeWidth: 2 }}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         nodesDraggable={!readOnly}
@@ -117,6 +125,17 @@ export function WorldGraphCanvas({
             return '#ffb870'
           }}
         />
+        {!readOnly && onApplyDemo && (
+          <Panel position="top-left" className="m-12 md:m-4">
+            <button
+              type="button"
+              onClick={onApplyDemo}
+              className="glass-panel px-3 py-1.5 text-xs text-neural-cyan border border-neural-cyan/30 hover:bg-neural-cyan/10 transition-colors rounded-md"
+            >
+              🔗 加载示例连线
+            </button>
+          </Panel>
+        )}
         {readOnly && (
           <Panel position="top-right" className="glass-panel px-2 py-1 text-[10px] font-neural-mono text-neural-cyan/60">
             READ ONLY
@@ -124,5 +143,13 @@ export function WorldGraphCanvas({
         )}
       </ReactFlow>
     </div>
+  )
+}
+
+export function WorldGraphCanvas(props: WorldGraphCanvasProps) {
+  return (
+    <ReactFlowProvider>
+      <WorldGraphCanvasInner {...props} />
+    </ReactFlowProvider>
   )
 }

@@ -396,3 +396,52 @@ export function handleNewConnection(
 
   return null
 }
+
+/** 示例数据：预填势力/角色/关系，便于验证图谱连线可见 */
+export function createDemoGraphSeed(): WorldGraphUpdate & {
+  title: string
+  scene: string
+  main_goal: string
+} {
+  const factions: WorldGraphInput['factions'] = [
+    { name: '星穹学院', type: 'school', leader: '苏浅', influence: 72 },
+    { name: '暗域议会', type: 'organization', leader: '', influence: 58 },
+  ]
+  const characters: WorldGraphInput['characters'] = [
+    { name: '林远', isMain: true, faction: '' },
+    { name: '苏浅', isMain: false, faction: '星穹学院' },
+    { name: '陈默', isMain: false, faction: '暗域议会' },
+  ]
+  return {
+    title: '星痕纪元',
+    scene: '星穹学院·新生报到处',
+    main_goal: '查明暗域议会渗透学院的真相',
+    factions,
+    characters,
+    characterRelations: {
+      苏浅: {
+        relationshipType: 'friend',
+        affection: 62,
+        trust: 55,
+        respect: 60,
+        dependence: 40,
+        hostility: 10,
+        attraction: 45,
+        tags: ['青梅竹马', '同窗'],
+      },
+      陈默: {
+        relationshipType: 'rival',
+        affection: 35,
+        trust: 28,
+        respect: 50,
+        dependence: 20,
+        hostility: 55,
+        attraction: 15,
+        tags: ['对手', '互相试探'],
+      },
+    },
+    artifacts: [
+      { name: '学院徽章', type: 'personal', ownerId: '林远' },
+    ],
+  }
+}
