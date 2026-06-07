@@ -907,9 +907,9 @@ def content_preference_rules_text() -> str:
     # ── 选项生成约束 ──
     if ADULT_MODE:
         if adult_w >= 50:
-            parts.append("【选项】至少 1 个选项应涉及亲密互动或成人情境，与当前角色关系阶段匹配。")
+            parts.append("【选项】最多只保留 1 个正常剧情选项（如探索、战斗、调查），其余所有选项必须涉及亲密互动或成人情境，与当前角色关系阶段自然匹配。")
         elif adult_w >= 25:
-            parts.append("【选项】可包含暧昧或亲密互动的选项，但应提供同等数量的剧情/探索选项作为替代。")
+            parts.append("【选项】每轮至少一半选项涉及暧昧或亲密互动，其余为正常剧情选项。两项数量大致均衡。")
         elif adult_w > 0:
             parts.append("【选项】成人相关选项作为点缀（约每 3-4 轮出现 1 次），多数选项仍以剧情和角色发展为主。")
         else:
@@ -917,11 +917,12 @@ def content_preference_rules_text() -> str:
     else:
         parts.append("【选项】所有选项必须是全年龄向。禁止出现暧昧邀约、亲密接触、成人暗示等选项。感情选项限于关心、鼓励、合作等友谊范畴。")
 
-    # 剧情/感情选项比例约束
-    if story_w >= 60:
-        parts.append("【选项】过半数选项应围绕主线剧情推进、世界观探索、冲突解决。")
-    if romance_w >= 50:
-        parts.append("【选项】每轮至少 1 个选项涉及角色感情互动或关系发展。")
+    # 剧情/感情选项比例约束（仅在非最高成人档时生效，避免与上述规则冲突）
+    if adult_w < 50:
+        if story_w >= 60:
+            parts.append("【选项】过半数选项应围绕主线剧情推进、世界观探索、冲突解决。")
+        if romance_w >= 50:
+            parts.append("【选项】每轮至少 1 个选项涉及角色感情互动或关系发展。")
 
     return "【内容节奏】\n" + "\n".join(f"- {p}" for p in parts)
 
