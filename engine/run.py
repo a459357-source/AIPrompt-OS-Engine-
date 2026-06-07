@@ -494,6 +494,22 @@ def _update_memory(response: dict, state: dict, choice: str | None = None) -> No
                         break
                 assign_character_tier(memory, name, world_pack, is_main=is_main)
 
+        # ── One-time trust migration for old data ─────────────
+        # Characters registered before the initial-trust system had
+        # default trust=0.5 or trust=0.0 (from old keyword heuristic).
+        # Migrate them to relationship-based initial trust once.
+        if not memory.get("_trust_migrated"):
+            for name in list(mem_chars.keys()):
+                old_trust = mem_chars[name].get("trust", 0.5)
+                # Only migrate if trust is at old defaults (0.5 or 0.0)
+                if old_trust in (0.5, 0.0):
+                    new_trust = get_initial_trust(name, world_pack)
+                    if abs(new_trust - old_trust) > 0.01:
+                        mem_chars[name]["trust"] = new_trust
+                        logger.info("Memory: migrated '%s' trust %.2f → %.2f",
+                                    name, old_trust, new_trust)
+            memory["_trust_migrated"] = True
+
         # ── Detect new characters from story text (fallback) ──
         # If the AI introduced a character in the narrative but forgot to
         # register it in state.characters, catch it from the story text.

@@ -734,13 +734,17 @@ def get_char_stats_for_ui(session_state: dict, memory: dict, world_pack: dict | 
             stage = custom_stages[stage_idx]
             stages_list = custom_stages
         else:
-            stage = "陌生"
             stages_list = _AFFECTION_STAGES if trust_pct >= 0 else _BAD_STAGES
+            stage = stages_list[0][1]  # default to first stage
             for threshold, label in stages_list:
                 if trust_pct >= threshold:
-                    stage = label
-                else:
-                    break
+                    stage = label  # keep going to find highest matching
+            # For negative trust, pick the lowest (most negative) matching stage
+            if trust_pct < 0:
+                for threshold, label in reversed(stages_list):
+                    if trust_pct <= threshold:
+                        stage = label
+                        break
 
         # Hearts: 5 hearts, filled count based on abs(trust_pct)/20
         filled = min(5, max(0, round(abs(trust_pct) / 20)))
@@ -790,8 +794,11 @@ def get_char_stats_for_ui(session_state: dict, memory: dict, world_pack: dict | 
             for threshold, label in stages_list:
                 if trust_pct >= threshold:
                     stage = label
-                else:
-                    break
+            if trust_pct < 0:
+                for threshold, label in reversed(stages_list):
+                    if trust_pct <= threshold:
+                        stage = label
+                        break
         filled = min(5, max(0, round(abs(trust_pct) / 20)))
         hearts = "♥" * filled + "♡" * (5 - filled)
         if trust_pct < 0:
