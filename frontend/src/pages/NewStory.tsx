@@ -168,6 +168,39 @@ type FactionRow = {
   leader: string
 }
 
+function factionTypeLabel(type: string): string {
+  const map: Record<string, string> = {
+    government: '🏛️ 政府',
+    corporation: '💼 企业',
+    family: '👪 家族',
+    organization: '🏢 组织',
+    guild: '⚔️ 行会',
+    school: '📚 学院',
+    religion: '⛪ 宗教',
+    kingdom: '👑 王国',
+    other: '📋 其他',
+  }
+  return map[type] || map.organization
+}
+
+const FACTION_RELATION_LABELS: Record<string, string> = {
+  ally: '盟友',
+  friendly: '友好',
+  neutral: '中立',
+  hostile: '敌对',
+  enemy: '死敌',
+}
+
+const FACTION_POWER_LABELS = {
+  military: '军事',
+  economic: '经济',
+  political: '政治',
+  technology: '科技',
+} as const
+
+const selectFieldClass =
+  'w-full h-9 bg-game-bg border border-game-border rounded-md px-2.5 text-sm text-game-text'
+
 function mapGeneratedFactions(raw: Array<Record<string, unknown>>): FactionRow[] {
   return raw.map((f) => ({
     name: (f.name as string) || '',
@@ -319,7 +352,25 @@ export default function NewStory() {
     dependence: number; hostility: number; attraction: number; tags: string[];
   }>>({})
   const [artifacts, setArtifacts] = useState<{ name: string; type: string; description: string; ownerType: string; ownerId: string; importance: number; abilities: string[]; tags: string[] }[]>([])
-  const [factions, setFactions] = useState<{ name: string; type: string; description: string; goals: string[]; resources: string[]; controlledTerritories: string[]; subordinateOrganizations: string[]; keyAssets: string[]; power: { military: number; economic: number; political: number; technology: number }; influence: number; relation_to_player: string; leader: string }[]>([])
+  const [factions, setFactions] = useState<FactionRow[]>([])
+  const patchFaction = useCallback((idx: number, patch: Partial<FactionRow>) => {
+    setFactions((prev) => prev.map((f, i) => (i === idx ? { ...f, ...patch } : f)))
+  }, [])
+  const patchFactionPower = useCallback(
+    (idx: number, key: keyof FactionRow['power'], val: number) => {
+      setFactions((prev) =>
+        prev.map((f, i) =>
+          i !== idx
+            ? f
+            : { ...f, power: { ...f.power, [key]: Math.max(0, Math.min(100, val)) } },
+        ),
+      )
+    },
+    [],
+  )
+  const removeFaction = useCallback((idx: number) => {
+    setFactions((prev) => prev.filter((_, i) => i !== idx))
+  }, [])
   const [customStats, setCustomStats] = useState<{ key: string; label: string; max: number }[]>([])
   const [keywords, setKeywords] = useState('')
   const [activePreset, setActivePreset] = useState<string | null>(null)
@@ -918,20 +969,20 @@ export default function NewStory() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                <div className="space-y-4">
                   {(factions || []).map((fac, idx) => (
                     <motion.div
                       key={idx}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
                     >
-                      <Card className="border-game-warning/30">
-                        <CardHeader className="pb-1">
-                          <div className="flex items-center justify-between">
-                            <Badge variant="warning" size="sm">
-                              {fac.type === 'government' ? '🏛️ 政府' : fac.type === 'corporation' ? '💼 企业' : fac.type === 'family' ? '👪 家族' : fac.type === 'religion' ? '⛪ 宗教' : '🏢 组织'}
+                      <Card className="border-game-warning/30 bg-game-bg/40">
+                        <CardHeader className="pb-3 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <Badge variant="warning" size="sm" className="shrink-0 mt-1">
+                              {factionTypeLabel(fac.type)}
                             </Badge>
-                            <div className="flex gap-1">
+                            <div className="flex gap-1 shrink-0">
                               <AIButton
                                 loading={generating === `faction-${idx}`}
                                 onClick={async () => {
@@ -944,8 +995,7 @@ export default function NewStory() {
                                       genre: getValues('genre').join('/'),
                                     })
                                     if ((data as { name?: string }).name) {
-                                      const current = factions || []
-                                      current[idx] = {
+                                      patchFaction(idx, {
                                         name: (data as { name: string }).name,
                                         type: ((data as { type?: string }).type || 'organization') as string,
                                         description: (data as { description?: string }).description || '',
@@ -954,142 +1004,180 @@ export default function NewStory() {
                                         controlledTerritories: (data as { controlledTerritories?: string[] }).controlledTerritories || [],
                                         subordinateOrganizations: (data as { subordinateOrganizations?: string[] }).subordinateOrganizations || [],
                                         keyAssets: (data as { keyAssets?: string[] }).keyAssets || [],
-                                        power: (data as { power?: { military: number; economic: number; political: number; technology: number } }).power || { military: 0, economic: 0, political: 0, technology: 0 },
+                                        power: (data as { power?: FactionRow['power'] }).power || { military: 0, economic: 0, political: 0, technology: 0 },
                                         influence: (data as { influence?: number }).influence || 50,
                                         relation_to_player: ((data as { relation_to_player?: string }).relation_to_player || 'neutral') as string,
                                         leader: (data as { leader?: string }).leader || '',
-                                      }
-                                      setFactions( [...current])
+                                      })
                                     }
                                     showStatus('✅ 势力生成完成', 'success')
                                   } catch (e) { showStatus(`❌ ${(e as Error).message}`, 'error') }
                                   setGenerating(null)
                                 }}
-                              >生成</AIButton>
+                              >AI 生成</AIButton>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const current = factions || []
-                                  current.splice(idx, 1)
-                                  setFactions( [...current])
-                                }}
-                                className="text-game-dim hover:text-game-danger transition-colors text-sm"
+                                onClick={() => removeFaction(idx)}
+                                className="h-8 w-8 rounded-md text-game-dim hover:text-game-danger hover:bg-game-danger/10 transition-colors text-sm"
+                                aria-label="删除势力"
                               >✕</button>
                             </div>
                           </div>
-                          <Input
-                            value={fac.name}
-                            onChange={(e) => {
-                              const current = factions || []
-                              current[idx] = { ...current[idx], name: e.target.value }
-                              setFactions( [...current])
-                            }}
-                            placeholder="势力名称"
-                            className="mt-1 font-bold text-sm h-8"
-                          />
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-game-muted">势力名称</Label>
+                            <Input
+                              value={fac.name}
+                              onChange={(e) => patchFaction(idx, { name: e.target.value })}
+                              placeholder="例如：光之圣域"
+                              className="font-medium h-9"
+                            />
+                          </div>
                         </CardHeader>
-                        <CardContent className="space-y-2 pt-0">
-                          <div className="flex gap-2">
-                            <select
-                              value={fac.type}
-                              onChange={(e) => {
-                                const current = factions || []
-                                current[idx] = { ...current[idx], type: e.target.value }
-                                setFactions( [...current])
-                              }}
-                              className="bg-game-bg border border-game-border rounded-md px-2 py-1 text-xs text-game-text"
-                            >
-                              <option value="government">政府</option>
-                              <option value="corporation">企业</option>
-                              <option value="family">家族</option>
-                              <option value="organization">组织</option>
-                              <option value="guild">行会</option>
-                              <option value="school">学院</option>
-                              <option value="religion">宗教</option>
-                              <option value="kingdom">王国</option>
-                              <option value="other">其他</option>
-                            </select>
-                            <select
-                              value={fac.relation_to_player}
-                              onChange={(e) => {
-                                const current = factions || []
-                                current[idx] = { ...current[idx], relation_to_player: e.target.value }
-                                setFactions( [...current])
-                              }}
-                              className="bg-game-bg border border-game-border rounded-md px-2 py-1 text-xs text-game-text"
-                            >
-                              <option value="ally">盟友</option>
-                              <option value="friendly">友好</option>
-                              <option value="neutral">中立</option>
-                              <option value="hostile">敌对</option>
-                              <option value="enemy">死敌</option>
-                            </select>
-                            <Input
-                              value={fac.leader}
-                              onChange={(e) => {
-                                const current = factions || []
-                                current[idx] = { ...current[idx], leader: e.target.value }
-                                setFactions( [...current])
-                              }}
-                              placeholder="首领"
-                              className="flex-1 text-xs h-7"
-                            />
-                            <Input
-                              type="number"
-                              value={fac.influence}
-                              onChange={(e) => {
-                                const current = factions || []
-                                current[idx] = { ...current[idx], influence: Math.max(1, Math.min(100, parseInt(e.target.value) || 50)) }
-                                setFactions( [...current])
-                              }}
-                              className="w-16 text-xs h-7"
-                              placeholder="影响力"
+                        <CardContent className="space-y-4 pt-0">
+                          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-game-muted">类型</Label>
+                              <select
+                                value={fac.type}
+                                onChange={(e) => patchFaction(idx, { type: e.target.value })}
+                                className={selectFieldClass}
+                              >
+                                <option value="government">政府</option>
+                                <option value="corporation">企业</option>
+                                <option value="family">家族</option>
+                                <option value="organization">组织</option>
+                                <option value="guild">行会</option>
+                                <option value="school">学院</option>
+                                <option value="religion">宗教</option>
+                                <option value="kingdom">王国</option>
+                                <option value="other">其他</option>
+                              </select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-game-muted">与主角关系</Label>
+                              <select
+                                value={fac.relation_to_player}
+                                onChange={(e) => patchFaction(idx, { relation_to_player: e.target.value })}
+                                className={selectFieldClass}
+                              >
+                                {Object.entries(FACTION_RELATION_LABELS).map(([val, label]) => (
+                                  <option key={val} value={val}>{label}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-game-muted">首领 / 领袖</Label>
+                              <Input
+                                value={fac.leader}
+                                onChange={(e) => patchFaction(idx, { leader: e.target.value })}
+                                placeholder="角色名"
+                                className="h-9"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-game-muted">影响力 (1–100)</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={100}
+                                value={fac.influence}
+                                onChange={(e) => patchFaction(idx, {
+                                  influence: Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 50)),
+                                })}
+                                className="h-9"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-game-muted">势力描述</Label>
+                            <Textarea
+                              value={fac.description}
+                              onChange={(e) => patchFaction(idx, { description: e.target.value })}
+                              placeholder="背景、立场、与主线关系…"
+                              className="min-h-[72px] resize-y text-sm"
                             />
                           </div>
-                          <Input
-                            value={fac.description}
-                            onChange={(e) => {
-                              const current = factions || []
-                              current[idx] = { ...current[idx], description: e.target.value }
-                              setFactions( [...current])
-                            }}
-                            placeholder="势力描述…"
-                            className="text-xs h-7"
-                          />
-                          <div className="grid grid-cols-4 gap-1 text-[10px]">
-                            {(['military','economic','political','technology'] as const).map((k) => (
-                              <div key={k} className="flex items-center gap-1">
-                                <span className="text-game-dim w-8">{{military:'军事',economic:'经济',political:'政治',technology:'科技'}[k]}</span>
-                                <Input
-                                  type="number"
-                                  value={fac.power?.[k] ?? 0}
-                                  onChange={(e) => {
-                                    const current = factions || []
-                                    current[idx] = { ...current[idx], power: { ...(current[idx].power || { military:0,economic:0,political:0,technology:0 }), [k]: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) } }
-                                    setFactions( [...current])
-                                  }}
-                                  className="flex-1 text-[10px] h-6 text-center"
-                                />
-                              </div>
-                            ))}
+
+                          <div className="space-y-2">
+                            <Label className="text-xs text-game-muted">实力评分 (0–100)</Label>
+                            <div className="grid grid-cols-2 gap-3">
+                              {(Object.keys(FACTION_POWER_LABELS) as Array<keyof typeof FACTION_POWER_LABELS>).map((k) => (
+                                <div key={k} className="space-y-1">
+                                  <span className="text-[11px] text-game-dim">{FACTION_POWER_LABELS[k]}</span>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={fac.power?.[k] ?? 0}
+                                    onChange={(e) => patchFactionPower(idx, k, parseInt(e.target.value, 10) || 0)}
+                                    className="h-9 text-sm"
+                                  />
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                          <TagInput
-                            value={fac.goals || []}
-                            onChange={(goals) => {
-                              const current = factions || []
-                              current[idx] = { ...current[idx], goals }
-                              setFactions( [...current])
-                            }}
-                            presets={[]}
-                            placeholder="目标…"
-                            color="warning"
-                          />
+
+                          <Separator className="bg-game-border/50" />
+
+                          <div className="space-y-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-game-muted">🎯 目标</Label>
+                              <TagInput
+                                value={fac.goals || []}
+                                onChange={(goals) => patchFaction(idx, { goals })}
+                                presets={[]}
+                                placeholder="回车添加目标…"
+                                color="warning"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-game-muted">📦 资源</Label>
+                              <TagInput
+                                value={fac.resources || []}
+                                onChange={(resources) => patchFaction(idx, { resources })}
+                                presets={[]}
+                                placeholder="回车添加资源…"
+                                color="warning"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-game-muted">🗺️ 控制区域</Label>
+                              <TagInput
+                                value={fac.controlledTerritories || []}
+                                onChange={(controlledTerritories) => patchFaction(idx, { controlledTerritories })}
+                                presets={[]}
+                                placeholder="回车添加区域…"
+                                color="warning"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-game-muted">🏢 下属机构</Label>
+                              <TagInput
+                                value={fac.subordinateOrganizations || []}
+                                onChange={(subordinateOrganizations) => patchFaction(idx, { subordinateOrganizations })}
+                                presets={[]}
+                                placeholder="回车添加机构…"
+                                color="warning"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-game-muted">💎 关键资产</Label>
+                              <TagInput
+                                value={fac.keyAssets || []}
+                                onChange={(keyAssets) => patchFaction(idx, { keyAssets })}
+                                presets={[]}
+                                placeholder="回车添加资产…"
+                                color="warning"
+                              />
+                            </div>
+                          </div>
                         </CardContent>
                       </Card>
                     </motion.div>
                   ))}
                   {(factions || []).length === 0 && (
-                    <p className="text-game-dim text-xs text-center py-4 col-span-2">
+                    <p className="text-game-dim text-xs text-center py-6">
                       暂无势力 · 点击「✨ 模块生成」AI 批量生成，或「➕ 添加势力」手动填写
                     </p>
                   )}

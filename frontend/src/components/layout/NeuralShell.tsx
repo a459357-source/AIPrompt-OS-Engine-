@@ -167,7 +167,7 @@ export function NeuralShell({ children }: NeuralShellProps) {
 
         {/* Desktop right inspector */}
         {hasInspector && inspector && (
-          <aside className="hidden md:flex flex-col w-80 shrink-0 border-l border-neural-cyan/10 overflow-hidden">
+          <aside className="hidden md:flex flex-col w-96 shrink-0 border-l border-neural-cyan/10 overflow-hidden">
             {inspector}
           </aside>
         )}
@@ -180,7 +180,7 @@ export function NeuralShell({ children }: NeuralShellProps) {
                 <PanelRight className="w-4 h-4 text-neural-cyan" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-80 glass-panel border-neural-cyan/20 p-0">
+            <SheetContent side="right" className="w-96 max-w-[92vw] glass-panel border-neural-cyan/20 p-0">
               {inspector}
             </SheetContent>
           </Sheet>
