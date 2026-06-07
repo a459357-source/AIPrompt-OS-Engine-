@@ -110,17 +110,29 @@ def build_html(
         ("frontend NPCs.tsx", (FRONTEND / "pages" / "NPCs.tsx").exists(), "NPC 页"),
         ("api listSaves", "listSaves" in (FRONTEND / "lib" / "api.ts").read_text(encoding="utf-8"), "V2 存档 API"),
         ("Settings 手动存档 UI", "handleSaveSlot" in (FRONTEND / "pages" / "Settings.tsx").read_text(encoding="utf-8"), "V2 存档 UI"),
-        ("Dashboard mermaid", "mermaid" in (FRONTEND / "pages" / "Dashboard.tsx").read_text(encoding="utf-8"), "分支图"),
-        ("dashboard story_graph API", "story_graph" in (ENGINE / "ui" / "routes" / "api.py").read_text(encoding="utf-8"), "图谱 API"),
+        ("Dashboard Mermaid 分支图", "剧情分支图" in (FRONTEND / "pages" / "Dashboard.tsx").read_text(encoding="utf-8")
+         and "mermaid" in (FRONTEND / "pages" / "Dashboard.tsx").read_text(encoding="utf-8"), "可视化（非仅节点数统计）"),
+        ("dashboard story_graph API", "story_graph" in (ENGINE / "ui" / "routes" / "api.py").read_text(encoding="utf-8"), "图谱 API 含 mermaid"),
     ]
 
+    npcs_src = (FRONTEND / "pages" / "NPCs.tsx").read_text(encoding="utf-8")
+    newstory_src = (FRONTEND / "pages" / "NewStory.tsx").read_text(encoding="utf-8")
+    apikey_src = (FRONTEND / "components" / "ApiKeyPrompt.tsx").read_text(encoding="utf-8")
+    settings_src = (FRONTEND / "pages" / "Settings.tsx").read_text(encoding="utf-8")
+
     bug_fixes = [
-        ("Game handleChoice 成功清 error", "setError('')" in (FRONTEND / "pages" / "Game.tsx").read_text(encoding="utf-8")),
-        ("Dashboard 成功清 error", "setError('')\n      setData(d)" in (FRONTEND / "pages" / "Dashboard.tsx").read_text(encoding="utf-8")),
-        ("历史回顾 historyError", "historyError" in (FRONTEND / "pages" / "Game.tsx").read_text(encoding="utf-8")),
-        ("Token 引导快捷设置", "快捷设置" in (FRONTEND / "pages" / "Game.tsx").read_text(encoding="utf-8")),
-        ("NewStory rel_stages UI", "关系阶段（全局）" in (FRONTEND / "pages" / "NewStory.tsx").read_text(encoding="utf-8")),
-        ("NewStory background 字段", "背景故事" in (FRONTEND / "pages" / "NewStory.tsx").read_text(encoding="utf-8")),
+        ("P1 Game handleChoice 成功清 error", "setError('')" in (FRONTEND / "pages" / "Game.tsx").read_text(encoding="utf-8")),
+        ("P1 Dashboard 成功清 error", "setError('')\n      setData(d)" in (FRONTEND / "pages" / "Dashboard.tsx").read_text(encoding="utf-8")),
+        ("P1 NPCs load/generate 成功清 error", "setError('')\n      setCharacters" in npcs_src and "setError('')\n      setCharacters((prev)" in npcs_src),
+        ("P2 历史回顾 historyError + 重试", "historyError" in (FRONTEND / "pages" / "Game.tsx").read_text(encoding="utf-8")),
+        ("P2 Token 引导快捷设置", "快捷设置" in (FRONTEND / "pages" / "Game.tsx").read_text(encoding="utf-8")
+         and "setGenSettingsOpen(true)" in (FRONTEND / "pages" / "Game.tsx").read_text(encoding="utf-8")),
+        ("P3 NewStory rel_stages UI", "关系阶段（全局）" in newstory_src),
+        ("P3 NewStory rel_affection UI", "初始好感度" in newstory_src and "rel_affection" in newstory_src),
+        ("P3 NewStory background 字段", "背景故事" in newstory_src),
+        ("P3 NewStory special_ability 字段", "特殊能力" in newstory_src),
+        ("P3 API Key 双入口说明", "apikey.json" in settings_src),
+        ("P3 ApiKeyPrompt settings-changed 事件", "promptos:settings-changed" in apikey_src and "promptos:settings-changed" in settings_src),
     ]
 
     pytest_ok = pytest_failed == 0
@@ -194,7 +206,8 @@ def build_html(
   </table>
 
   <h2>3. 事务层 state_store</h2>
-  <p style="color:var(--muted)"><code>run.step()</code> 回合内内存更新，<code>commit_runtime()</code> 单点落盘；<code>save_manager.load</code> / <code>/reset</code> / <code>/new</code> 使用 <code>commit_bundle</code>。</p>
+  <p style="color:var(--muted)"><code>run.step()</code> 回合内内存更新，<code>commit_runtime()</code> 单点落盘 session / memory / story_graph；<code>save_manager.load</code> / <code>/reset</code> / <code>/new</code> 使用 <code>commit_bundle</code>。</p>
+  <p style="color:var(--muted)">已知边界：<code>world_pack.yaml</code> 创建故事时独立写入；<code>chapter.md</code> 在 <code>commit_runtime</code> 之后追加，不纳入同事务。</p>
 
   <h2>4. Bug 修复验证（静态）</h2>
   <table>
