@@ -777,6 +777,73 @@ def detect_new_characters_from_story(story: str,
     return unique
 
 
+def parse_option_metric_deltas(options: list[str]) -> list[tuple[str, str, float]]:
+    """
+    Parse relationship hints from option strings.
+
+    Supports:
+      - 艾琳↑5 / 林夜↓3  → trust
+      - 艾琳 affection+3 trust-1
+      - 艾琳信任度+10
+    Returns (character_name, metric_key, delta) with delta in 0–1 scale.
+    """
+    import re
+
+    METRIC_ALIASES = {
+        "trust": "trust", "信任": "trust", "信任度": "trust",
+        "affection": "affection", "好感": "affection", "好感度": "affection",
+        "respect": "respect", "尊重": "respect", "respect度": "respect",
+        "dependence": "dependence", "依赖": "dependence",
+        "hostility": "hostility", "敌意": "hostility",
+        "attraction": "attraction", "吸引": "attraction",
+    }
+
+    results: list[tuple[str, str, float]] = []
+    arrow_pattern = re.compile(
+        r'([\u4e00-\u9fff·]{1,12}|[A-Za-z_]\w{1,19})\s*'
+        r'([↑➕\+↓➖\-])\s*'
+        r'(\d+)'
+    )
+    metric_pattern = re.compile(
+        r'([\u4e00-\u9fff·]{1,12}|[A-Za-z_]\w{1,19})\s*'
+        r'(affection|trust|respect|dependence|hostility|attraction|好感度?|信任度?|尊重度?|依赖度?|敌意度?|吸引度?)'
+        r'\s*([+\-➕➖]?)\s*'
+        r'(\d+)',
+        re.IGNORECASE,
+    )
+
+    def _delta_from_sign(sign: str, value: int) -> float:
+        if sign in ('↑', '➕', '+', ''):
+            d = value / 100.0
+        else:
+            d = -value / 100.0
+        return max(-1.0, min(1.0, d))
+
+    for opt in options:
+        if not isinstance(opt, str):
+            continue
+        segments = opt.split("|")
+        target = segments[-1] if segments else opt
+        # Also scan full option for custom free-text hints
+        for scan in (target, opt):
+            for match in arrow_pattern.finditer(scan):
+                name = match.group(1)
+                results.append((name, "trust", _delta_from_sign(match.group(2), int(match.group(3)))))
+            for match in metric_pattern.finditer(scan):
+                name = match.group(1)
+                raw_metric = match.group(2).lower()
+                sign = match.group(3) or '+'
+                value = int(match.group(4))
+                metric = METRIC_ALIASES.get(raw_metric, "trust")
+                results.append((name, metric, _delta_from_sign(sign if sign else '+', value)))
+
+    # Deduplicate last wins
+    seen: dict[tuple[str, str], float] = {}
+    for name, metric, delta in results:
+        seen[(name, metric)] = delta
+    return [(n, m, d) for (n, m), d in seen.items()]
+
+
 def parse_option_trust_deltas(options: list[str]) -> list[tuple[str, float]]:
     """
     Parse AI-generated trust hints from option strings.
@@ -795,47 +862,7 @@ def parse_option_trust_deltas(options: list[str]) -> list[tuple[str, float]]:
 
     Returns list of (character_name, delta) where delta is in 0-1 range.
     """
-    import re
-
-    results: list[tuple[str, float]] = []
-
-    # Pattern: Chinese/English name followed by ↑↓+-➕➖ and a number
-    # Chinese names: up to 12 chars including middle dot (e.g. 卡洛琳·福斯特)
-    # ASCII names: 2-20 word chars
-    pattern = re.compile(
-        r'([\u4e00-\u9fff·]{1,12}|[A-Za-z_]\w{1,19})\s*'
-        r'([↑➕\+↓➖\-])\s*'
-        r'(\d+)'
-    )
-
-    for opt in options:
-        if not isinstance(opt, str):
-            continue
-        # Focus on the third segment (trust hints) if pipe-delimited
-        # Format: "action→consequence|attitude|trust hints"
-        segments = opt.split("|")
-        target = segments[-1] if segments else opt
-
-        for match in pattern.finditer(target):
-            name = match.group(1)
-            arrow = match.group(2)
-            value = int(match.group(3))
-
-            # Determine direction and magnitude.
-            # AI outputs trust hints on a 0-100 feel scale (e.g. ↑3 = +3%).
-            # Divide by 100:  ↑1 → +0.01    ↑5 → +0.05    ↑20 → +0.20
-            if arrow in ('↑', '➕', '+'):
-                delta = value / 100.0
-            elif arrow in ('↓', '➖', '-'):
-                delta = -value / 100.0
-            else:
-                continue  # shouldn't happen due to regex
-
-            # Clamp to reasonable bounds
-            delta = max(-1.0, min(1.0, delta))
-            results.append((name, delta))
-
-    return results
+    return [(name, delta) for name, metric, delta in parse_option_metric_deltas(options) if metric == "trust"]
 
 
 # ── UI helpers ─────────────────────────────────────────────────────

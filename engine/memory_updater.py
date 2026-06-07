@@ -21,7 +21,8 @@ from engine import io_utils
 from engine.memory import (
     load_memory, save_memory, update_trust, set_flag,
     guess_trust_delta_from_story,
-    parse_option_trust_deltas, detect_new_characters_from_story,
+    parse_option_trust_deltas, parse_option_metric_deltas,
+    detect_new_characters_from_story,
     get_initial_trust,
     init_factions, update_faction_reputation,
     init_faction_attitudes, update_faction_attitude,
@@ -184,6 +185,48 @@ def auto_register_npcs(memory: dict, state: dict, world_pack: dict,
 
 # ── 3. Trust Delta Application ─────────────────────────────────────
 
+def _resolve_chosen_option(choice: str | None, prev_options: list[str]) -> list[str]:
+    """Map player choice (A/B/C/D, action text, or custom) to option strings to parse."""
+    if not choice:
+        return []
+    texts: list[str] = []
+    choice_map = {"A": 0, "B": 1, "C": 2, "D": 3}
+    if choice.upper() in choice_map and prev_options:
+        idx = choice_map[choice.upper()]
+        if 0 <= idx < len(prev_options):
+            texts.append(prev_options[idx])
+    elif prev_options:
+        stripped = choice.strip()
+        for opt in prev_options:
+            action = opt.split("→")[0].split("|")[0].strip()
+            if stripped == action or stripped in opt or action in stripped:
+                texts.append(opt)
+                break
+    # Custom / freeform: parse hints embedded in the choice itself
+    texts.append(choice)
+    return texts
+
+
+def _apply_metric_deltas(memory: dict, deltas: list[tuple[str, str, float]], turn: int, source: str) -> None:
+    mem_chars = memory.setdefault("characters", {})
+    for char_name, metric, delta in deltas:
+        matched = False
+        for mem_name in list(mem_chars.keys()):
+            if char_name in mem_name or mem_name in char_name:
+                update_trust(memory, mem_name, delta, turn, metric=metric)
+                matched = True
+                logger.info(
+                    "Memory updater: %s %s %s %+.2f (matched '%s')",
+                    source, mem_name, metric, delta, char_name,
+                )
+        if not matched:
+            update_trust(memory, char_name, delta, turn, metric=metric)
+            logger.info(
+                "Memory updater: %s %s %s %+.2f (new char)",
+                source, char_name, metric, delta,
+            )
+
+
 def apply_trust_deltas(memory: dict, story: str, choice: str | None,
                         turn: int, prev_options: list[str]) -> None:
     """
@@ -193,31 +236,14 @@ def apply_trust_deltas(memory: dict, story: str, choice: str | None,
     """
     mem_chars = memory.setdefault("characters", {})
 
-    # (a) Option-based deltas from the chosen previous-turn option
-    if choice and prev_options:
-        choice_map = {"A": 0, "B": 1, "C": 2, "D": 3}
-        idx = choice_map.get(choice.upper(), -1)
-        if 0 <= idx < len(prev_options):
-            chosen_opt = prev_options[idx]
-            option_deltas = parse_option_trust_deltas([chosen_opt])
-            for char_name, delta in option_deltas:
-                matched = False
-                for mem_name in list(mem_chars.keys()):
-                    if char_name in mem_name or mem_name in char_name:
-                        update_trust(memory, mem_name, delta, turn)
-                        matched = True
-                        logger.info(
-                            "Memory updater: choice %s trust delta %s %+.2f (matched '%s')",
-                            choice, mem_name, delta, char_name,
-                        )
-                if not matched:
-                    update_trust(memory, char_name, delta, turn)
-                    logger.info(
-                        "Memory updater: choice %s trust delta %s %+.2f (new char)",
-                        choice, char_name, delta,
-                    )
+    # (a) Option-based deltas — preset A-D, matched action text, or custom input
+    if choice:
+        for opt_text in _resolve_chosen_option(choice, prev_options):
+            deltas = parse_option_metric_deltas([opt_text])
+            if deltas:
+                _apply_metric_deltas(memory, deltas, turn, f"choice[{choice[:12]}]")
 
-    # (b) Heuristic trust deltas from story keywords
+    # (b) Heuristic trust deltas from story keywords (covers custom narrative outcomes)
     deltas = guess_trust_delta_from_story(story)
     for char_name, delta, flag in deltas:
         if char_name == "__all_present__":

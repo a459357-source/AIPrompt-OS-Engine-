@@ -21,13 +21,14 @@ import config
 from engine.memory import (
     load_memory, save_memory, update_trust,
     set_flag, get_context_for_prompt,
-    parse_option_trust_deltas,
+    parse_option_trust_deltas, parse_option_metric_deltas,
     detect_new_characters_from_story,
     get_initial_trust,
     init_factions, update_faction_reputation,
     init_faction_attitudes, update_faction_attitude,
     assign_character_tier, degrade_inactive_characters,
 )
+from engine.memory_updater import _resolve_chosen_option, apply_trust_deltas
 
 # Use a temp memory path so tests don't pollute real data
 _ORIG_MEMORY_PATH = config.MEMORY_PATH
@@ -130,6 +131,45 @@ def test_parse_option_trust_deltas():
     print("✅ 选项信任度解析: PASS")
 
 
+def test_parse_option_metric_deltas():
+    """解析选项中的多维关系 delta"""
+    opts = [
+        "主动搭话 → 可能缓和 | 友好 | 艾琳↑5, 林夜信任度+10",
+        "保持沉默 → 无变化 | 冷淡 | 艾琳 affection-3",
+    ]
+    deltas = parse_option_metric_deltas(opts)
+    names = {d[0] for d in deltas}
+    metrics = {d[1] for d in deltas}
+    assert "艾琳" in names
+    assert "trust" in metrics
+    assert "affection" in metrics
+    print("✅ 选项多维关系解析: PASS")
+
+
+def test_resolve_chosen_option_by_letter():
+    """A/B/C/D 选项索引解析"""
+    opts = [
+        "帮助艾琳 → 发展 | 友好 | 艾琳↑5",
+        "离开",
+        "攻击",
+        "观望",
+    ]
+    resolved = _resolve_chosen_option("A", opts)
+    assert opts[0] in resolved
+    assert _resolve_chosen_option("C", opts)[0] == opts[2]
+    print("✅ 选项字母解析: PASS")
+
+
+def test_apply_trust_deltas_from_choice_letter():
+    """通过 A/B/C/D 选择应用关系变化"""
+    mem = _fresh_memory()
+    mem["characters"]["艾琳"] = {"trust": 0.5, "flags": [], "metric_history": {"trust": [[0, 0.5]]}}
+    opts = ["帮助艾琳 → 发展 | 友好 | 艾琳↑10"]
+    apply_trust_deltas(mem, story="", choice="A", turn=1, prev_options=opts)
+    assert mem["characters"]["艾琳"]["trust"] > 0.5
+    print("✅ 字母选择关系更新: PASS")
+
+
 # ── Character detection tests ───────────────────────────────────────
 
 def test_detect_new_characters():
@@ -226,6 +266,8 @@ if __name__ == "__main__":
         test_update_trust_basic, test_update_trust_clamped,
         test_metric_history_tracking, test_metric_history_generic,
         test_set_flag, test_parse_option_trust_deltas,
+        test_parse_option_metric_deltas, test_resolve_chosen_option_by_letter,
+        test_apply_trust_deltas_from_choice_letter,
         test_detect_new_characters, test_init_factions,
         test_faction_reputation, test_assign_tier,
         test_degrade_inactive, test_get_context_for_prompt,
