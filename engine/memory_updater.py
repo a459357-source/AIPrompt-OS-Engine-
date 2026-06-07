@@ -346,9 +346,13 @@ def detect_artifact_transfers(memory: dict, story: str, turn: int) -> None:
                 break
 
             # Detect who gained/lost the artifact
-            # Look for known character names in the same window
+            # Only match REAL characters (tier assigned, not story fragments)
             chars = memory.get("characters", {})
-            for char_name in chars:
+            real_names = [n for n, d in chars.items()
+                          if d.get("tier") in ("主角", "核心", "重要")
+                          and len(n) >= 2 and len(n) <= 4
+                          and not any(c in '的是了我也就把能倒吸盯着露出' for c in n)]
+            for char_name in real_names:
                 if char_name in window and char_name != art_data.get("ownerId", ""):
                     if direction in ("acquire",):
                         transfer_artifact(memory, art_name, "character", char_name, turn,
