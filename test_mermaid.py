@@ -48,7 +48,17 @@ def test_build_mermaid_no_empty_pipe_edges():
     assert "n0 --> n1" in src
 
 
-def test_build_faction_graph_square_nodes():
+def test_build_mermaid_class_uses_commas_for_many_nodes():
+    nodes = {str(i): {"turn": i + 1, "text": f"story {i}"} for i in range(21)}
+    edges = [{"from": str(i), "to": str(i + 1), "choice": "A"} for i in range(20)]
+    src = _build_mermaid(nodes, edges, {})
+    assert "class n0 n1" not in src
+    assert "class n0,n1" in src
+    assert "classDef story fill:#1f6feb,stroke:#58a6ff,color:#fff;" in src
+    assert "class n0,n1,n2" in src
+    assert src.rstrip().endswith("story;")
+
+
     memory = {
         "factions": {"北方[联盟]": {"reputation": 0.8}},
         "faction_attitudes": {},
@@ -64,6 +74,7 @@ if __name__ == "__main__":
         test_empty_choice_edge_omits_pipes,
         test_build_mermaid_no_empty_pipe_edges,
         test_build_mermaid_no_round_char_nodes,
+        test_build_mermaid_class_uses_commas_for_many_nodes,
         test_build_faction_graph_square_nodes,
     ):
         fn()

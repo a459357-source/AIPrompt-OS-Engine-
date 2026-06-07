@@ -233,27 +233,27 @@ def _build_mermaid(nodes: dict, edges: list, chars: dict) -> str:
     for edge in edges:
         mm.append(_format_mermaid_edge(edge["from"], edge["to"], edge.get("choice", "")))
 
-    # Styles
+    # Styles (Mermaid 11: classDef/class 需分号；多节点 class 用逗号分隔)
     mm.append("")
-    mm.append("  classDef story fill:#1f6feb,stroke:#58a6ff,color:#fff")
-    mm.append("  classDef highTrust fill:#2ea043,stroke:#3fb950,color:#fff")
-    mm.append("  classDef midTrust fill:#d29922,stroke:#e3b341,color:#fff")
-    mm.append("  classDef lowTrust fill:#da3633,stroke:#f85149,color:#fff")
+    mm.append("  classDef story fill:#1f6feb,stroke:#58a6ff,color:#fff;")
+    mm.append("  classDef highTrust fill:#2ea043,stroke:#3fb950,color:#fff;")
+    mm.append("  classDef midTrust fill:#d29922,stroke:#e3b341,color:#fff;")
+    mm.append("  classDef lowTrust fill:#da3633,stroke:#f85149,color:#fff;")
     mm.append("")
 
-    story_ids = " ".join(f"n{nid}" for nid in nodes)
+    story_ids = ",".join(f"n{nid}" for nid in sorted(nodes.keys(), key=lambda k: (not str(k).isdigit(), int(k) if str(k).isdigit() else k)))
     if story_ids:
-        mm.append(f"  class {story_ids} story")
+        mm.append(f"  class {story_ids} story;")
 
     for name, data in chars.items():
         cid = char_ids[name]
         trust = data.get("trust", 0.5)
         if trust >= 0.7:
-            mm.append(f"  class {cid} highTrust")
+            mm.append(f"  class {cid} highTrust;")
         elif trust >= 0.4:
-            mm.append(f"  class {cid} midTrust")
+            mm.append(f"  class {cid} midTrust;")
         else:
-            mm.append(f"  class {cid} lowTrust")
+            mm.append(f"  class {cid} lowTrust;")
 
     return "\n".join(mm)
 
