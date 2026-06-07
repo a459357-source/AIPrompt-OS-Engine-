@@ -149,10 +149,13 @@ export default function Game() {
             </div>
           </div>
           {c.relation && <p className="text-xs text-game-muted">{c.relation}</p>}
-          <div className="flex items-center gap-2">
-            <AffectionBar value={c.affection ?? 50} />
-            <span className="text-xs text-game-dim tabular-nums">{c.affection ?? 50}%</span>
-          </div>
+          {/* 主角对自己没有好感度，只显示 NPC 对主角的好感 */}
+          {c.tier !== '主角' && (
+            <div className="flex items-center gap-2">
+              <AffectionBar value={c.affection ?? 50} />
+              <span className="text-xs text-game-dim tabular-nums">{c.affection ?? 50}%</span>
+            </div>
+          )}
           <Separator />
         </div>
       ))}

@@ -108,21 +108,23 @@ export function CharacterCard({ character, index, isMain, onRemove, className, t
 
           <Separator className="my-1" />
 
-          {/* Affinity — uses real trust_pct from memory.json */}
-          <div>
-            <span className="text-[10px] text-game-muted">好感度</span>
-            <div className="flex items-center gap-2 mt-0.5">
-              <div className="flex-1 h-2 bg-game-border rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-game-primary to-game-accent rounded-full transition-all"
-                  style={{ width: `${Math.max(0, Math.min(100, affinity))}%` }}
-                />
+          {/* Affinity — uses real trust_pct from memory.json. 主角对自己没有好感度 */}
+          {!isMain && (
+            <div>
+              <span className="text-[10px] text-game-muted">好感度</span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex-1 h-2 bg-game-border rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-game-primary to-game-accent rounded-full transition-all"
+                    style={{ width: `${Math.max(0, Math.min(100, affinity))}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-game-muted tabular-nums">
+                  {affinity}%
+                </span>
               </div>
-              <span className="text-[10px] text-game-muted tabular-nums">
-                {affinity}%
-              </span>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </motion.div>
