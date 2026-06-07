@@ -94,6 +94,14 @@ export function buildWorldGraph(input: WorldGraphInput): { nodes: Node[]; edges:
         influence: f.influence,
       },
     })
+    edges.push({
+      id: `core-faction-${i}`,
+      source: CORE_ID,
+      target: id,
+      type: 'relation',
+      data: { edgeType: 'inWorld' },
+      style: { stroke: 'rgba(0,240,255,0.45)', strokeDasharray: '6 4' },
+    })
   })
 
   input.characters.forEach((c, i) => {
@@ -145,6 +153,15 @@ export function buildWorldGraph(input: WorldGraphInput): { nodes: Node[]; edges:
   const mainChar = input.characters.find((c) => c.isMain) || input.characters[0]
   const mainIdx = input.characters.findIndex((c) => c === mainChar)
   if (mainIdx >= 0) {
+    edges.push({
+      id: `core-main-${mainIdx}`,
+      source: CORE_ID,
+      target: `character-${mainIdx}`,
+      type: 'relation',
+      data: { edgeType: 'protagonist' },
+      animated: true,
+      style: { stroke: '#ff2d95' },
+    })
     Object.keys(input.characterRelations).forEach((npcName) => {
       const ni = input.characters.findIndex((c) => c.name === npcName && !c.isMain)
       if (ni >= 0) {
@@ -243,55 +260,138 @@ export function parseNodeSelection(nodeId: string | null): {
   return { type: m[1] as WorldNodeType, index: parseInt(m[2], 10) }
 }
 
+export type WorldGraphUpdate = Partial<{
+  factions: WorldGraphInput['factions']
+  characters: WorldGraphInput['characters']
+  artifacts: WorldGraphInput['artifacts']
+  characterRelations: WorldGraphInput['characterRelations']
+}>
+
+function setProtagonist(input: WorldGraphInput, charIndex: number): WorldGraphUpdate | null {
+  if (charIndex < 0 || charIndex >= input.characters.length) return null
+  const characters = input.characters.map((c, i) => ({
+    ...c,
+    isMain: i === charIndex,
+  }))
+  return { characters }
+}
+
+function setCharacterFaction(
+  input: WorldGraphInput,
+  charIndex: number,
+  factionIndex: number,
+): WorldGraphUpdate | null {
+  if (charIndex < 0 || factionIndex < 0) return null
+  const factionName = input.factions[factionIndex]?.name || ''
+  const characters = [...input.characters]
+  characters[charIndex] = { ...characters[charIndex], faction: factionName }
+  return { characters }
+}
+
+function setFactionLeader(
+  input: WorldGraphInput,
+  factionIndex: number,
+  charIndex: number,
+): WorldGraphUpdate | null {
+  if (factionIndex < 0 || charIndex < 0) return null
+  const leaderName = input.characters[charIndex]?.name || ''
+  const factions = [...input.factions]
+  factions[factionIndex] = { ...factions[factionIndex], leader: leaderName }
+  return { factions }
+}
+
+function setArtifactOwner(
+  input: WorldGraphInput,
+  artifactIndex: number,
+  ownerName: string,
+): WorldGraphUpdate | null {
+  if (artifactIndex < 0) return null
+  const artifacts = [...input.artifacts]
+  artifacts[artifactIndex] = { ...artifacts[artifactIndex], ownerId: ownerName }
+  return { artifacts }
+}
+
+function addCharacterRelation(
+  input: WorldGraphInput,
+  indexA: number,
+  indexB: number,
+): WorldGraphUpdate | null {
+  const a = input.characters[indexA]
+  const b = input.characters[indexB]
+  if (!a || !b || a.isMain === b.isMain) return null
+  const npcName = a.isMain ? b.name : a.name
+  if (!npcName.trim()) return null
+  return {
+    characterRelations: {
+      ...input.characterRelations,
+      [npcName]: input.characterRelations[npcName] || {
+        relationshipType: 'friend',
+        affection: 50,
+        trust: 50,
+        respect: 50,
+        dependence: 50,
+        hostility: 30,
+        attraction: 50,
+        tags: [],
+      },
+    },
+  }
+}
+
 export function handleNewConnection(
   connection: { source: string; target: string },
   input: WorldGraphInput,
-): Partial<{
-  factions: WorldGraphInput['factions']
-  characters: WorldGraphInput['characters']
-  characterRelations: WorldGraphInput['characterRelations']
-}> | null {
+): WorldGraphUpdate | null {
   const src = parseNodeSelection(connection.source)
   const tgt = parseNodeSelection(connection.target)
 
+  // 世界核心 ↔ 角色：指定主角
+  if (src.type === 'worldCore' && tgt.type === 'character' && tgt.index != null) {
+    return setProtagonist(input, tgt.index)
+  }
+  if (src.type === 'character' && tgt.type === 'worldCore' && src.index != null) {
+    return setProtagonist(input, src.index)
+  }
+
+  // 角色 ↔ 势力：所属
   if (src.type === 'character' && tgt.type === 'faction' && src.index != null && tgt.index != null) {
-    const characters = [...input.characters]
-    characters[src.index] = {
-      ...characters[src.index],
-      faction: input.factions[tgt.index]?.name || '',
-    }
-    return { characters }
+    return setCharacterFaction(input, src.index, tgt.index)
   }
-
   if (src.type === 'faction' && tgt.type === 'character' && src.index != null && tgt.index != null) {
-    const factions = [...input.factions]
-    factions[src.index] = {
-      ...factions[src.index],
-      leader: input.characters[tgt.index]?.name || '',
+    const char = input.characters[tgt.index]
+    const fac = input.factions[src.index]
+    // 已有首领且连到不同角色 → 视为所属；否则设为首领
+    if (fac?.leader && char?.name && fac.leader !== char.name) {
+      return setCharacterFaction(input, tgt.index, src.index)
     }
-    return { factions }
+    return setFactionLeader(input, src.index, tgt.index)
   }
 
+  // 角色 ↔ 角色：关系
   if (src.type === 'character' && tgt.type === 'character' && src.index != null && tgt.index != null) {
-    const a = input.characters[src.index]
-    const b = input.characters[tgt.index]
-    if (!a?.name || !b?.name || a.isMain === b.isMain) return null
-    const npcName = a.isMain ? b.name : a.name
-    return {
-      characterRelations: {
-        ...input.characterRelations,
-        [npcName]: input.characterRelations[npcName] || {
-          relationshipType: 'friend',
-          affection: 50,
-          trust: 50,
-          respect: 50,
-          dependence: 50,
-          hostility: 30,
-          attraction: 50,
-          tags: [],
-        },
-      },
-    }
+    return addCharacterRelation(input, src.index, tgt.index)
+  }
+
+  // 角色 / 势力 → 物品：持有者
+  if (src.type === 'character' && tgt.type === 'artifact' && src.index != null && tgt.index != null) {
+    const ownerName = input.characters[src.index]?.name || ''
+    if (!ownerName.trim()) return null
+    return setArtifactOwner(input, tgt.index, ownerName)
+  }
+  if (src.type === 'faction' && tgt.type === 'artifact' && src.index != null && tgt.index != null) {
+    const ownerName = input.factions[src.index]?.name || ''
+    if (!ownerName.trim()) return null
+    return setArtifactOwner(input, tgt.index, ownerName)
+  }
+  if (src.type === 'artifact' && tgt.type === 'character' && src.index != null && tgt.index != null) {
+    const ownerName = input.characters[tgt.index]?.name || ''
+    if (!ownerName.trim()) return null
+    return setArtifactOwner(input, src.index, ownerName)
+  }
+  if (src.type === 'artifact' && tgt.type === 'faction' && src.index != null && tgt.index != null) {
+    const ownerName = input.factions[tgt.index]?.name || ''
+    if (!ownerName.trim()) return null
+    return setArtifactOwner(input, src.index, ownerName)
   }
 
   return null

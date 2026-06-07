@@ -7,6 +7,7 @@ import {
   Panel,
   useNodesState,
   useEdgesState,
+  addEdge,
   type Connection,
   type Node,
   BackgroundVariant,
@@ -54,9 +55,21 @@ export function WorldGraphCanvas({
         { source: connection.source, target: connection.target },
         input,
       )
-      if (update) onGraphUpdate(update)
+      if (!update) return
+      onGraphUpdate(update)
+      // 数据更新后 buildWorldGraph 会重建边；先乐观追加避免连线闪灭
+      setEdges((eds) =>
+        addEdge(
+          {
+            ...connection,
+            type: 'relation',
+            id: `pending-${connection.source}-${connection.target}-${Date.now()}`,
+          },
+          eds,
+        ),
+      )
     },
-    [readOnly, input, onGraphUpdate],
+    [readOnly, input, onGraphUpdate, setEdges],
   )
 
   const onNodeClick = useCallback(

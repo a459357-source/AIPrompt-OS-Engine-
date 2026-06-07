@@ -35,6 +35,7 @@ function FactionNode({ data, selected }: NodeProps) {
       )}
       style={{ clipPath: 'polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%)' }}
     >
+      <Handle type="target" position={Position.Top} id="core-in" className="!bg-neural-cyan !w-2 !h-2" />
       <Handle type="target" position={Position.Left} className="!bg-neural-violet !w-2 !h-2" />
       <div className="text-[9px] font-neural-mono text-neural-violet uppercase">Faction</div>
       <div className="text-xs font-bold text-game-text truncate">{d.name}</div>
@@ -78,6 +79,7 @@ function ArtifactNode({ data, selected }: NodeProps) {
         <div className="text-[8px] font-neural-mono text-neural-magenta">ITEM</div>
         <div className="text-[10px] font-bold truncate max-w-[70px]">{d.name}</div>
       </div>
+      <Handle type="target" position={Position.Left} className="!bg-neural-magenta !w-2 !h-2" />
       <Handle type="source" position={Position.Right} className="!bg-neural-magenta !w-2 !h-2" />
     </div>
   )

@@ -1739,13 +1739,25 @@ export default function NewStory() {
           onSelectNode={setSelectedNodeId}
           onPositionsChange={setNodePositions}
           onGraphUpdate={(update) => {
-            if (update.factions) setFactions(update.factions as typeof factions)
+            if (update.factions) {
+              setFactions((prev) =>
+                update.factions!.map((f, i) => ({ ...(prev[i] || {}), ...f })),
+              )
+            }
             if (update.characters) {
-              const chars = getValues('characters')
-              update.characters.forEach((c, i) => {
-                if (chars[i]) chars[i] = { ...chars[i], ...c }
-              })
-              setValue('characters', chars)
+              const current = getValues('characters')
+              setValue(
+                'characters',
+                update.characters.map((c, i) => ({
+                  ...(current[i] || {}),
+                  ...c,
+                })) as FormValues['characters'],
+              )
+            }
+            if (update.artifacts) {
+              setArtifacts((prev) =>
+                update.artifacts!.map((a, i) => ({ ...(prev[i] || {}), ...a })),
+              )
             }
             if (update.characterRelations) setCharacterRelations(update.characterRelations as typeof characterRelations)
           }}
