@@ -6,7 +6,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { ParticleBackground } from '@/components/neural/ParticleBackground'
-import { DesireAtmosphere } from '@/components/neural/DesireAtmosphere'
+import { PrivateStoryAtmosphere } from '@/components/neural/PrivateStoryAtmosphere'
 import { WorldNavTree } from './WorldNavTree'
 import { useNeuralShell } from './NeuralShellContext'
 import { useAppSettings } from '@/hooks/useAppSettings'
@@ -119,7 +119,7 @@ export function NeuralShell({ children }: NeuralShellProps) {
   return (
     <div className="h-screen flex flex-col overflow-hidden relative">
       <ParticleBackground />
-      <DesireAtmosphere />
+      <PrivateStoryAtmosphere />
       <NeuralTopBar />
       <div className="flex-1 flex min-h-0 relative z-10 pb-14 lg:pb-0">
         {/* Desktop left panel */}

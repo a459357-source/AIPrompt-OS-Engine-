@@ -36,7 +36,7 @@ export function ParticleBackground() {
       ? (a: number, h: number) => `hsla(${h}, 75%, 68%, ${a})`
       : (a: number) => `rgba(79, 140, 255, ${a})`
     const lineColor = isAdult
-      ? (a: number) => `rgba(255, 77, 109, ${a})`
+      ? (a: number) => `rgba(236, 72, 153, ${a})`
       : (a: number) => `rgba(124, 92, 255, ${a})`
 
     const resize = () => {

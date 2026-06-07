@@ -4,7 +4,7 @@ export type UiTheme = 'normal' | 'adult'
 
 export const UI_THEME_ATTR = 'data-ui-theme'
 
-export const DESIRE_THEME_NAME = 'Desire+'
+export const ADULT_THEME_NAME = 'Desire+'
 
 export interface RelationLevel {
   key: string
@@ -14,7 +14,7 @@ export interface RelationLevel {
   max: number
 }
 
-/** Desire+ relation tiers — gray → rose → violet, story-driven labels */
+/** Desire+ relation tiers */
 export const ADULT_RELATION_LEVELS: RelationLevel[] = [
   { key: 'glance', label: '初遇', color: '#9CA3AF', min: 0, max: 20 },
   { key: 'heartbeat', label: '心动', color: '#FF4D6D', min: 21, max: 40 },
@@ -24,7 +24,6 @@ export const ADULT_RELATION_LEVELS: RelationLevel[] = [
   { key: 'resonance', label: '欲望共鸣', color: '#FFD1DC', min: 86, max: 100 },
 ]
 
-/** Stat display names in Desire+ mode */
 export const ADULT_STAT_LABELS: Record<string, string> = {
   affection: '吸引力',
   trust: '情感张力',

@@ -18,7 +18,6 @@
   --color-game-secret: #5a3d72;
   --radius-game: 1rem;
   --radius-card: 1rem;
-  --radius-btn: 0.375rem;
 
   --color-neural-void: #0b1020;
   --color-neural-glass: rgba(11, 16, 32, 0.55);
@@ -38,263 +37,195 @@
   --card-hover-shadow: 0 0 32px rgba(124, 92, 255, 0.1);
 }
 
-/* ── Desire+ Theme (adult_mode) ── */
+/* ── Private Story Mode (Adult) — base; Desire+ overrides in desire-theme.css ── */
 [data-ui-theme='adult'] {
-  --color-game-bg: #080808;
-  --color-game-surface: #121212;
-  --color-game-card: rgba(255, 255, 255, 0.04);
+  --color-game-bg: #0a0810;
+  --color-game-surface: #15131f;
+  --color-game-card: rgba(21, 19, 31, 0.65);
   --color-game-border: rgba(255, 255, 255, 0.08);
-  --color-game-primary: #ff004d;
-  --color-game-secondary: #a855f7;
-  --color-game-accent: #ff4d6d;
-  --color-game-highlight: #ffd1dc;
-  --color-game-success: #ff4d6d;
-  --color-game-warning: #ff4d6d;
-  --color-game-danger: #ff004d;
-  --color-game-text: #faf5f6;
-  --color-game-muted: #c4a0ad;
-  --color-game-dim: #8a7080;
+  --color-game-primary: #d946ef;
+  --color-game-secondary: #a78bfa;
+  --color-game-accent: #ec4899;
+  --color-game-highlight: #f472b6;
+  --color-game-success: #a78bfa;
+  --color-game-warning: #f472b6;
+  --color-game-danger: #fb7185;
+  --color-game-text: #f8f6fc;
+  --color-game-muted: #a78bfa;
+  --color-game-dim: #8b7cb8;
   --color-game-secret: #6b21a8;
   --radius-game: 1.5rem;
   --radius-card: 1.5rem;
-  --radius-btn: 999px;
 
-  --color-neural-void: #080808;
-  --color-neural-glass: rgba(255, 255, 255, 0.04);
-  --color-neural-cyan: #ff004d;
-  --color-neural-magenta: #ff4d6d;
-  --color-neural-violet: #a855f7;
+  --color-neural-void: #0a0810;
+  --color-neural-glass: rgba(21, 19, 31, 0.55);
+  --color-neural-cyan: #d946ef;
+  --color-neural-magenta: #ec4899;
+  --color-neural-violet: #a78bfa;
   --color-neural-grid: transparent;
-  --color-neural-glow: rgba(255, 0, 77, 0.14);
+  --color-neural-glow: rgba(217, 70, 239, 0.12);
 
   --theme-body-gradient:
-    radial-gradient(ellipse 80% 60% at 50% 120%, rgba(255, 0, 77, 0.12), transparent 55%),
-    radial-gradient(ellipse 55% 45% at 15% 20%, rgba(255, 77, 109, 0.1), transparent 50%),
-    radial-gradient(ellipse 45% 40% at 85% 75%, rgba(168, 85, 247, 0.08), transparent 45%),
+    radial-gradient(circle at top, rgba(217, 70, 239, 0.15), transparent 40%),
+    radial-gradient(ellipse 60% 50% at 20% 80%, rgba(236, 72, 153, 0.06), transparent 50%),
     var(--color-game-bg);
 
   --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-shadow: 0 0 40px rgba(255, 0, 77, 0.08);
-  --card-hover-shadow: 0 0 48px rgba(255, 77, 109, 0.22);
+  --glass-shadow: 0 0 32px rgba(236, 72, 153, 0.06);
+  --card-hover-shadow: 0 0 40px rgba(236, 72, 153, 0.15);
 }
 
-/* ── Global theme transition ── */
+/* ── Global theme transition (600ms) ── */
 html {
-  transition: background-color 800ms ease, color 800ms ease;
+  transition: background-color 600ms ease, color 600ms ease;
 }
 
 body,
 .glass-panel,
 .theme-card {
   transition:
-    background-color 800ms ease,
-    border-color 800ms ease,
-    box-shadow 800ms ease,
-    color 800ms ease,
-    transform 800ms ease;
+    background-color 600ms ease,
+    border-color 600ms ease,
+    box-shadow 600ms ease,
+    color 600ms ease;
 }
 
 body {
   background: var(--theme-body-gradient);
-  background-size: 200% 200%;
-}
-
-[data-ui-theme='adult'] body {
-  animation: desire-gradient-flow 24s ease-in-out infinite;
-}
-
-@keyframes desire-gradient-flow {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-/* Desire+ atmosphere — blur orbs & bokeh */
-.desire-atmosphere {
-  overflow: hidden;
-}
-
-.desire-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.35;
-  animation: desire-orb-breathe 8s ease-in-out infinite;
-}
-
-.desire-orb-1 {
-  width: 420px;
-  height: 420px;
-  top: -8%;
-  left: 10%;
-  background: radial-gradient(circle, rgba(255, 0, 77, 0.5), transparent 70%);
-  animation-delay: 0s;
-}
-
-.desire-orb-2 {
-  width: 360px;
-  height: 360px;
-  bottom: 5%;
-  right: 5%;
-  background: radial-gradient(circle, rgba(255, 77, 109, 0.45), transparent 70%);
-  animation-delay: -3s;
-}
-
-.desire-orb-3 {
-  width: 280px;
-  height: 280px;
-  top: 40%;
-  right: 20%;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.35), transparent 70%);
-  animation-delay: -5s;
-}
-
-@keyframes desire-orb-breathe {
-  0%, 100% { transform: scale(1) translate(0, 0); opacity: 0.3; }
-  50% { transform: scale(1.08) translate(8px, -6px); opacity: 0.45; }
 }
 
 [data-ui-theme='adult'] .neural-grid-bg {
   background-image: none;
 }
 
-/* Glass cards */
+/* Soft floating glow orbs */
+.private-story-atmosphere {
+  overflow: hidden;
+}
+
+.private-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(72px);
+  opacity: 0.28;
+  animation: private-orb-float 18s ease-in-out infinite;
+}
+
+.private-orb-1 {
+  width: 380px;
+  height: 380px;
+  top: -5%;
+  left: 15%;
+  background: radial-gradient(circle, rgba(217, 70, 239, 0.35), transparent 70%);
+}
+
+.private-orb-2 {
+  width: 320px;
+  height: 320px;
+  bottom: 10%;
+  right: 8%;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.28), transparent 70%);
+  animation-delay: -6s;
+}
+
+.private-orb-3 {
+  width: 240px;
+  height: 240px;
+  top: 45%;
+  right: 25%;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.22), transparent 70%);
+  animation-delay: -10s;
+}
+
+@keyframes private-orb-float {
+  0%, 100% { transform: translate(0, 0); opacity: 0.22; }
+  50% { transform: translate(12px, -8px); opacity: 0.32; }
+}
+
+/* Glass cards — 24px, frosted */
 [data-ui-theme='adult'] .glass-panel {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-game-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   border-radius: 24px;
 }
 
 [data-ui-theme='adult'] .theme-card {
-  background: rgba(255, 255, 255, 0.04);
   border-radius: 24px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 [data-ui-theme='adult'] .theme-card:hover {
   box-shadow: var(--card-hover-shadow);
-  border-color: rgba(255, 77, 109, 0.2);
-}
-
-/* Pill buttons — seductive hover */
-[data-ui-theme='adult'] button.inline-flex:not(.rounded-none):not([class*='rounded-md'][class*='w-9']) {
-  border-radius: 999px;
-  transition: all 800ms ease;
-}
-
-[data-ui-theme='adult'] button.inline-flex:hover:not(:disabled):not(.rounded-none) {
-  transform: scale(1.03);
-  box-shadow: 0 0 28px rgba(255, 0, 77, 0.35);
-}
-
-[data-ui-theme='adult'] a.rounded-md {
-  border-radius: 999px;
-  transition: all 800ms ease;
 }
 
 [data-ui-theme='adult'] .adult-relation-inspector {
   background: rgba(21, 19, 31, 0.5);
 }
 
-/* Adult relation panel */
 .adult-relation-bar {
   height: 4px;
-  border-radius: 999px;
+  border-radius: 2px;
   background: rgba(255, 255, 255, 0.06);
   overflow: hidden;
 }
 
 .adult-relation-bar-fill {
   height: 100%;
-  border-radius: 999px;
-  transition: width 800ms ease, background-color 800ms ease;
-  box-shadow: 0 0 12px rgba(255, 0, 77, 0.4);
+  border-radius: 2px;
+  transition: width 600ms ease, background-color 600ms ease;
 }
 
 .adult-relation-label {
   font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  transition: color 800ms ease;
+  letter-spacing: 0.04em;
+  transition: color 600ms ease;
 }
 
-.adult-relation-inspector {
-  backdrop-filter: blur(24px);
-}
-
-/* Reading mode — immersive story focus */
+/* Reading mode */
 .game-reading-mode .game-chrome-hidden {
   opacity: 0;
   pointer-events: none;
   max-height: 0;
   overflow: hidden;
-  transition: opacity 600ms ease, max-height 600ms ease;
+  transition: opacity 400ms ease, max-height 400ms ease;
 }
 
 .game-reading-mode .game-story-focus {
-  max-width: 860px !important;
+  max-width: 760px !important;
   margin-left: auto;
   margin-right: auto;
 }
 
-.game-reading-mode .game-story-focus .glass-panel,
-.game-reading-mode .theme-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(28px);
-}
-
-[data-ui-theme='adult'].game-reading-mode,
-.game-reading-mode[data-ui-theme='adult'] {
-  /* applied on wrapper */
-}
-
-html[data-ui-theme='adult'] .game-reading-mode .desire-atmosphere .desire-orb {
-  opacity: 0.55;
-  filter: blur(100px);
-}
-
 @keyframes theme-card-fade-in {
-  from { opacity: 0.88; transform: translateY(6px); }
+  from { opacity: 0.85; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 [data-ui-theme='adult'] .theme-card-enter {
-  animation: theme-card-fade-in 800ms ease forwards;
+  animation: theme-card-fade-in 600ms ease forwards;
 }
 
 [data-ui-theme='adult'] .neural-pulse-dot {
-  animation: pulse-desire 4s ease-in-out infinite;
+  animation: pulse-adult 3s ease-in-out infinite;
   background: var(--color-game-primary) !important;
-  box-shadow: 0 0 12px rgba(255, 0, 77, 0.45);
+  box-shadow: 0 0 8px rgba(217, 70, 239, 0.3);
 }
 
-@keyframes pulse-desire {
+@keyframes pulse-adult {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.65; transform: scale(0.9); }
+  50% { opacity: 0.7; transform: scale(0.92); }
 }
 
 [data-ui-theme='adult'] .neural-text-glow {
-  text-shadow: 0 0 20px rgba(255, 0, 77, 0.35);
-  font-family: 'Segoe UI', 'Noto Sans SC', sans-serif;
-  letter-spacing: 0.08em;
+  text-shadow: 0 0 16px rgba(217, 70, 239, 0.25);
 }
 
 [data-ui-theme='adult'] .glass-panel-glow {
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 0 48px rgba(255, 0, 77, 0.12);
-}
-
-[data-ui-theme='adult'] .font-neural-display,
-[data-ui-theme='adult'] .font-neural-mono {
-  font-family: 'Segoe UI', 'Noto Sans SC', sans-serif;
-  text-transform: none;
-  letter-spacing: 0.04em;
-}
-
-[data-ui-theme='adult'] .neural-scan-hover:hover {
-  background: linear-gradient(90deg, transparent, rgba(255, 0, 77, 0.08), transparent);
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 40px rgba(236, 72, 153, 0.1);
 }

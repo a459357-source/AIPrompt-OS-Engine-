@@ -20,7 +20,8 @@ import { InspectorPanel } from '@/components/layout/InspectorPanel'
 import { getDashboard, type DashboardData } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { useAppSettings } from '@/hooks/useAppSettings'
-import { t } from '@/lib/i18n'
+import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
+import { t, tTheme } from '@/lib/i18n'
 
 type DashSection = 'overview' | 'timeline' | 'network' | 'branch' | 'factions'
 
@@ -57,6 +58,7 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' 
 
 export default function Dashboard() {
   const { language } = useAppSettings()
+  const adultMode = useAdultThemeOptional()?.adultMode ?? false
   const lang = language as 'zh' | 'en' | 'ja'
   const [data, setData] = useState<DashboardData | null>(null)
   const [activeSection, setActiveSection] = useState<DashSection>('overview')
@@ -490,8 +492,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">💞 角色好感度</CardTitle>
-            <CardDescription>当前各角色好感度一览</CardDescription>
+            <CardTitle className="text-sm">💞 {tTheme('dashboard.affection', lang, adultMode)}</CardTitle>
+            <CardDescription>{tTheme('dashboard.affectionDesc', lang, adultMode)}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {data.characters.length === 0 ? (
@@ -580,8 +582,8 @@ export default function Dashboard() {
           {trustChart && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">📈 好感度变化曲线</CardTitle>
-                <CardDescription>角色信任度随剧情推进的变化</CardDescription>
+                <CardTitle className="text-sm">📈 {tTheme('dashboard.affectionChart', lang, adultMode)}</CardTitle>
+                <CardDescription>{adultMode ? '角色关系随剧情推进的变化' : '角色信任度随剧情推进的变化'}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-64">

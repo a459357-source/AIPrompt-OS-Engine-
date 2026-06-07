@@ -8,13 +8,6 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { StatusToast } from '@/components/StatusToast'
 import { InspectorPanel } from '@/components/layout/InspectorPanel'
 import { usePageShell } from '@/components/layout/usePageShell'
@@ -967,7 +960,7 @@ export default function Game() {
     leftPanel: hasGame && !readingMode ? (
       <div className="p-3 space-y-1 overflow-y-auto h-full">
         <h3 className="text-[10px] font-neural-mono text-neural-cyan uppercase tracking-widest mb-3">
-          {t('game.timeline', lang)}
+          {tTheme('game.timeline', lang, adultMode)}
         </h3>
         {Array.from({ length: Math.max(turn, 1) }, (_, i) => {
           const n = i + 1
@@ -1354,29 +1347,6 @@ export default function Game() {
 
                   {adultMode && (
                     <>
-                      <QuickGenRow label="主题切换" hint="覆盖设置页的背景色调">
-                        <Select
-                          value={adultBgTheme}
-                          disabled={choosing}
-                          onValueChange={(v) => {
-                            setAdultBgTheme(v)
-                            localStorage.setItem('adultBgTheme', v)
-                            applyBgTheme(v)
-                          }}
-                        >
-                          <SelectTrigger className="w-36 h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(['dark', 'sepia', 'gray', 'crimson', 'violet'] as const).map((t) => (
-                              <SelectItem key={t} value={t} className="text-xs">
-                                {BG_THEME_LABELS[t] || t}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </QuickGenRow>
-
                       <QuickGenRow label={tTheme('game.readingMode', lang, false)} hint="隐藏侧栏与快捷设置，聚焦正文阅读">
                         <Switch
                           checked={readingMode}
@@ -1535,7 +1505,7 @@ export default function Game() {
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="flex flex-col gap-2 min-w-0 flex-1">
                       <div className="flex items-center gap-3 flex-wrap">
-                        <p className="text-sm text-game-muted font-medium shrink-0">🎯 {t('game.choices', lang)}</p>
+                        <p className="text-sm text-game-muted font-medium shrink-0">🎯 {tTheme('game.choices', lang, adultMode)}</p>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs text-game-muted shrink-0">⚡ 自动推进</span>
                           <Switch
