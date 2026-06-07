@@ -368,8 +368,46 @@ OBSIDIAN_VAULT_PATH = _load_obsidian_path()
 
 # ── Logging setup ───────────────────────────────────────────────────
 
-def setup_logging():
-    """Configure Python logging: console + rotating file handlers."""
+_LOGGING_CONFIGURED = False
+
+
+def log_paths_hint() -> str:
+    """Human-readable paths to runtime log files."""
+    return f"运行日志: {LOG_PATH}\n错误日志: {ERROR_LOG_PATH}"
+
+
+def install_excepthook() -> None:
+    """Write uncaught exceptions to error.log (exe / bat / CLI)."""
+    if getattr(install_excepthook, "_installed", False):
+        return
+    install_excepthook._installed = True
+
+    import logging
+    import traceback
+
+    def _hook(exc_type, exc, tb):
+        try:
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            with open(ERROR_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(f"\n{'=' * 60}\n")
+                f.write("Uncaught exception\n")
+                traceback.print_exception(exc_type, exc, tb, file=f)
+        except Exception:
+            pass
+        logging.getLogger("promptos").critical(
+            "Uncaught exception", exc_info=(exc_type, exc, tb)
+        )
+        sys.__excepthook__(exc_type, exc, tb)
+
+    sys.excepthook = _hook
+
+
+def setup_logging(*, console: bool = True) -> None:
+    """Configure Python logging: console + rotating app.log + error.log."""
+    global _LOGGING_CONFIGURED
+    if _LOGGING_CONFIGURED:
+        return
+
     import logging
     from logging.handlers import RotatingFileHandler
 
@@ -380,32 +418,53 @@ def setup_logging():
 
     from engine.constants import LOG_MAX_BYTES, LOG_BACKUP_COUNT
 
-    # File handler — all logs (rotating)
-    fh = RotatingFileHandler(
-        str(LOG_PATH), maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8"
+    fmt = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
-    fh.setLevel(logging.DEBUG)
-    fh.setFormatter(logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    ))
-    root_logger.addHandler(fh)
+
+    if console and not any(
+        isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFileHandler)
+        for h in root_logger.handlers
+    ):
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
+        ch.setFormatter(fmt)
+        root_logger.addHandler(ch)
+
+    if not any(getattr(h, "baseFilename", None) == str(LOG_PATH) for h in root_logger.handlers):
+        fh = RotatingFileHandler(
+            str(LOG_PATH), maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8"
+        )
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(fmt)
+        root_logger.addHandler(fh)
 
     from engine.constants import ERROR_LOG_MAX_BYTES, ERROR_LOG_BACKUP_COUNT
 
-    # Error file handler — errors only
-    efh = RotatingFileHandler(
-        str(ERROR_LOG_PATH), maxBytes=ERROR_LOG_MAX_BYTES, backupCount=ERROR_LOG_BACKUP_COUNT, encoding="utf-8"
-    )
-    efh.setLevel(logging.ERROR)
-    efh.setFormatter(logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s: %(message)s\n"
-        "  File: %(pathname)s:%(lineno)d\n"
-        "  Function: %(funcName)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    ))
-    root_logger.addHandler(efh)
+    if not any(getattr(h, "baseFilename", None) == str(ERROR_LOG_PATH) for h in root_logger.handlers):
+        efh = RotatingFileHandler(
+            str(ERROR_LOG_PATH),
+            maxBytes=ERROR_LOG_MAX_BYTES,
+            backupCount=ERROR_LOG_BACKUP_COUNT,
+            encoding="utf-8",
+        )
+        efh.setLevel(logging.ERROR)
+        efh.setFormatter(logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s\n"
+            "  File: %(pathname)s:%(lineno)d\n"
+            "  Function: %(funcName)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        ))
+        root_logger.addHandler(efh)
 
-    logging.getLogger("engine.deepseek_client").info("Logging initialized — app.log + error.log")
+    for name in ("uvicorn", "uvicorn.error", "uvicorn.access", "fastapi"):
+        lg = logging.getLogger(name)
+        lg.propagate = True
+
+    install_excepthook()
+    _LOGGING_CONFIGURED = True
+    logging.getLogger("promptos").info("Logging initialized — %s | %s", LOG_PATH, ERROR_LOG_PATH)
 
 
 # ── Character tier system ───────────────────────────────────────────

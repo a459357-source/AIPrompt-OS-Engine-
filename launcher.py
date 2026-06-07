@@ -2,6 +2,7 @@
 """PromptOS desktop launcher — starts API + bundled React UI on :8000."""
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import threading
@@ -19,7 +20,10 @@ else:
     sys.path.insert(0, str(ROOT))
 
 import config
+
 config.ensure_runtime_files()
+config.setup_logging(console=True)
+logger = logging.getLogger("launcher")
 
 
 def _open_browser() -> None:
@@ -32,7 +36,11 @@ def main() -> None:
     print("PromptOS — 启动中…")
     print(f"  数据目录: {config.DATA_DIR}")
     print(f"  访问地址: {config.frontend_url('/')}")
+    print(f"  运行日志: {config.LOG_PATH}")
+    print(f"  错误日志: {config.ERROR_LOG_PATH}")
     print("  关闭本窗口即停止服务\n")
+
+    logger.info("PromptOS exe starting — UI %s", config.frontend_url("/"))
 
     threading.Thread(target=_open_browser, daemon=True).start()
 

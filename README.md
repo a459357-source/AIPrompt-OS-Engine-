@@ -80,6 +80,8 @@ scripts/         重置用户数据等工具
 build_release.py 一键打包
 launcher.py      exe 入口
 data/            运行时数据（个人进度，勿提交）
+data/app.log     运行日志（bat / exe 启动后自动生成）
+data/error.log   错误日志（含未捕获异常）
 release/         发布 zip 与使用说明
 ```
 

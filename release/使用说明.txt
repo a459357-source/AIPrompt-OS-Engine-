@@ -17,4 +17,9 @@ PromptOS 发布包使用说明
   cd prompt-os-engine
   python build_release.py
 
+【日志】
+- 运行日志: PromptOS\data\app.log
+- 错误日志: PromptOS\data\error.log
+- 用「启动 PromptOS.bat」或双击 PromptOS.exe 启动后自动生成
+
 打包前请勿在 dist\PromptOS 目录运行过程序后再手动打 zip。
