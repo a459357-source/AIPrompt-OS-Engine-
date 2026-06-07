@@ -201,3 +201,25 @@ export async function startGame(): Promise<{ story: string; options: string[]; s
   }
   return res.json()
 }
+
+export async function getSettingsStatus(): Promise<{ configured: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/settings-status')
+    if (!res.ok) return { configured: false, error: `HTTP ${res.status}` }
+    return res.json()
+  } catch {
+    return { configured: false, error: 'network' }
+  }
+}
+
+export async function saveApiKey(key: string): Promise<{ ok?: boolean; error?: string }> {
+  const params = new URLSearchParams({ api_key: key.trim() })
+  const res = await fetch('/api/settings-key', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  })
+  const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string }
+  if (!res.ok) return { error: data.error || `HTTP ${res.status}` }
+  return data
+}

@@ -9,6 +9,7 @@ import Game from './pages/Game'
 import NPCs from './pages/NPCs'
 import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
+import { ApiKeyPrompt } from '@/components/ApiKeyPrompt'
 
 const NAV_LINKS = [
   { to: '/new', icon: '🆕', label: '新故事' },
@@ -134,6 +135,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-game-bg text-game-text pb-16 md:pb-0">
+      <ApiKeyPrompt />
       <DesktopNav />
       <MobileTopBar />
       <MobileBottomNav />
