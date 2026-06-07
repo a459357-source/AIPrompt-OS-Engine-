@@ -42,7 +42,7 @@ errors = 0
 
 # ── 1. 创建新故事 ──
 print("\n📖 1. 创建新故事...")
-r = post("/new", follow_redirects=False, data={
+r = post("/new", data={
     "title": "星海迷途",
     "world": "2157年，人类在火星发现古代文明遗迹「星门」，打开了通往银河系各地的通道。各大势力争夺星门控制权。",
     "genre": "科幻 / 冒险",

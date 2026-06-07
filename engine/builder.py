@@ -193,13 +193,6 @@ def build_prompt() -> tuple[str, str]:
     else:
         state_for_prompt = session_state
 
-    # ── Estimate token usage and warn ───────────────────────────
-    _warn_if_approaching_limit(system_prompt, user_prompt,
-                                state_for_prompt, world_pack,
-                                memory_context, tier_context, faction_attitude_context,
-                                faction_scope_context, artifact_context,
-                                event_context, world_state_context)
-
     # ── Interpolate user prompt ────────────────────────────────
     user_raw = template.get("user", "")
     user_prompt = (
@@ -219,6 +212,13 @@ def build_prompt() -> tuple[str, str]:
         .replace("{{EVENT_CONTEXT}}", event_context)
         .replace("{{WORLD_STATE}}", world_state_context)
     )
+
+    # ── Estimate token usage and warn ───────────────────────────
+    _warn_if_approaching_limit(system_prompt, user_prompt,
+                                state_for_prompt, world_pack,
+                                memory_context, tier_context, faction_attitude_context,
+                                faction_scope_context, artifact_context,
+                                event_context, world_state_context)
 
     logger.info("Prompt built — force_event=%s last_choice=%s", force_triggered, last_choice or "none")
     return system_prompt, user_prompt

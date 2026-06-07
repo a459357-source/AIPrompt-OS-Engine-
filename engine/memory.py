@@ -734,15 +734,17 @@ def detect_new_characters_from_story(story: str,
     # X is 2-3 chars; the trailing particle (的/，/。) acts as a boundary.
     _NC = r'[\u4e00-\u9fff]'  # name char
     intro_patterns = [
-        # "名叫X" / "叫做X" / "称为X" — explicit naming
-        rf'(?:名叫|叫做|称为)\s*({_NC}{{2,3}})',
-        # Bare "叫X" — but NOT "名叫" or "叫做" (already covered above)
-        rf'(?<!名)(?<!做)叫\s*({_NC}{{2,3}})',
+        # "名叫X" / "叫做X" / "称为X" — explicit naming, highest precision
+        rf'(?:名叫|叫做|称为)\s*({_NC}{{2,4}})',
         # "自称X" — but NOT "自称是…" (which means "claimed that…")
-        rf'自称\s*(?!是)({_NC}{{2,3}})',
+        rf'自称\s*(?!是)({_NC}{{2,4}})',
         # "一位叫X" / "一个叫X" / "名为X" / "姓X"
-        rf'(?:一位叫|一个叫|名为|姓)\s*({_NC}{{2,3}})',
+        rf'(?:一位叫|一个叫|名为|姓)\s*({_NC}{{2,4}})',
+        # AI explicitly introduced a character in state: "新角色：X" or "X加入了"
+        rf'(?:新角色|新人)[：:]\s*({_NC}{{2,4}})',
     ]
+    # NOTE: bare "叫X" pattern removed — too many false positives
+    # from sentences like "林夜叫停了操作" / "这叫什么事"
 
     for pat in intro_patterns:
         for m in re.finditer(pat, story):
@@ -756,6 +758,11 @@ def detect_new_characters_from_story(story: str,
                 continue
             # Reject if all high-frequency particles
             if all(c in '的了是我也就不这人一个来去说看' for c in name):
+                continue
+            # Reject story fragments: names containing common verbs/particles
+            _FRAGMENT_CHARS = set('倒吸盯着露出启动紧急主控要巨大知道彻底关闭接近'
+                                 '把能也是远前个成半觉次再开室起过')
+            if any(c in _FRAGMENT_CHARS for c in name):
                 continue
             candidates.append(name)
 
