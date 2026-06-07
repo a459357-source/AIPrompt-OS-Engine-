@@ -38,6 +38,176 @@ _ARTIFACT_PATCH_KEYS = (
     "abilities", "tags", "relatedCharacters", "relatedFactions", "status",
 )
 
+_REVISION_PREFIXES = (
+    "改为", "不再是", "去掉", "删除", "替换为", "变更为", "修正为", "改为仅有",
+)
+
+
+def _is_revision_text(text: str) -> bool:
+    t = str(text or "").strip()
+    return any(t.startswith(prefix) for prefix in _REVISION_PREFIXES)
+
+
+def _strip_revision_prefix(text: str) -> str:
+    t = str(text or "").strip()
+    for prefix in _REVISION_PREFIXES:
+        if t.startswith(prefix):
+            return t[len(prefix):].strip(" ：:")
+    return t
+
+
+def _merge_text_field(existing: str, patch: str, *, single_slot: bool = False) -> str:
+    """Append by default; on conflict or revision wording, supplement wins."""
+    existing = str(existing or "").strip()
+    patch = str(patch or "").strip()
+    if not patch:
+        return existing
+    if not existing:
+        return _strip_revision_prefix(patch) if _is_revision_text(patch) else patch
+    if patch in existing:
+        return existing
+    if existing in patch:
+        return _strip_revision_prefix(patch) if _is_revision_text(patch) else patch
+    if _is_revision_text(patch):
+        cleaned = _strip_revision_prefix(patch)
+        return cleaned or patch
+    if single_slot:
+        return patch
+    return f"{existing}；{patch}"
+
+
+def _merge_list_field(existing: Any, patch: Any) -> list:
+    base: list[Any] = existing if isinstance(existing, list) else ([existing] if existing else [])
+    add: list[Any] = patch if isinstance(patch, list) else ([patch] if patch else [])
+    out: list[str] = []
+    for item in base:
+        s = str(item).strip()
+        if s and s not in out:
+            out.append(s)
+    for item in add:
+        s = str(item).strip()
+        if not s or s in out:
+            continue
+        if any(s in x or x in s for x in out):
+            continue
+        out.append(s)
+    return out
+
+
+def _merge_scalar(existing: Any, patch: Any) -> Any:
+    """Scalar conflict → supplement wins."""
+    if patch is None:
+        return existing
+    if isinstance(patch, str) and not patch.strip():
+        return existing
+    if existing is None or existing == "":
+        return patch
+    return patch
+
+
+def _merge_dict_value(existing: Any, patch: Any) -> Any:
+    if not isinstance(patch, dict) or not patch:
+        return existing
+    base = dict(existing) if isinstance(existing, dict) else {}
+    merged = dict(base)
+    for key, val in patch.items():
+        if val is None:
+            continue
+        if isinstance(val, str) and not val.strip():
+            continue
+        if key in merged and merged[key] != val:
+            merged[key] = val
+        else:
+            merged[key] = val
+    return merged
+
+
+def _merge_character_record(existing: dict, patch: dict) -> dict:
+    out = dict(existing)
+    for key in ("role_tags", "personality_tags", "relationship"):
+        if key not in patch or not patch.get(key):
+            continue
+        raw = patch[key]
+        if isinstance(raw, str):
+            raw = [raw]
+        out[key] = _merge_list_field(out.get(key), raw)
+    for key in ("goal", "secret", "background"):
+        if key in patch and patch.get(key):
+            out[key] = _merge_text_field(out.get(key, ""), str(patch[key]), single_slot=False)
+    if "appearance" in patch and patch.get("appearance"):
+        out["appearance"] = _merge_text_field(
+            out.get("appearance", ""), str(patch["appearance"]), single_slot=True,
+        )
+    if "faction" in patch and patch.get("faction"):
+        out["faction"] = str(_merge_scalar(out.get("faction"), patch["faction"])).strip()
+    memberships = patch.get("factionMemberships") or patch.get("faction_memberships")
+    if isinstance(memberships, list) and memberships:
+        prev = out.get("faction_memberships") or out.get("factionMemberships") or []
+        combined = list(prev) if isinstance(prev, list) else []
+        for item in memberships:
+            if not isinstance(item, dict):
+                continue
+            fname = str(item.get("faction", "")).strip()
+            if not fname:
+                continue
+            replaced = False
+            for idx, old in enumerate(combined):
+                if isinstance(old, dict) and str(old.get("faction", "")).strip() == fname:
+                    combined[idx] = item
+                    replaced = True
+                    break
+            if not replaced:
+                combined.append(item)
+        out["faction_memberships"] = combined
+    if patch.get("is_main") is not None:
+        out["is_main"] = bool(patch.get("is_main"))
+    return out
+
+
+def _merge_faction_record(existing: dict, patch: dict) -> dict:
+    out = dict(existing)
+    if "description" in patch and patch.get("description"):
+        out["description"] = _merge_text_field(out.get("description", ""), str(patch["description"]))
+    for key in ("goals", "resources", "controlledTerritories", "subordinateOrganizations", "keyAssets"):
+        if key in patch and patch.get(key):
+            out[key] = _merge_list_field(out.get(key), patch[key])
+    for key in ("type", "leader", "relation_to_player"):
+        if key in patch and patch.get(key):
+            out[key] = _merge_scalar(out.get(key), patch[key])
+    if "power" in patch and isinstance(patch.get("power"), dict):
+        out["power"] = _merge_dict_value(out.get("power"), patch["power"])
+    if "influence" in patch and patch.get("influence") is not None:
+        out["influence"] = _merge_scalar(out.get("influence"), patch["influence"])
+    return out
+
+
+def _merge_artifact_record(existing: dict, patch: dict) -> dict:
+    out = dict(existing)
+    if "description" in patch and patch.get("description"):
+        out["description"] = _merge_text_field(out.get("description", ""), str(patch["description"]))
+    for key in ("abilities", "tags", "relatedCharacters", "relatedFactions"):
+        if key in patch and patch.get(key):
+            out[key] = _merge_list_field(out.get(key), patch[key])
+    for key in ("type", "ownerType", "ownerId", "status"):
+        if key in patch and patch.get(key):
+            out[key] = _merge_scalar(out.get(key), patch[key])
+    if "importance" in patch and patch.get("importance") is not None:
+        out["importance"] = _merge_scalar(out.get("importance"), patch["importance"])
+    return out
+
+
+def _merge_relation_entry(existing: dict, patch: dict) -> dict:
+    out = dict(existing) if isinstance(existing, dict) else {}
+    rel_type = patch.get("relationshipType")
+    if isinstance(rel_type, str) and rel_type in _REL_TYPES:
+        out["relationshipType"] = rel_type
+    for metric in _REL_METRICS:
+        if metric in patch and isinstance(patch.get(metric), (int, float)):
+            out[metric] = _clamp_rel_metric(patch.get(metric), 50)
+    if patch.get("tags"):
+        out["tags"] = _merge_list_field(out.get("tags"), patch.get("tags"))
+    return out
+
 
 def _clamp_rel_metric(value: Any, default: int = 50) -> int:
     try:
@@ -338,10 +508,10 @@ def _analysis_prompt(context: str, user_text: str) -> tuple[str, str]:
 
 各字段仅在玩家文本**明确提到**时才填写，结构示例（不要照抄示例值）：
 - characters[].action: add|update；update 只含玩家提到的字段；add 时 name 必填，其余字段仅填玩家写到的属性
-- characters[].special_ability：update 时只写要**追加**的能力片段（系统合并到已有能力，不覆盖）
-- characters[].special_ability_remove：玩家明确要去掉某能力时填写（字符串或数组）
-- characters[].special_ability_replace：仅当玩家明确「改为仅有/替换为/去掉原来能力」时为 true，此时 special_ability 表示完整替换结果
-- factions / artifacts 同上
+- characters[].special_ability：update 时只写要**追加**的能力片段
+- characters[].special_ability_remove / special_ability_replace：仅当玩家明确去掉或整段替换能力时使用
+- **入库合并规则（系统执行，无需写入 JSON）**：所有字段优先追加；若与已有内容冲突，以本次补充为准；玩家写「改为/去掉/不再是…」时表示修订，以补充为准
+- factions / artifacts / 角色其他字段同上：列表追加去重，短文本可追加，单值冲突以补充为准
 - characterRelations：只含玩家明确提到的 NPC；六维数值只输出玩家写到的维度，未写不要输出
 - rel_affection：仅当玩家明确给出初始/当前好感数值时才输出该字段，否则整个字段省略
 
@@ -442,16 +612,19 @@ def _apply_world_core(analysis: dict, world_pack: dict, session_state: dict) -> 
     world = world_pack.setdefault("world", {})
 
     if analysis.get("title"):
-        world["title"] = analysis["title"]
+        world["title"] = _merge_text_field(
+            world.get("title", ""), analysis["title"], single_slot=True,
+        )[:20]
         changes.append("更新标题")
     if analysis.get("world"):
-        world["setting"] = analysis["world"]
+        merged = _merge_text_field(world.get("setting", ""), analysis["world"])
+        world["setting"] = merged[:300]
         changes.append("更新世界观")
     if analysis.get("genre"):
-        world["genre"] = analysis["genre"]
+        world["genre"] = _merge_list_field(world.get("genre"), analysis["genre"])
         changes.append("更新类型标签")
     if analysis.get("main_goal"):
-        world["main_goal"] = analysis["main_goal"]
+        world["main_goal"] = _merge_text_field(world.get("main_goal", ""), analysis["main_goal"])
         changes.append("更新主线目标")
 
     scene = analysis.get("scene") or ""
@@ -461,7 +634,9 @@ def _apply_world_core(analysis: dict, world_pack: dict, session_state: dict) -> 
         desc = analysis.get("scene_desc") or ""
         if existing:
             if desc:
-                existing["desc"] = desc[:200]
+                existing["desc"] = _merge_text_field(
+                    existing.get("desc", ""), desc, single_slot=True,
+                )[:200]
             changes.append(f"更新场景：{scene}")
         else:
             locations.append({"name": scene, "desc": desc[:200] if desc else "补充设定地点"})
@@ -478,8 +653,9 @@ def _apply_rel_system(analysis: dict, world_pack: dict) -> list[str]:
 
     stages = analysis.get("rel_stages") or []
     if stages:
-        rel_sys["stages"] = stages
-        custom["stages"] = stages
+        merged_stages = _merge_list_field(rel_sys.get("stages"), stages)
+        rel_sys["stages"] = merged_stages
+        custom["stages"] = merged_stages
         changes.append("更新关系阶段")
 
     aff = analysis.get("rel_affection")
@@ -576,7 +752,7 @@ def _apply_characters(
                 changes.append(f"新增角色：{name}")
 
         if action == "update" and existing:
-            merged = _merge_dict(existing, entry, _CHAR_PATCH_KEYS)
+            merged = _merge_character_record(existing, entry)
             if (
                 "special_ability" in entry
                 or "special_ability_remove" in entry
@@ -648,7 +824,7 @@ def _apply_factions(entries: list[dict], world_pack: dict, memory: dict) -> list
             changes.append(f"新增势力：{name}")
         elif existing:
             idx = wp_factions.index(existing)
-            wp_factions[idx] = _merge_dict(existing, entry, _FACTION_PATCH_KEYS)
+            wp_factions[idx] = _merge_faction_record(existing, entry)
             wp_factions[idx]["name"] = name
             changes.append(f"更新势力：{name}")
 
@@ -683,7 +859,7 @@ def _apply_artifacts(entries: list[dict], world_pack: dict, memory: dict) -> lis
             changes.append(f"新增关键物品：{name}")
         elif existing:
             idx = wp_arts.index(existing)
-            wp_arts[idx] = _merge_dict(existing, entry, _ARTIFACT_PATCH_KEYS)
+            wp_arts[idx] = _merge_artifact_record(existing, entry)
             wp_arts[idx]["name"] = name
             changes.append(f"更新关键物品：{name}")
 
@@ -695,7 +871,9 @@ def _apply_relations(rel_patch: dict, custom: dict, session_state: dict, memory:
     if not rel_patch:
         return []
     merged = dict(custom.get("characterRelations") or {})
-    merged.update(rel_patch)
+    for npc_name, rel in rel_patch.items():
+        prev = merged.get(npc_name, {}) if isinstance(merged.get(npc_name), dict) else {}
+        merged[npc_name] = _merge_relation_entry(prev, rel)
     custom["characterRelations"] = merged
 
     changes: list[str] = []
@@ -703,6 +881,7 @@ def _apply_relations(rel_patch: dict, custom: dict, session_state: dict, memory:
     session_chars = session_state.get("characters") or {}
 
     for npc_name, rel in rel_patch.items():
+        combined = merged.get(npc_name, {})
         entry = mem_chars.setdefault(npc_name, {"trust": 0.5, "flags": [], "relationship": ""})
         for metric in _REL_METRICS:
             raw = rel.get(metric)
@@ -712,10 +891,6 @@ def _apply_relations(rel_patch: dict, custom: dict, session_state: dict, memory:
         rel_type = rel.get("relationshipType", "")
         if rel_type:
             entry["relationship_type"] = rel_type
-        for tag in rel.get("tags") or []:
-            flag = f"关系：{tag}"
-            if flag not in entry.get("flags", []):
-                entry.setdefault("flags", []).append(flag)
 
         label = initial_relation_label(
             npc_name, is_main=False, relationship=[], char_relations=merged,
@@ -725,6 +900,10 @@ def _apply_relations(rel_patch: dict, custom: dict, session_state: dict, memory:
             if isinstance(state_ch, dict) and state_ch.get("name") == npc_name:
                 state_ch["relation"] = label
                 break
+        for tag in combined.get("tags") or []:
+            flag = f"关系：{tag}"
+            if flag not in entry.get("flags", []):
+                entry.setdefault("flags", []).append(flag)
         changes.append(f"更新关系：{npc_name}")
 
     return changes

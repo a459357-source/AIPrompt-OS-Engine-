@@ -2179,9 +2179,8 @@ export default function Game() {
             </div>
             <div className="p-5 space-y-3">
               <p className="text-xs text-game-dim leading-relaxed">
-                仅根据您填写的内容提取设定，AI 不会推断或补全未写明的信息。
-                可更新标题 / 世界观 / 类型 / 场景 / 主线、角色、势力、物品、追踪维度、关系等；
-                纯叙事规则会追加到<strong className="text-game-muted">本故事专属 prompt</strong>。
+                仅根据您填写的内容提取设定，不会推断未写明的信息。
+                入库时<strong className="text-game-muted">优先追加</strong>到已有设定；若与已有内容冲突，以本次补充为准。
               </p>
               <Textarea
                 value={supplementText}

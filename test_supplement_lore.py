@@ -88,6 +88,27 @@ def lore_env(tmp_path, monkeypatch):
     return {"world_pack_path": wp, "session_path": ss, "memory_path": mem}
 
 
+def test_merge_text_field_append_and_conflict():
+    from engine.supplement_lore import _merge_text_field
+
+    assert _merge_text_field("收集碎片", "学会催眠") == "收集碎片；学会催眠"
+    assert _merge_text_field("银发", "黑发", single_slot=True) == "黑发"
+    assert _merge_text_field("旧目标", "改为新目标") == "新目标"
+
+
+def test_merge_character_record_append_goal():
+    from engine.supplement_lore import _merge_character_record
+
+    merged = _merge_character_record(
+        {"goal": "收集碎片", "role_tags": ["骑士"]},
+        {"goal": "学会催眠", "role_tags": ["法师"]},
+    )
+    assert "收集碎片" in merged["goal"]
+    assert "催眠" in merged["goal"]
+    assert "骑士" in merged["role_tags"]
+    assert "法师" in merged["role_tags"]
+
+
 def test_merge_special_ability_append_and_remove():
     from engine.supplement_lore import _merge_special_ability
 
@@ -202,6 +223,24 @@ def test_apply_supplement_add_faction(lore_env):
     assert "暗部" in names
 
 
+def test_apply_world_core_appends_setting(lore_env):
+    pack = io_utils.read_yaml(lore_env["world_pack_path"])
+    pack["world"]["setting"] = "原有世界观"
+    io_utils.write_yaml(lore_env["world_pack_path"], pack)
+
+    apply_supplement({
+        "world": "补充的世界观细节",
+        "characters": [],
+        "factions": [],
+        "artifacts": [],
+        "characterRelations": {},
+        "summary": "追加世界观",
+    })
+    pack = io_utils.read_yaml(lore_env["world_pack_path"])
+    assert "原有世界观" in pack["world"]["setting"]
+    assert "补充的世界观细节" in pack["world"]["setting"]
+
+
 def test_apply_supplement_world_core_artifact_stats(lore_env):
     analysis = {
         "story_prompt": "",
@@ -236,9 +275,10 @@ def test_apply_supplement_world_core_artifact_stats(lore_env):
     pack = io_utils.read_yaml(lore_env["world_pack_path"])
     world = pack["world"]
     assert world["title"] == "新标题"
-    assert world["setting"] == "扩展后的世界观描述"
+    assert "扩展后的世界观描述" in world["setting"]
     assert "图书馆" in [loc["name"] for loc in world["locations"]]
-    assert world["relationship_system"]["stages"] == ["陌生", "试探", "盟友"]
+    assert "试探" in world["relationship_system"]["stages"]
+    assert "盟友" in world["relationship_system"]["stages"]
     assert pack["custom"]["stats"][0]["key"] == "suspicion"
     art_names = [a["name"] for a in world["artifacts"]]
     assert "古书" in art_names
