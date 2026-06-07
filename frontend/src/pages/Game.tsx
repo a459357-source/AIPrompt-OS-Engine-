@@ -7,12 +7,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
+import { Switch } from '@/components/ui/switch'
 import { StatusToast } from '@/components/StatusToast'
 import { getGameState, startGame, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, type HistoryTurn, type GameGenSettings } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { parseRelationHints } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
-import { getSettings, clampAutoAdvanceRounds } from '@/lib/settings'
+import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS } from '@/lib/settings'
 import { t } from '@/lib/i18n'
 
 /** Keep in sync with config.py */
@@ -1032,16 +1033,46 @@ export default function Game() {
             <div className="shrink-0 border-t border-game-border bg-game-bg/95 backdrop-blur-sm pt-3 pb-1">
             <AnimatePresence>
               {options.length > 0 && (
-                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <p className="text-sm text-game-muted font-medium">🎯 {t('game.choices', lang)}</p>
-                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex flex-col gap-2 min-w-0 flex-1">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <p className="text-sm text-game-muted font-medium shrink-0">🎯 {t('game.choices', lang)}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-game-muted shrink-0">⚡ 自动推进</span>
+                          <Switch
+                            checked={appSettings.autoAdvance}
+                            disabled={choosing}
+                            onCheckedChange={(v) => saveSettings({ autoAdvance: v })}
+                          />
+                          {appSettings.autoAdvance && (
+                            <>
+                              <span className="text-xs text-game-dim shrink-0">推进轮数</span>
+                              {AUTO_ADVANCE_ROUND_OPTIONS.map((n) => (
+                                <Button
+                                  key={n}
+                                  type="button"
+                                  size="xs"
+                                  variant={clampAutoAdvanceRounds(appSettings.autoAdvanceRounds) === n ? 'primary' : 'ghost'}
+                                  disabled={choosing}
+                                  onClick={() => saveSettings({ autoAdvanceRounds: n })}
+                                >
+                                  {n}
+                                </Button>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      </div>
                       {appSettings.autoAdvance && (
-                        <>
+                        <div className="flex items-center gap-2 flex-wrap pl-0.5">
                           <span className="text-xs text-game-muted tabular-nums">
                             剩余 {autoAdvanceRemaining}/{clampAutoAdvanceRounds(appSettings.autoAdvanceRounds)} 轮
                             {autoAdvanceRunning && (
-                              <span className="text-game-accent ml-1">{autoAdvanceCountdown}s → A</span>
+                              <span className="text-game-accent ml-1">{autoAdvanceCountdown}s 后自动选 A</span>
+                            )}
+                            {autoAdvanceRemaining <= 0 && !autoAdvanceRunning && (
+                              <span className="text-game-dim ml-1">轮数已用尽，点继续可重置</span>
                             )}
                           </span>
                           {autoAdvancePaused || autoAdvanceRemaining <= 0 ? (
@@ -1049,7 +1080,7 @@ export default function Game() {
                               type="button"
                               variant="outline"
                               size="xs"
-                              disabled={choosing || !appSettings.autoAdvance}
+                              disabled={choosing}
                               onClick={resumeAutoAdvance}
                             >
                               ▶ 继续自动
@@ -1065,8 +1096,10 @@ export default function Game() {
                               ⏸ 暂停
                             </Button>
                           )}
-                        </>
+                        </div>
                       )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
                       <span className="text-xs text-game-muted/80 hidden sm:inline">
                         {showConsequences ? 'AI 预测每个选项的剧情发展和好感影响' : '已隐藏剧情推测'}
                       </span>
@@ -1083,6 +1116,7 @@ export default function Game() {
                       </button>
                     </div>
                   </div>
+                  <div className="space-y-3 pt-1">
                   {options.map((choice, i) => {
                     // Parse "行动 → 可能发展 | 态度 | 人际影响"
                     const parts = choice.split(/\s*[→]\s*/)
@@ -1136,6 +1170,7 @@ export default function Game() {
                       >确定</Button>
                     </motion.div>
                   )}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>

@@ -123,6 +123,10 @@ def metrics_curves() -> dict[str, dict]:
     memory = io_utils.read_json(config.MEMORY_PATH)
     chars = memory.get("characters", {})
     allowed = set(_canonical_character_names())
+    # Include valid memory-only names (tests + chars not yet in session roster)
+    for name, data in chars.items():
+        if isinstance(data, dict) and _is_valid_character_name(name):
+            allowed.add(name)
 
     # Discover all metrics from metric_history + top-level numeric fields
     all_metrics: dict[str, dict] = {}  # metric_name → {char_name → [[turn, val], ...]}

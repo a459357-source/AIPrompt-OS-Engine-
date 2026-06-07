@@ -183,10 +183,37 @@ export default function Dashboard() {
     }],
   } : null
 
+  // ── Chart: Faction reputation ──────────────────────────────────────
+  const factionCurves = a?.faction_curves
+  const factionChart = (() => {
+    if (!factionCurves || Object.keys(factionCurves).length === 0) return null
+    const entries = Object.values(factionCurves)
+    const allTurns = new Set<number>()
+    entries.forEach((curve) => curve.labels.forEach((t) => allTurns.add(t)))
+    const labels = Array.from(allTurns).sort((x, y) => x - y).map(String)
+    const datasets = entries.map((curve, i) => {
+      const turnMap = new Map(curve.labels.map((t, idx) => [t, curve.datasets[0]?.data[idx] ?? 0]))
+      return {
+        label: curve.label || curve.datasets[0]?.name || `势力 ${i + 1}`,
+        data: labels.map((l) => turnMap.get(Number(l)) ?? null),
+        borderColor: CHART_COLORS[i % CHART_COLORS.length],
+        backgroundColor: CHART_COLORS[i % CHART_COLORS.length] + '22',
+        tension: 0.3,
+        fill: false,
+        pointRadius: 3,
+        spanGaps: true,
+      }
+    })
+    return { labels, datasets }
+  })()
+
+  const statusTimeline = a?.status_timeline?.filter((item) => item.turn > 0) ?? []
+
   // ── Branch stats ─────────────────────────────────────────────────
   const bs = a?.branch_stats
 
-  const hasCharts = trustChart || apiChart || choiceChart || wordChart || freqChart
+  const hasCharts = trustChart || apiChart || choiceChart || wordChart || freqChart || factionChart
+  const showAnalytics = hasCharts || statusTimeline.length > 0
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -302,7 +329,7 @@ export default function Dashboard() {
       </div>
 
       {/* Charts Section */}
-      {hasCharts && (
+      {showAnalytics && (
         <>
           <Separator className="my-2" />
 
@@ -400,10 +427,68 @@ export default function Dashboard() {
               </Card>
             )}
           </div>
+
+          {/* Faction + Status timeline */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {factionChart && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">🏛️ 势力声望曲线</CardTitle>
+                  <CardDescription>各势力声望随回合变化（来自 memory.json）</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-56">
+                    <Line data={factionChart} options={{
+                      ...CHART_OPTIONS_DARK,
+                      scales: {
+                        ...CHART_OPTIONS_DARK.scales,
+                        y: { ...CHART_OPTIONS_DARK.scales?.y, min: 0, max: 100 },
+                      },
+                    }} />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {statusTimeline.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">🕐 状态时间线</CardTitle>
+                  <CardDescription>每轮叙事状态与场景（来自剧情图）</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                    {statusTimeline.map((item) => (
+                      <div
+                        key={`tl-${item.turn}-${item.scene}`}
+                        className="flex items-start gap-2 text-xs border-b border-game-border/50 pb-2 last:border-0"
+                      >
+                        <Badge variant="outline" size="sm" className="shrink-0 tabular-nums">
+                          T{item.turn}
+                        </Badge>
+                        <Badge
+                          variant={
+                            item.status === 'TENSION' ? 'warning' :
+                            item.status === 'CLIMAX' ? 'danger' :
+                            item.status === 'COOLDOWN' ? 'success' : 'primary'
+                          }
+                          size="sm"
+                          className="shrink-0"
+                        >
+                          {item.status}
+                        </Badge>
+                        <span className="text-game-muted leading-relaxed">{item.scene || '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </>
       )}
 
-      {!hasCharts && (
+      {!showAnalytics && (
         <Card>
           <CardContent className="py-8 text-center text-game-dim text-sm">
             📈 进行更多轮次后，这里会展示数据可视化图表

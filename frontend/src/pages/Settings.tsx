@@ -108,7 +108,6 @@ export default function Settings() {
   const [apiKey, setApiKey] = useState('')
   const [apiKeyMasked, setApiKeyMasked] = useState('')
   const [model, setModel] = useState('deepseek-chat')
-  const [stream, setStream] = useState(false)
   const [maxContextMsgs, setMaxContextMsgs] = useState(20)
   const [autoCompress, setAutoCompress] = useState(true)
 
@@ -148,7 +147,6 @@ export default function Settings() {
       .then((data) => {
         if (data.api_key_masked) setApiKeyMasked(data.api_key_masked)
         setModel(data.model)
-        setStream(data.stream)
         setMaxContextMsgs(data.max_context_messages)
         setAutoCompress(data.auto_compress)
       })
@@ -189,7 +187,6 @@ export default function Settings() {
       const data = await saveEngineSettings({
         apiKey: apiKey || undefined,
         model,
-        stream,
         maxContextMsgs,
         autoCompress,
       })
@@ -202,7 +199,7 @@ export default function Settings() {
       logger.error('Settings', 'Save API failed', { error: String(e) })
     }
     setApiSaving(false)
-  }, [apiKey, model, stream, maxContextMsgs, autoCompress])
+  }, [apiKey, model, maxContextMsgs, autoCompress])
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -289,6 +286,32 @@ export default function Settings() {
                 <p className="text-xs text-game-dim">
                   自动保存间隔控制引擎 autosave 频率；自动导出写入 <code className="text-game-muted">output/exports/</code>。
                 </p>
+                <Separator />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <Label className="text-sm text-game-muted">存档管理</Label>
+                    <Badge variant="outline" size="sm" className="text-[10px] shrink-0">V2 即将推出</Badge>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" className="w-full" disabled>
+                    💾 读档 / 存档 / 重置
+                  </Button>
+                  <p className="text-[11px] text-game-dim">
+                    后端已支持 <code className="text-game-muted">/save</code>、<code className="text-game-muted">/load</code>，React 界面将在 V2 提供。
+                  </p>
+                </div>
+                <Separator />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <Label className="text-sm text-game-muted">Obsidian 导出</Label>
+                    <Badge variant="outline" size="sm" className="text-[10px] shrink-0">V2 即将推出</Badge>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" className="w-full" disabled>
+                    📓 导出完整叙事到 Obsidian
+                  </Button>
+                  <p className="text-[11px] text-game-dim">
+                    后端 <code className="text-game-muted">GET /export</code> 已可用；一键下载入口将在 V2 加入。
+                  </p>
+                </div>
               </CardContent>
             </AccordionContent>
           </Card>
@@ -320,7 +343,7 @@ export default function Settings() {
                   />
                 )}
                 <p className="text-xs text-game-dim">
-                  开启后游戏页可自动选 A；可在对局内暂停/继续，每轮成功生成后扣减剩余轮数。
+                  开启后游戏页选项区上方可开关、调整轮数；5 秒后自动选 A，可暂停/继续，每轮成功生成后扣减剩余轮数。
                 </p>
                 <div className="flex items-center justify-between">
                   <Label className="text-sm text-game-muted">动画效果</Label>
@@ -330,12 +353,15 @@ export default function Settings() {
                   />
                 </div>
                 <SelectRow
-                  label="侧栏默认"
+                  label="快捷设置默认展开"
                   value={values.sidebarDefault}
                   options={['expanded', 'collapsed']}
                   onChange={(v) => setValue('sidebarDefault', v as string)}
                   labels={{ expanded: '展开', collapsed: '折叠' }}
                 />
+                <p className="text-xs text-game-dim -mt-2">
+                  控制游戏页 ⚡ 快捷设置面板的初始折叠状态（不影响角色状态面板）。
+                </p>
                 <SelectRow
                   label="角色面板位置"
                   value={values.charPanelPosition}
@@ -393,9 +419,15 @@ export default function Settings() {
                 <p className="text-xs text-game-dim rounded-md border border-game-border/60 bg-game-bg/50 px-3 py-2">
                   生成相关参数（字数、温度、选项数、视角、文风等）请在<strong className="text-game-muted">游戏页 → ⚡ 快捷设置</strong>中调整。
                 </p>
-                <div className="flex items-center justify-between">
-                  <Label>📡 流式输出</Label>
-                  <Switch checked={stream} onCheckedChange={setStream} />
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <Label>📡 流式输出</Label>
+                    <p className="text-xs text-game-dim">逐字显示 AI 回复（SSE）</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant="outline" size="sm" className="text-[10px]">V2 即将推出</Badge>
+                    <Switch checked={false} disabled aria-readonly />
+                  </div>
                 </div>
                 <Separator />
                 <p className="text-xs text-game-accent font-medium">💬 上下文管理</p>

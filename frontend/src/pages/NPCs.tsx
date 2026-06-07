@@ -78,6 +78,9 @@ export default function NPCs() {
           <p className="text-game-muted text-sm mt-1">
             共 {stats.total} 位角色 · {stats.main} 主角 · {stats.npc} NPC · 平均好感 {stats.avg_trust}%
           </p>
+          <p className="text-game-dim text-xs mt-1">
+            角色由对局与记忆系统自动维护，暂不支持编辑或删除。
+          </p>
         </div>
         <Button variant="glow" size="sm" onClick={handleGenerate} disabled={generating}>
           {generating ? (

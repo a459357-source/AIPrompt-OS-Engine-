@@ -19,6 +19,12 @@ import { StatusToast } from '@/components/StatusToast'
 import type { Character, WorldGenResponse } from '@/lib/types'
 import { STORY_PRESETS, type StoryPreset } from '@/lib/storyPresets'
 
+const WORLD_GEN_CONFIRM_MSG =
+  '一键生成会用 AI 结果覆盖当前表单中的全部设定（标题、世界观、角色、势力、物品、关系维度等），此操作不可撤销。\n\n确定继续？'
+
+const START_STORY_CONFIRM_MSG =
+  '开始新故事将初始化全新对局，当前游戏进度、剧情记录与相关存档将被覆盖，此操作不可撤销。\n\n确定继续？'
+
 // ── Schema ──
 const characterSchema = z.object({
   name: z.string().min(1, '必填'),
@@ -481,9 +487,13 @@ export default function NewStory() {
     setGenerating(null)
   }, [keywords, applyWorldGenResult, getValues, setValue])
 
-  const handleWorldGen = useCallback(() => runWorldGen(), [runWorldGen])
+  const handleWorldGen = useCallback(() => {
+    if (!window.confirm(WORLD_GEN_CONFIRM_MSG)) return
+    runWorldGen()
+  }, [runWorldGen])
 
   const handlePresetSelect = useCallback(async (preset: StoryPreset) => {
+    if (!window.confirm(WORLD_GEN_CONFIRM_MSG)) return
     setActivePreset(preset.id)
     const kw = [preset.keywords, preset.form.title, preset.form.world].filter(Boolean).join('\n')
     setKeywords(kw)
@@ -596,6 +606,7 @@ export default function NewStory() {
   }, [getValues])
 
   const onSubmit = useCallback(async (data: FormValues) => {
+    if (!window.confirm(START_STORY_CONFIRM_MSG)) return
     const fd = new FormData()
     fd.append('title', data.title)
     fd.append('world', data.world)
@@ -664,6 +675,9 @@ export default function NewStory() {
                 {fieldErrors.world && (
                   <p className="text-[11px] text-game-danger">{fieldErrors.world}</p>
                 )}
+                <p className="text-[11px] text-game-dim leading-relaxed">
+                  将覆盖当前表单全部设定，操作不可撤销。
+                </p>
               </CardContent>
             </Card>
 
@@ -1505,14 +1519,19 @@ export default function NewStory() {
             </Card>
 
             {/* Submit */}
-            <Button
-              type="submit"
-              variant="success"
-              size="lg"
-              className="w-full text-base"
-            >
-              🎬 开始新故事
-            </Button>
+            <div className="space-y-2">
+              <p className="text-xs text-game-dim text-center">
+                提交后将覆盖当前对局进度，操作不可撤销。
+              </p>
+              <Button
+                type="submit"
+                variant="success"
+                size="lg"
+                className="w-full text-base"
+              >
+                🎬 开始新故事
+              </Button>
+            </div>
           </div>
         </div>
       </form>
