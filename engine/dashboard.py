@@ -166,7 +166,7 @@ def _build_mermaid(nodes: dict, edges: list, chars: dict) -> str:
     for i, (name, data) in enumerate(chars.items()):
         cid = f"c{i}"
         char_ids[name] = cid
-        trust_pct = int(data.get("trust", 0.5) * 100)
+        trust_pct = round(data.get("trust", 0.5) * 100)
         label = f"{name} ({trust_pct}%)".replace('"', "'")
         mm.append(f'  {cid}("{label}")')
         for nid, node in nodes.items():
@@ -213,7 +213,7 @@ def _build_char_cards(chars: dict) -> str:
     cards = ['<div class="char-cards">']
     for name, data in chars.items():
         trust = data.get("trust", 0.5)
-        trust_pct = int(trust * 100)
+        trust_pct = round(trust * 100)
         rel = data.get("relationship", "")
         flags = data.get("flags", [])
 

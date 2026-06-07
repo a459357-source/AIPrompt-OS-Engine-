@@ -669,24 +669,24 @@ def parse_option_trust_deltas(options: list[str]) -> list[tuple[str, float]]:
 
 # ── UI helpers ─────────────────────────────────────────────────────
 
-# 7-stage affection progression
+# 7-stage affection progression on 0-100 scale (50 = neutral)
 _AFFECTION_STAGES = [
-    (0,   "陌生"),
-    (15,  "认识"),
-    (30,  "熟悉"),
-    (45,  "朋友"),
-    (60,  "暧昧"),
-    (80,  "恋人"),
+    (50,  "陌生"),
+    (55,  "认识"),
+    (65,  "熟悉"),
+    (75,  "朋友"),
+    (85,  "暧昧"),
+    (95,  "恋人"),
     (100, "灵魂伴侣"),
 ]
 
 _BAD_STAGES = [
-    (0,   "正常"),
-    (-20, "疏远"),
-    (-40, "冷漠"),
-    (-60, "对立"),
-    (-80, "敌视"),
-    (-100,"崩坏"),
+    (50,  "正常"),
+    (40,  "疏远"),
+    (30,  "冷漠"),
+    (20,  "对立"),
+    (10,  "敌视"),
+    (0,   "崩坏"),
 ]
 
 
@@ -721,35 +721,40 @@ def get_char_stats_for_ui(session_state: dict, memory: dict, world_pack: dict | 
         flags = mem.get("flags", [])
         relationship = mem.get("relationship", sc.get("relation", ""))
 
-        # Convert 0-1 trust to -100..100 (center at 0.5 = 0)
-        trust_pct = round((trust - 0.5) * 200)
+        # Convert 0-1 trust to 0-100 (50 = neutral)
+        trust_pct = round(trust * 100)
 
         # Determine stage (use custom stages if available)
         if custom_stages:
             # Map trust_pct to custom stage index
             stage_count = len(custom_stages)
-            # trust_pct -100..100 → stage index 0..stage_count-1
-            normalized = (trust_pct + 100) / 200  # 0..1
+            normalized = trust_pct / 100  # 0..1
             stage_idx = min(stage_count - 1, max(0, int(normalized * stage_count)))
             stage = custom_stages[stage_idx]
             stages_list = custom_stages
         else:
-            stages_list = _AFFECTION_STAGES if trust_pct >= 0 else _BAD_STAGES
-            stage = stages_list[0][1]  # default to first stage
-            for threshold, label in stages_list:
-                if trust_pct >= threshold:
-                    stage = label  # keep going to find highest matching
-            # For negative trust, pick the lowest (most negative) matching stage
-            if trust_pct < 0:
-                for threshold, label in reversed(stages_list):
-                    if trust_pct <= threshold:
+            # trust_pct >= 50: positive stages (ascending thresholds)
+            # trust_pct < 50:  negative stages (descending thresholds)
+            if trust_pct >= 50:
+                stages_list = _AFFECTION_STAGES
+                stage = stages_list[0][1]
+                for threshold, label in stages_list:
+                    if trust_pct >= threshold:
                         stage = label
-                        break
+            else:
+                stages_list = _BAD_STAGES
+                stage = stages_list[-1][1]  # default to worst
+                for threshold, label in stages_list:
+                    if trust_pct <= threshold:
+                        stage = label  # keep going, tightest bound wins
 
-        # Hearts: 5 hearts, filled count based on abs(trust_pct)/20
-        filled = min(5, max(0, round(abs(trust_pct) / 20)))
-        hearts = "♥" * filled + "♡" * (5 - filled)
-        if trust_pct < 0:
+        # Hearts: 5 hearts.  0-10=💔x5, 10-30=💔x4, 30-50=💔x1-3
+        # 50=♡x5, 50-70=♥x1-3, 70-90=♥x4, 90-100=♥x5
+        if trust_pct >= 50:
+            filled = min(5, max(0, round((trust_pct - 50) / 10)))
+            hearts = "♥" * filled + "♡" * (5 - filled)
+        else:
+            filled = min(5, max(0, round((50 - trust_pct) / 10)))
             hearts = "💔" * filled + "♡" * (5 - filled) if filled > 0 else "♡♡♡♡♡"
 
         # Build custom stats display values
@@ -783,25 +788,29 @@ def get_char_stats_for_ui(session_state: dict, memory: dict, world_pack: dict | 
         if name in names_seen:
             continue
         trust = mem.get("trust", 0.5)
-        trust_pct = round((trust - 0.5) * 200)
+        trust_pct = round(trust * 100)
         if custom_stages:
-            normalized = (trust_pct + 100) / 200
+            normalized = trust_pct / 100
             stage_idx = min(len(custom_stages) - 1, max(0, int(normalized * len(custom_stages))))
             stage = custom_stages[stage_idx]
         else:
-            stages_list = _AFFECTION_STAGES if trust_pct >= 0 else _BAD_STAGES
-            stage = stages_list[0][1]
-            for threshold, label in stages_list:
-                if trust_pct >= threshold:
-                    stage = label
-            if trust_pct < 0:
-                for threshold, label in reversed(stages_list):
-                    if trust_pct <= threshold:
+            if trust_pct >= 50:
+                stages_list = _AFFECTION_STAGES
+                stage = stages_list[0][1]
+                for threshold, label in stages_list:
+                    if trust_pct >= threshold:
                         stage = label
-                        break
-        filled = min(5, max(0, round(abs(trust_pct) / 20)))
-        hearts = "♥" * filled + "♡" * (5 - filled)
-        if trust_pct < 0:
+            else:
+                stages_list = _BAD_STAGES
+                stage = stages_list[-1][1]  # default to worst
+                for threshold, label in stages_list:
+                    if trust_pct <= threshold:
+                        stage = label  # keep going, tightest bound wins
+        if trust_pct >= 50:
+            filled = min(5, max(0, round((trust_pct - 50) / 10)))
+            hearts = "♥" * filled + "♡" * (5 - filled)
+        else:
+            filled = min(5, max(0, round((50 - trust_pct) / 10)))
             hearts = "💔" * filled + "♡" * (5 - filled) if filled > 0 else "♡♡♡♡♡"
         result.append({
             "name": name,

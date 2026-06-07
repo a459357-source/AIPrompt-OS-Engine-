@@ -105,11 +105,11 @@ async def api_game_state():
         name = sc.get("name", key)
         mem = mem_chars.get(name, {})
         trust = mem.get("trust", 0.5)
-        trust_pct = round((trust - 0.5) * 200)  # -100..100
+        trust_pct = round(trust * 100)  # 0-100, 50=neutral
         chars_with_trust[key] = {
             **sc,
             "trust": trust,
-            "affection": trust_pct + 50,  # map -100..100 → 0..100 for frontend
+            "affection": trust_pct,   # same scale now
             "trust_pct": trust_pct,
             "flags": mem.get("flags", []),
             "tier": mem.get("tier", ""),
@@ -167,7 +167,7 @@ async def api_npcs():
             "background": ch.get("background", ""),
             "special_ability": ch.get("special_ability", ""),
             "trust": trust_val,
-            "trust_pct": int(trust_val * 100),
+            "trust_pct": round(trust_val * 100),
             "flags": mem.get("flags", []),
         })
 

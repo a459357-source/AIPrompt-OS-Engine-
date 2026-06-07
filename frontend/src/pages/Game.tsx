@@ -74,7 +74,7 @@ export default function Game() {
       if (chars) {
         setCharacters(Object.values(chars).map((c) => ({
           ...c,
-          affection: c.affection ?? (c.trust_pct !== undefined ? c.trust_pct + 50 : 50),
+          affection: c.affection ?? c.trust_pct ?? 50,
         })))
       }
       const factionsData = st.factions as FactionInfo[] | undefined
@@ -104,7 +104,7 @@ export default function Game() {
       const chars = data.state.characters as Record<string, CharInfo> | undefined
       if (chars) setCharacters(Object.values(chars).map((c) => ({
         ...c,
-        affection: c.affection ?? (c.trust_pct !== undefined ? c.trust_pct + 50 : 50),
+        affection: c.affection ?? c.trust_pct ?? 50,
       })))
       const factionsData = data.state.factions as FactionInfo[] | undefined
       if (factionsData) setFactions(factionsData)
