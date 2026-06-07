@@ -55,7 +55,7 @@ system: |
   {
     "story": "Markdown 叙事文本",
     "state": { "scene": "...", "status": "SETUP|BUILD|TENSION|CLIMAX|COOLDOWN", "turn": int, "characters": {...} },
-    "options": ["行动→推测剧情发展|态度/情绪|角色关系影响(如：艾琳 affection+3 trust-1 hostility+5)。日常±1~3，关键事件±5~10", ...共{{OPTION_COUNT}}个，应包含结识新角色的选项]
+    "options": ["行动→推测剧情发展|态度/情绪|角色关系影响(如：艾琳 affection+3 trust-1 hostility+5)。日常±1~3，关键事件±5~10", ...共{{OPTION_COUNT}}个{{ADULT_OPTIONS_HINT}}]
   }
 
 user: |
@@ -69,4 +69,4 @@ user: |
   ENGINE: {{ENGINE_RULES}}
   {{FORCE_EVENT_PROMPT}}
 
-  TASK: 根据玩家选择生成下一轮剧情。story 正文必须在 {{STORY_LENGTH_MIN}}–{{STORY_LENGTH_MAX}} 字之间，目标约 {{STORY_LENGTH}} 字；超出上限视为错误。必须输出合法 JSON。
+  TASK: 根据玩家选择生成下一轮剧情。story 正文必须在 {{STORY_LENGTH_MIN}}–{{STORY_LENGTH_MAX}} 字之间，目标约 {{STORY_LENGTH}} 字；超出上限视为错误。必须输出合法 JSON。{{ADULT_TASK_HINT}}

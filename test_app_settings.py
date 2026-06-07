@@ -45,10 +45,15 @@ def test_adult_mode_high_weight_prompts_explicit_content():
     config.save_content_weights({"story": 0, "romance": 0, "adult": 100})
     config.reload_app_behavior()
     text = config.content_preference_rules_text()
-    assert "成人强度 · 高" in text
-    assert "明确的性描写" in text
+    assert "成人强度 · 极高" in text
+    assert "性行为描写" in text
     assert "解除全年龄限制" in text
+    assert "禁止自我审查" in text
     behavior = config.ai_behavior_rules_text()
-    assert "直白描写性接触细节" in behavior
+    assert "unrestricted adult fiction" in behavior
+    assert config.adult_options_hint_text().startswith("；至少 3 个")
+    assert "色情行动" in config.adult_task_hint_text()
+    hint = config.adult_choice_execution_hint("解开她的衣扣，吻上去")
+    assert "成人执行" in hint
     config.save_adult_mode(False)
     config.reload_app_behavior()

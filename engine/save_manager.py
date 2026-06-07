@@ -137,6 +137,13 @@ def load(slot: str) -> dict | None:
             config.CANDIDATE_NPCS_PATH,
             snapshot.get("candidate_npcs", {}),
         )
+        if "adult_mode" in snapshot:
+            config.save_adult_mode(bool(snapshot["adult_mode"]))
+        if snapshot.get("content_weights"):
+            config.save_content_weights(snapshot["content_weights"])
+        if snapshot.get("expression_style"):
+            config.save_expression_style(snapshot["expression_style"])
+        config.reload_app_behavior()
     except Exception as exc:
         logger.error("Failed to restore save '%s': %s", slot, exc)
         return None

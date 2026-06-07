@@ -39,18 +39,21 @@ def _player_choice_prompt(choice: str | None, session_state: dict) -> str:
     if letter in choice_map and prev_options:
         idx = choice_map[letter]
         if 0 <= idx < len(prev_options):
-            return (
+            base = (
                 f"玩家本轮选择了选项 {letter}：{prev_options[idx]}\n"
                 "请在本轮 story 中直接写出该选择的行动与后果，不得推迟到下一轮。"
             )
+            return base + config.adult_choice_execution_hint(prev_options[idx])
         return (
             f"玩家本轮选择了选项 {letter}。\n"
             "请在本轮 story 中直接写出该选择的行动与后果，不得推迟到下一轮。"
         )
 
+    custom = choice.strip()
     return (
-        f"玩家本轮自定义行动：{choice.strip()}\n"
+        f"玩家本轮自定义行动：{custom}\n"
         "请在本轮 story 中直接写出该行动与后果，不得推迟到下一轮。"
+        + config.adult_choice_execution_hint(custom)
     )
 
 
@@ -184,6 +187,7 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
         .replace("{{STORY_LENGTH_MAX}}", str(max_len))
         .replace("{{AI_BEHAVIOR_RULES}}", config.ai_behavior_rules_text())
         .replace("{{OPTION_COUNT}}", str(config.OPTION_COUNT))
+        .replace("{{ADULT_OPTIONS_HINT}}", config.adult_options_hint_text())
         .replace("{{CUSTOM_RULES}}", custom_rules_text)
         .replace("{{MAIN_GOAL}}", main_goal)
     )
@@ -218,6 +222,7 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
         .replace("{{STORY_LENGTH_MIN}}", str(min_len))
         .replace("{{STORY_LENGTH_MAX}}", str(max_len))
         .replace("{{OPTION_COUNT}}", str(config.OPTION_COUNT))
+        .replace("{{ADULT_TASK_HINT}}", config.adult_task_hint_text())
     )
 
     user_prompt = _apply_prompt_budget(user_prompt)

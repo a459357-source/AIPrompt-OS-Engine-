@@ -504,6 +504,7 @@ export default function Game() {
   const [autoAdvanceRemaining, setAutoAdvanceRemaining] = useState(0)
   const [autoAdvanceCountdown, setAutoAdvanceCountdown] = useState(autoAdvanceDelaySec)
   const [openingPending, setOpeningPending] = useState(false)
+  const persistGenSettingsBeforeTurnRef = useRef<(() => Promise<void>) | null>(null)
 
   const applyTurnData = useCallback((data: {
     story: string
@@ -576,6 +577,8 @@ export default function Game() {
         logger.info('Game', 'Game not started — calling startGameOnce()')
         setOpeningPending(true)
         setStory('')
+        await persistGenSettingsBeforeTurnRef.current?.()
+        if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
         let firstDelta = false
         const started = await startGameOnce({
           onStoryDelta: (delta) => {
@@ -871,6 +874,9 @@ export default function Game() {
       ...pending,
       storyLength: clamped,
       compressThreshold: estimateCompressThreshold(clamped, storyLengthMin, storyLengthMax, contextTokens),
+      adultMode,
+      expressionStyle,
+      contentWeights,
     }
     try {
       logger.info('Game', 'Sync gen settings before turn', patch)
@@ -879,7 +885,18 @@ export default function Game() {
     } catch (e) {
       logger.error('Game', 'Persist gen settings before turn failed', { error: String(e) })
     }
-  }, [storyLengthDraft, storyLengthMin, storyLengthMax, contextTokens, applyGenSettings])
+  }, [
+    storyLengthDraft,
+    storyLengthMin,
+    storyLengthMax,
+    contextTokens,
+    adultMode,
+    expressionStyle,
+    contentWeights,
+    applyGenSettings,
+  ])
+
+  persistGenSettingsBeforeTurnRef.current = persistGenSettingsBeforeTurn
 
   useEffect(() => {
     const parsed = parseInt(storyLengthDraft, 10)
