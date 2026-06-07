@@ -67,7 +67,10 @@ def apply_engine_settings(
     """Persist engine settings and return updated payload."""
     key = api_key.strip()
     if key:
-        save_api_key(key)
+        try:
+            save_api_key(key)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
         reload_api_key()
     if model in AVAILABLE_MODELS:
         save_model(model)

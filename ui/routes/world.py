@@ -368,8 +368,12 @@ async def generate_world(keywords: str = Form("")):
         result = call_deepseek(system, user, temperature=0.9, max_tokens=config.MAX_TOKENS * 2, skip_validation=True)
         return JSONResponse(result)
     except DeepSeekError as exc:
+        import logging
+        logging.getLogger("world").error("generate-world failed: %s", exc)
         return JSONResponse({"error": f"AI 生成失败: {exc}"}, status_code=500)
     except Exception as exc:
+        import logging
+        logging.getLogger("world").error("generate-world failed: %s", exc, exc_info=True)
         return JSONResponse({"error": f"未知错误: {exc}"}, status_code=500)
 
 

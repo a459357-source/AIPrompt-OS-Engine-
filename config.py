@@ -7,6 +7,7 @@ Set DEEPSEEK_API_KEY in your environment before running.
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -127,15 +128,28 @@ def _update_settings(**kwargs) -> dict:
     return data
 
 
+_API_KEY_RE = re.compile(r"sk-[a-fA-F0-9]{20,}")
+
+
+def _sanitize_api_key(raw: str) -> str:
+    """Extract a valid DeepSeek key from pasted text."""
+    text = raw.strip()
+    if not text:
+        return ""
+    if _API_KEY_RE.fullmatch(text):
+        return text
+    matches = _API_KEY_RE.findall(text)
+    return matches[-1] if matches else ""
+
+
 def _read_stored_api_key() -> str:
     """API key saved in data/apikey.json only (not env var)."""
-    return _read_settings().get("api_key", "").strip()
+    return _sanitize_api_key(_read_settings().get("api_key", ""))
 
 
 def _load_api_key() -> str:
     """Load API key: file first, then env var (dev only), then empty."""
-    data = _read_settings()
-    key = data.get("api_key", "").strip()
+    key = _sanitize_api_key(_read_settings().get("api_key", ""))
     if key:
         return key
     # Packaged exe must NOT inherit the builder's machine env var.
@@ -149,7 +163,10 @@ def _load_api_key() -> str:
 
 def save_api_key(key: str) -> None:
     """Persist API key to disk."""
-    _update_settings(api_key=key.strip())
+    cleaned = _sanitize_api_key(key)
+    if key.strip() and not cleaned:
+        raise ValueError("API Key 格式无效，请只粘贴以 sk- 开头的密钥")
+    _update_settings(api_key=cleaned)
 
 
 def clear_api_key() -> None:

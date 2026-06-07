@@ -462,7 +462,10 @@ async def api_save_settings_key(api_key: str = Form(...)):
     key = api_key.strip()
     if not key:
         return JSONResponse({"error": "API Key 不能为空"}, status_code=400)
-    config.save_api_key(key)
+    try:
+        config.save_api_key(key)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     config.reload_api_key()
     return JSONResponse({"ok": True, "configured": True})
 
@@ -489,18 +492,22 @@ async def api_save_settings(
 ):
     """Save engine settings from the React settings page."""
     from ui.routes.settings import apply_engine_settings
-    return JSONResponse(apply_engine_settings(
-        api_key=api_key,
-        model=model,
-        story_length=story_length,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        top_p=top_p,
-        stream=stream,
-        max_context_messages=max_context_messages,
-        auto_compress=auto_compress,
-        compress_threshold=compress_threshold,
-    ))
+    try:
+        payload = apply_engine_settings(
+            api_key=api_key,
+            model=model,
+            story_length=story_length,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            stream=stream,
+            max_context_messages=max_context_messages,
+            auto_compress=auto_compress,
+            compress_threshold=compress_threshold,
+        )
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return JSONResponse(payload)
 
 
 @router.post("/settings/clear")
