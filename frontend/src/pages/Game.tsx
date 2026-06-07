@@ -483,6 +483,7 @@ export default function Game() {
       setGenStoryChars(0)
     }
   }, [])
+  const streamGenerationStartedRef = useRef(false)
   const autoAdvanceDelaySec = 5
   const pendingGenPatchRef = useRef<{
     storyLength?: number
@@ -942,24 +943,31 @@ export default function Game() {
         ? 'border-game-danger/40 text-game-danger'
         : 'border-amber-500/40 text-amber-400'
 
-  // 新正文生成后滚回顶部，方便从开头阅读
+  // 新回合完成后滚回顶部，方便从开头阅读（流式过程中不滚动，便于继续看上一轮正文）
   useEffect(() => {
-    if (!story) return
     const el = storyScrollRef.current
     if (!el) return
     requestAnimationFrame(() => { el.scrollTop = 0 })
-  }, [turn, story])
+  }, [turn])
 
   const handleChoice = useCallback(async (choice: string, opts?: { auto?: boolean }) => {
     if (!opts?.auto) setAutoAdvancePaused(true)
     setChoosing(true)
-    resetStreamStory()
+    streamGenerationStartedRef.current = false
     setGenProgress('building_prompt')
-    setGenStoryChars(0)
     logger.info('Game', `Choice: ${choice}`)
     const streamHandlers = {
-      onStoryDelta: appendStoryDelta,
-      onStoryReset: resetStreamStory,
+      onStoryDelta: (delta: string) => {
+        if (!streamGenerationStartedRef.current) {
+          streamGenerationStartedRef.current = true
+          resetStreamStory()
+        }
+        appendStoryDelta(delta)
+      },
+      onStoryReset: () => {
+        streamGenerationStartedRef.current = true
+        resetStreamStory()
+      },
       onProgress: (phase: string) => {
         if (mountedRef.current) setGenProgress(phase)
       },
