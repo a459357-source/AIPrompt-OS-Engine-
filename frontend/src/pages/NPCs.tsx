@@ -147,6 +147,7 @@ export default function NPCs() {
                 }}
                 index={i}
                 isMain={c.isMain}
+                trustPct={c.trust_pct}
               />
             ))}
           </AnimatePresence>

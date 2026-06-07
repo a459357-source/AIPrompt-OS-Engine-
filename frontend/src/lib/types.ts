@@ -12,6 +12,7 @@ export interface Character {
   background: string
   special_ability: string
   notes?: string
+  trust_pct?: number   // 实际信任度 0-100，来自 memory.json（NPC 页面展示用）
 }
 
 export interface WorldGenRequest {
