@@ -829,6 +829,11 @@ export default function Game() {
     [adultMode, supplementOpen, supplementText],
   )
 
+  const customInputSuggestAdult = useMemo(
+    () => !adultMode && showCustomInput && suggestsAdultModeForText(customInput),
+    [adultMode, showCustomInput, customInput],
+  )
+
   useEffect(() => {
     if (adultMode) setSupplementAdultHint(false)
   }, [adultMode])
@@ -2023,19 +2028,24 @@ export default function Game() {
                       ✏️ 自定义输入…
                     </Button>
                   ) : (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="flex gap-2">
-                      <input value={customInput} onChange={(e) => setCustomInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && customInput.trim()) { handleChoice(customInput.trim()); setCustomInput(''); setShowCustomInput(false) }
-                          if (e.key === 'Escape') { setShowCustomInput(false); setCustomInput('') }
-                        }}
-                        placeholder="输入你想做的事…" disabled={choosing} autoFocus
-                        className="flex-1 bg-game-bg border border-game-border rounded-md px-3 py-2 text-sm text-game-text placeholder:text-game-dim focus:outline-none focus:border-game-primary"
-                      />
-                      <Button variant="accent" size="sm" disabled={choosing || !customInput.trim()}
-                        onClick={() => { if (customInput.trim()) { handleChoice(customInput.trim()); setCustomInput(''); setShowCustomInput(false) } }}
-                      >确定</Button>
-                    </motion.div>
+                    <div className="space-y-2">
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="flex gap-2">
+                        <input value={customInput} onChange={(e) => setCustomInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && customInput.trim()) { handleChoice(customInput.trim()); setCustomInput(''); setShowCustomInput(false) }
+                            if (e.key === 'Escape') { setShowCustomInput(false); setCustomInput('') }
+                          }}
+                          placeholder="输入你想做的事…" disabled={choosing} autoFocus
+                          className="flex-1 bg-game-bg border border-game-border rounded-md px-3 py-2 text-sm text-game-text placeholder:text-game-dim focus:outline-none focus:border-game-primary"
+                        />
+                        <Button variant="accent" size="sm" disabled={choosing || !customInput.trim()}
+                          onClick={() => { if (customInput.trim()) { handleChoice(customInput.trim()); setCustomInput(''); setShowCustomInput(false) } }}
+                        >确定</Button>
+                      </motion.div>
+                      {customInputSuggestAdult && (
+                        <AdultModeSuggestBanner onEnable={enableAdultModeFromHint} />
+                      )}
+                    </div>
                   )}
                   </div>
                 </motion.div>
@@ -2067,18 +2077,23 @@ export default function Game() {
                             ✏️ 自定义输入…
                           </Button>
                         ) : (
-                          <div className="flex gap-2">
-                            <input value={customInput} onChange={(e) => setCustomInput(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && customInput.trim()) { handleChoice(customInput.trim()); setCustomInput(''); setShowCustomInput(false) }
-                                if (e.key === 'Escape') { setShowCustomInput(false); setCustomInput('') }
-                              }}
-                              placeholder="输入你想做的事…" disabled={choosing} autoFocus
-                              className="flex-1 bg-game-bg border border-game-border rounded-md px-3 py-2 text-sm text-game-text placeholder:text-game-dim focus:outline-none focus:border-game-primary"
-                            />
-                            <Button variant="accent" size="sm" disabled={choosing || !customInput.trim()}
-                              onClick={() => { if (customInput.trim()) { handleChoice(customInput.trim()); setCustomInput(''); setShowCustomInput(false) } }}
-                            >确定</Button>
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
+                              <input value={customInput} onChange={(e) => setCustomInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && customInput.trim()) { handleChoice(customInput.trim()); setCustomInput(''); setShowCustomInput(false) }
+                                  if (e.key === 'Escape') { setShowCustomInput(false); setCustomInput('') }
+                                }}
+                                placeholder="输入你想做的事…" disabled={choosing} autoFocus
+                                className="flex-1 bg-game-bg border border-game-border rounded-md px-3 py-2 text-sm text-game-text placeholder:text-game-dim focus:outline-none focus:border-game-primary"
+                              />
+                              <Button variant="accent" size="sm" disabled={choosing || !customInput.trim()}
+                                onClick={() => { if (customInput.trim()) { handleChoice(customInput.trim()); setCustomInput(''); setShowCustomInput(false) } }}
+                              >确定</Button>
+                            </div>
+                            {customInputSuggestAdult && (
+                              <AdultModeSuggestBanner onEnable={enableAdultModeFromHint} />
+                            )}
                           </div>
                         )
                       )}
