@@ -23,7 +23,7 @@ import { InspectorPanel } from '@/components/layout/InspectorPanel'
 import { usePageShell } from '@/components/layout/usePageShell'
 import { SectionHeader } from '@/components/neural/SectionHeader'
 import { GlowDivider } from '@/components/neural/GlowDivider'
-import { parseNodeSelection, createDemoGraphSeed } from '@/lib/worldGraphAdapter'
+import { parseNodeSelection, createDemoGraphSeed, graphStructureKey } from '@/lib/worldGraphAdapter'
 import { t, tTheme } from '@/lib/i18n'
 import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
 import type { Character, WorldGenResponse } from '@/lib/types'
@@ -475,8 +475,14 @@ export default function NewStory() {
         facRows,
       ))
     }
+    setNodePositions({})
     showStatus('✅ 已加载示例连线（核心→势力→角色→物品）', 'success')
   }, [getValues, setValue])
+
+  const relayoutGraph = useCallback(() => {
+    setNodePositions({})
+    showStatus('✨ 已按关系重新优化布局', 'success')
+  }, [])
 
   const demoGraphLoadedRef = useRef(false)
   useEffect(() => {
@@ -777,8 +783,44 @@ export default function NewStory() {
       ownerId: a.ownerId,
     })),
     characterRelations,
-    nodePositions,
+    nodePositions: Object.keys(nodePositions).length > 0 ? nodePositions : undefined,
   }), [watchAll, factions, artifacts, characterRelations, nodePositions])
+
+  const graphLayoutKey = useMemo(
+    () => graphStructureKey({
+      title: watchAll.title || '',
+      world: watchAll.world || '',
+      genre: watchAll.genre || [],
+      scene: watchAll.scene || '',
+      main_goal: watchAll.main_goal || '',
+      characters: (watchAll.characters || []).map((c) => ({
+        name: c.name,
+        isMain: c.isMain,
+        faction: c.faction,
+      })),
+      factions: factions.map((f) => ({
+        name: f.name,
+        type: f.type,
+        leader: f.leader,
+        influence: f.influence,
+      })),
+      artifacts: artifacts.map((a) => ({
+        name: a.name,
+        type: a.type,
+        ownerId: a.ownerId,
+      })),
+      characterRelations,
+    }),
+    [watchAll.characters, factions, artifacts, characterRelations, watchAll.title, watchAll.world, watchAll.genre, watchAll.scene, watchAll.main_goal],
+  )
+
+  const prevGraphLayoutKey = useRef<string | null>(null)
+  useEffect(() => {
+    if (prevGraphLayoutKey.current !== null && prevGraphLayoutKey.current !== graphLayoutKey) {
+      setNodePositions({})
+    }
+    prevGraphLayoutKey.current = graphLayoutKey
+  }, [graphLayoutKey])
 
   const navItems = useMemo(() => {
     if (adultMode) {
@@ -1780,10 +1822,12 @@ export default function NewStory() {
       <div className="h-full w-full relative">
         <WorldGraphCanvas
           input={graphInput}
+          layoutKey={graphLayoutKey + (Object.keys(nodePositions).length ? '-manual' : '-auto')}
           selectedNodeId={selectedNodeId}
           onSelectNode={setSelectedNodeId}
           onPositionsChange={setNodePositions}
           onApplyDemo={applyDemoGraph}
+          onRelayout={relayoutGraph}
           onGraphUpdate={(update) => {
             if (update.factions) {
               setFactions((prev) =>

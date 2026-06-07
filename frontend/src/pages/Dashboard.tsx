@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { StatusToast } from '@/components/StatusToast'
 import { WorldGraphCanvas } from '@/components/world/WorldGraphCanvas'
+import { graphStructureKey } from '@/lib/worldGraphAdapter'
 import { SectionHeader } from '@/components/neural/SectionHeader'
 import { usePageShell } from '@/components/layout/usePageShell'
 import { InspectorPanel } from '@/components/layout/InspectorPanel'
@@ -157,6 +158,11 @@ export default function Dashboard() {
       networkEdges: netEdges,
     }
   }, [data])
+
+  const dashboardLayoutKey = useMemo(
+    () => graphStructureKey(graphInput),
+    [graphInput],
+  )
 
   usePageShell({
     navItems,
@@ -339,7 +345,7 @@ export default function Dashboard() {
     return (
       <div className="h-full w-full">
         <StatusToast message="" type="info" />
-        <WorldGraphCanvas input={graphInput} selectedNodeId={null} onSelectNode={() => {}} readOnly />
+        <WorldGraphCanvas input={graphInput} layoutKey={dashboardLayoutKey} selectedNodeId={null} onSelectNode={() => {}} readOnly />
       </div>
     )
   }

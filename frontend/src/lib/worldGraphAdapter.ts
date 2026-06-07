@@ -1,4 +1,7 @@
 import type { Node, Edge } from '@xyflow/react'
+import { computeRelationLayout, graphStructureKey } from './worldGraphLayout'
+
+export { graphStructureKey, computeRelationLayout } from './worldGraphLayout'
 
 export type WorldNodeType = 'worldCore' | 'faction' | 'character' | 'artifact'
 
@@ -51,23 +54,33 @@ export interface WorldGraphInput {
   /** 来自 world_state_v2 的显式边，用于仪表盘只读图谱 */
   networkEdges?: Array<{ from: string; to: string; kind: string; label: string }>
   nodePositions?: Record<string, { x: number; y: number }>
+  /** 为 true 时忽略已存坐标，按关系重新布局 */
+  relayout?: boolean
 }
 
 const CORE_ID = 'world-core'
 
-function pos(id: string, positions: Record<string, { x: number; y: number }> | undefined, x: number, y: number) {
-  return positions?.[id] ?? { x, y }
+function pos(
+  id: string,
+  positions: Record<string, { x: number; y: number }> | undefined,
+  auto: Record<string, { x: number; y: number }>,
+  x: number,
+  y: number,
+) {
+  return positions?.[id] ?? auto[id] ?? { x, y }
 }
 
 export function buildWorldGraph(input: WorldGraphInput): { nodes: Node[]; edges: Edge[] } {
-  const positions = input.nodePositions
+  const saved = input.relayout ? undefined : input.nodePositions
+  const autoLayout = computeRelationLayout(input)
+  const positions = saved
   const nodes: Node[] = []
   const edges: Edge[] = []
 
   nodes.push({
     id: CORE_ID,
     type: 'worldCore',
-    position: pos(CORE_ID, positions, 400, 200),
+    position: pos(CORE_ID, positions, autoLayout, 400, 200),
     data: {
       nodeType: 'worldCore',
       title: input.title || '未命名世界',
@@ -80,11 +93,10 @@ export function buildWorldGraph(input: WorldGraphInput): { nodes: Node[]; edges:
 
   input.factions.forEach((f, i) => {
     const id = `faction-${i}`
-    const angle = (i / Math.max(input.factions.length, 1)) * Math.PI * 2
     nodes.push({
       id,
       type: 'faction',
-      position: pos(id, positions, 400 + Math.cos(angle) * 220, 80 + Math.sin(angle) * 120),
+      position: pos(id, positions, autoLayout, 400, 80),
       data: {
         nodeType: 'faction',
         index: i,
@@ -106,12 +118,10 @@ export function buildWorldGraph(input: WorldGraphInput): { nodes: Node[]; edges:
 
   input.characters.forEach((c, i) => {
     const id = `character-${i}`
-    const row = Math.floor(i / 3)
-    const col = i % 3
     nodes.push({
       id,
       type: 'character',
-      position: pos(id, positions, 180 + col * 180, 320 + row * 140),
+      position: pos(id, positions, autoLayout, 180 + (i % 3) * 180, 320 + Math.floor(i / 3) * 140),
       data: {
         nodeType: 'character',
         index: i,
@@ -205,7 +215,7 @@ export function buildWorldGraph(input: WorldGraphInput): { nodes: Node[]; edges:
     nodes.push({
       id,
       type: 'artifact',
-      position: pos(id, positions, 620 + (i % 2) * 100, 400 + Math.floor(i / 2) * 90),
+      position: pos(id, positions, autoLayout, 620 + (i % 2) * 100, 400 + Math.floor(i / 2) * 90),
       data: {
         nodeType: 'artifact',
         index: i,

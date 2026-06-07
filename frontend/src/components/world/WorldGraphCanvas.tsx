@@ -8,6 +8,7 @@ import {
   Panel,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   addEdge,
   type Connection,
   type Node,
@@ -19,23 +20,38 @@ import { worldNodeTypes, worldEdgeTypes } from './nodes'
 
 interface WorldGraphCanvasProps {
   input: WorldGraphInput
+  layoutKey?: string
   selectedNodeId: string | null
   onSelectNode: (nodeId: string | null) => void
   onPositionsChange?: (positions: Record<string, { x: number; y: number }>) => void
   onGraphUpdate?: (update: Partial<WorldGraphInput>) => void
   onApplyDemo?: () => void
+  onRelayout?: () => void
   readOnly?: boolean
   focusSection?: string | null
   className?: string
 }
 
+function AutoFitView({ layoutKey }: { layoutKey: string }) {
+  const { fitView } = useReactFlow()
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fitView({ padding: 0.2, duration: 400 })
+    }, 80)
+    return () => clearTimeout(timer)
+  }, [layoutKey, fitView])
+  return null
+}
+
 function WorldGraphCanvasInner({
   input,
+  layoutKey = '',
   selectedNodeId,
   onSelectNode,
   onPositionsChange,
   onGraphUpdate,
   onApplyDemo,
+  onRelayout,
   readOnly = false,
   className,
 }: WorldGraphCanvasProps) {
@@ -44,14 +60,10 @@ function WorldGraphCanvasInner({
   const [edges, setEdges, onEdgesChange] = useEdgesState(graph.edges)
 
   useEffect(() => {
-    setNodes((prev) => {
-      const prevById = new Map(prev.map((n) => [n.id, n]))
-      return graph.nodes.map((n) => ({
-        ...n,
-        position: prevById.get(n.id)?.position ?? n.position,
-        selected: n.id === selectedNodeId,
-      }))
-    })
+    setNodes(graph.nodes.map((n) => ({
+      ...n,
+      selected: n.id === selectedNodeId,
+    })))
     setEdges(graph.edges)
   }, [graph, selectedNodeId, setNodes, setEdges])
 
@@ -106,14 +118,15 @@ function WorldGraphCanvasInner({
         edgeTypes={worldEdgeTypes}
         defaultEdgeOptions={{ type: 'relation' }}
         connectionLineStyle={{ stroke: '#58a6ff', strokeWidth: 2 }}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
+        minZoom={0.25}
+        maxZoom={1.8}
         nodesDraggable={!readOnly}
         nodesConnectable={!readOnly}
         elementsSelectable
         proOptions={{ hideAttribution: true }}
         className="bg-transparent"
       >
+        <AutoFitView layoutKey={layoutKey} />
         <Background variant={BackgroundVariant.Lines} gap={32} color="rgba(0,240,255,0.04)" />
         <Controls className="!glass-panel !border-neural-cyan/20 [&>button]:!bg-neural-glass [&>button]:!border-neural-cyan/20 [&>button]:!text-neural-cyan" />
         <MiniMap
@@ -125,15 +138,26 @@ function WorldGraphCanvasInner({
             return '#ffb870'
           }}
         />
-        {!readOnly && onApplyDemo && (
-          <Panel position="top-left" className="m-12 md:m-4">
-            <button
-              type="button"
-              onClick={onApplyDemo}
-              className="glass-panel px-3 py-1.5 text-xs text-neural-cyan border border-neural-cyan/30 hover:bg-neural-cyan/10 transition-colors rounded-md"
-            >
-              🔗 加载示例连线
-            </button>
+        {!readOnly && (onApplyDemo || onRelayout) && (
+          <Panel position="top-left" className="m-12 md:m-4 flex flex-col gap-1.5">
+            {onRelayout && (
+              <button
+                type="button"
+                onClick={onRelayout}
+                className="glass-panel px-3 py-1.5 text-xs text-neural-violet border border-neural-violet/30 hover:bg-neural-violet/10 transition-colors rounded-md"
+              >
+                ✨ 优化布局
+              </button>
+            )}
+            {onApplyDemo && (
+              <button
+                type="button"
+                onClick={onApplyDemo}
+                className="glass-panel px-3 py-1.5 text-xs text-neural-cyan border border-neural-cyan/30 hover:bg-neural-cyan/10 transition-colors rounded-md"
+              >
+                🔗 加载示例连线
+              </button>
+            )}
           </Panel>
         )}
         {readOnly && (
