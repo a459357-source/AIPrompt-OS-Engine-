@@ -93,7 +93,7 @@ def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
     except Exception:
         pass
 
-    return {
+    payload = {
         "story": story,
         "options": options,
         "state": {
@@ -106,6 +106,9 @@ def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
             "chapter": state.get("chapter", 1),
         },
     }
+    if not config.ADULT_MODE:
+        payload["suggest_adult_mode"] = config.suggest_adult_mode_for_options(options)
+    return payload
 
 
 @router.get("/game-state")
@@ -606,6 +609,9 @@ async def api_supplement_lore(text: str = Form("")):
         return JSONResponse({"error": f"AI 分析失败: {exc}"}, status_code=500)
     except Exception as exc:
         return JSONResponse({"error": f"更新失败: {exc}"}, status_code=500)
+
+    if not config.ADULT_MODE and config.is_clearly_adult_content(text):
+        result["suggest_adult_mode"] = True
 
     try:
         state = io_utils.read_yaml(config.SESSION_STATE_PATH)

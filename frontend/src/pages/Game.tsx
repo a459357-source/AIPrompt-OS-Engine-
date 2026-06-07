@@ -22,6 +22,37 @@ import { dispatchAdultModeChange, dispatchAdultThemeChange, dispatchVisualThemeC
 import { t, tTheme } from '@/lib/i18n'
 import { dedupeCharactersByName } from '@/lib/characters'
 import { cn } from '@/lib/utils'
+import { suggestsAdultModeForOptions, suggestsAdultModeForText } from '@/lib/adultContentHint'
+
+function AdultModeSuggestBanner({
+  onEnable,
+  className,
+}: {
+  onEnable: () => void
+  className?: string
+}) {
+  return (
+    <div className={cn(
+      'rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/90 flex flex-wrap items-center gap-2',
+      className,
+    )}>
+      <span>
+        检测到较明确的成人向内容。建议在「⚡ 生成快捷设置」中开启
+        <strong className="mx-0.5 font-semibold">成人模式</strong>
+        ，以获得更匹配的情节与选项。
+      </span>
+      <Button
+        type="button"
+        variant="outline"
+        size="xs"
+        className="border-amber-500/50 shrink-0"
+        onClick={onEnable}
+      >
+        开启成人模式
+      </Button>
+    </div>
+  )
+}
 
 /** Keep in sync with config.py */
 const STORY_CHAR_TO_TOKEN = 1.35
@@ -320,6 +351,7 @@ export default function Game() {
   const [supplementLoading, setSupplementLoading] = useState(false)
   const [supplementError, setSupplementError] = useState('')
   const [supplementSuccess, setSupplementSuccess] = useState('')
+  const [supplementAdultHint, setSupplementAdultHint] = useState(false)
   const [history, setHistory] = useState<HistoryTurn[]>([])
   const [historyFocusTurn, setHistoryFocusTurn] = useState<number | null>(null)
   const [historyError, setHistoryError] = useState('')
@@ -781,6 +813,26 @@ export default function Game() {
     genSettingsTimerRef.current = setTimeout(() => scheduleFlush(), 600)
   }, [normalizeGenPatch, flushGenSettings])
 
+  const enableAdultModeFromHint = useCallback(() => {
+    setGenSettingsOpen(true)
+    queueGenSettingsSave({ adultMode: true }, true)
+    setSupplementAdultHint(false)
+  }, [queueGenSettingsSave])
+
+  const optionsSuggestAdult = useMemo(
+    () => !adultMode && options.length > 0 && suggestsAdultModeForOptions(options),
+    [adultMode, options],
+  )
+
+  const supplementInputSuggestAdult = useMemo(
+    () => !adultMode && supplementOpen && suggestsAdultModeForText(supplementText),
+    [adultMode, supplementOpen, supplementText],
+  )
+
+  useEffect(() => {
+    if (adultMode) setSupplementAdultHint(false)
+  }, [adultMode])
+
   const previewMaxTokens = useMemo(() => {
     const length = parseDraftLength(storyLengthDraft, storyLength)
     return estimateMaxTokens(length, storyLengthMin, storyLengthMax, maxOutputTokens)
@@ -917,6 +969,7 @@ export default function Game() {
     setSupplementLoading(true)
     setSupplementError('')
     setSupplementSuccess('')
+    setSupplementAdultHint(false)
     try {
       const result = await supplementLore(text)
       if (result.state) {
@@ -928,6 +981,9 @@ export default function Game() {
       }
       const detail = result.changes?.length ? result.changes.join('；') : ''
       setSupplementSuccess(detail ? `${result.summary ?? '设定已更新'}（${detail}）` : (result.summary ?? '设定已更新'))
+      if (result.suggest_adult_mode || suggestsAdultModeForText(text)) {
+        setSupplementAdultHint(true)
+      }
       setSupplementText('')
     } catch (e) {
       setSupplementError(formatFetchError(e))
@@ -1846,6 +1902,9 @@ export default function Game() {
                 </motion.div>
               ) : options.length > 0 ? (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                  {optionsSuggestAdult && (
+                    <AdultModeSuggestBanner onEnable={enableAdultModeFromHint} />
+                  )}
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="flex flex-col gap-2 min-w-0 flex-1">
                       <div className="flex items-center gap-3 flex-wrap">
@@ -2190,6 +2249,9 @@ export default function Game() {
                 disabled={supplementLoading || choosing}
                 className="resize-y min-h-[140px] bg-game-bg/60 border-game-border text-sm"
               />
+              {(supplementInputSuggestAdult || supplementAdultHint) && (
+                <AdultModeSuggestBanner onEnable={enableAdultModeFromHint} />
+              )}
               {supplementError && (
                 <p className="text-xs text-game-danger">❌ {supplementError}</p>
               )}

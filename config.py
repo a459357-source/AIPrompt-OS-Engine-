@@ -1179,6 +1179,31 @@ def explicit_option_count(options: list) -> int:
     return sum(1 for o in options if count_intimate_markers(str(o)) >= 2)
 
 
+_EXPLICIT_ADULT_PHRASES = (
+    "做爱", "性交", "性行为", "色情", "裸体", "全裸", "口交", "肛交", "乳交",
+    "手淫", "自慰", "淫", "骚", "勃起", "阳具", "阴部", "私处", "春药",
+    "AV", "黄片", "援交", "卖淫", "嫖娼",
+)
+
+
+def is_clearly_adult_content(text: str) -> bool:
+    """Heuristic: text is clearly adult-oriented (suggest enabling adult mode)."""
+    t = str(text or "")
+    if not t.strip():
+        return False
+    if any(p in t for p in _EXPLICIT_ADULT_PHRASES):
+        return True
+    if count_orgasm_markers(t) >= 1:
+        return True
+    return count_intimate_markers(t) >= 2
+
+
+def suggest_adult_mode_for_options(options: list) -> bool:
+    if not options:
+        return False
+    return any(is_clearly_adult_content(str(o)) for o in options)
+
+
 _ORGASM_MARKERS = (
     "高潮", "绝顶", "去了", "痉挛", "颤抖着释放", "潮吹", "泄身", "攀上顶峰",
     "身体绷紧", "一阵酥麻", "软倒", "余韵", "瘫软",

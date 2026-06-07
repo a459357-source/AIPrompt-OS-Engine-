@@ -204,7 +204,7 @@ export async function shutdownServer(): Promise<void> {
   }
 }
 
-export async function getGameState(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; not_started?: boolean; generating?: boolean; error?: string }> {
+export async function getGameState(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; not_started?: boolean; generating?: boolean; suggest_adult_mode?: boolean; error?: string }> {
   const res = await apiFetch('/api/game-state')
   if (!res.ok) {
     const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
@@ -860,6 +860,7 @@ export interface SupplementLoreResult {
   story?: string
   options?: string[]
   state?: Record<string, unknown>
+  suggest_adult_mode?: boolean
   error?: string
 }
 
