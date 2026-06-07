@@ -1,8 +1,13 @@
-"""Analyze player-supplied lore and merge into world_pack / runtime state."""
+"""Analyze player-supplied lore and merge into world_pack / runtime state.
+
+Field coverage aligns with NewStory one-click generation (WorldGenResponse):
+title, world, genre, scene, main_goal, characters, factions, artifacts,
+stats, rel_stages, rel_affection, characterRelations — plus story_prompt
+for in-game narrative rules that are not part of world-gen JSON.
+"""
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -10,7 +15,7 @@ import config
 from engine import io_utils
 from engine.character_registry import initial_relation_label
 from engine.deepseek_client import call_deepseek, DeepSeekError
-from engine.memory import init_factions, load_memory, save_memory
+from engine.memory import init_artifacts, init_factions
 from engine.memory_layers import build_world_summary_from_pack
 from engine.state_store import commit_runtime, load_runtime
 
@@ -27,6 +32,10 @@ _FACTION_PATCH_KEYS = (
     "type", "description", "goals", "resources", "controlledTerritories",
     "subordinateOrganizations", "keyAssets", "power", "influence",
     "relation_to_player", "leader",
+)
+_ARTIFACT_PATCH_KEYS = (
+    "type", "description", "ownerType", "ownerId", "importance",
+    "abilities", "tags", "relatedCharacters", "relatedFactions", "status",
 )
 
 
@@ -67,14 +76,84 @@ def _merge_dict(base: dict, patch: dict, keys: tuple[str, ...]) -> dict:
     return out
 
 
+def _remap_relation_keys(raw: dict, npc_names: list[str]) -> dict:
+    if not isinstance(raw, dict):
+        return {}
+    remapped: dict = {}
+    used: set[str] = set()
+    for npc in npc_names:
+        if not npc:
+            continue
+        if npc in raw and isinstance(raw.get(npc), dict):
+            remapped[npc] = raw[npc]
+            used.add(npc)
+            continue
+        for key, val in raw.items():
+            if key in used or not isinstance(val, dict):
+                continue
+            key_str = str(key)
+            if key_str == npc or key_str in npc or npc in key_str:
+                remapped[npc] = val
+                used.add(key_str)
+                break
+    return remapped
+
+
+def _normalize_rel_entry(rel: dict) -> dict:
+    rel_type = rel.get("relationshipType", "friend")
+    if rel_type not in _REL_TYPES:
+        rel_type = "friend"
+    tags = rel.get("tags") or []
+    if not isinstance(tags, list):
+        tags = [tags] if tags else []
+    return {
+        "relationshipType": rel_type,
+        **{m: _clamp_rel_metric(rel.get(m), 50) for m in _REL_METRICS},
+        "tags": [str(t).strip() for t in tags if t and str(t).strip()][:6],
+    }
+
+
+def _normalize_stats(raw: Any) -> list[dict]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for s in raw:
+        if not isinstance(s, dict):
+            continue
+        key = str(s.get("key") or "stat").strip()
+        if not key:
+            continue
+        action = str(s.get("action") or "update").lower()
+        if action not in ("add", "update"):
+            action = "update"
+        out.append({
+            "action": action,
+            "key": key,
+            "label": str(s.get("label") or key).strip(),
+            "max": s.get("max", 100) if isinstance(s.get("max"), (int, float)) else 100,
+        })
+    return out
+
+
+def _npc_names_from_world(world: dict, extra: list[str] | None = None) -> list[str]:
+    names = [
+        str(c.get("name", "")).strip()
+        for c in (world.get("characters") or [])
+        if isinstance(c, dict) and c.get("name") and not c.get("is_main")
+    ]
+    for n in extra or []:
+        if n and n not in names:
+            names.append(n)
+    return names
+
+
 def _build_analysis_context(world_pack: dict, session_state: dict) -> str:
     world = world_pack.get("world", {}) or {}
-    chars = world.get("characters") or []
-    factions = world.get("factions") or []
     custom = world_pack.get("custom") or {}
+    rel_sys = world.get("relationship_system") or {}
 
     char_lines = []
-    for ch in chars[:24]:
+    for ch in (world.get("characters") or [])[:24]:
         if not isinstance(ch, dict):
             continue
         name = ch.get("name", "?")
@@ -83,17 +162,33 @@ def _build_analysis_context(world_pack: dict, session_state: dict) -> str:
         char_lines.append(f"- {name}（{tag}）{(' · ' + role) if role else ''}")
 
     fac_lines = []
-    for fac in factions[:16]:
-        if not isinstance(fac, dict):
-            continue
-        fac_lines.append(f"- {fac.get('name', '?')}：{str(fac.get('description', ''))[:60]}")
+    for fac in (world.get("factions") or [])[:16]:
+        if isinstance(fac, dict):
+            fac_lines.append(f"- {fac.get('name', '?')}：{str(fac.get('description', ''))[:60]}")
+
+    art_lines = []
+    for art in (world.get("artifacts") or [])[:12]:
+        if isinstance(art, dict):
+            art_lines.append(
+                f"- {art.get('name', '?')}（{art.get('type', '?')}）持有者={art.get('ownerId', '无')}"
+            )
+
+    stat_lines = []
+    for s in (custom.get("stats") or [])[:8]:
+        if isinstance(s, dict):
+            stat_lines.append(f"- {s.get('label', s.get('key', '?'))}")
 
     rel_raw = custom.get("characterRelations") or {}
     rel_lines = []
     if isinstance(rel_raw, dict):
         for npc, rel in list(rel_raw.items())[:12]:
             if isinstance(rel, dict):
-                rel_lines.append(f"- {npc}：{rel.get('relationshipType', '?')} affection={rel.get('affection', '?')}")
+                rel_lines.append(f"- {npc}：{rel.get('relationshipType', '?')}")
+
+    genre = world.get("genre") or []
+    if isinstance(genre, str):
+        genre = [genre]
+    stages = rel_sys.get("stages") or custom.get("stages") or []
 
     history = session_state.get("history") or []
     recent = ""
@@ -104,17 +199,33 @@ def _build_analysis_context(world_pack: dict, session_state: dict) -> str:
     existing_prompt = str(custom.get("story_prompt") or "").strip()
     prompt_note = existing_prompt[:400] + ("…" if len(existing_prompt) > 400 else "")
 
+    loc_names = [
+        str(loc.get("name", "")).strip()
+        for loc in (world.get("locations") or [])
+        if isinstance(loc, dict) and loc.get("name")
+    ]
+
     return f"""【故事标题】{world.get('title', '')}
+【类型标签】{' / '.join(str(g) for g in genre) or '（无）'}
 【世界观】{str(world.get('setting', ''))[:200]}
 【主线】{str(world.get('main_goal', ''))[:120]}
+【初始/已知场景】{' / '.join(loc_names) or session_state.get('scene', '')}
 【当前场景】{session_state.get('scene', '')}
 【当前回合】T{session_state.get('turn', 0)} 状态={session_state.get('status', '')}
+【关系阶段链】{' → '.join(str(s) for s in stages[:12]) or '（默认）'}
+【初始好感】{rel_sys.get('affection', 0)}
 
 【已有角色】
 {chr(10).join(char_lines) or '（无）'}
 
 【已有势力】
 {chr(10).join(fac_lines) or '（无）'}
+
+【已有关键物品】
+{chr(10).join(art_lines) or '（无）'}
+
+【已有追踪维度】
+{chr(10).join(stat_lines) or '（无）'}
 
 【已有关系种子】
 {chr(10).join(rel_lines) or '（无）'}
@@ -128,23 +239,35 @@ def _build_analysis_context(world_pack: dict, session_state: dict) -> str:
 
 def _analysis_prompt(context: str, user_text: str) -> tuple[str, str]:
     system = (
-        "你是 Galgame 设定分析师。玩家会在进行中补充世界观/角色/关系/叙事规则。"
-        "请分析补充内容，输出合法 JSON。只输出 JSON，不要 markdown。"
+        "你是 Galgame 设定分析师。玩家会在游戏进行中补充设定。"
+        "输出字段须与「一键生成完整设定」同一套数据结构（见下方 JSON）。"
+        "只输出合法 JSON，不要 markdown。"
     )
     user = f"""{context}
 
 【玩家补充设定】
 {user_text.strip()}
 
-请分析并输出 JSON：
+请分析并输出 JSON（与新建故事「一键生成」字段对齐，另加 story_prompt）：
 {{
-  "story_prompt": "应写入本故事专属 prompt 的内容：叙事规则、风格禁忌、世界观细节、剧情约束等。与角色/势力/关系无关的 prompt 类内容放这里。无则空字符串。",
+  "story_prompt": "叙事规则/风格禁忌/剧情约束等，仅写入本故事 prompt，不放实体设定。无则空字符串",
+  "title": "故事标题（8~20字，仅变更时填写，否则省略或空字符串）",
+  "world": "世界观背景（50~300字，仅变更时填写）",
+  "genre": ["类型标签"],
+  "scene": "场景/地点名称（仅变更或新增地点时填写）",
+  "scene_desc": "场景描述（可选，配合 scene）",
+  "main_goal": "主线目标（仅变更时填写）",
+  "rel_stages": ["关系阶段标签，6~10个，双向从疏远到亲密，仅变更时填写"],
+  "rel_affection": 0,
+  "stats": [
+    {{"action": "add|update", "key": "english_key", "label": "中文维度名", "max": 100}}
+  ],
   "characters": [
     {{
-      "action": "add 或 update",
-      "name": "角色名（update 必须与已有角色名一致）",
+      "action": "add|update",
+      "name": "角色名",
       "is_main": false,
-      "faction": "主要明面势力（可选）",
+      "faction": "主要明面势力",
       "factionMemberships": [{{"faction": "势力名", "visibility": "public|hidden"}}],
       "role_tags": ["身份"],
       "personality_tags": ["性格"],
@@ -158,47 +281,82 @@ def _analysis_prompt(context: str, user_text: str) -> tuple[str, str]:
   ],
   "factions": [
     {{
-      "action": "add 或 update",
+      "action": "add|update",
       "name": "势力名",
-      "type": "organization",
+      "type": "government|corporation|family|organization|guild|school|religion|kingdom|other",
       "description": "描述",
       "goals": ["目标"],
-      "leader": "首领角色名",
-      "power": {{"military": 50, "economic": 50, "political": 50, "technology": 50}},
+      "resources": ["资源"],
+      "controlledTerritories": ["区域"],
+      "subordinateOrganizations": ["下属"],
+      "keyAssets": ["资产"],
+      "power": {{"military": 0, "economic": 0, "political": 0, "technology": 0}},
       "influence": 50,
-      "relation_to_player": "neutral"
+      "relation_to_player": "neutral",
+      "leader": "首领角色名"
+    }}
+  ],
+  "artifacts": [
+    {{
+      "action": "add|update",
+      "name": "物品名",
+      "type": "personal|faction|world",
+      "description": "描述",
+      "ownerType": "character|faction|none",
+      "ownerId": "持有者名",
+      "importance": 50,
+      "abilities": ["能力"],
+      "tags": ["标签"]
     }}
   ],
   "characterRelations": {{
     "NPC姓名": {{
       "relationshipType": "friend|lover|family|teacher|rival|ally|enemy",
-      "affection": 0,
-      "trust": 0,
-      "respect": 0,
-      "dependence": 0,
-      "hostility": 0,
-      "attraction": 0,
+      "affection": 0, "trust": 0, "respect": 0,
+      "dependence": 0, "hostility": 0, "attraction": 0,
       "tags": ["标签"]
     }}
   }},
-  "summary": "用中文简要说明本次更新了哪些内容（给玩家看）"
+  "summary": "用中文简要说明本次更新了哪些内容"
 }}
 
 规则：
-1. 仅根据玩家补充内容提取/推断，不要编造无关设定
-2. prompt 类（写作风格、禁忌、剧情规则）→ story_prompt；实体类 → characters/factions/relations
-3. update 只填需要变更的字段；add 需填完整基础信息
-4. 不要修改主角 is_main=true 的身份；新增 NPC 默认 is_main=false
-5. characterRelations 的 key 必须与 NPC 姓名一致
-6. 若无某类更新，对应字段用空数组 {{}} 或空字符串"""
+1. 仅根据玩家补充提取/推断，不要编造无关内容
+2. 写作规则/禁忌/叙事约束 → story_prompt；结构化设定 → 对应字段
+3. update 只填变更字段；add 需填完整基础信息
+4. 不修改主角 is_main；新增角色默认 NPC
+5. characterRelations 的 key 须与 NPC 姓名一致（含本次 add 的角色）
+6. ownerId / leader / faction 须与已有或本次新增的角色/势力名一致
+7. 未涉及的字段：字符串用 ""，数组用 []，数字可省略"""
     return system, user
 
 
 def _normalize_analysis(raw: dict, npc_names: list[str]) -> dict:
-    out = {
+    genre = raw.get("genre")
+    if isinstance(genre, str):
+        genre = [genre.strip()] if genre.strip() else []
+    elif not isinstance(genre, list):
+        genre = []
+
+    rel_stages = raw.get("rel_stages")
+    if not isinstance(rel_stages, list):
+        rel_stages = []
+    rel_stages = [str(s).strip() for s in rel_stages if s and str(s).strip()]
+
+    out: dict[str, Any] = {
         "story_prompt": str(raw.get("story_prompt") or "").strip(),
+        "title": str(raw.get("title") or "").strip()[:20],
+        "world": str(raw.get("world") or "").strip()[:300],
+        "genre": [str(g).strip() for g in genre if g and str(g).strip()],
+        "scene": str(raw.get("scene") or "").strip(),
+        "scene_desc": str(raw.get("scene_desc") or "").strip(),
+        "main_goal": str(raw.get("main_goal") or "").strip(),
+        "rel_stages": rel_stages,
+        "rel_affection": raw.get("rel_affection"),
+        "stats": _normalize_stats(raw.get("stats")),
         "characters": [],
         "factions": [],
+        "artifacts": [],
         "characterRelations": {},
         "summary": str(raw.get("summary") or "设定已更新").strip(),
     }
@@ -213,6 +371,8 @@ def _normalize_analysis(raw: dict, npc_names: list[str]) -> dict:
         if action not in ("add", "update"):
             action = "update"
         out["characters"].append({"action": action, "name": name, **entry})
+        if action == "add" and not entry.get("is_main") and name not in npc_names:
+            npc_names.append(name)
 
     for entry in raw.get("factions") or []:
         if not isinstance(entry, dict):
@@ -225,24 +385,105 @@ def _normalize_analysis(raw: dict, npc_names: list[str]) -> dict:
             action = "update"
         out["factions"].append({"action": action, "name": name, **entry})
 
+    for entry in raw.get("artifacts") or []:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name") or "").strip()
+        if not name:
+            continue
+        action = str(entry.get("action") or "update").lower()
+        if action not in ("add", "update"):
+            action = "update"
+        out["artifacts"].append({"action": action, "name": name, **entry})
+
     rel_raw = raw.get("characterRelations")
     if isinstance(rel_raw, dict):
-        for npc in npc_names:
-            if npc not in rel_raw or not isinstance(rel_raw.get(npc), dict):
-                continue
-            rel = rel_raw[npc]
-            rel_type = rel.get("relationshipType", "friend")
-            if rel_type not in _REL_TYPES:
-                rel_type = "friend"
-            tags = rel.get("tags") or []
-            if not isinstance(tags, list):
-                tags = [tags] if tags else []
-            out["characterRelations"][npc] = {
-                "relationshipType": rel_type,
-                **{m: _clamp_rel_metric(rel.get(m), 50) for m in _REL_METRICS},
-                "tags": [str(t).strip() for t in tags if t and str(t).strip()][:6],
-            }
+        remapped = _remap_relation_keys(rel_raw, npc_names)
+        for npc, rel in remapped.items():
+            if isinstance(rel, dict):
+                out["characterRelations"][npc] = _normalize_rel_entry(rel)
+
     return out
+
+
+def _apply_world_core(analysis: dict, world_pack: dict, session_state: dict) -> list[str]:
+    changes: list[str] = []
+    world = world_pack.setdefault("world", {})
+
+    if analysis.get("title"):
+        world["title"] = analysis["title"]
+        changes.append("更新标题")
+    if analysis.get("world"):
+        world["setting"] = analysis["world"]
+        changes.append("更新世界观")
+    if analysis.get("genre"):
+        world["genre"] = analysis["genre"]
+        changes.append("更新类型标签")
+    if analysis.get("main_goal"):
+        world["main_goal"] = analysis["main_goal"]
+        changes.append("更新主线目标")
+
+    scene = analysis.get("scene") or ""
+    if scene:
+        locations: list = world.setdefault("locations", [])
+        existing = _find_by_name(locations, scene)
+        desc = analysis.get("scene_desc") or ""
+        if existing:
+            if desc:
+                existing["desc"] = desc[:200]
+            changes.append(f"更新场景：{scene}")
+        else:
+            locations.append({"name": scene, "desc": desc[:200] if desc else "补充设定地点"})
+            changes.append(f"新增场景：{scene}")
+
+    return changes
+
+
+def _apply_rel_system(analysis: dict, world_pack: dict) -> list[str]:
+    changes: list[str] = []
+    world = world_pack.setdefault("world", {})
+    custom = world_pack.setdefault("custom", {})
+    rel_sys = world.setdefault("relationship_system", {"stages": [], "affection": 0})
+
+    stages = analysis.get("rel_stages") or []
+    if stages:
+        rel_sys["stages"] = stages
+        custom["stages"] = stages
+        changes.append("更新关系阶段")
+
+    aff = analysis.get("rel_affection")
+    if isinstance(aff, (int, float)):
+        rel_sys["affection"] = max(0, min(100, int(aff)))
+        changes.append("更新初始好感")
+
+    return changes
+
+
+def _apply_stats(entries: list[dict], custom: dict) -> list[str]:
+    if not entries:
+        return []
+    stats: list = list(custom.get("stats") or [])
+    changes: list[str] = []
+    by_key = {str(s.get("key", "")): s for s in stats if isinstance(s, dict) and s.get("key")}
+
+    for entry in entries:
+        key = entry["key"]
+        label = entry.get("label") or key
+        max_val = entry.get("max", 100)
+        action = entry.get("action", "update")
+        if action == "add" and key not in by_key:
+            by_key[key] = {"key": key, "label": label, "max": max_val}
+            changes.append(f"新增追踪维度：{label}")
+        elif key in by_key:
+            by_key[key]["label"] = label
+            by_key[key]["max"] = max_val
+            changes.append(f"更新追踪维度：{label}")
+        else:
+            by_key[key] = {"key": key, "label": label, "max": max_val}
+            changes.append(f"新增追踪维度：{label}")
+
+    custom["stats"] = list(by_key.values())
+    return changes
 
 
 def _char_note(ch: dict) -> str:
@@ -330,8 +571,7 @@ def _apply_characters(
             key = next((letters[i] for i in range(len(letters)) if letters[i] not in used), f"X{len(session_chars)}")
             state_entry = {"name": name, "role": role_str, "level": "L0", "relation": "", "note": ""}
             session_chars[key] = state_entry
-            if action == "add":
-                changes.append(f"注册到当前会话：{name}")
+            changes.append(f"注册到当前会话：{name}")
 
         state_entry["role"] = role_str or state_entry.get("role", "")
         note = _char_note(existing)
@@ -375,6 +615,41 @@ def _apply_factions(entries: list[dict], world_pack: dict, memory: dict) -> list
             changes.append(f"更新势力：{name}")
 
     init_factions(memory)
+    return changes
+
+
+def _apply_artifacts(entries: list[dict], world_pack: dict, memory: dict) -> list[str]:
+    changes: list[str] = []
+    world = world_pack.setdefault("world", {})
+    wp_arts: list = world.setdefault("artifacts", [])
+
+    for entry in entries:
+        name = entry["name"]
+        action = entry["action"]
+        existing = _find_by_name(wp_arts, name)
+
+        if action == "add" and not existing:
+            art = {
+                "name": name,
+                "type": entry.get("type") or "personal",
+                "description": entry.get("description") or "",
+                "ownerType": entry.get("ownerType") or "none",
+                "ownerId": entry.get("ownerId") or "",
+                "importance": entry.get("importance", 50),
+                "status": entry.get("status") or "active",
+                "abilities": entry.get("abilities") or [],
+                "tags": entry.get("tags") or [],
+            }
+            art = _merge_dict(art, entry, _ARTIFACT_PATCH_KEYS)
+            wp_arts.append(art)
+            changes.append(f"新增关键物品：{name}")
+        elif existing:
+            idx = wp_arts.index(existing)
+            wp_arts[idx] = _merge_dict(existing, entry, _ARTIFACT_PATCH_KEYS)
+            wp_arts[idx]["name"] = name
+            changes.append(f"更新关键物品：{name}")
+
+    init_artifacts(memory)
     return changes
 
 
@@ -440,11 +715,12 @@ def analyze_supplement(user_text: str) -> dict:
         raise DeepSeekError("AI 返回格式无效")
 
     world = world_pack.get("world", {}) or {}
-    npc_names = [
-        str(c.get("name", "")).strip()
-        for c in (world.get("characters") or [])
-        if isinstance(c, dict) and c.get("name") and not c.get("is_main")
+    add_npc = [
+        str(e.get("name", "")).strip()
+        for e in (raw.get("characters") or [])
+        if isinstance(e, dict) and e.get("action") == "add" and not e.get("is_main")
     ]
+    npc_names = _npc_names_from_world(world, add_npc)
     return _normalize_analysis(raw, npc_names)
 
 
@@ -458,6 +734,10 @@ def apply_supplement(analysis: dict) -> dict:
 
     all_changes: list[str] = []
 
+    all_changes.extend(_apply_world_core(analysis, world_pack, session_state))
+    all_changes.extend(_apply_rel_system(analysis, world_pack))
+    all_changes.extend(_apply_stats(analysis.get("stats") or [], custom))
+
     prompt_add = str(analysis.get("story_prompt") or "").strip()
     if prompt_add:
         prev = str(custom.get("story_prompt") or "").strip()
@@ -470,6 +750,7 @@ def apply_supplement(analysis: dict) -> dict:
         world_pack, session_state, memory, char_relations,
     ))
     all_changes.extend(_apply_factions(analysis.get("factions") or [], world_pack, memory))
+    all_changes.extend(_apply_artifacts(analysis.get("artifacts") or [], world_pack, memory))
     all_changes.extend(_apply_relations(
         analysis.get("characterRelations") or {},
         custom, session_state, memory,
@@ -495,8 +776,16 @@ def supplement_lore(user_text: str) -> dict:
     analysis = analyze_supplement(user_text)
     result = apply_supplement(analysis)
     result["analysis"] = {
+        "world_core": bool(
+            analysis.get("title") or analysis.get("world") or analysis.get("genre")
+            or analysis.get("main_goal") or analysis.get("scene")
+        ),
+        "rel_system": bool(analysis.get("rel_stages") or analysis.get("rel_affection") is not None),
+        "stats": len(analysis.get("stats") or []),
         "characters": len(analysis.get("characters") or []),
         "factions": len(analysis.get("factions") or []),
+        "artifacts": len(analysis.get("artifacts") or []),
         "relations": len(analysis.get("characterRelations") or {}),
+        "story_prompt": bool(analysis.get("story_prompt")),
     }
     return result

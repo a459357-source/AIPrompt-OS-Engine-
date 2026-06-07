@@ -2179,9 +2179,9 @@ export default function Game() {
             </div>
             <div className="p-5 space-y-3">
               <p className="text-xs text-game-dim leading-relaxed">
-                填写世界观细节、角色背景、关系变化或叙事规则。提交后 AI 会分析：
-                与 prompt 相关的内容追加到<strong className="text-game-muted">本故事专属 prompt</strong>；
-                角色、势力、关系按分析结果更新到当前故事。
+                与新建故事「一键生成」同一套设定维度，AI 会按补充内容选择性更新：
+                标题 / 世界观 / 类型 / 场景 / 主线、角色、势力、关键物品、追踪维度、关系阶段与多维关系；
+                叙事规则类内容追加到<strong className="text-game-muted">本故事专属 prompt</strong>（仅本故事生效）。
               </p>
               <Textarea
                 value={supplementText}

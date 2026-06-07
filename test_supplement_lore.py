@@ -45,8 +45,11 @@ def lore_env(tmp_path, monkeypatch):
             "factions": [
                 {"name": "学生会", "type": "organization", "description": "管理学院"},
             ],
+            "artifacts": [],
+            "relationship_system": {"stages": ["陌生", "认识", "朋友"], "affection": 0},
+            "locations": [{"name": "教室", "desc": "初始场景"}],
         },
-        "custom": {"characterRelations": {}},
+        "custom": {"characterRelations": {}, "stats": []},
     }
     session = {
         "scene": "教室",
@@ -138,6 +141,48 @@ def test_apply_supplement_add_faction(lore_env):
     pack = io_utils.read_yaml(lore_env["world_pack_path"])
     names = [f["name"] for f in pack["world"]["factions"]]
     assert "暗部" in names
+
+
+def test_apply_supplement_world_core_artifact_stats(lore_env):
+    analysis = {
+        "story_prompt": "",
+        "title": "新标题",
+        "world": "扩展后的世界观描述",
+        "genre": ["悬疑", "校园"],
+        "main_goal": "查明真相",
+        "scene": "图书馆",
+        "scene_desc": "禁书区在地下",
+        "rel_stages": ["陌生", "试探", "盟友"],
+        "rel_affection": 10,
+        "stats": [{"action": "add", "key": "suspicion", "label": "怀疑度", "max": 100}],
+        "characters": [],
+        "factions": [],
+        "artifacts": [
+            {
+                "action": "add",
+                "name": "古书",
+                "type": "world",
+                "description": "封印咒语",
+                "ownerType": "none",
+                "ownerId": "",
+                "importance": 80,
+                "abilities": ["解封"],
+                "tags": ["关键"],
+            },
+        ],
+        "characterRelations": {},
+        "summary": "综合更新",
+    }
+    apply_supplement(analysis)
+    pack = io_utils.read_yaml(lore_env["world_pack_path"])
+    world = pack["world"]
+    assert world["title"] == "新标题"
+    assert world["setting"] == "扩展后的世界观描述"
+    assert "图书馆" in [loc["name"] for loc in world["locations"]]
+    assert world["relationship_system"]["stages"] == ["陌生", "试探", "盟友"]
+    assert pack["custom"]["stats"][0]["key"] == "suspicion"
+    art_names = [a["name"] for a in world["artifacts"]]
+    assert "古书" in art_names
 
 
 def test_analyze_supplement_empty_raises(lore_env):
