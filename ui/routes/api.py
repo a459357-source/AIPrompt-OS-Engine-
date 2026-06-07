@@ -17,6 +17,9 @@ _REL_METRICS = ("trust", "affection", "respect", "dependence", "hostility", "att
 
 def _merge_characters_with_memory(raw_chars: dict, mem_chars: dict, faction_map: dict) -> dict[str, dict]:
     """Merge session characters with memory metrics for API responses."""
+    from engine.character_registry import dedupe_characters_by_name
+
+    raw_chars = dedupe_characters_by_name(raw_chars)
     result: dict[str, dict] = {}
     for key, sc in raw_chars.items():
         name = sc.get("name", key)
@@ -42,8 +45,10 @@ def _merge_characters_with_memory(raw_chars: dict, mem_chars: dict, faction_map:
 def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
     """Build JSON payload for GET /api/game-state and idempotent POST /api/start."""
     if not_started or not state.get("history"):
+        from engine.character_registry import dedupe_characters_by_name
+
         chars_with_trust: dict[str, dict] = {}
-        raw_chars = state.get("characters", {})
+        raw_chars = dedupe_characters_by_name(state.get("characters", {}))
         for key, sc in raw_chars.items():
             chars_with_trust[key] = {**sc, "trust": 0.5, "trust_pct": 50, "flags": [], "tier": ""}
         payload = {

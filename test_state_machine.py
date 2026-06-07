@@ -120,6 +120,30 @@ def test_turn_increment():
     print("✅ Turn increment: PASS")
 
 
+def test_merge_duplicate_name_character():
+    """AI registering 诺亚 under name key merges into letter key A."""
+    current = {
+        "turn": 1,
+        "scene": "森林",
+        "status": "BUILD",
+        "characters": {
+            "A": {"name": "诺亚", "role": "骑士", "level": "L1", "relation": "死敌"},
+        },
+        "history": [],
+    }
+    proposed = {
+        "status": "BUILD",
+        "characters": {
+            "诺亚": {"name": "诺亚", "role": "主角", "level": "L2", "relation": "主角"},
+        },
+    }
+    result = _merge_and_enforce(current, proposed)
+    assert "诺亚" not in result["characters"]
+    assert result["characters"]["A"]["relation"] == "主角"
+    assert result["characters"]["A"]["level"] == "L2"
+    print("✅ Merge duplicate name: PASS")
+
+
 if __name__ == "__main__":
     tests = [
         test_climax_to_cooldown,
@@ -128,6 +152,7 @@ if __name__ == "__main__":
         test_force_event_same_status,
         test_force_event_same_scene,
         test_turn_increment,
+        test_merge_duplicate_name_character,
     ]
     for test in tests:
         try:

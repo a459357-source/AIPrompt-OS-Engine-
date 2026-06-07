@@ -194,32 +194,13 @@ def _merge_and_enforce(current: dict, proposed: dict) -> dict:
     old_chars: dict = current.get("characters", {})
     new_chars: dict = proposed.get("characters", {})
 
-    merged_chars: dict = {}
-    for key in old_chars:
-        old_char = old_chars[key]
-        new_char = new_chars.get(key, old_char)
+    from engine.character_registry import merge_proposed_characters
 
-        old_level = old_char.get("level", "L0")
-        new_level = new_char.get("level", old_level)
-
-        old_lvl_idx = _level_idx(old_level)
-        new_lvl_idx = _level_idx(new_level)
-
-        if new_lvl_idx < old_lvl_idx:
-            logger.warning(
-                "AI attempted to decrease interaction level for %s (%s → %s); keeping %s",
-                key, old_level, new_level, old_level,
-            )
-            new_level = old_level
-
-        merged_chars[key] = {**old_char, **new_char, "level": new_level}
-
-    # Keep any new characters the AI introduced
-    for key in new_chars:
-        if key not in merged_chars:
-            merged_chars[key] = new_chars[key]
-
-    merged["characters"] = merged_chars
+    merged["characters"] = merge_proposed_characters(
+        old_chars,
+        new_chars,
+        level_idx_fn=_level_idx,
+    )
 
     return merged
 

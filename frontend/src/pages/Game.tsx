@@ -19,6 +19,7 @@ import { useAppSettings } from '@/hooks/useAppSettings'
 import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS, MAX_WIDTH_OPTIONS } from '@/lib/settings'
 import { dispatchAdultModeChange, dispatchAdultThemeChange, dispatchVisualThemeChange, getAdultRelationLevel, applyUiTheme, VISUAL_THEME_OPTIONS, VISUAL_THEME_LABELS, type AdultThemeId, type VisualThemeId } from '@/lib/theme'
 import { t, tTheme } from '@/lib/i18n'
+import { dedupeCharactersByName } from '@/lib/characters'
 import { cn } from '@/lib/utils'
 
 /** Keep in sync with config.py */
@@ -537,10 +538,10 @@ export default function Game() {
     setScene((st.scene as string) || '')
     const chars = st.characters as Record<string, CharInfo> | undefined
     if (chars) {
-      setCharacters(Object.values(chars).map((c) => ({
+      setCharacters(dedupeCharactersByName(Object.values(chars).map((c) => ({
         ...c,
         affection: c.affection ?? c.trust_pct ?? 50,
-      })))
+      }))))
     }
     const factionsData = st.factions as FactionInfo[] | undefined
     if (factionsData) setFactions(factionsData)
@@ -1105,10 +1106,10 @@ export default function Game() {
       setStatus(data.state.status)
       setScene(data.state.scene)
       const chars = data.state.characters as Record<string, CharInfo> | undefined
-      if (chars) setCharacters(Object.values(chars).map((c) => ({
+      if (chars) setCharacters(dedupeCharactersByName(Object.values(chars).map((c) => ({
         ...c,
         affection: c.affection ?? c.trust_pct ?? 50,
-      })))
+      }))))
       const factionsData = data.state.factions as FactionInfo[] | undefined
       if (factionsData) setFactions(factionsData)
       void getHistory().then((hist) => {

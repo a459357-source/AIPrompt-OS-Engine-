@@ -314,9 +314,11 @@ async def create_new_story(
     # Build initial state with dynamic characters
     state_chars = {}
     mem_chars = {}
-    init_stage = rel_config.get("stages", ["陌生"])[0] if rel_config.get("stages") else "陌生"
     init_affection = rel_config.get("affection", 0)
+    char_relations = custom.get("characterRelations", {}) if custom else {}
     letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    from engine.character_registry import initial_relation_label
+
     for i, ch in enumerate(chars):
         if i >= len(letters):
             break
@@ -348,25 +350,33 @@ async def create_new_story(
         note = "\n".join(p for p in note_parts if p)
         if not note: note = ""
 
+        relation_label = initial_relation_label(
+            name,
+            is_main=is_main,
+            relationship=relationship,
+            char_relations=char_relations,
+        )
+
         state_chars[key] = {
             "name": name,
             "role": role_str,
             "level": "L0",
-            "relation": init_stage,
+            "relation": relation_label,
             "note": note,
         }
         initial_trust = init_affection / 100.0 if init_affection > 0 else 0.5
-        rel_desc = (role_str + "，" if role_str else "") + init_stage
+        mem_rel = relation_label
+        if is_main and role_str:
+            mem_rel = f"{role_str}，主角"
         mem_chars[name] = {
             "trust": initial_trust,
             "flags": [],
-            "relationship": rel_desc,
+            "relationship": mem_rel,
         }
         if secret:
             mem_chars[name].setdefault("flags", []).append(f"隐藏秘密：{secret}")
 
     # Seed multidimensional relations from NewStory「专属规则 & 多维关系」
-    char_relations = custom.get("characterRelations", {}) if custom else {}
     rel_metrics = ("trust", "affection", "respect", "dependence", "hostility", "attraction")
     for npc_name, rel in char_relations.items():
         if not isinstance(rel, dict) or npc_name not in mem_chars:
@@ -385,6 +395,15 @@ async def create_new_story(
             flag = f"关系：{tag}"
             if flag not in entry.get("flags", []):
                 entry.setdefault("flags", []).append(flag)
+        for state_key, state_ch in state_chars.items():
+            if state_ch.get("name") == npc_name:
+                state_ch["relation"] = initial_relation_label(
+                    npc_name,
+                    is_main=False,
+                    relationship=[],
+                    char_relations=char_relations,
+                )
+                break
 
     initial_state = {
         "scene": scene,

@@ -944,6 +944,8 @@ def get_char_stats_for_ui(session_state: dict, memory: dict, world_pack: dict | 
         custom_stats_config = custom.get("stats", [])
         custom_stages = custom.get("stages", [])
     state_chars = session_state.get("characters", {})
+    from engine.character_registry import dedupe_characters_by_name
+    state_chars = dedupe_characters_by_name(state_chars)
     mem_chars = memory.get("characters", {})
 
     result: list[dict] = []
