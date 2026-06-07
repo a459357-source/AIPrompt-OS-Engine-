@@ -492,6 +492,7 @@ a{{color:#58a6ff;text-decoration:none}}
 <button class="toggle-btn" onclick="t('factions')">🏛️ 世界势力</button>
 <button class="toggle-btn" onclick="t('factionGraph')">🕸️ 势力关系</button>
 <button class="toggle-btn" onclick="t('factionPower')">⚔️ 势力实力</button>
+<button class="toggle-btn" onclick="t('artifacts')">🗝️ 关键物品</button>
 <button class="toggle-btn" onclick="t('branch')">🔀 分支统计</button>
 </div>
 
@@ -528,6 +529,13 @@ a{{color:#58a6ff;text-decoration:none}}
 <div id="sec-factionPower" class="section">
 <h2>⚔️ 势力实力对比（军事/经济/政治/科技）</h2>
 <div class="chart-wrap wide"><canvas id="factionPowerChart"></canvas></div>
+</div>
+
+<div id="sec-artifacts" class="section">
+<h2>🗝️ 关键物品</h2>
+<div style="overflow-x:auto"><table id="artifactTable">
+<tr><th>物品</th><th>类型</th><th>持有者</th><th>重要度</th><th>状态</th><th>转移次数</th></tr>
+</table></div>
 </div>
 
 <div id="sec-factionGraph" class="section">
@@ -679,6 +687,24 @@ if(A.character_frequency&&A.character_frequency.labels){{makeChart('charFreqChar
         y:{{ticks:{{color:'#8b949e',font:{{size:10}}}},grid:{{color:'#21262d'}}}}
       }}
     }}
+  }});
+}})();
+
+// Artifact table
+(function(){{
+  var arts=A.artifacts;if(!arts||!arts.length)return;
+  var tbl=document.getElementById('artifactTable');
+  if(!tbl)return;
+  var typeLabels={{personal:'个人',faction:'势力资产',world:'世界级'}};
+  var statusLabels={{active:'进行中',lost:'已遗失',destroyed:'已销毁',sealed:'已封印'}};
+  arts.forEach(function(a){{
+    var row=tbl.insertRow();
+    row.innerHTML='<td style="font-weight:600">'+a.name+'</td>'+
+      '<td>'+((a.type&&typeLabels[a.type])||a.type||'?')+'</td>'+
+      '<td>'+(a.ownerId||'无')+'</td>'+
+      '<td>'+('⭐'.repeat(Math.ceil(a.importance/20)))+' '+a.importance+'</td>'+
+      '<td>'+((a.status&&statusLabels[a.status])||a.status||'?')+'</td>'+
+      '<td>'+(a.transferCount||0)+'</td>';
   }});
 }})();
 </script>

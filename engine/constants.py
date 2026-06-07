@@ -61,6 +61,40 @@ COMMON_WORDS: frozenset[str] = frozenset({
     '觉得', '知道', '看到', '听到', '感到', '想到',
 })
 
+# ── Artifact transfer keywords ─────────────────────────────────
+# Story-text keywords that signal an artifact changed hands.
+# Format: keyword → (action_label, direction)
+#   direction: "acquire" = 获得, "lose" = 失去, "transfer" = 转移
+ARTIFACT_TRANSFER_KEYWORDS: dict[str, tuple[str, str]] = {
+    "获得": ("acquire", "acquire"),
+    "得到": ("acquire", "acquire"),
+    "找到": ("acquire", "acquire"),
+    "发现": ("acquire", "acquire"),
+    "拿到": ("acquire", "acquire"),
+    "入手": ("acquire", "acquire"),
+    "夺取": ("acquire", "acquire"),
+    "夺回": ("acquire", "acquire"),
+    "抢走": ("transfer", "acquire"),
+    "遗失": ("lose", "lose"),
+    "丢失": ("lose", "lose"),
+    "失窃": ("lose", "lose"),
+    "被盗": ("lose", "lose"),
+    "交出": ("transfer", "lose"),
+    "交给": ("transfer", "transfer"),
+    "赠予": ("transfer", "transfer"),
+    "归还": ("transfer", "acquire"),
+    "交易": ("transfer", "transfer"),
+    "拍卖": ("transfer", "transfer"),
+    "抵押": ("transfer", "transfer"),
+    "继承": ("acquire", "acquire"),
+    "偷走": ("transfer", "acquire"),
+    "窃取": ("transfer", "acquire"),
+    "销毁": ("destroy", "lose"),
+    "毁掉": ("destroy", "lose"),
+    "封印": ("seal", "lose"),
+    "解锁": ("unlock", "acquire"),
+}
+
 # ── Relationship → initial trust mapping ───────────────────────────
 RELATIONSHIP_TRUST: dict[str, float] = {
     # Positive / allied

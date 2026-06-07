@@ -26,6 +26,10 @@ from engine.memory import (
     init_factions, update_faction_reputation,
     init_faction_attitudes, update_faction_attitude,
     assign_character_tier, degrade_inactive_characters,
+    init_artifacts, transfer_artifact,
+)
+from engine.constants import (
+    ARTIFACT_TRANSFER_KEYWORDS,
 )
 from engine.events import init_events, check_event_triggers, seed_default_events
 from engine.world_driver import passive_faction_drift
@@ -69,6 +73,12 @@ def init_world_state(memory: dict, world_pack: dict, turn: int = 0) -> None:
     triggered = check_event_triggers(memory, turn)
     for evt in triggered:
         logger.info("Event triggered: %s (turn %d)", evt.get("title"), turn)
+
+    # Artifacts
+    existing_artifacts = memory.get("artifacts", {})
+    init_artifacts(memory)
+    if memory.get("artifacts", {}) != existing_artifacts:
+        save_memory(memory)
 
 
 # ── 2. NPC Auto-Registration ───────────────────────────────────────
@@ -282,4 +292,75 @@ def update_factions(memory: dict, story: str, turn: int) -> None:
     # (c) Passive drift
     passive_faction_drift(memory, turn)
 
+    # (d) Artifact transfer detection
+    detect_artifact_transfers(memory, story, turn)
+
     save_memory(memory)
+
+
+# ── 5. Artifact Transfer Detection ─────────────────────────────────
+
+def detect_artifact_transfers(memory: dict, story: str, turn: int) -> None:
+    """
+    Scan story text for artifact names near transfer keywords.
+    If a transfer is detected, update the artifact's owner.
+
+    Uses ARTIFACT_TRANSFER_KEYWORDS from constants.py.
+    """
+    arts = memory.get("artifacts", {})
+    if not arts or not story:
+        return
+
+    for art_name, art_data in arts.items():
+        if art_data.get("status") != "active":
+            continue
+        if art_name not in story:
+            continue
+
+        # Find the keyword closest to the artifact mention
+        art_idx = story.find(art_name)
+        if art_idx < 0:
+            continue
+
+        # Search 80 chars around the artifact mention for transfer keywords
+        window_start = max(0, art_idx - 40)
+        window_end = min(len(story), art_idx + len(art_name) + 40)
+        window = story[window_start:window_end]
+
+        for kw, (action, direction) in ARTIFACT_TRANSFER_KEYWORDS.items():
+            if kw not in window:
+                continue
+
+            if action == "destroy":
+                from engine.memory import set_artifact_status
+                set_artifact_status(memory, art_name, "destroyed")
+                logger.info("Artifact updater: '%s' destroyed (turn %d, keyword: %s)",
+                            art_name, turn, kw)
+                break
+
+            if action == "seal":
+                from engine.memory import set_artifact_status
+                set_artifact_status(memory, art_name, "sealed")
+                logger.info("Artifact updater: '%s' sealed (turn %d, keyword: %s)",
+                            art_name, turn, kw)
+                break
+
+            # Detect who gained/lost the artifact
+            # Look for known character names in the same window
+            chars = memory.get("characters", {})
+            for char_name in chars:
+                if char_name in window and char_name != art_data.get("ownerId", ""):
+                    if direction in ("acquire",):
+                        transfer_artifact(memory, art_name, "character", char_name, turn,
+                                          f"关键词检测: {kw}")
+                        logger.info("Artifact updater: '%s' → %s (turn %d, keyword: %s)",
+                                    art_name, char_name, turn, kw)
+                        break
+                    elif direction == "lose":
+                        art_data["ownerType"] = "none"
+                        art_data["ownerId"] = ""
+                        art_data["status"] = "lost"
+                        logger.info("Artifact updater: '%s' lost (turn %d, keyword: %s)",
+                                    art_name, turn, kw)
+                        break
+            break  # Only apply first matching keyword per artifact

@@ -499,6 +499,114 @@ def _faction_action_hints(
     return hints
 
 
+# ── Artifact tracking ──────────────────────────────────────────────
+
+def init_artifacts(memory: dict) -> None:
+    """Auto-register artifacts from world_pack.yaml into memory."""
+    world = io_utils.read_yaml(config.WORLD_PACK_PATH)
+    artifacts_raw = world.get("world", {}).get("artifacts", [])
+    mem_artifacts = memory.setdefault("artifacts", {})
+
+    for art in artifacts_raw:
+        name = art.get("name", "")
+        if not name:
+            continue
+        if name not in mem_artifacts:
+            mem_artifacts[name] = {
+                "type": art.get("type", "personal"),
+                "description": art.get("description", ""),
+                "ownerType": art.get("ownerType", "none"),
+                "ownerId": art.get("ownerId", ""),
+                "previousOwners": art.get("previousOwners", []),
+                "importance": art.get("importance", 50),
+                "abilities": art.get("abilities", []),
+                "tags": art.get("tags", []),
+                "relatedCharacters": art.get("relatedCharacters", []),
+                "relatedFactions": art.get("relatedFactions", []),
+                "status": art.get("status", "active"),
+                "transferHistory": [],
+            }
+            logger.info("Memory: auto-registered artifact '%s' (type=%s, owner=%s)",
+                        name, art.get("type", "?"), art.get("ownerId", "none"))
+
+
+def transfer_artifact(memory: dict, artifact_name: str, new_owner_type: str,
+                      new_owner_id: str, turn: int = 0, reason: str = "") -> bool:
+    """Transfer an artifact to a new owner. Records transfer history."""
+    arts = memory.setdefault("artifacts", {})
+    if artifact_name not in arts:
+        return False
+    art = arts[artifact_name]
+    old_owner = f"{art.get('ownerType','?')}:{art.get('ownerId','')}"
+    art["previousOwners"].append(art.get("ownerId", ""))
+    art["ownerType"] = new_owner_type
+    art["ownerId"] = new_owner_id
+    art["transferHistory"].append({
+        "turn": turn,
+        "from": old_owner,
+        "to": f"{new_owner_type}:{new_owner_id}",
+        "reason": reason,
+    })
+    logger.info("Artifact: '%s' transferred %s → %s:%s (turn %d)",
+                artifact_name, old_owner, new_owner_type, new_owner_id, turn)
+    return True
+
+
+def set_artifact_status(memory: dict, artifact_name: str, status: str) -> bool:
+    """Set artifact status: active, lost, destroyed, sealed."""
+    arts = memory.setdefault("artifacts", {})
+    if artifact_name not in arts:
+        return False
+    arts[artifact_name]["status"] = status
+    logger.info("Artifact: '%s' status → %s", artifact_name, status)
+    return True
+
+
+def get_artifact_context_for_prompt(memory: dict) -> str:
+    """Build a prompt-ready summary of key artifacts."""
+    arts = memory.get("artifacts", {})
+    if not arts:
+        return ""
+
+    lines: list[str] = ["【关键物品】"]
+    for name, data in arts.items():
+        status = data.get("status", "active")
+        if status != "active":
+            continue
+        owner_type = data.get("ownerType", "none")
+        owner_id = data.get("ownerId", "")
+        importance = data.get("importance", 50)
+        abilities = data.get("abilities", [])
+        tags = data.get("tags", [])
+        lines.append(f"  [{name}] 重要性:{importance} 持有者:{owner_type}:{owner_id} 状态:{status}")
+        if abilities:
+            lines.append(f"    能力: {'; '.join(abilities[:3])}")
+        if tags:
+            lines.append(f"    标签: {', '.join(tags)}")
+    lines.append("  【AI规则】物品可转移、可争夺、可遗失——围绕物品状态变化生成剧情冲突。")
+    return "\n".join(lines)
+
+
+def get_artifact_stats_for_ui(memory: dict) -> list[dict]:
+    """Return artifact data for UI display."""
+    arts = memory.get("artifacts", {})
+    result: list[dict] = []
+    for name, data in arts.items():
+        result.append({
+            "name": name,
+            "type": data.get("type", "personal"),
+            "description": data.get("description", "")[:80],
+            "ownerType": data.get("ownerType", "none"),
+            "ownerId": data.get("ownerId", ""),
+            "importance": data.get("importance", 50),
+            "status": data.get("status", "active"),
+            "abilities": data.get("abilities", []),
+            "tags": data.get("tags", []),
+            "transferCount": len(data.get("transferHistory", [])),
+        })
+    return sorted(result, key=lambda x: x["importance"], reverse=True)
+
+
 def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | None]]:
     """
     Heuristic: scan the story text for character names near sentiment

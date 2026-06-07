@@ -38,6 +38,7 @@ def compute_all() -> dict:
         "faction_curves": faction_curves(),  # faction reputation curves
         "faction_power": faction_power_stats(),  # faction power scores
         "faction_attitude_curves": faction_attitude_curves(),  # inter-faction attitude curves
+        "artifacts": artifact_stats(),  # key artifacts
         "status_timeline": status_timeline(),
         "word_counts": word_counts(),
         "choice_stats": choice_stats(),
@@ -179,6 +180,13 @@ def faction_power_stats() -> dict:
         "labels": ["军事", "经济", "政治", "科技"],
         "datasets": datasets,
     }
+
+
+def artifact_stats() -> list[dict]:
+    """Key artifact summary for dashboard display."""
+    memory = io_utils.read_json(config.MEMORY_PATH)
+    from engine.memory import get_artifact_stats_for_ui
+    return get_artifact_stats_for_ui(memory)
 
 
 def faction_attitude_curves() -> dict:
