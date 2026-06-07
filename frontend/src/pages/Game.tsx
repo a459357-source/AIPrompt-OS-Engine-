@@ -33,7 +33,6 @@ interface FactionInfo {
   keyAssets?: string[]
   power?: { military: number; economic: number; political: number; technology: number }
 }
-}
 
 function AffectionBar({ value }: { value: number; name?: string }) {
   // 防御 NaN / undefined / 负数（避免 '█'.repeat(NaN) 崩溃）
