@@ -49,8 +49,8 @@ def test_prompt_under_budget_with_long_history():
             if "engine" in p:
                 return {"rules": []}
             return {
-                "system": "sys {{FORCE_EVENT_NOTICE}} {{STORY_LENGTH}} {{STORY_LENGTH_MIN}} {{STORY_LENGTH_MAX}} {{AI_BEHAVIOR_RULES}} {{OPTION_COUNT}} {{CUSTOM_RULES}} {{MAIN_GOAL}}",
-                "user": "{{WORLD}}\n{{LONG_TERM_MEMORY}}\n{{RECENT_SUMMARIES}}\n{{HOT_CONTEXT}}\n{{LAST_CHOICE}}\n{{CHARACTERS_CONTEXT}}\n{{CHARACTER_BRAIN}}\n{{RELATIONSHIP_SYSTEM}}\n{{ENGINE_RULES}}\n{{FORCE_EVENT_PROMPT}}",
+                "system": "sys {{MODE_CONTEXT_SYSTEM}} {{NARRATIVE_STYLE_LINE}} {{FORCE_EVENT_NOTICE}} {{STORY_LENGTH}} {{STORY_LENGTH_MIN}} {{STORY_LENGTH_MAX}} {{BEHAVIOR_RULES}} {{OPTION_COUNT}} {{OPTIONS_SCHEMA_HINT}} {{CUSTOM_RULES}} {{MAIN_GOAL}}",
+                "user": "{{WORLD}}\n{{LONG_TERM_MEMORY}}\n{{RECENT_SUMMARIES}}\n{{HOT_CONTEXT}}\n{{OBJECTIVES_CONTEXT}}\n{{DIRECTOR_ADVICE}}\n{{MODE_CONTEXT_USER}}\n{{LAST_CHOICE}}\n{{CHARACTERS_CONTEXT}}\n{{CHARACTER_BRAIN}}\n{{RELATIONSHIP_SYSTEM}}\n{{ENGINE_RULES}}\n{{FORCE_EVENT_PROMPT}}\n{{TASK_HINT}}",
             }
         ry.side_effect = _yaml
 
@@ -168,8 +168,8 @@ def test_prompt_router_filters_unrelated_factions():
             if "engine" in p:
                 return {"rules": []}
             return {
-                "system": "sys {{FORCE_EVENT_NOTICE}} {{STORY_LENGTH}} {{STORY_LENGTH_MIN}} {{STORY_LENGTH_MAX}} {{AI_BEHAVIOR_RULES}} {{OPTION_COUNT}} {{CUSTOM_RULES}} {{MAIN_GOAL}}",
-                "user": "{{WORLD}}\n{{LONG_TERM_MEMORY}}\n{{RECENT_SUMMARIES}}\n{{HOT_CONTEXT}}\n{{LAST_CHOICE}}\n{{CHARACTERS_CONTEXT}}\n{{CHARACTER_BRAIN}}\n{{RELATIONSHIP_SYSTEM}}\n{{ENGINE_RULES}}\n{{FORCE_EVENT_PROMPT}}",
+                "system": "sys {{MODE_CONTEXT_SYSTEM}} {{NARRATIVE_STYLE_LINE}} {{FORCE_EVENT_NOTICE}} {{STORY_LENGTH}} {{STORY_LENGTH_MIN}} {{STORY_LENGTH_MAX}} {{BEHAVIOR_RULES}} {{OPTION_COUNT}} {{OPTIONS_SCHEMA_HINT}} {{CUSTOM_RULES}} {{MAIN_GOAL}}",
+                "user": "{{WORLD}}\n{{LONG_TERM_MEMORY}}\n{{RECENT_SUMMARIES}}\n{{HOT_CONTEXT}}\n{{OBJECTIVES_CONTEXT}}\n{{DIRECTOR_ADVICE}}\n{{MODE_CONTEXT_USER}}\n{{LAST_CHOICE}}\n{{CHARACTERS_CONTEXT}}\n{{CHARACTER_BRAIN}}\n{{RELATIONSHIP_SYSTEM}}\n{{ENGINE_RULES}}\n{{FORCE_EVENT_PROMPT}}\n{{TASK_HINT}}",
             }
         ry.side_effect = _yaml
 
@@ -208,8 +208,8 @@ def test_prompt_includes_director_advice_placeholder():
          patch("engine.builder.load_world_summary_text", return_value="世界"), \
          patch("engine.memory_layers.load_chapter_summaries", return_value=[]):
         template = {
-            "system": "sys {{FORCE_EVENT_NOTICE}} {{STORY_LENGTH}} {{STORY_LENGTH_MIN}} {{STORY_LENGTH_MAX}} {{AI_BEHAVIOR_RULES}} {{OPTION_COUNT}} {{CUSTOM_RULES}} {{MAIN_GOAL}}",
-            "user": "{{WORLD}}\n{{HOT_CONTEXT}}\n{{DIRECTOR_ADVICE}}\n{{LAST_CHOICE}}",
+            "system": "sys {{MODE_CONTEXT_SYSTEM}} {{NARRATIVE_STYLE_LINE}} {{FORCE_EVENT_NOTICE}} {{STORY_LENGTH}} {{STORY_LENGTH_MIN}} {{STORY_LENGTH_MAX}} {{BEHAVIOR_RULES}} {{OPTION_COUNT}} {{OPTIONS_SCHEMA_HINT}} {{CUSTOM_RULES}} {{MAIN_GOAL}}",
+            "user": "{{WORLD}}\n{{HOT_CONTEXT}}\n{{OBJECTIVES_CONTEXT}}\n{{DIRECTOR_ADVICE}}\n{{MODE_CONTEXT_USER}}\n{{LAST_CHOICE}}\n{{TASK_HINT}}",
         }
 
         def _yaml(path, use_cache=True):
@@ -256,8 +256,8 @@ def test_prompt_includes_objectives_context():
          patch("engine.builder.load_world_summary_text", return_value="世界"), \
          patch("engine.memory_layers.load_chapter_summaries", return_value=[]):
         template = {
-            "system": "sys {{FORCE_EVENT_NOTICE}} {{STORY_LENGTH}} {{STORY_LENGTH_MIN}} {{STORY_LENGTH_MAX}} {{AI_BEHAVIOR_RULES}} {{OPTION_COUNT}} {{CUSTOM_RULES}} {{MAIN_GOAL}}",
-            "user": "{{WORLD}}\n{{HOT_CONTEXT}}\n{{OBJECTIVES_CONTEXT}}\n{{DIRECTOR_ADVICE}}\n{{LAST_CHOICE}}",
+            "system": "sys {{MODE_CONTEXT_SYSTEM}} {{NARRATIVE_STYLE_LINE}} {{FORCE_EVENT_NOTICE}} {{STORY_LENGTH}} {{STORY_LENGTH_MIN}} {{STORY_LENGTH_MAX}} {{BEHAVIOR_RULES}} {{OPTION_COUNT}} {{OPTIONS_SCHEMA_HINT}} {{CUSTOM_RULES}} {{MAIN_GOAL}}",
+            "user": "{{WORLD}}\n{{HOT_CONTEXT}}\n{{OBJECTIVES_CONTEXT}}\n{{DIRECTOR_ADVICE}}\n{{MODE_CONTEXT_USER}}\n{{LAST_CHOICE}}\n{{TASK_HINT}}",
         }
 
         def _yaml(path, use_cache=True):

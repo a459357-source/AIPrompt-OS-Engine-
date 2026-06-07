@@ -356,12 +356,14 @@ def step(
     profiler.mark("continuation_done")
 
     from engine.adult_content_guard import ensure_adult_turn_content
+    from engine.experience.prompt_strategy import get_prompt_strategy
 
-    response = ensure_adult_turn_content(
-        response,
-        scene=scene,
-        characters=pre_state.get("characters", {}),
-    )
+    if get_prompt_strategy().requires_content_guard():
+        response = ensure_adult_turn_content(
+            response,
+            scene=scene,
+            characters=pre_state.get("characters", {}),
+        )
 
     story_chars = count_story_chars(response.get("story", ""))
     if should_retry_story_length(story_chars, target_len):

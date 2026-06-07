@@ -42,6 +42,6 @@
 | ExperienceStrategy | `engine/experience/experience_strategy.py`（骨架） |
 | ViewStrategy | 未实现（Game.tsx 内联） |
 | ThemeStrategy | `engine/experience/theme_strategy.py`（骨架） |
-| PromptStrategy | `engine/experience/prompt_strategy.py`（骨架） |
+| PromptStrategy | `engine/experience/prompt_strategy.py`（**Phase 2 已接入 builder**） |
 
 **规则**：Mode Layer 可不同；Shared System 必须一致。

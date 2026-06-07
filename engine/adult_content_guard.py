@@ -1,4 +1,8 @@
-"""Ensure adult-mode turns include intimate options (and optionally story markers)."""
+"""Compliance Layer — adult-mode turn quality guard (options fallback / validation).
+
+Not part of Mode Layer narrative perspective; last-resort enforcement when
+PromptStrategy Mode Context did not yield sufficient intimate options.
+"""
 
 from __future__ import annotations
 

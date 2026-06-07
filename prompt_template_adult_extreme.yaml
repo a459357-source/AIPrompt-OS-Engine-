@@ -1,4 +1,6 @@
-# ── Prompt Template (Adult Extreme — adult_mode + tier=extreme) ──
+# ── Prompt Template (Adult Extreme — DEPRECATED) ──
+# @deprecated Use unified prompt_template.yaml + PromptStrategy Mode Context.
+# Emergency rollback only: set PROMPTOS_USE_LEGACY_EXTREME_TEMPLATE=1
 
 system: |
   {{ADULT_SYSTEM_OVERRIDE}}

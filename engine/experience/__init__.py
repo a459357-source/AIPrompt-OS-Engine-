@@ -10,7 +10,7 @@ from engine.experience.experience_strategy import (
     is_adult,
     is_story,
 )
-from engine.experience.prompt_strategy import PromptStrategy, get_prompt_strategy
+from engine.experience.prompt_strategy import PromptStrategy, ModeContext, get_prompt_strategy
 from engine.experience.theme_strategy import ThemeStrategy, get_theme_strategy
 
 __all__ = [
@@ -18,6 +18,7 @@ __all__ = [
     "is_adult",
     "is_story",
     "PromptStrategy",
+    "ModeContext",
     "get_prompt_strategy",
     "ThemeStrategy",
     "get_theme_strategy",

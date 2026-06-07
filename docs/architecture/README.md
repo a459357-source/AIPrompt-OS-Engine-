@@ -31,4 +31,5 @@
 
 ## Phase 1 交付
 
-- [`ADR_FOUNDATION_REPORT.md`](ADR_FOUNDATION_REPORT.md) — experience_mode 兼容层与 Strategy 骨架说明
+- [`ADR_FOUNDATION_REPORT.md`](ADR_FOUNDATION_REPORT.md) — Phase 1 experience_mode 兼容层
+- [`PROMPT_UNIFIED_DESIGN.md`](PROMPT_UNIFIED_DESIGN.md) — Phase 2 统一 Prompt 架构（已实现）

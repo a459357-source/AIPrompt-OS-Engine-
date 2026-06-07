@@ -196,6 +196,8 @@ engine/experience/
 
 Phase 1 已完成 ADR-001 基础设施：**experience_mode 兼容层**、**Strategy 骨架**、**分类 enforcement 文档**、**reset/plot_state 一致性**。
 
-**暂停开发**，等待 Phase 2（Prompt Unified Architecture）评审后再继续。
+**暂停开发**，等待 Phase 3（UI ExperienceContext / `/api/experience`）评审。
 
-**不得提前进入**：Prompt 模板合并、adult_mode 删除、UI 重构。
+**Phase 2 已完成**（2026-06-08）：见 [`PROMPT_UNIFIED_DESIGN.md`](PROMPT_UNIFIED_DESIGN.md)。
+
+**不得提前进入**：UI 大重构、`adult_mode` 字段删除。

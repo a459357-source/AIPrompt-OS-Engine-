@@ -1,4 +1,6 @@
-"""Tests for adult extreme prompt template selection and rules."""
+"""Tests for adult extreme prompt — unified architecture + legacy rollback."""
+import os
+
 import config
 from engine.builder import build_prompt
 
@@ -10,21 +12,28 @@ def _enable_extreme():
     config.reload_app_behavior()
 
 
-def test_resolve_extreme_template_path():
+def test_resolve_unified_template_path_by_default():
     _enable_extreme()
+    path = config.resolve_prompt_template_path()
+    assert path.name == "prompt_template.yaml"
+    assert path.is_file()
+
+
+def test_resolve_extreme_template_path_legacy(monkeypatch):
+    _enable_extreme()
+    monkeypatch.setenv("PROMPTOS_USE_LEGACY_EXTREME_TEMPLATE", "1")
     path = config.resolve_prompt_template_path()
     assert path.name == "prompt_template_adult_extreme.yaml"
     assert path.is_file()
 
 
-def test_adult_system_override_has_supreme_rules_when_extreme_template():
+def test_adult_system_override_has_supreme_rules_when_extreme():
     _enable_extreme()
     override = config.adult_system_override_text()
     assert "禁止男男" in override
     rules = config.adult_extreme_content_rules_text()
     assert "每轮性内容铁律" in rules
     assert "禁止男男" in rules
-    assert "禁止男男" in override
 
 
 def test_vocabulary_domain_from_world_pack():
@@ -68,8 +77,25 @@ def test_validate_adult_story_content_extreme():
     assert any("亲密标记" in w for w in warnings)
 
 
-def test_build_prompt_uses_extreme_template():
+def test_build_prompt_unified_extreme_mode_context():
     _enable_extreme()
+    os.environ.pop("PROMPTOS_USE_LEGACY_EXTREME_TEMPLATE", None)
+    from engine import io_utils
+
+    io_utils.clear_cache()
+    system, user = build_prompt(current_choice=None)
+    assert "每轮性内容铁律" in system
+    assert "优先级" in system
+    assert "性内容进度" in user
+    assert "体验模式" in system
+    assert "objective_updates" in system
+    config.save_adult_mode(False)
+    config.reload_app_behavior()
+
+
+def test_build_prompt_legacy_extreme_template(monkeypatch):
+    _enable_extreme()
+    monkeypatch.setenv("PROMPTOS_USE_LEGACY_EXTREME_TEMPLATE", "1")
     from engine import io_utils
 
     io_utils.clear_cache()

@@ -119,14 +119,33 @@ PROMPT_TEMPLATE_PATH = bundled_asset("prompt_template.yaml")
 PROMPT_TEMPLATE_ADULT_EXTREME_PATH = bundled_asset("prompt_template_adult_extreme.yaml")
 
 
-def use_adult_extreme_template() -> bool:
-    """True when adult_mode is on and intensity tier is extreme."""
+def use_legacy_extreme_template_file() -> bool:
+    """Emergency rollback: use prompt_template_adult_extreme.yaml when set."""
+    return os.getenv("PROMPTOS_USE_LEGACY_EXTREME_TEMPLATE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def is_extreme_tier() -> bool:
+    """True when adult experience is active and intensity tier is extreme."""
     return bool(ADULT_MODE) and adult_intensity_tier() == "extreme"
 
 
+def use_adult_extreme_template() -> bool:
+    """True when extreme intensity tier is active (unified or legacy)."""
+    return is_extreme_tier()
+
+
 def resolve_prompt_template_path() -> Path:
-    """Pick default or adult-extreme prompt template."""
-    if use_adult_extreme_template() and PROMPT_TEMPLATE_ADULT_EXTREME_PATH.is_file():
+    """Pick unified base template, or legacy extreme yaml when rollback flag is on."""
+    if (
+        use_legacy_extreme_template_file()
+        and is_extreme_tier()
+        and PROMPT_TEMPLATE_ADULT_EXTREME_PATH.is_file()
+    ):
         return PROMPT_TEMPLATE_ADULT_EXTREME_PATH
     return PROMPT_TEMPLATE_PATH
 
@@ -1283,7 +1302,7 @@ def adult_system_override_text() -> str:
     if not ADULT_MODE:
         return ""
     supreme = adult_orientation_supreme_rules_text()
-    if use_adult_extreme_template():
+    if use_legacy_extreme_template_file() and is_extreme_tier():
         return supreme
     tier = adult_intensity_tier()
     if tier == "extreme":
@@ -1557,8 +1576,8 @@ def sample_char_a_name(world_pack: dict | None, session_state: dict | None) -> s
 
 
 def intimacy_escalation_hint(session_state: dict | None) -> str:
-    """Cross-turn intimacy escalation hint for extreme template."""
-    if not use_adult_extreme_template():
+    """Cross-turn intimacy escalation hint for extreme intensity tier."""
+    if not is_extreme_tier():
         return ""
     session = session_state or {}
     status = str(session.get("status") or "SETUP")
@@ -1578,8 +1597,8 @@ def intimacy_escalation_hint(session_state: dict | None) -> str:
 
 
 def adult_extreme_content_rules_text() -> str:
-    """Hard adult content rules injected into extreme template only."""
-    if not use_adult_extreme_template():
+    """Hard adult content rules for extreme intensity tier (unified Mode Context or legacy yaml)."""
+    if not is_extreme_tier():
         return ""
     return "\n".join([
         "【成人内容规则 — 强制】",
@@ -1607,8 +1626,8 @@ def adult_extreme_behavior_rules_text(
     vocabulary_domain: str = "",
     normalized_block: str = "",
 ) -> str:
-    """Behavior rules for extreme template (replaces generic AI_BEHAVIOR_RULES)."""
-    if not use_adult_extreme_template():
+    """Behavior rules for extreme tier (replaces generic AI_BEHAVIOR_RULES)."""
+    if not is_extreme_tier():
         return ""
     vocab = vocabulary_domain.strip() or vocabulary_domain_text(None)
     lines = [
@@ -1638,8 +1657,8 @@ def adult_extreme_behavior_rules_text(
 
 
 def adult_extreme_task_hint_text() -> str:
-    """Supplementary task hint for extreme template user prompt."""
-    if not use_adult_extreme_template():
+    """Supplementary task hint for extreme tier user prompt."""
+    if not is_extreme_tier():
         return ""
     return (
         " 若玩家选择含亲密/色情意味，须在本轮写满具体过程（动作、触感、对话、生理反应）；"
