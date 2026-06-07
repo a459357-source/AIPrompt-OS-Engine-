@@ -17,7 +17,7 @@ import { logger } from '@/lib/logger'
 import { parseOptionEffects, deltaArrow, type RelationHint } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
 import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS, MAX_WIDTH_OPTIONS } from '@/lib/settings'
-import { dispatchAdultModeChange, dispatchAdultThemeChange, dispatchVisualThemeChange, getAdultRelationLevel, applyUiTheme, applyAdultThemePack, type AdultThemeId, type VisualThemeId } from '@/lib/theme'
+import { dispatchAdultModeChange, dispatchAdultThemeChange, dispatchVisualThemeChange, getAdultRelationLevel, applyUiTheme, VISUAL_THEME_OPTIONS, VISUAL_THEME_LABELS, type AdultThemeId, type VisualThemeId } from '@/lib/theme'
 import { t, tTheme } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
@@ -422,8 +422,8 @@ export default function Game() {
   const [visualTheme, setVisualTheme] = useState<VisualThemeId>('desire')
   const [adultThemeOptions, setAdultThemeOptions] = useState<string[]>([])
   const [adultThemeLabels, setAdultThemeLabels] = useState<Record<string, string>>({})
-  const [visualThemeOptions, setVisualThemeOptions] = useState<string[]>([])
-  const [visualThemeLabels, setVisualThemeLabels] = useState<Record<string, string>>({})
+  const [visualThemeOptions, setVisualThemeOptions] = useState<string[]>([...VISUAL_THEME_OPTIONS])
+  const [visualThemeLabels, setVisualThemeLabels] = useState<Record<string, string>>({ ...VISUAL_THEME_LABELS })
   const [adultAdvancedOpen, setAdultAdvancedOpen] = useState(false)
   const [expressionStyle, setExpressionStyle] = useState('light_novel')
   const [expressionStyleOptions, setExpressionStyleOptions] = useState<string[]>(['literary', 'romantic', 'light_novel', 'direct'])
@@ -648,18 +648,24 @@ export default function Game() {
     setAdultProfileLabels(data.adult_profile_labels)
     setAdultProfileDescriptions(data.adult_profile_descriptions)
     const themeId = (data.adult_theme || 'deep_purple') as AdultThemeId
-    const visualId = (data.visual_theme || 'desire') as VisualThemeId
     setAdultTheme(themeId)
-    setVisualTheme(visualId)
     setAdultThemeOptions(data.adult_theme_options)
     setAdultThemeLabels(data.adult_theme_labels)
-    setVisualThemeOptions(data.visual_theme_options)
-    setVisualThemeLabels(data.visual_theme_labels)
-    if (data.adult_mode) {
-      applyUiTheme(visualId, themeId)
-      dispatchAdultThemeChange(themeId)
-      dispatchVisualThemeChange(visualId)
-    }
+    setVisualThemeOptions(data.visual_theme_options?.length ? data.visual_theme_options : [...VISUAL_THEME_OPTIONS])
+    setVisualThemeLabels({ ...VISUAL_THEME_LABELS, ...(data.visual_theme_labels ?? {}) })
+    setVisualTheme((prev) => {
+      const apiVisual = data.visual_theme
+      const next: VisualThemeId =
+        apiVisual === 'adult' || apiVisual === 'desire' ? apiVisual : prev
+      if (data.adult_mode) {
+        applyUiTheme(next, themeId)
+        dispatchAdultThemeChange(themeId)
+        dispatchVisualThemeChange(next)
+      } else {
+        applyUiTheme('normal')
+      }
+      return next
+    })
     setExpressionStyle(data.expression_style)
     setExpressionStyleOptions(data.expression_style_options)
     setExpressionStyleLabels(data.expression_style_labels)
@@ -745,7 +751,6 @@ export default function Game() {
     if (next.adultTheme != null) {
       const themeId = next.adultTheme as AdultThemeId
       setAdultTheme(themeId)
-      applyAdultThemePack(themeId)
       dispatchAdultThemeChange(themeId)
       if (adultMode) applyUiTheme(visualTheme as VisualThemeId, themeId)
     }
@@ -1541,7 +1546,7 @@ export default function Game() {
                       <QuickGenRow label="视觉主题" hint="Adult / Desire+ 为界面风格；配色方案可叠加切换">
                         <div className="flex flex-col gap-2 w-full">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            {visualThemeOptions.map((themeId) => (
+                            {(visualThemeOptions.length ? visualThemeOptions : VISUAL_THEME_OPTIONS).map((themeId) => (
                               <Button
                                 key={themeId}
                                 type="button"
@@ -1550,12 +1555,13 @@ export default function Game() {
                                 disabled={choosing}
                                 onClick={() => queueGenSettingsSave({ visualTheme: themeId }, true)}
                               >
-                                {visualThemeLabels[themeId] || themeId}
+                                {visualThemeLabels[themeId] || VISUAL_THEME_LABELS[themeId as VisualThemeId] || themeId}
                               </Button>
                             ))}
                           </div>
+                          {visualTheme === 'desire' && (
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-[10px] text-game-dim shrink-0 w-full">配色方案</span>
+                            <span className="text-[10px] text-game-dim shrink-0 w-full">配色方案（Desire+）</span>
                             {adultThemeOptions.map((themeId) => (
                               <Button
                                 key={themeId}
@@ -1569,6 +1575,7 @@ export default function Game() {
                               </Button>
                             ))}
                           </div>
+                          )}
                         </div>
                       </QuickGenRow>
 

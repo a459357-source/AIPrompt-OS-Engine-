@@ -78,6 +78,14 @@ export function isPrivateUiTheme(theme: string | null | undefined): boolean {
   return theme === 'adult' || theme === 'desire'
 }
 
+export function resolveAdultThemePack(
+  visualTheme: UiTheme,
+  pack?: AdultThemeId | null,
+): AdultThemeId | null {
+  if (visualTheme !== 'desire') return null
+  return pack ?? 'deep_purple'
+}
+
 export function applyAdultThemePack(themeId: AdultThemeId | null) {
   const root = document.documentElement
   if (themeId) {
@@ -89,8 +97,8 @@ export function applyAdultThemePack(themeId: AdultThemeId | null) {
 
 export function applyUiTheme(theme: UiTheme, adultThemePack?: AdultThemeId | null) {
   document.documentElement.setAttribute(UI_THEME_ATTR, theme)
-  if (isPrivateUiTheme(theme)) {
-    applyAdultThemePack(adultThemePack ?? 'deep_purple')
+  if (theme === 'adult' || theme === 'desire') {
+    applyAdultThemePack(resolveAdultThemePack(theme, adultThemePack))
     document.documentElement.style.setProperty('--story-max-width', '800px')
   } else {
     applyAdultThemePack(null)
