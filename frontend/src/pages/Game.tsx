@@ -23,6 +23,7 @@ import { t, tTheme } from '@/lib/i18n'
 import { dedupeCharactersByName } from '@/lib/characters'
 import { cn } from '@/lib/utils'
 import { suggestsAdultModeForOptions, suggestsAdultModeForText } from '@/lib/adultContentHint'
+import { AdultUnlockDialog } from '@/components/AdultUnlockDialog'
 
 function AdultModeSuggestBanner({
   onEnable,
@@ -335,6 +336,10 @@ export default function Game() {
   const [stylePreference, setStylePreference] = useState('balanced')
   const [repetitionCheck, setRepetitionCheck] = useState('standard')
   const [adultMode, setAdultMode] = useState(false)
+  const [adultUnlocked, setAdultUnlocked] = useState(false)
+  const [adultUnlockOpen, setAdultUnlockOpen] = useState(false)
+  const [adultUnlockError, setAdultUnlockError] = useState('')
+  const [adultUnlockSaving, setAdultUnlockSaving] = useState(false)
   const [adultProfile, setAdultProfile] = useState('balanced')
   const [adultProfileOptions, setAdultProfileOptions] = useState<string[]>(['story_first', 'balanced', 'adult_first'])
   const [adultProfileLabels, setAdultProfileLabels] = useState<Record<string, string>>({})
@@ -569,6 +574,7 @@ export default function Game() {
     setStylePreference(data.style_preference)
     setRepetitionCheck(data.repetition_check)
     setAdultMode(data.adult_mode)
+    setAdultUnlocked(!!data.adult_unlocked)
     dispatchAdultModeChange(data.adult_mode)
     setAdultProfile(data.adult_profile)
     setAdultProfileOptions(data.adult_profile_options)
@@ -788,6 +794,11 @@ export default function Game() {
   }, [normalizeGenPatch, flushGenSettings])
 
   const enableAdultModeFromHint = useCallback(async () => {
+    if (!adultUnlocked) {
+      setAdultUnlockError('')
+      setAdultUnlockOpen(true)
+      return
+    }
     try {
       const saved = await updateGameGenSettings({ adultMode: true })
       applyGenSettings(saved)
@@ -795,6 +806,22 @@ export default function Game() {
       setSupplementAdultHint(false)
     } catch (e) {
       logger.error('Game', 'Enable adult mode from hint failed', { error: String(e) })
+    }
+  }, [adultUnlocked, applyGenSettings])
+
+  const submitAdultUnlockFromHint = useCallback(async (key: string) => {
+    setAdultUnlockSaving(true)
+    setAdultUnlockError('')
+    try {
+      const saved = await updateGameGenSettings({ adultUnlockKey: key, adultMode: true })
+      applyGenSettings(saved)
+      if (saved.options?.length) setOptions(saved.options)
+      setSupplementAdultHint(false)
+      setAdultUnlockOpen(false)
+    } catch (e) {
+      setAdultUnlockError(e instanceof Error ? e.message : '解锁失败')
+    } finally {
+      setAdultUnlockSaving(false)
     }
   }, [applyGenSettings])
 
@@ -2103,6 +2130,14 @@ export default function Game() {
       {genSettingsSaving && (
         <GameBusyOverlay message="正在保存快捷设置…" />
       )}
+
+      <AdultUnlockDialog
+        open={adultUnlockOpen}
+        saving={adultUnlockSaving}
+        error={adultUnlockError}
+        onClose={() => setAdultUnlockOpen(false)}
+        onSubmit={submitAdultUnlockFromHint}
+      />
     </div>
   )
 }

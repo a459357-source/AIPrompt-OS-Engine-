@@ -31,6 +31,9 @@ from config import (
     reload_repetition_check,
     save_adult_mode,
     reload_adult_mode,
+    is_adult_unlocked,
+    reload_adult_unlock_key,
+    save_adult_unlock_key,
     save_adult_profile,
     reload_adult_profile,
     save_adult_theme,
@@ -69,6 +72,7 @@ from config import (
     save_context_settings,
     reload_context_settings,
 )
+from engine.adult_unlock import mask_unlock_key
 
 router = APIRouter(tags=["settings"])
 gen_settings_logger = logging.getLogger("gen_settings")
@@ -187,6 +191,10 @@ def game_settings_payload() -> dict:
         "style_preference": config.STYLE_PREFERENCE,
         "repetition_check": config.REPETITION_CHECK,
         "adult_mode": config.ADULT_MODE,
+        "adult_unlocked": is_adult_unlocked(),
+        "adult_unlock_key_masked": (
+            mask_unlock_key(reload_adult_unlock_key()) if is_adult_unlocked() else ""
+        ),
         "adult_profile": config.ADULT_PROFILE,
         "adult_profile_options": ADULT_PROFILE_OPTIONS,
         "adult_profile_labels": ADULT_PROFILE_LABELS,
@@ -217,6 +225,7 @@ def apply_game_gen_settings(
     style_preference: str | None = None,
     repetition_check: str | None = None,
     adult_mode: bool | None = None,
+    adult_unlock_key: str | None = None,
     adult_profile: str | None = None,
     adult_theme: str | None = None,
     visual_theme: str | None = None,
@@ -252,6 +261,8 @@ def apply_game_gen_settings(
         save_style_preference(style_preference)
     if repetition_check is not None:
         save_repetition_check(repetition_check)
+    if adult_unlock_key is not None:
+        save_adult_unlock_key(adult_unlock_key)
     adult_mode_changed = False
     if adult_mode is not None:
         prev_adult = config.ADULT_MODE
@@ -268,7 +279,8 @@ def apply_game_gen_settings(
     if content_weights is not None:
         save_content_weights(content_weights)
     if any(x is not None for x in (option_count, narrative_pov, style_preference, repetition_check,
-                                    adult_mode, adult_profile, adult_theme, visual_theme, expression_style, content_weights)):
+                                    adult_unlock_key, adult_mode, adult_profile, adult_theme, visual_theme,
+                                    expression_style, content_weights)):
         reload_app_behavior()
     ensure_story_length_context_sync(force_compress=story_length is not None)
     after = _gen_settings_snapshot()

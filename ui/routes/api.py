@@ -546,6 +546,7 @@ async def api_set_game_settings(
     style_preference: str | None = Form(default=None),
     repetition_check: str | None = Form(default=None),
     adult_mode: str | None = Form(default=None),
+    adult_unlock_key: str | None = Form(default=None),
     adult_profile: str | None = Form(default=None),
     adult_theme: str | None = Form(default=None),
     visual_theme: str | None = Form(default=None),
@@ -569,22 +570,26 @@ async def api_set_game_settings(
         except Exception:
             pass
 
-    payload = apply_game_gen_settings(
-        story_length=story_length,
-        temperature=temperature,
-        top_p=top_p,
-        compress_threshold=compress_threshold,
-        option_count=option_count,
-        narrative_pov=narrative_pov,
-        style_preference=style_preference,
-        repetition_check=repetition_check,
-        adult_mode=_adult_mode,
-        adult_profile=adult_profile,
-        adult_theme=adult_theme,
-        visual_theme=visual_theme,
-        expression_style=expression_style,
-        content_weights=_content_weights,
-    )
+    try:
+        payload = apply_game_gen_settings(
+            story_length=story_length,
+            temperature=temperature,
+            top_p=top_p,
+            compress_threshold=compress_threshold,
+            option_count=option_count,
+            narrative_pov=narrative_pov,
+            style_preference=style_preference,
+            repetition_check=repetition_check,
+            adult_mode=_adult_mode,
+            adult_unlock_key=adult_unlock_key,
+            adult_profile=adult_profile,
+            adult_theme=adult_theme,
+            visual_theme=visual_theme,
+            expression_style=expression_style,
+            content_weights=_content_weights,
+        )
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     return JSONResponse({"ok": True, **payload})
 
 

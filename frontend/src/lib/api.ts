@@ -646,6 +646,8 @@ export interface GameGenSettings {
   style_preference: string
   repetition_check: string
   adult_mode: boolean
+  adult_unlocked: boolean
+  adult_unlock_key_masked: string
   adult_profile: string
   adult_profile_options: string[]
   adult_profile_labels: Record<string, string>
@@ -701,6 +703,8 @@ const GAME_GEN_FALLBACK: GameGenSettings = {
   style_preference: 'balanced',
   repetition_check: 'standard',
   adult_mode: false,
+  adult_unlocked: false,
+  adult_unlock_key_masked: '',
   adult_profile: 'balanced',
   adult_profile_options: ['story_first', 'balanced', 'adult_first'],
   adult_profile_labels: { story_first: '剧情优先', balanced: '平衡模式', adult_first: '成人优先' },
@@ -756,6 +760,8 @@ function parseGameGenSettings(data: Partial<GameGenSettings>): GameGenSettings {
     style_preference: data.style_preference ?? GAME_GEN_FALLBACK.style_preference,
     repetition_check: data.repetition_check ?? GAME_GEN_FALLBACK.repetition_check,
     adult_mode: data.adult_mode ?? GAME_GEN_FALLBACK.adult_mode,
+    adult_unlocked: data.adult_unlocked ?? GAME_GEN_FALLBACK.adult_unlocked,
+    adult_unlock_key_masked: data.adult_unlock_key_masked ?? GAME_GEN_FALLBACK.adult_unlock_key_masked,
     adult_profile: data.adult_profile ?? GAME_GEN_FALLBACK.adult_profile,
     adult_profile_options: data.adult_profile_options ?? GAME_GEN_FALLBACK.adult_profile_options,
     adult_profile_labels: data.adult_profile_labels ?? GAME_GEN_FALLBACK.adult_profile_labels,
@@ -794,6 +800,7 @@ export async function updateGameGenSettings(patch: {
   stylePreference?: string
   repetitionCheck?: string
   adultMode?: boolean
+  adultUnlockKey?: string
   adultProfile?: string
   adultTheme?: string
   visualTheme?: string
@@ -810,6 +817,7 @@ export async function updateGameGenSettings(patch: {
   if (patch.stylePreference != null) fd.append('style_preference', patch.stylePreference)
   if (patch.repetitionCheck != null) fd.append('repetition_check', patch.repetitionCheck)
   if (patch.adultMode != null) fd.append('adult_mode', patch.adultMode ? 'true' : 'false')
+  if (patch.adultUnlockKey != null) fd.append('adult_unlock_key', patch.adultUnlockKey)
   if (patch.adultProfile != null) fd.append('adult_profile', patch.adultProfile)
   if (patch.adultTheme != null) fd.append('adult_theme', patch.adultTheme)
   if (patch.visualTheme != null) fd.append('visual_theme', patch.visualTheme)

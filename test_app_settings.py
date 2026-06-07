@@ -39,7 +39,15 @@ def test_ai_behavior_rules_contains_option_count():
     assert "3 个 options" in text
 
 
-def test_adult_mode_high_weight_prompts_explicit_content():
+def test_adult_mode_high_weight_prompts_explicit_content(tmp_path, monkeypatch):
+    settings_path = tmp_path / "apikey.json"
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(config, "APIKEY_PATH", settings_path)
+    from engine.adult_unlock import generate_unlock_key, write_secret
+
+    write_secret()
+    key = generate_unlock_key()
+    config.save_adult_unlock_key(key)
     config.save_adult_mode(True)
     config.save_adult_profile("adult_first")
     config.save_content_weights({"story": 0, "romance": 0, "adult": 100})

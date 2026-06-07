@@ -30,6 +30,7 @@ function detectActiveProfile(weights: ContentWeights, presets: Record<string, Co
 
 export type ContentPreferencesPatch = {
   adultMode?: boolean
+  adultUnlockKey?: string
   adultProfile?: string
   adultTheme?: string
   visualTheme?: string
@@ -41,6 +42,8 @@ export function useContentPreferences() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [adultMode, setAdultMode] = useState(false)
+  const [adultUnlocked, setAdultUnlocked] = useState(false)
+  const [adultUnlockKeyMasked, setAdultUnlockKeyMasked] = useState('')
   const [adultProfile, setAdultProfile] = useState('balanced')
   const [adultProfileOptions, setAdultProfileOptions] = useState<string[]>(['story_first', 'balanced', 'adult_first'])
   const [adultProfileLabels, setAdultProfileLabels] = useState<Record<string, string>>({})
@@ -66,6 +69,8 @@ export function useContentPreferences() {
       ? data.visual_theme
       : 'desire') as VisualThemeId
     setAdultMode(mode)
+    setAdultUnlocked(!!data.adult_unlocked)
+    setAdultUnlockKeyMasked(data.adult_unlock_key_masked || '')
     setAdultProfile(data.adult_profile)
     setAdultProfileOptions(data.adult_profile_options)
     setAdultProfileLabels(data.adult_profile_labels)
@@ -160,10 +165,29 @@ export function useContentPreferences() {
     saveTimerRef.current = setTimeout(() => void flushSave(), 400)
   }, [adultMode, adultTheme, visualTheme, presetWeights, flushSave])
 
+  const unlockAndEnableAdult = useCallback(async (key: string) => {
+    setSaving(true)
+    try {
+      const saved = await updateGameGenSettings({
+        adultUnlockKey: key,
+        adultMode: true,
+      })
+      applySettings(saved)
+      dispatchContentPreferencesSaved({
+        options: saved.options,
+        options_regenerated: saved.options_regenerated,
+      })
+    } finally {
+      setSaving(false)
+    }
+  }, [applySettings])
+
   return {
     loading,
     saving,
     adultMode,
+    adultUnlocked,
+    adultUnlockKeyMasked,
     adultProfile,
     adultProfileOptions,
     adultProfileLabels,
@@ -180,5 +204,6 @@ export function useContentPreferences() {
     contentWeights,
     activeAdultProfile,
     savePreferences,
+    unlockAndEnableAdult,
   }
 }

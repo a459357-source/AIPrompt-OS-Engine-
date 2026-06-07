@@ -861,11 +861,54 @@ def reload_auto_export() -> str:
 
 # ── Content preference (adult mode / expression style / weights) ────
 
+def _load_adult_unlock_key() -> str:
+    from engine.adult_unlock import normalize_unlock_key
+
+    return normalize_unlock_key(_read_settings().get("adult_unlock_key", ""))
+
+
+def is_adult_unlocked() -> bool:
+    import os
+
+    if os.getenv("PROMPTOS_SKIP_ADULT_UNLOCK") == "1":
+        return True
+    from engine.adult_unlock import verify_unlock_key
+
+    stored = _load_adult_unlock_key()
+    return bool(stored) and verify_unlock_key(stored)
+
+
+def save_adult_unlock_key(key: str) -> None:
+    from engine.adult_unlock import normalize_unlock_key, verify_unlock_key
+
+    cleaned = normalize_unlock_key(key)
+    if not cleaned:
+        raise ValueError("请输入成人模式解锁密钥")
+    if not verify_unlock_key(cleaned):
+        raise ValueError("成人模式解锁密钥无效，请检查后重试")
+    _update_settings(adult_unlock_key=cleaned)
+
+
+def clear_adult_unlock_key() -> None:
+    data = _read_settings()
+    data.pop("adult_unlock_key", None)
+    data["adult_mode"] = False
+    _write_settings(data)
+
+
+def reload_adult_unlock_key() -> str:
+    return _load_adult_unlock_key()
+
+
 def _load_adult_mode() -> bool:
+    if not is_adult_unlocked():
+        return False
     return bool(_read_settings().get("adult_mode", DEFAULT_ADULT_MODE))
 
 
 def save_adult_mode(enabled: bool) -> None:
+    if enabled and not is_adult_unlocked():
+        raise ValueError("请先输入有效的成人模式解锁密钥")
     _update_settings(adult_mode=bool(enabled))
 
 
