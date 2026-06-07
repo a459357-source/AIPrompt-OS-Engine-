@@ -106,6 +106,10 @@ export default function NewStory() {
       artifacts: [] as { name: string; type: 'personal'|'faction'|'world'; description: string; ownerType: 'character'|'faction'|'location'|'none'; ownerId: string; importance: number; abilities: string[]; tags: string[] }[],
       factions: [] as { name: string; type: string; description: string; goals: string[]; resources: string[]; controlledTerritories: string[]; subordinateOrganizations: string[]; keyAssets: string[]; power: { military: number; economic: number; political: number; technology: number }; influence: number; relation_to_player: string; leader: string }[],
       customStats: [] as { key: string; label: string; max: number }[],
+      characterRelations: {} as Record<string, {
+        relationshipType: string; affection: number; trust: number; respect: number;
+        dependence: number; hostility: number; attraction: number; tags: string[];
+      }>,
     },
   })
 
@@ -268,7 +272,7 @@ export default function NewStory() {
     fd.append('main_goal', data.main_goal)
     fd.append('chars_json', JSON.stringify(data.characters))
     fd.append('rel_system', JSON.stringify({ stages: data.rel_stages, affection: data.rel_affection }))
-    fd.append('custom_rules', JSON.stringify({ stats: data.customStats || [], stages: data.rel_stages }))
+    fd.append('custom_rules', JSON.stringify({ stats: data.customStats || [], stages: data.rel_stages, characterRelations: data.characterRelations || {} }))
     fd.append('artifacts_json', JSON.stringify(data.artifacts || []))
     fd.append('factions_json', JSON.stringify(data.factions || []))
     showStatus('正在创建故事…', 'loading')
@@ -591,54 +595,77 @@ export default function NewStory() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Who's involved */}
+                {/* Who's involved — 每个NPC与主角的独立多维关系 */}
                 {(() => {
                   const allChars = watch('characters') || []
                   const mainChar = allChars.find((c: { isMain?: boolean }) => c.isMain) || allChars[0]
                   const npcs = allChars.filter((c: { isMain?: boolean }) => !c.isMain && c.name)
+                  const rels = getValues('characterRelations') || {}
+                  const DIMS = [
+                    ['❤️好感', 'affection'], ['🤝信任', 'trust'], ['🙏尊重', 'respect'],
+                    ['🔗依赖', 'dependence'], ['⚔️敌意', 'hostility'], ['💫吸引', 'attraction'],
+                  ]
+                  const REL_TYPES = ['friend','lover','family','teacher','rival','ally','enemy']
+                  const REL_LABELS: Record<string,string> = {friend:'朋友',lover:'恋人',family:'家人',teacher:'师徒',rival:'对手',ally:'盟友',enemy:'敌人'}
+
+                  if (npcs.length === 0) return <p className="text-xs text-game-dim">添加 NPC 后自动显示关系对</p>
+
                   return (
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] text-game-muted">💞 关系对象</span>
-                      {npcs.length > 0 ? npcs.map((c: { name: string }) => (
-                        <div key={c.name} className="flex items-center gap-2 text-sm">
-                          <span className="font-bold text-game-accent">{mainChar?.name || '主角'}</span>
-                          <span className="text-game-accent">↔</span>
-                          <Badge variant="primary" size="sm">{c.name}</Badge>
-                        </div>
-                      )) : (
-                        <p className="text-xs text-game-dim">添加 NPC 后自动显示关系对</p>
-                      )}
+                    <div className="space-y-3">
+                      {npcs.map((c: { name: string }) => {
+                        const r = rels[c.name] || { relationshipType:'friend', affection:50, trust:50, respect:50, dependence:50, hostility:30, attraction:50, tags:[] as string[] }
+                        const update = (k: string, v: unknown) => {
+                          const current = getValues('characterRelations') || {}
+                          current[c.name] = { ...(current[c.name] || r), [k]: v }
+                          setValue('characterRelations', {...current})
+                        }
+                        return (
+                          <div key={c.name} className="bg-game-surface border border-game-border rounded-md p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="font-bold text-game-accent">{mainChar?.name || '主角'}</span>
+                                <span className="text-game-accent">↔</span>
+                                <span className="font-bold text-game-primary">{c.name}</span>
+                              </div>
+                              <select
+                                value={r.relationshipType}
+                                onChange={(e) => update('relationshipType', e.target.value)}
+                                className="bg-game-bg border border-game-border rounded-md px-2 py-0.5 text-[10px] text-game-text"
+                              >
+                                {REL_TYPES.map(t => <option key={t} value={t}>{REL_LABELS[t]}</option>)}
+                              </select>
+                            </div>
+                            <div className="grid grid-cols-3 gap-x-3 gap-y-1">
+                              {DIMS.map(([label, key]) => {
+                                const val = (r as Record<string,number>)[key] ?? 50
+                                const color = key === 'hostility' ? 'game-danger' : 'game-accent'
+                                return (
+                                  <div key={key} className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-game-dim w-12 shrink-0">{label}</span>
+                                    <input
+                                      type="range"
+                                      min={0} max={100} value={val}
+                                      onChange={(e) => update(key, parseInt(e.target.value))}
+                                      className="flex-1 h-1 accent-game-accent"
+                                    />
+                                    <span className="text-[10px] text-game-muted w-6 text-right tabular-nums">{val}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            <TagInput
+                              value={r.tags || []}
+                              onChange={(tags) => update('tags', tags)}
+                              presets={['青梅竹马','救命恩人','秘密共享','竞争意识','单向暗恋','互相试探','过去纠葛','命运绑定']}
+                              placeholder="关系标签…"
+                              color="accent"
+                            />
+                          </div>
+                        )
+                      })}
                     </div>
                   )
                 })()}
-
-                <Separator />
-
-                {/* Multidimensional relationship model */}
-                <div className="bg-game-surface border border-game-border rounded-md p-3 space-y-2">
-                  <span className="text-[10px] text-game-muted">📐 多维关系模型（替代单一好感度+固定阶段）</span>
-                  <div className="grid grid-cols-3 gap-1 text-[10px]">
-                    {[
-                      ['❤️ 好感', 'affection'],
-                      ['🤝 信任', 'trust'],
-                      ['🙏 尊重', 'respect'],
-                      ['🔗 依赖', 'dependence'],
-                      ['⚔️ 敌意', 'hostility'],
-                      ['💫 吸引', 'attraction'],
-                    ].map(([label, key]) => (
-                      <div key={key} className="flex items-center gap-1">
-                        <span className="text-game-dim w-12">{label}</span>
-                        <div className="flex-1 h-1.5 bg-game-border rounded-full overflow-hidden">
-                          <div className="h-full bg-game-accent/60 rounded-full" style={{ width: '50%' }} />
-                        </div>
-                        <span className="text-game-dim w-6 text-right">50</span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-game-dim mt-1">
-                    关系由类型（家人/朋友/恋人/师徒/对手/盟友/敌人）+ 六维数值 + 标签 + 关键经历共同定义。AI 优先参考关键经历和关系标签。
-                  </p>
-                </div>
 
                 {/* Current custom stats */}
                 {(() => {
