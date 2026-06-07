@@ -765,31 +765,35 @@ export default function Game() {
     return next
   }, [storyLengthMin, storyLengthMax, contextTokens, maxOutputTokens, adultTheme, visualTheme, presetWeights])
 
-  const flushGenSettings = useCallback(async () => {
+  const flushGenSettings = useCallback(async (silent = false) => {
     const pending = pendingGenPatchRef.current
     pendingGenPatchRef.current = {}
     if (!Object.keys(pending).length) {
       markGenSettingsSaved()
       return
     }
-    setGenSettingsSaving(true)
+    if (!silent) setGenSettingsSaving(true)
     setGenSettingsSaveError('')
     try {
       logger.info('Game', 'Saving gen settings', pending)
       const saved = await updateGameGenSettings(pending)
-      applyGenSettings(saved)
-      logger.info('Game', 'Gen settings saved', {
-        story_length: saved.story_length,
-        max_tokens: saved.max_tokens,
-        compress_threshold: saved.compress_threshold,
-      })
-      markGenSettingsSaved()
+      if (silent) {
+        markGenSettingsSaved()
+      } else {
+        applyGenSettings(saved)
+        logger.info('Game', 'Gen settings saved', {
+          story_length: saved.story_length,
+          max_tokens: saved.max_tokens,
+          compress_threshold: saved.compress_threshold,
+        })
+        markGenSettingsSaved()
+      }
     } catch (e) {
       const msg = formatFetchError(e)
       logger.error('Game', 'Save gen settings failed', { error: msg })
       if (mountedRef.current) setGenSettingsSaveError(msg)
     } finally {
-      if (mountedRef.current) setGenSettingsSaving(false)
+      if (!silent && mountedRef.current) setGenSettingsSaving(false)
     }
   }, [applyGenSettings, markGenSettingsSaved])
 
@@ -808,12 +812,12 @@ export default function Game() {
     visualTheme?: string
     expressionStyle?: string
     contentWeights?: ContentWeights
-  }, immediate = false) => {
+  }, immediate = false, silent = false) => {
     const normalized = normalizeGenPatch(patch)
     pendingGenPatchRef.current = { ...pendingGenPatchRef.current, ...normalized }
 
     const scheduleFlush = () => {
-      saveQueueRef.current = saveQueueRef.current.then(() => flushGenSettings())
+      saveQueueRef.current = saveQueueRef.current.then(() => flushGenSettings(silent))
     }
 
     if (genSettingsTimerRef.current) {
@@ -824,7 +828,7 @@ export default function Game() {
       scheduleFlush()
       return
     }
-    genSettingsTimerRef.current = setTimeout(scheduleFlush, 600)
+    genSettingsTimerRef.current = setTimeout(() => scheduleFlush(), 600)
   }, [normalizeGenPatch, flushGenSettings])
 
   const previewMaxTokens = useMemo(() => {
@@ -1553,29 +1557,35 @@ export default function Game() {
                                 size="xs"
                                 variant={visualTheme === themeId ? 'primary' : 'ghost'}
                                 disabled={choosing}
-                                onClick={() => queueGenSettingsSave({ visualTheme: themeId }, true)}
+                                onClick={() => queueGenSettingsSave({ visualTheme: themeId }, true, true)}
                               >
                                 {visualThemeLabels[themeId] || VISUAL_THEME_LABELS[themeId as VisualThemeId] || themeId}
                               </Button>
                             ))}
                           </div>
-                          {visualTheme === 'desire' && (
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-[10px] text-game-dim shrink-0 w-full">配色方案（Desire+）</span>
+                          <div className={cn(
+                            'flex flex-wrap items-center gap-1.5 transition-opacity',
+                            visualTheme === 'desire' ? 'opacity-100' : 'opacity-40 pointer-events-none',
+                          )}>
+                            <span className="text-[10px] text-game-dim shrink-0 w-full">
+                              配色方案（Desire+）
+                              {visualTheme !== 'desire' && (
+                                <span className="ml-1 text-game-muted">— 切换至 Desire+ 后可选</span>
+                              )}
+                            </span>
                             {adultThemeOptions.map((themeId) => (
                               <Button
                                 key={themeId}
                                 type="button"
                                 size="xs"
                                 variant={adultTheme === themeId ? 'primary' : 'ghost'}
-                                disabled={choosing}
-                                onClick={() => queueGenSettingsSave({ adultTheme: themeId }, true)}
+                                disabled={choosing || visualTheme !== 'desire'}
+                                onClick={() => queueGenSettingsSave({ adultTheme: themeId }, true, true)}
                               >
                                 {adultThemeLabels[themeId] || themeId}
                               </Button>
                             ))}
                           </div>
-                          )}
                         </div>
                       </QuickGenRow>
 
