@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { StatusToast } from '@/components/StatusToast'
-import { getGameState, nextTurn, getHistory, type HistoryTurn } from '@/lib/api'
+import { getGameState, startGame, nextTurn, getHistory, type HistoryTurn } from '@/lib/api'
 import { logger } from '@/lib/logger'
+import { parseRelationHints } from '@/lib/relationHints'
 
 
 interface CharInfo {
@@ -32,6 +33,40 @@ interface FactionInfo {
   subordinateOrganizations?: string[]
   keyAssets?: string[]
   power?: { military: number; economic: number; political: number; technology: number }
+}
+
+function RelationChips({ text }: { text: string }) {
+  const hints = parseRelationHints(text)
+  if (!hints.length) return null
+  return (
+    <div className="flex flex-wrap gap-1.5 ml-5 mt-1">
+      {hints.map((h, j) => (
+        <span
+          key={j}
+          className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded border ${
+            h.tone === 'up'
+              ? 'border-game-success/40 text-game-success bg-game-success/10'
+              : h.tone === 'down'
+                ? 'border-game-danger/40 text-game-danger bg-game-danger/10'
+                : h.tone === 'new'
+                  ? 'border-game-accent/40 text-game-accent bg-game-accent/10'
+                  : 'border-game-border text-game-muted'
+          }`}
+        >
+          <span>{h.icon}</span>
+          <span>{h.name}</span>
+          {h.tone !== 'new' && (
+            <span className="text-game-dim">{h.metricLabel}</span>
+          )}
+          {h.tone !== 'new' && (
+            <span className="font-bold tabular-nums">
+              {h.delta > 0 ? '+' : ''}{h.delta}
+            </span>
+          )}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 function AffectionBar({ value }: { value: number; name?: string }) {
@@ -69,6 +104,29 @@ export default function Game() {
   const [showConsequences, setShowConsequences] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState<HistoryTurn[]>([])
+  const storyScrollRef = useRef<HTMLDivElement>(null)
+
+  const applyTurnData = useCallback((data: {
+    story: string
+    options?: string[]
+    state: Record<string, unknown>
+  }) => {
+    setStory(data.story)
+    setOptions(data.options || [])
+    const st = data.state
+    setTurn((st.turn as number) || 1)
+    setStatus((st.status as string) || 'SETUP')
+    setScene((st.scene as string) || '')
+    const chars = st.characters as Record<string, CharInfo> | undefined
+    if (chars) {
+      setCharacters(Object.values(chars).map((c) => ({
+        ...c,
+        affection: c.affection ?? c.trust_pct ?? 50,
+      })))
+    }
+    const factionsData = st.factions as FactionInfo[] | undefined
+    if (factionsData) setFactions(factionsData)
+  }, [])
 
   const loadGame = useCallback(async () => {
     setLoading(true)
@@ -77,31 +135,48 @@ export default function Game() {
     try {
       const data = await getGameState()
       if (data.error) { setError(data.error); setLoading(false); return }
-      setStory(data.story)
-      setOptions(data.options || [])
-      const st = data.state as Record<string, unknown>
-      setTurn((st.turn as number) || 1)
-      setStatus((st.status as string) || 'SETUP')
-      setScene((st.scene as string) || '')
-      const chars = st.characters as Record<string, CharInfo> | undefined
-      if (chars) {
-        setCharacters(Object.values(chars).map((c) => ({
-          ...c,
-          affection: c.affection ?? c.trust_pct ?? 50,
-        })))
+
+      if (data.not_started) {
+        logger.info('Game', 'Game not started — calling startGame()')
+        const started = await startGame()
+        if (started.error || !started.story) {
+          setError(started.error || '开篇生成失败')
+          setLoading(false)
+          return
+        }
+        applyTurnData({
+          story: started.story,
+          options: started.options,
+          state: started.state as Record<string, unknown>,
+        })
+        logger.info('Game', 'Opening scene generated')
+        setLoading(false)
+        return
       }
-      const factionsData = st.factions as FactionInfo[] | undefined
-      if (factionsData) setFactions(factionsData)
-      logger.info('Game', `Loaded: turn=${st.turn}`)
+
+      applyTurnData({
+        story: data.story,
+        options: data.options,
+        state: data.state as Record<string, unknown>,
+      })
+      logger.info('Game', `Loaded: turn=${(data.state as Record<string, unknown>).turn}`)
     } catch (e) {
       const msg = (e as Error).message || String(e)
       logger.error('Game', 'Load failed', { error: msg })
       setError(msg)
     }
     setLoading(false)
-  }, [])
+  }, [applyTurnData])
 
   useEffect(() => { loadGame() }, [loadGame])
+
+  // 新正文生成后滚回顶部，方便从开头阅读
+  useEffect(() => {
+    if (!story) return
+    const el = storyScrollRef.current
+    if (!el) return
+    requestAnimationFrame(() => { el.scrollTop = 0 })
+  }, [turn, story])
 
   const handleChoice = useCallback(async (choice: string) => {
     setChoosing(true)
@@ -297,7 +372,7 @@ export default function Game() {
             )}
 
             {/* Story — scrollable */}
-            <div className="flex-1 overflow-y-auto min-h-0 space-y-4">
+            <div ref={storyScrollRef} className="flex-1 overflow-y-auto min-h-0 space-y-4">
             <Card>
               <CardContent className="pt-6 md:px-8">
                 <motion.div key={turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -348,7 +423,7 @@ export default function Game() {
                     const relation = segments[2] || ''
                     return (
                       <Button key={`${turn}-${i}`} variant="outline" disabled={choosing}
-                        onClick={() => handleChoice(action)}
+                        onClick={() => handleChoice(String.fromCharCode(65 + i))}
                         className="w-full justify-start text-left h-auto py-3 px-4 hover:bg-game-primary/10 hover:border-game-primary/50 transition-all"
                       >
                         <div className="flex flex-col gap-1 min-w-0">
@@ -362,19 +437,7 @@ export default function Game() {
                           {showConsequences && consequence && (
                             <p className="text-sm text-game-muted ml-5 pl-0.5">{consequence.trim()}</p>
                           )}
-                          {showConsequences && relation && (
-                            <p className="text-sm ml-5 pl-0.5">
-                              💞 {relation.trim().split(/[,，、]/).map((r, j) => {
-                                const t = r.trim()
-                                if (!t) return null
-                                const isUp = /[↑➕+]/g.test(t)
-                                const isDown = /[↓➖-]/g.test(t)
-                                const isNew = /新人|new|\+/i.test(t)
-                                const color = isDown ? 'text-game-danger' : isNew ? 'text-game-accent' : isUp ? 'text-game-success' : 'text-game-muted'
-                                return <span key={j} className={color}>{t}{j < relation.trim().split(/[,，、]/).filter(Boolean).length - 1 ? '、' : ''}</span>
-                              })}
-                            </p>
-                          )}
+                          {relation && <RelationChips text={relation} />}
                         </div>
                       </Button>
                     )

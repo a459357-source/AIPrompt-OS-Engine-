@@ -24,9 +24,18 @@ def _get_world_title() -> tuple[str, str]:
     except Exception:
         return "", ""
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("/")
 async def index():
-    """Show the current story state with option buttons."""
+    """Redirect root to the React SPA (legacy HTML removed from /)."""
+    if config.has_bundled_frontend():
+        from fastapi.responses import FileResponse
+        return FileResponse(config.FRONTEND_DIST / "index.html")
+    return RedirectResponse(url=config.frontend_url(), status_code=302)
+
+
+@router.get("/legacy", response_class=HTMLResponse)
+async def legacy_index():
+    """Legacy HTML game page (kept for debugging / bookmark compat)."""
     try:
         state = io_utils.read_yaml(config.SESSION_STATE_PATH)
     except Exception:
@@ -36,17 +45,14 @@ async def index():
     status = state.get("status", "SETUP")
     scene = state.get("scene", "初始")
 
-    # Get last turn's options from session history (clean, no parsing needed)
     history = state.get("history", [])
     if history:
         last = history[-1]
         story = last.get("story", last.get("summary", ""))
         options = last.get("options", [])
     else:
-        # No history — auto-generate the opening scene
         result = step(None)
         if result is not None:
-            # Re-read state after step() modified it
             try:
                 state = io_utils.read_yaml(config.SESSION_STATE_PATH)
             except Exception:
@@ -57,7 +63,6 @@ async def index():
             story = result["story"]
             options = result["options"]
         else:
-            # AI generation failed — show static fallback
             world_title = _get_world_title()[0] or "Galgame"
             world_scene = scene or "初始场景"
             story = f"欢迎来到 **{world_title}**。\n\n当前场景：{world_scene}\n\n❌ AI 生成失败，请检查 API Key 后刷新页面。"
@@ -200,7 +205,7 @@ async def load_game(slot: str = Query("autosave", min_length=1)):
         return JSONResponse({"error": "读取存档失败"}, status_code=500)
 
     # Redirect to main page to show loaded state
-    return RedirectResponse(url="/", status_code=303)
+    return RedirectResponse(url=config.frontend_url("/game"), status_code=303)
 
 
 @router.get("/saves")
@@ -355,7 +360,7 @@ async def reset():
             io_utils.write_json(config.STORY_GRAPH_PATH, init["graph"])
             io_utils.write_json(config.MEMORY_PATH, init["memory"])
             config.CHAPTER_PATH.write_text("", encoding="utf-8")
-            return RedirectResponse(url="/", status_code=303)
+            return RedirectResponse(url=config.frontend_url("/game"), status_code=303)
         except Exception:
             pass
 
@@ -387,6 +392,6 @@ async def reset():
     }
     io_utils.write_json(config.MEMORY_PATH, initial_memory)
     config.CHAPTER_PATH.write_text("", encoding="utf-8")
-    return RedirectResponse(url="/", status_code=303)
+    return RedirectResponse(url=config.frontend_url("/game"), status_code=303)
 
 

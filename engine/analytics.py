@@ -10,6 +10,7 @@ and Chart.js consumption.
 
 import json
 import logging
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -28,6 +29,62 @@ PRICING = {
 # Dashboard data size limit: keep at most N data points per metric curve.
 # Beyond this, older points are downsampled to prevent HTML bloat (>1MB).
 MAX_HISTORY_POINTS = 50
+
+_METRIC_TOKENS = frozenset({
+    "affection", "trust", "respect", "dependence", "hostility", "attraction",
+})
+_NAME_BAD_START = set("的我你他她它们这那")
+_NAME_VERB_CHARS = set(
+    "做说看走动跑拿送给负负责打断找觉逐低继续压力装服回"
+)
+
+
+def _is_valid_character_name(name: str) -> bool:
+    """Reject narrative fragments and English metric tokens mistaken as names."""
+    name = (name or "").strip()
+    if len(name) < 2 or len(name) > 6:
+        return False
+    if name.lower() in _METRIC_TOKENS:
+        return False
+    if re.fullmatch(r"[a-zA-Z_]+", name):
+        return False
+    cjk = sum(1 for c in name if "\u4e00" <= c <= "\u9fff")
+    if cjk < len(name):
+        return False
+    if name[0] in _NAME_BAD_START:
+        return False
+    if any(c in _NAME_VERB_CHARS for c in name[1:]):
+        return False
+    return True
+
+
+def _canonical_character_names(memory: dict | None = None) -> list[str]:
+    """Names from world setup + session roster only (ignore memory auto-garbage)."""
+    names: set[str] = set()
+
+    try:
+        world = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        for ch in world.get("world", {}).get("characters", []):
+            n = (ch.get("name") or "").strip()
+            if _is_valid_character_name(n):
+                names.add(n)
+    except Exception:
+        pass
+
+    try:
+        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+        for sc in state.get("characters", {}).values():
+            if not isinstance(sc, dict):
+                continue
+            n = (sc.get("name") or "").strip()
+            role = (sc.get("role") or "").strip()
+            # Session roster entries always have role; memory fragments do not
+            if role and _is_valid_character_name(n):
+                names.add(n)
+    except Exception:
+        pass
+
+    return sorted(names)
 
 
 def compute_all() -> dict:
@@ -65,12 +122,13 @@ def metrics_curves() -> dict[str, dict]:
     """
     memory = io_utils.read_json(config.MEMORY_PATH)
     chars = memory.get("characters", {})
+    allowed = set(_canonical_character_names())
 
     # Discover all metrics from metric_history + top-level numeric fields
     all_metrics: dict[str, dict] = {}  # metric_name → {char_name → [[turn, val], ...]}
 
     for name, data in chars.items():
-        if not isinstance(data, dict):
+        if name not in allowed or not isinstance(data, dict):
             continue
         # 1. Check new-style metric_history
         mh = data.get("metric_history", {})
@@ -83,12 +141,29 @@ def metrics_curves() -> dict[str, dict]:
         if th and "trust" not in all_metrics.get("trust", {}).get(name, []):
             all_metrics.setdefault("trust", {})[name] = th
 
-        # 3. Check top-level numeric fields as fallback
+        # 3. Check top-level numeric fields as fallback (non-trust metrics)
         for key, val in data.items():
             if isinstance(val, (int, float)) and key not in ("trust",):
                 # Only if no history exists yet, create a baseline
                 if key not in all_metrics:
                     all_metrics.setdefault(key, {})[name] = []
+
+    # Canonical chars with only a current trust/affection value (no history yet)
+    try:
+        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+        current_turn = int(state.get("turn", 0))
+    except Exception:
+        current_turn = 0
+    for name in allowed:
+        data = chars.get(name, {})
+        if not isinstance(data, dict):
+            continue
+        for metric in ("trust", "affection", "respect", "hostility"):
+            if metric in all_metrics and name in all_metrics[metric] and all_metrics[metric][name]:
+                continue
+            val = data.get(metric)
+            if isinstance(val, (int, float)):
+                all_metrics.setdefault(metric, {})[name] = [[current_turn, val]]
 
     # Build chart data for each metric
     result = {}
@@ -106,6 +181,8 @@ def metrics_curves() -> dict[str, dict]:
         all_turns: set[int] = set()
         datasets = []
         for name, history in char_data.items():
+            if name not in allowed:
+                continue
             if history:
                 history = _downsample_history(history)
                 turns = [h[0] for h in history]
@@ -117,6 +194,9 @@ def metrics_curves() -> dict[str, dict]:
                 current = chars.get(name, {}).get(metric, 0.5)
                 datasets.append({"name": name, "data": [int(current * 100)]})
                 all_turns.add(0)
+
+        if not datasets:
+            continue
 
         labels = sorted(all_turns) if all_turns else [0]
         label = METRIC_LABELS.get(metric, metric)
@@ -363,19 +443,25 @@ def character_frequency() -> dict:
     """
     How often each character appears in story nodes.
     Returns {labels: [names], counts: [appearance_count]}.
+    Only counts canonical characters — not memory auto-garbage fragments.
     """
     memory = io_utils.read_json(config.MEMORY_PATH)
-    chars = memory.get("characters", {})
     graph = load_graph()
     nodes = graph.get("nodes", {})
 
-    labels = list(chars.keys())
-    counts = []
+    labels = _canonical_character_names(memory)
+    paired: list[tuple[str, int]] = []
     for name in labels:
-        count = sum(1 for n in nodes.values() if name in n.get("text", ""))
-        counts.append(count)
+        count = sum(
+            1 for n in nodes.values() if name in (n.get("text") or "")
+        )
+        paired.append((name, count))
 
-    return {"labels": labels, "counts": counts}
+    paired.sort(key=lambda x: (-x[1], x[0]))
+    if not paired:
+        return {"labels": [], "counts": []}
+    labels_out, counts_out = zip(*paired)
+    return {"labels": list(labels_out), "counts": list(counts_out)}
 
 
 def branch_stats() -> dict:

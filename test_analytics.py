@@ -101,12 +101,76 @@ def test_branch_stats():
     print(f"✅ branch_stats: PASS — {result['total_nodes']} nodes, depth {result['max_depth']}")
 
 
+def test_character_frequency_filters_garbage():
+    """character_frequency should exclude narrative fragments from memory keys."""
+    import engine.io_utils as io
+    import config
+    _orig_read_json = io.read_json
+    _orig_read_yaml = io.read_yaml
+    _orig_load_graph = None
+
+    from engine import analytics as analytics_mod
+    from engine.router import load_graph as _load_graph
+
+    def _mock_read_json(path):
+        if path == config.MEMORY_PATH:
+            return {
+                "characters": {
+                    "天野悠": {"trust": 0.6, "tier": "主角"},
+                    "仆装": {"trust": 0.5, "tier": "背景"},
+                    "affection": {"trust": 0.5},
+                    "我送你回": {"trust": 0.5, "tier": "背景"},
+                    "雪莉": {"trust": 0.5, "tier": "重要"},
+                }
+            }
+        if path == config.STORY_GRAPH_PATH:
+            return {
+                "nodes": {
+                    "0": {"text": "天野悠在房间。雪莉也来了。"},
+                    "1": {"text": "天野悠与雪莉对话。仆装细节。"},
+                },
+                "edges": [],
+            }
+        return _orig_read_json(path)
+
+    def _mock_read_yaml(path):
+        if path == config.WORLD_PACK_PATH:
+            return {"world": {"characters": [
+                {"name": "天野悠", "is_main": True},
+                {"name": "雪莉", "is_main": False},
+            ]}}
+        if path == config.SESSION_STATE_PATH:
+            return {"characters": {
+                "A": {"name": "天野悠", "role": "主角"},
+                "B": {"name": "雪莉", "role": "NPC"},
+            }}
+        return _orig_read_yaml(path)
+
+    io.read_json = _mock_read_json
+    io.read_yaml = _mock_read_yaml
+    try:
+        result = character_frequency()
+        labels = result["labels"]
+        assert "天野悠" in labels
+        assert "雪莉" in labels
+        assert "仆装" not in labels
+        assert "affection" not in labels
+        assert "我送你回" not in labels
+        idx_yuu = labels.index("天野悠")
+        assert result["counts"][idx_yuu] == 2
+        print(f"✅ character_frequency filter: PASS — {labels}")
+    finally:
+        io.read_json = _orig_read_json
+        io.read_yaml = _orig_read_yaml
+
+
 if __name__ == "__main__":
     tests = [
         test_metrics_curves_type_guard,
         test_metrics_curves_multi_metric,
         test_summary_stats,
         test_branch_stats,
+        test_character_frequency_filters_garbage,
     ]
     passed = 0
     for test in tests:

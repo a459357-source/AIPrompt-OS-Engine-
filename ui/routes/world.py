@@ -199,6 +199,27 @@ async def create_new_story(
         if secret:
             mem_chars[name].setdefault("flags", []).append(f"隐藏秘密：{secret}")
 
+    # Seed multidimensional relations from NewStory「专属规则 & 多维关系」
+    char_relations = custom.get("characterRelations", {}) if custom else {}
+    rel_metrics = ("trust", "affection", "respect", "dependence", "hostility", "attraction")
+    for npc_name, rel in char_relations.items():
+        if not isinstance(rel, dict) or npc_name not in mem_chars:
+            continue
+        entry = mem_chars[npc_name]
+        for metric in rel_metrics:
+            raw = rel.get(metric)
+            if isinstance(raw, (int, float)):
+                val = round(max(0.0, min(1.0, float(raw) / 100.0)), 2)
+                entry[metric] = val
+                entry.setdefault("metric_history", {}).setdefault(metric, []).append([0, val])
+        rel_type = rel.get("relationshipType", "")
+        if rel_type:
+            entry["relationship_type"] = rel_type
+        for tag in rel.get("tags") or []:
+            flag = f"关系：{tag}"
+            if flag not in entry.get("flags", []):
+                entry.setdefault("flags", []).append(flag)
+
     initial_state = {
         "scene": scene,
         "status": "SETUP",
@@ -249,7 +270,7 @@ async def create_new_story(
 
     # Redirect to main page
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/", status_code=303)
+    return RedirectResponse(url=config.frontend_url("/game"), status_code=303)
 
 
 # ── AI World Generator ─────────────────────────────────────────────
