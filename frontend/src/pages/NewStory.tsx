@@ -780,53 +780,53 @@ export default function NewStory() {
           }
         }}
       >
-        <Card className="border-neural-cyan/10">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-neural-cyan">{t('world.aiGen', lang)}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Textarea
-              id="kw-input"
-              value={keywords}
-              onChange={(e) => setKeywords(e.target.value)}
-              placeholder="粘贴小说简介 / 世界观描述 / 关键词…"
-              className="h-24 resize-y text-xs"
-            />
-            <Button type="button" variant="neural" className="w-full" disabled={generating === 'world'} onClick={handleWorldGen}>
-              {generating === 'world' ? '生成中…' : '✨ 一键生成完整设定'}
-            </Button>
-            <GlowDivider label={t('world.presets', lang)} />
-            <div className="flex flex-wrap gap-1">
-              {STORY_PRESETS.map((preset) => (
-                <Button
-                  key={preset.id}
-                  type="button"
-                  variant={activePreset === preset.id ? 'default' : 'outline'}
-                  size="xs"
-                  onClick={() => handlePresetSelect(preset)}
-                  disabled={generating === 'world'}
-                >
-                  {preset.label}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
         <div className={activeSection === 'core' ? '' : 'hidden'}>
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">{t('world.core', lang)}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <Card className="border-neural-cyan/10 bg-neural-cyan/[0.03]">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm text-neural-cyan">{t('world.aiGen', lang)}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Textarea
+                      id="kw-input"
+                      value={keywords}
+                      onChange={(e) => setKeywords(e.target.value)}
+                      placeholder="粘贴小说简介 / 世界观描述 / 关键词…"
+                      className="min-h-[5rem] resize-y text-xs"
+                    />
+                    <Button type="button" variant="neural" className="w-full" disabled={generating === 'world'} onClick={handleWorldGen}>
+                      {generating === 'world' ? '生成中…' : '✨ 一键生成完整设定'}
+                    </Button>
+                    <GlowDivider label={t('world.presets', lang)} />
+                    <div className="flex flex-wrap gap-1">
+                      {STORY_PRESETS.map((preset) => (
+                        <Button
+                          key={preset.id}
+                          type="button"
+                          variant={activePreset === preset.id ? 'default' : 'outline'}
+                          size="xs"
+                          onClick={() => handlePresetSelect(preset)}
+                          disabled={generating === 'world'}
+                        >
+                          {preset.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Title */}
                 <div className="space-y-1.5">
                   <Label className="flex justify-between">
                     <span>📖 故事标题</span>
                     <span className="text-game-dim font-normal">{titleLen}/20</span>
                   </Label>
-                  <div className="flex gap-2">
-                    <Input {...register('title')} placeholder="给你的故事起个名字…" className="flex-1" />
+                  <div className="space-y-2">
+                    <Input {...register('title')} placeholder="给你的故事起个名字…" />
                     <AIButton
                       loading={generating === 'title'}
                       error={fieldErrors.title}
@@ -851,8 +851,8 @@ export default function NewStory() {
                 {/* Scene */}
                 <div className="space-y-1.5">
                   <Label>📍 开局地点</Label>
-                  <div className="flex gap-2">
-                    <Input {...register('scene')} placeholder="如：高二三班教室、回声号舰桥" className="flex-1" />
+                  <div className="space-y-2">
+                    <Input {...register('scene')} placeholder="如：高二三班教室、回声号舰桥" />
                     <AIButton
                       loading={generating === 'scene'}
                       error={fieldErrors.scene}
@@ -865,8 +865,8 @@ export default function NewStory() {
                 {/* Main Goal */}
                 <div className="space-y-1.5">
                   <Label>🎯 故事主线目标</Label>
-                  <div className="flex gap-2">
-                    <Input {...register('main_goal')} placeholder="如：调查失踪舰队、找到失踪的妹妹…" className="flex-1" />
+                  <div className="space-y-2">
+                    <Input {...register('main_goal')} placeholder="如：调查失踪舰队、找到失踪的妹妹…" />
                     <AIButton
                       loading={generating === 'main_goal'}
                       error={fieldErrors.main_goal}
@@ -881,12 +881,12 @@ export default function NewStory() {
                     <span>🌍 世界观背景 <span className="text-game-dim">· 可选</span></span>
                     <span className="text-game-dim font-normal">{worldLen}/300</span>
                   </Label>
-                  <div className="flex gap-2">
+                  <div className="space-y-2">
                     <Textarea
                       {...register('world')}
-                      rows={3}
+                      rows={4}
                       placeholder="校园恋爱/都市日常可跳过不填…"
-                      className="flex-1 resize-y"
+                      className="resize-y"
                     />
                     <AIButton
                       loading={generating === 'world'}
@@ -901,11 +901,11 @@ export default function NewStory() {
 
         <div className={activeSection === 'factions' ? '' : 'hidden'}>
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-sm">
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2 text-sm shrink-0">
                   {t('world.factions', lang)}
                 </CardTitle>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1.5">
                   <Button
                     type="button"
                     variant="outline"
@@ -1034,7 +1034,7 @@ export default function NewStory() {
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-4 pt-0">
-                          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="space-y-1.5">
                               <Label className="text-xs text-game-muted">类型</Label>
                               <select
@@ -1188,8 +1188,8 @@ export default function NewStory() {
 
         <div className={activeSection === 'characters' ? '' : 'hidden'}>
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-sm">
+              <CardHeader className="flex flex-row items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2 text-sm min-w-0">
                   {t('world.characters', lang)}
                 </CardTitle>
                 <Button
@@ -1206,7 +1206,7 @@ export default function NewStory() {
                 </Button>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <AnimatePresence>
                     {fields.map((field, idx) => {
                       const c = watch(`characters.${idx}`)
@@ -1251,6 +1251,7 @@ export default function NewStory() {
                                   presets={ROLE_PRESETS}
                                   placeholder="输入后回车添加…"
                                   color="primary"
+                                  compact
                                 />
                               </div>
 
@@ -1260,7 +1261,7 @@ export default function NewStory() {
                                 <select
                                   value={c?.faction || ''}
                                   onChange={(e) => setValue(`characters.${idx}.faction`, e.target.value)}
-                                  className="w-full bg-game-bg border border-game-border rounded-md px-2 py-1.5 text-xs text-game-text mt-0.5"
+                                  className="w-full bg-game-bg border border-game-border rounded-md px-2 py-2 text-sm text-game-text mt-0.5"
                                 >
                                   <option value="">无</option>
                                   {(factions || []).map((f: { name: string }) => (
@@ -1275,7 +1276,6 @@ export default function NewStory() {
                                 <Input
                                   {...register(`characters.${idx}.goal`)}
                                   placeholder="角色想要达成的事…"
-                                  className="text-xs h-8"
                                 />
                               </div>
 
@@ -1285,7 +1285,7 @@ export default function NewStory() {
                                 <Input
                                   {...register(`characters.${idx}.secret`)}
                                   placeholder="用于制造剧情爆点…"
-                                  className="text-xs h-8 border-game-secret/40 bg-game-secret/10 text-game-accent placeholder:text-game-dim"
+                                  className="border-game-secret/40 bg-game-secret/10 text-game-accent placeholder:text-game-dim"
                                 />
                               </div>
 
@@ -1298,6 +1298,7 @@ export default function NewStory() {
                                   presets={PERSONALITY_PRESETS}
                                   placeholder="选择或输入性格标签…"
                                   color="accent"
+                                  compact
                                 />
                               </div>
 
@@ -1419,13 +1420,13 @@ export default function NewStory() {
                         }
                         return (
                           <div key={c.name} className="bg-game-surface border border-game-border rounded-md p-3 space-y-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 text-sm">
-                                <span className="font-bold text-game-accent">{mainChar?.name || '主角'}</span>
-                                <span className="text-game-accent">↔</span>
-                                <span className="font-bold text-game-primary">{c.name}</span>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex flex-wrap items-center gap-2 text-sm min-w-0">
+                                <span className="font-bold text-game-accent truncate max-w-[40%]">{mainChar?.name || '主角'}</span>
+                                <span className="text-game-accent shrink-0">↔</span>
+                                <span className="font-bold text-game-primary truncate max-w-[40%]">{c.name}</span>
                               </div>
-                              <div className="flex items-center gap-2 shrink-0">
+                              <div className="flex flex-wrap items-center gap-2">
                                 <AIButton
                                   loading={generating === `rel-${c.name}`}
                                   error={fieldErrors[`rel-${c.name}`]}
@@ -1442,22 +1443,21 @@ export default function NewStory() {
                                 </select>
                               </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-x-3 gap-y-1">
+                            <div className="space-y-2">
                               {DIMS.map(([label, key]) => {
                                 const val = (r as unknown as Record<string,number>)[key] ?? 50
                                 const barColor = key === 'hostility' ? '#da3633' : '#58a6ff'
                                 return (
-                                  <div key={key} className="flex items-center gap-1">
-                                    <span className="text-[10px] text-game-dim w-12 shrink-0">{label}</span>
+                                  <div key={key} className="flex items-center gap-2">
+                                    <span className="text-xs text-game-dim w-14 shrink-0">{label}</span>
                                     <input
                                       type="number"
                                       min={0} max={100} value={val}
                                       onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) updateRel(key, Math.max(0, Math.min(100, v))) }}
                                       onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
-                                      className="w-12 text-center text-[11px] h-6 bg-game-bg border border-game-border rounded text-game-text"
-                                      style={{minWidth: '36px'}}
+                                      className="w-14 text-center text-xs h-8 bg-game-bg border border-game-border rounded text-game-text shrink-0"
                                     />
-                                    <div className="flex-1 h-2 bg-game-border rounded-full overflow-hidden">
+                                    <div className="flex-1 h-2.5 bg-game-border rounded-full overflow-hidden min-w-[4rem]">
                                       <div className="h-full rounded-full transition-all" style={{width: `${val}%`, background: barColor}} />
                                     </div>
                                   </div>
@@ -1528,11 +1528,11 @@ export default function NewStory() {
 
         <div className={activeSection === 'artifacts' ? '' : 'hidden'}>
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-sm">
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2 text-sm shrink-0">
                   {t('world.artifacts', lang)}
                 </CardTitle>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1.5">
                   <Button
                     type="button"
                     variant="outline"
@@ -1582,7 +1582,7 @@ export default function NewStory() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                <div className="space-y-3">
                   {(artifacts || []).map((art, idx) => (
                     <motion.div
                       key={idx}
@@ -1707,7 +1707,7 @@ export default function NewStory() {
                     </motion.div>
                   ))}
                   {(artifacts || []).length === 0 && (
-                    <p className="text-game-dim text-xs text-center py-4 col-span-2">
+                    <p className="text-game-dim text-xs text-center py-4">
                       暂无关键物品 · 点击「✨ 模块生成」AI 批量生成，或「➕ 添加物品」手动填写
                     </p>
                   )}

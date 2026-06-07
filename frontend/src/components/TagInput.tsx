@@ -13,6 +13,8 @@ interface TagInputProps {
   placeholder?: string
   color?: TagColor
   maxTags?: number
+  /** 侧栏等窄布局：隐藏底部快捷预设 chips，仅用输入框 + 下拉 */
+  compact?: boolean
 }
 
 const colorVariantMap: Record<TagColor, 'primary' | 'accent' | 'secret' | 'success' | 'warning'> = {
@@ -30,6 +32,7 @@ export function TagInput({
   placeholder = '输入后回车添加…',
   color = 'primary',
   maxTags = 20,
+  compact = false,
 }: TagInputProps) {
   const [input, setInput] = useState('')
   const [showCommand, setShowCommand] = useState(false)
@@ -139,7 +142,7 @@ export function TagInput({
       </div>
 
       {/* Quick presets */}
-      {!input && presets.length > 0 && (
+      {!compact && !input && presets.length > 0 && (
         <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
           {presets.filter((p) => !value.includes(p)).slice(0, 20).map((p) => (
             <button
