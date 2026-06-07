@@ -127,23 +127,12 @@ def build_hot_context(session_state: dict, memory: dict | None = None) -> str:
     return "\n".join(lines)
 
 
-def build_long_term_memory(
-    memory: dict,
-    session_state: dict,
-    *,
-    max_chars: int | None = None,
-) -> str:
-    """Structured world/character state — no story bodies or full history."""
-    limit = max_chars or config.LONG_TERM_MEMORY_MAX_CHARS
+def _legacy_context_block(memory: dict, session_state: dict) -> str:
+    """Pre-router memory sections (used for token baseline comparison)."""
     parts: list[str] = []
-
     mem_ctx = get_context_for_prompt(memory)
     if mem_ctx:
         parts.append(mem_ctx)
-
-    tier = build_character_tier_context(memory)
-    if tier:
-        parts.append(tier)
 
     faction = get_faction_attitude_context(memory)
     if faction:
@@ -165,6 +154,73 @@ def build_long_term_memory(
     faction_scope = get_faction_context_for_prompt(memory)
     if faction_scope:
         parts.append(faction_scope)
+
+    return "\n".join(p for p in parts if p.strip())
+
+
+def build_long_term_memory(
+    memory: dict,
+    session_state: dict,
+    *,
+    max_chars: int | None = None,
+    world_pack: dict | None = None,
+) -> str:
+    """Structured world/character state — no story bodies or full history."""
+    limit = max_chars or config.LONG_TERM_MEMORY_MAX_CHARS
+    parts: list[str] = []
+
+    tier = build_character_tier_context(memory)
+    if tier:
+        parts.append(tier)
+
+    if config.CONTEXT_ROUTER_ENABLED:
+        rel_system = memory.get("relationship_system", {})
+        if rel_system:
+            stages = rel_system.get("stages", [])
+            if stages:
+                parts.append(f"【关系阶段系统】{' → '.join(stages)}")
+
+        if world_pack is None:
+            try:
+                world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+            except Exception:
+                world_pack = {}
+        from engine.context_router import route_context_for_prompt
+
+        baseline_chars = len(_legacy_context_block(memory, session_state))
+        routed = route_context_for_prompt(
+            memory,
+            session_state,
+            world_pack,
+            baseline_chars=baseline_chars,
+        )
+        if routed:
+            parts.append(routed)
+    else:
+        mem_ctx = get_context_for_prompt(memory)
+        if mem_ctx:
+            parts.append(mem_ctx)
+
+        faction = get_faction_attitude_context(memory)
+        if faction:
+            parts.append(faction)
+
+        turn = session_state.get("turn", 0)
+        artifact = get_artifact_context_for_prompt(memory)
+        if artifact:
+            parts.append(artifact)
+
+        event = get_event_context(memory)
+        if event:
+            parts.append(event)
+
+        world_state = get_world_state_context(memory, turn)
+        if world_state:
+            parts.append(world_state)
+
+        faction_scope = get_faction_context_for_prompt(memory)
+        if faction_scope:
+            parts.append(faction_scope)
 
     block = "\n".join(p for p in parts if p.strip())
     return _clip(block, limit)
@@ -287,7 +343,11 @@ def build_world_summary_from_pack(world_pack: dict) -> dict:
     }
 
 
-def load_world_summary_text() -> str:
+def load_world_summary_text(
+    session_state: dict | None = None,
+    memory: dict | None = None,
+    world_pack: dict | None = None,
+) -> str:
     path = config.WORLD_SUMMARY_PATH
     if path.exists():
         try:
@@ -301,9 +361,40 @@ def load_world_summary_text() -> str:
                 lines.append(f"主线: {_clip(data['main_goal'], 150)}")
             factions = data.get("factions") or []
             if factions:
+                if config.CONTEXT_ROUTER_ENABLED:
+                    if session_state is None:
+                        try:
+                            session_state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+                        except Exception:
+                            session_state = {}
+                    if memory is None:
+                        try:
+                            from engine.memory import load_memory
+
+                            memory = load_memory()
+                        except Exception:
+                            memory = {}
+                    if world_pack is None:
+                        try:
+                            world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+                        except Exception:
+                            world_pack = {}
+                    from engine.context_router import route_world_summary_factions
+
+                    regions = list(data.get("regions") or [])[:12]
+                    routed = route_world_summary_factions(
+                        factions[:8],
+                        session_state,
+                        memory,
+                        world_pack,
+                        regions=regions,
+                    )
+                    factions = routed if routed else factions[: config.MAX_WORLD_FACTION_ITEMS]
                 lines.append("【主要势力】")
-                for f in factions[:8]:
-                    lines.append(f"  - {f.get('name', '?')}: {_clip(f.get('description', ''), 80)}")
+                for f in factions:
+                    lines.append(
+                        f"  - {f.get('name', '?')}: {_clip(f.get('description', ''), 80)}"
+                    )
             regions = data.get("regions") or []
             if regions:
                 lines.append(f"重要地区: {', '.join(regions[:8])}")

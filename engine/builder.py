@@ -222,7 +222,7 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
     # ── Player choice for THIS generation ───────────────────────
     last_choice_text = _player_choice_prompt(current_choice, session_state)
 
-    world_text = load_world_summary_text()
+    world_text = load_world_summary_text(session_state=session_state)
     if not world_text:
         world_text = compact_world_for_prompt(world_pack)
 
