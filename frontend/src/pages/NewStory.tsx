@@ -104,6 +104,7 @@ export default function NewStory() {
       rel_stages: DEFAULT_STAGES,
       rel_affection: 0,
       artifacts: [] as { name: string; type: 'personal'|'faction'|'world'; description: string; ownerType: 'character'|'faction'|'location'|'none'; ownerId: string; importance: number; abilities: string[]; tags: string[] }[],
+      factions: [] as { name: string; type: string; description: string; goals: string[]; resources: string[]; controlledTerritories: string[]; subordinateOrganizations: string[]; keyAssets: string[]; power: { military: number; economic: number; political: number; technology: number }; influence: number; relation_to_player: string; leader: string }[],
     },
   })
 
@@ -263,6 +264,7 @@ export default function NewStory() {
     fd.append('chars_json', JSON.stringify(data.characters))
     fd.append('rel_system', JSON.stringify({ stages: data.rel_stages, affection: data.rel_affection }))
     fd.append('artifacts_json', JSON.stringify(data.artifacts || []))
+    fd.append('factions_json', JSON.stringify(data.factions || []))
     showStatus('正在创建故事…', 'loading')
     try {
       await createStory(fd)
@@ -885,6 +887,256 @@ export default function NewStory() {
                   {(getValues('artifacts') || []).length === 0 && (
                     <p className="text-game-dim text-xs text-center py-4 col-span-2">
                       暂无关键物品 · 点击「✨ 模块生成」AI 批量生成，或「➕ 添加物品」手动填写
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Part 6: Factions */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-game-warning/20 text-game-warning text-xs flex items-center justify-center">6</span>
+                  🏛️ 势力
+                </CardTitle>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    disabled={generating === 'factions-all'}
+                    onClick={async () => {
+                      setGenerating('factions-all')
+                      showStatus('正在批量生成势力…', 'loading')
+                      const current = getValues('factions') || []
+                      const newFacs: typeof current = []
+                      for (let i = 0; i < 3; i++) {
+                        try {
+                          const data = await generateField({
+                            field: 'faction',
+                            title: getValues('title'),
+                            world: getValues('world'),
+                            genre: getValues('genre').join('/'),
+                          })
+                          if ((data as { name?: string }).name) {
+                            newFacs.push({
+                              name: (data as { name: string }).name,
+                              type: ((data as { type?: string }).type || 'organization') as string,
+                              description: (data as { description?: string }).description || '',
+                              goals: (data as { goals?: string[] }).goals || [],
+                              resources: (data as { resources?: string[] }).resources || [],
+                              controlledTerritories: (data as { controlledTerritories?: string[] }).controlledTerritories || [],
+                              subordinateOrganizations: (data as { subordinateOrganizations?: string[] }).subordinateOrganizations || [],
+                              keyAssets: (data as { keyAssets?: string[] }).keyAssets || [],
+                              power: (data as { power?: { military: number; economic: number; political: number; technology: number } }).power || { military: 0, economic: 0, political: 0, technology: 0 },
+                              influence: (data as { influence?: number }).influence || 50,
+                              relation_to_player: ((data as { relation_to_player?: string }).relation_to_player || 'neutral') as string,
+                              leader: (data as { leader?: string }).leader || '',
+                            })
+                          }
+                        } catch { /* continue */ }
+                      }
+                      setValue('factions', [...current, ...newFacs])
+                      showStatus(`✅ 已生成 ${newFacs.length} 个势力`, 'success')
+                      setGenerating(null)
+                    }}
+                  >
+                    {generating === 'factions-all' ? '⏳' : '✨'} 模块生成(×3)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => {
+                      const current = getValues('factions') || []
+                      setValue('factions', [...current, {
+                        name: '', type: 'organization', description: '',
+                        goals: [], resources: [], controlledTerritories: [],
+                        subordinateOrganizations: [], keyAssets: [],
+                        power: { military: 0, economic: 0, political: 0, technology: 0 },
+                        influence: 50, relation_to_player: 'neutral', leader: '',
+                      }])
+                    }}
+                  >
+                    ➕ 添加势力
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {(getValues('factions') || []).map((fac, idx) => (
+                    <motion.div
+                      key={idx}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                    >
+                      <Card className="border-game-warning/30">
+                        <CardHeader className="pb-1">
+                          <div className="flex items-center justify-between">
+                            <Badge variant="warning" size="sm">
+                              {fac.type === 'government' ? '🏛️ 政府' : fac.type === 'corporation' ? '💼 企业' : fac.type === 'family' ? '👪 家族' : fac.type === 'religion' ? '⛪ 宗教' : '🏢 组织'}
+                            </Badge>
+                            <div className="flex gap-1">
+                              <AIButton
+                                loading={generating === `faction-${idx}`}
+                                onClick={async () => {
+                                  setGenerating(`faction-${idx}`)
+                                  try {
+                                    const data = await generateField({
+                                      field: 'faction',
+                                      title: getValues('title'),
+                                      world: getValues('world'),
+                                      genre: getValues('genre').join('/'),
+                                    })
+                                    if ((data as { name?: string }).name) {
+                                      const current = getValues('factions') || []
+                                      current[idx] = {
+                                        name: (data as { name: string }).name,
+                                        type: ((data as { type?: string }).type || 'organization') as string,
+                                        description: (data as { description?: string }).description || '',
+                                        goals: (data as { goals?: string[] }).goals || [],
+                                        resources: (data as { resources?: string[] }).resources || [],
+                                        controlledTerritories: (data as { controlledTerritories?: string[] }).controlledTerritories || [],
+                                        subordinateOrganizations: (data as { subordinateOrganizations?: string[] }).subordinateOrganizations || [],
+                                        keyAssets: (data as { keyAssets?: string[] }).keyAssets || [],
+                                        power: (data as { power?: { military: number; economic: number; political: number; technology: number } }).power || { military: 0, economic: 0, political: 0, technology: 0 },
+                                        influence: (data as { influence?: number }).influence || 50,
+                                        relation_to_player: ((data as { relation_to_player?: string }).relation_to_player || 'neutral') as string,
+                                        leader: (data as { leader?: string }).leader || '',
+                                      }
+                                      setValue('factions', [...current])
+                                    }
+                                    showStatus('✅ 势力生成完成', 'success')
+                                  } catch (e) { showStatus(`❌ ${(e as Error).message}`, 'error') }
+                                  setGenerating(null)
+                                }}
+                              >生成</AIButton>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const current = getValues('factions') || []
+                                  current.splice(idx, 1)
+                                  setValue('factions', [...current])
+                                }}
+                                className="text-game-dim hover:text-game-danger transition-colors text-sm"
+                              >✕</button>
+                            </div>
+                          </div>
+                          <Input
+                            value={fac.name}
+                            onChange={(e) => {
+                              const current = getValues('factions') || []
+                              current[idx] = { ...current[idx], name: e.target.value }
+                              setValue('factions', [...current])
+                            }}
+                            placeholder="势力名称"
+                            className="mt-1 font-bold text-sm h-8"
+                          />
+                        </CardHeader>
+                        <CardContent className="space-y-2 pt-0">
+                          <div className="flex gap-2">
+                            <select
+                              value={fac.type}
+                              onChange={(e) => {
+                                const current = getValues('factions') || []
+                                current[idx] = { ...current[idx], type: e.target.value }
+                                setValue('factions', [...current])
+                              }}
+                              className="bg-game-bg border border-game-border rounded-md px-2 py-1 text-xs text-game-text"
+                            >
+                              <option value="government">政府</option>
+                              <option value="corporation">企业</option>
+                              <option value="family">家族</option>
+                              <option value="organization">组织</option>
+                              <option value="guild">行会</option>
+                              <option value="school">学院</option>
+                              <option value="religion">宗教</option>
+                              <option value="kingdom">王国</option>
+                              <option value="other">其他</option>
+                            </select>
+                            <select
+                              value={fac.relation_to_player}
+                              onChange={(e) => {
+                                const current = getValues('factions') || []
+                                current[idx] = { ...current[idx], relation_to_player: e.target.value }
+                                setValue('factions', [...current])
+                              }}
+                              className="bg-game-bg border border-game-border rounded-md px-2 py-1 text-xs text-game-text"
+                            >
+                              <option value="ally">盟友</option>
+                              <option value="friendly">友好</option>
+                              <option value="neutral">中立</option>
+                              <option value="hostile">敌对</option>
+                              <option value="enemy">死敌</option>
+                            </select>
+                            <Input
+                              value={fac.leader}
+                              onChange={(e) => {
+                                const current = getValues('factions') || []
+                                current[idx] = { ...current[idx], leader: e.target.value }
+                                setValue('factions', [...current])
+                              }}
+                              placeholder="首领"
+                              className="flex-1 text-xs h-7"
+                            />
+                            <Input
+                              type="number"
+                              value={fac.influence}
+                              onChange={(e) => {
+                                const current = getValues('factions') || []
+                                current[idx] = { ...current[idx], influence: Math.max(1, Math.min(100, parseInt(e.target.value) || 50)) }
+                                setValue('factions', [...current])
+                              }}
+                              className="w-16 text-xs h-7"
+                              placeholder="影响力"
+                            />
+                          </div>
+                          <Input
+                            value={fac.description}
+                            onChange={(e) => {
+                              const current = getValues('factions') || []
+                              current[idx] = { ...current[idx], description: e.target.value }
+                              setValue('factions', [...current])
+                            }}
+                            placeholder="势力描述…"
+                            className="text-xs h-7"
+                          />
+                          <div className="grid grid-cols-4 gap-1 text-[10px]">
+                            {(['military','economic','political','technology'] as const).map((k) => (
+                              <div key={k} className="flex items-center gap-1">
+                                <span className="text-game-dim w-8">{{military:'军事',economic:'经济',political:'政治',technology:'科技'}[k]}</span>
+                                <Input
+                                  type="number"
+                                  value={fac.power?.[k] ?? 0}
+                                  onChange={(e) => {
+                                    const current = getValues('factions') || []
+                                    current[idx] = { ...current[idx], power: { ...(current[idx].power || { military:0,economic:0,political:0,technology:0 }), [k]: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) } }
+                                    setValue('factions', [...current])
+                                  }}
+                                  className="flex-1 text-[10px] h-6 text-center"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <TagInput
+                            value={fac.goals || []}
+                            onChange={(goals) => {
+                              const current = getValues('factions') || []
+                              current[idx] = { ...current[idx], goals }
+                              setValue('factions', [...current])
+                            }}
+                            presets={[]}
+                            placeholder="目标…"
+                            color="warning"
+                          />
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                  {(getValues('factions') || []).length === 0 && (
+                    <p className="text-game-dim text-xs text-center py-4 col-span-2">
+                      暂无势力 · 点击「✨ 模块生成」AI 批量生成，或「➕ 添加势力」手动填写
                     </p>
                   )}
                 </div>

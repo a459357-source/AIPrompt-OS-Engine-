@@ -28,6 +28,7 @@ async def create_new_story(
     main_goal: str = Form(""),
     rel_system: str = Form(""),
     artifacts_json: str = Form(""),
+    factions_json: str = Form(""),
 ):
     """Process the new story form and initialize all state."""
     import yaml
@@ -80,6 +81,27 @@ async def create_new_story(
         except Exception:
             pass
 
+    # Parse factions
+    factions = []
+    if factions_json.strip():
+        try:
+            raw_factions = json.loads(factions_json.strip())
+            for f in raw_factions:
+                f.setdefault("type", "organization")
+                f.setdefault("goals", [])
+                f.setdefault("resources", [])
+                f.setdefault("controlledTerritories", [])
+                f.setdefault("subordinateOrganizations", [])
+                f.setdefault("keyAssets", [])
+                f.setdefault("power", {"military": 0, "economic": 0, "political": 0, "technology": 0})
+                f.setdefault("influence", 50)
+                f.setdefault("relation_to_player", "neutral")
+                f.setdefault("leader", "")
+                f.setdefault("description", "")
+                factions.append(f)
+        except Exception:
+            pass
+
     # Build world_pack.yaml
     world_pack = {
         "world": {
@@ -88,7 +110,7 @@ async def create_new_story(
             "era": "故事开端",
             "setting": world,
             "main_goal": main_goal_text,
-            "factions": [],
+            "factions": factions,
             "locations": [
                 {"name": scene, "desc": "初始场景"},
             ],
@@ -324,6 +346,8 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
         user = f"为以下 Galgame 推荐关系阶段系统（5-7个递进阶段）：\n{ctx}\n\n输出JSON：{{\"rel_stages\":[\"阶段1\",\"阶段2\",...],\"rel_affection\":0}}"
     elif field == "artifact":
         user = f"为以下故事生成一个关键物品（Artifact），用 JSON 格式输出：\n故事标题：{title}\n世界观：{world[:300] if world else context[:300]}\n\n输出格式：{{\"name\":\"物品名称（8字内）\",\"type\":\"personal|faction|world\",\"description\":\"物品描述（20-60字）\",\"ownerType\":\"character|faction|location|none\",\"ownerId\":\"持有者名（与已有角色或势力匹配，或留空）\",\"importance\":50-95,\"abilities\":[\"能力1\",\"能力2\"],\"tags\":[\"标签1\",\"标签2\"]}}\n\n要求：物品要有故事推动力，可以是传家宝、机密文件、武器、货币、信物等。只输出JSON。"
+    elif field == "faction":
+        user = f"为以下故事生成一个势力（Faction），用 JSON 格式输出：\n故事标题：{title}\n世界观：{world[:300] if world else context[:300]}\n\n输出格式：{{\"name\":\"势力名（6字内）\",\"type\":\"government|corporation|family|organization|guild|school|religion|kingdom|other\",\"description\":\"势力描述（20-80字）\",\"goals\":[\"目标1\",\"目标2\"],\"resources\":[\"资源1\",\"资源2\"],\"controlledTerritories\":[\"控制区域\"],\"subordinateOrganizations\":[\"下属机构\"],\"keyAssets\":[\"关键资产\"],\"power\":{{\"military\":0-100,\"economic\":0-100,\"political\":0-100,\"technology\":0-100}},\"influence\":10-100,\"relation_to_player\":\"ally|friendly|neutral|hostile|enemy\",\"leader\":\"首领名\"}}\n\n要求：势力要有明确目标和资源，能独立推动剧情。只输出JSON。"
     else:
         return JR({"error": f"未知字段类型: {field}"}, status_code=400)
 
@@ -395,6 +419,28 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
                 except Exception:
                     pass
             return JR({"name": story.strip()[:20], "type": "personal", "description": story.strip()[:60], "ownerType": "none", "ownerId": "", "importance": 50, "abilities": [], "tags": []})
+        if field == "faction":
+            if "name" in result:
+                result.setdefault("type", "organization")
+                result.setdefault("influence", 50)
+                result.setdefault("relation_to_player", "neutral")
+                result.setdefault("goals", [])
+                result.setdefault("resources", [])
+                result.setdefault("power", {"military": 0, "economic": 0, "political": 0, "technology": 0})
+                return JR(result)
+            story = result.get("story", "")
+            import re as _re5
+            m = _re5.search(r'\{[^}]+\}', story)
+            if m:
+                import json as _json5
+                try:
+                    fac = _json5.loads(m.group())
+                    fac.setdefault("type", "organization")
+                    fac.setdefault("influence", 50)
+                    return JR(fac)
+                except Exception:
+                    pass
+            return JR({"name": story.strip()[:20], "type": "organization", "influence": 50, "relation_to_player": "neutral", "goals": [], "resources": []})
         if field == "genre":
             story = result.get("story", "")
             import re as _re2
