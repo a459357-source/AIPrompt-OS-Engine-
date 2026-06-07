@@ -109,6 +109,7 @@ export interface NpcData {
   secret: string
   background: string
   special_ability: string
+  faction: string
   trust: number
   trust_pct: number
   flags: string[]

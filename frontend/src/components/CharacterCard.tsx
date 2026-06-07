@@ -28,9 +28,14 @@ export function CharacterCard({ character, index, isMain, onRemove, className, t
       <Card className={`overflow-hidden ${isMain ? 'border-game-accent/50 bg-game-accent/[0.03]' : ''} ${className || ''}`}>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <Badge variant={isMain ? 'accent' : 'success'} size="sm">
-              {isMain ? '⭐ 主角' : '👤 NPC'}
-            </Badge>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Badge variant={isMain ? 'accent' : 'success'} size="sm">
+                {isMain ? '⭐ 主角' : '👤 NPC'}
+              </Badge>
+              {(c as { faction?: string }).faction && (
+                <Badge variant="warning" size="sm">🏛️ {(c as { faction?: string }).faction}</Badge>
+              )}
+            </div>
             {!isMain && onRemove && (
               <button
                 type="button"

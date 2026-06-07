@@ -17,6 +17,7 @@ interface CharInfo {
   affection?: number
   trust_pct?: number
   tier?: string
+  faction?: string
 }
 
 interface FactionInfo {
@@ -140,7 +141,12 @@ export default function Game() {
               {c.tier === '主角' && <span className="text-game-accent text-xs ml-1">⭐</span>}
               {c.tier === '核心' && <span className="text-game-primary text-xs ml-1">◆</span>}
             </span>
-            <Badge variant="outline" size="sm">{c.role}</Badge>
+            <div className="flex items-center gap-1">
+              {c.faction && (
+                <Badge variant="warning" size="sm">🏛️ {c.faction}</Badge>
+              )}
+              <Badge variant="outline" size="sm">{c.role}</Badge>
+            </div>
           </div>
           {c.relation && <p className="text-xs text-game-muted">{c.relation}</p>}
           <div className="flex items-center gap-2">

@@ -57,8 +57,12 @@ async def api_game_state():
     try:
         memory = load_memory()
         mem_chars = memory.get("characters", {})
+        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        world_chars = world_pack.get("world", {}).get("characters", [])
+        faction_map = {wc["name"]: wc.get("faction", "") for wc in world_chars if "name" in wc}
     except Exception:
         mem_chars = {}
+        faction_map = {}
 
     chars_with_trust: dict[str, dict] = {}
     raw_chars = state.get("characters", {})
@@ -74,6 +78,7 @@ async def api_game_state():
             "trust_pct": trust_pct,
             "flags": mem.get("flags", []),
             "tier": mem.get("tier", ""),
+            "faction": faction_map.get(name, mem.get("faction", "")),
         }
 
     # Faction data
@@ -115,6 +120,12 @@ async def api_start_game():
 
     memory = load_memory()
     mem_chars = memory.get("characters", {})
+    try:
+        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        world_chars = world_pack.get("world", {}).get("characters", [])
+        faction_map = {wc["name"]: wc.get("faction", "") for wc in world_chars if "name" in wc}
+    except Exception:
+        faction_map = {}
 
     chars_with_trust: dict[str, dict] = {}
     raw_chars = state.get("characters", {})
@@ -125,6 +136,7 @@ async def api_start_game():
         chars_with_trust[key] = {
             **sc, "trust": trust, "trust_pct": round(trust * 100),
             "flags": mem.get("flags", []), "tier": mem.get("tier", ""),
+            "faction": faction_map.get(name, mem.get("faction", "")),
         }
 
     # Faction data (consistent with /api/game-state)
@@ -178,6 +190,7 @@ async def api_npcs():
             "secret": ch.get("secret", ""),
             "background": ch.get("background", ""),
             "special_ability": ch.get("special_ability", ""),
+            "faction": ch.get("faction", ""),
             "trust": trust_val,
             "trust_pct": round(trust_val * 100),
             "flags": mem.get("flags", []),
@@ -397,6 +410,12 @@ async def api_next_turn(choice: str = Form("A")):
     # Merge trust data into characters (consistent with /api/game-state)
     memory = load_memory()
     mem_chars = memory.get("characters", {})
+    try:
+        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        world_chars = world_pack.get("world", {}).get("characters", [])
+        faction_map = {wc["name"]: wc.get("faction", "") for wc in world_chars if "name" in wc}
+    except Exception:
+        faction_map = {}
     chars_with_trust: dict[str, dict] = {}
     raw_chars = state.get("characters", {})
     for key, sc in raw_chars.items():
@@ -411,6 +430,7 @@ async def api_next_turn(choice: str = Form("A")):
             "trust_pct": trust_pct,
             "flags": mem.get("flags", []),
             "tier": mem.get("tier", ""),
+            "faction": faction_map.get(name, mem.get("faction", "")),
         }
 
     # Faction data (consistent with /api/game-state)
