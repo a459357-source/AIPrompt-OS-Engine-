@@ -103,6 +103,7 @@ export default function NewStory() {
       ],
       rel_stages: DEFAULT_STAGES,
       rel_affection: 0,
+      artifacts: [] as { name: string; type: 'personal'|'faction'|'world'; description: string; ownerType: 'character'|'faction'|'location'|'none'; ownerId: string; importance: number; abilities: string[]; tags: string[] }[],
     },
   })
 
@@ -261,6 +262,7 @@ export default function NewStory() {
     fd.append('main_goal', data.main_goal)
     fd.append('chars_json', JSON.stringify(data.characters))
     fd.append('rel_system', JSON.stringify({ stages: data.rel_stages, affection: data.rel_affection }))
+    fd.append('artifacts_json', JSON.stringify(data.artifacts || []))
     showStatus('正在创建故事…', 'loading')
     try {
       await createStory(fd)
@@ -682,6 +684,210 @@ export default function NewStory() {
                 >
                   AI 生成专属规则
                 </AIButton>
+              </CardContent>
+            </Card>
+
+            {/* Part 5: Artifacts */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-game-accent/20 text-game-accent text-xs flex items-center justify-center">5</span>
+                  🗝️ 关键物品
+                </CardTitle>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    disabled={generating === 'artifacts-all'}
+                    onClick={async () => {
+                      setGenerating('artifacts-all')
+                      showStatus('正在批量生成关键物品…', 'loading')
+                      const current = getValues('artifacts') || []
+                      const newArts: typeof current = []
+                      for (let i = 0; i < 3; i++) {
+                        try {
+                          const data = await generateField({
+                            field: 'artifact',
+                            title: getValues('title'),
+                            world: getValues('world'),
+                            genre: getValues('genre').join('/'),
+                          })
+                          if ((data as { name?: string }).name) {
+                            newArts.push({
+                              name: (data as { name: string }).name,
+                              type: ((data as { type?: string }).type || 'personal') as 'personal' | 'faction' | 'world',
+                              description: (data as { description?: string }).description || '',
+                              ownerType: ((data as { ownerType?: string }).ownerType || 'none') as 'character' | 'faction' | 'location' | 'none',
+                              ownerId: (data as { ownerId?: string }).ownerId || '',
+                              importance: (data as { importance?: number }).importance || 50,
+                              abilities: (data as { abilities?: string[] }).abilities || [],
+                              tags: (data as { tags?: string[] }).tags || [],
+                            })
+                          }
+                        } catch { /* continue */ }
+                      }
+                      setValue('artifacts', [...current, ...newArts])
+                      showStatus(`✅ 已生成 ${newArts.length} 个关键物品`, 'success')
+                      setGenerating(null)
+                    }}
+                  >
+                    {generating === 'artifacts-all' ? '⏳' : '✨'} 模块生成(×3)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => {
+                      const current = getValues('artifacts') || []
+                      setValue('artifacts', [...current, {
+                        name: '', type: 'personal' as const, description: '',
+                        ownerType: 'none' as const, ownerId: '',
+                        importance: 50, abilities: [], tags: [],
+                      }])
+                    }}
+                  >
+                    ➕ 添加物品
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {(getValues('artifacts') || []).map((art, idx) => (
+                    <motion.div
+                      key={idx}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                    >
+                      <Card className="border-game-accent/30">
+                        <CardHeader className="pb-1">
+                          <div className="flex items-center justify-between">
+                            <Badge variant="accent" size="sm">
+                              {art.type === 'world' ? '🌍 世界级' : art.type === 'faction' ? '🏛️ 势力资产' : '👤 个人物品'}
+                            </Badge>
+                            <div className="flex gap-1">
+                              <AIButton
+                                loading={generating === `artifact-${idx}`}
+                                onClick={async () => {
+                                  setGenerating(`artifact-${idx}`)
+                                  try {
+                                    const data = await generateField({
+                                      field: 'artifact',
+                                      title: getValues('title'),
+                                      world: getValues('world'),
+                                      genre: getValues('genre').join('/'),
+                                    })
+                                    if ((data as { name?: string }).name) {
+                                      const current = getValues('artifacts') || []
+                                      current[idx] = {
+                                        name: (data as { name: string }).name,
+                                        type: ((data as { type?: string }).type || 'personal') as 'personal' | 'faction' | 'world',
+                                        description: (data as { description?: string }).description || '',
+                                        ownerType: ((data as { ownerType?: string }).ownerType || 'none') as 'character' | 'faction' | 'location' | 'none',
+                                        ownerId: (data as { ownerId?: string }).ownerId || '',
+                                        importance: (data as { importance?: number }).importance || 50,
+                                        abilities: (data as { abilities?: string[] }).abilities || [],
+                                        tags: (data as { tags?: string[] }).tags || [],
+                                      }
+                                      setValue('artifacts', [...current])
+                                    }
+                                    showStatus('✅ 物品生成完成', 'success')
+                                  } catch (e) { showStatus(`❌ ${(e as Error).message}`, 'error') }
+                                  setGenerating(null)
+                                }}
+                              >生成</AIButton>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const current = getValues('artifacts') || []
+                                  current.splice(idx, 1)
+                                  setValue('artifacts', [...current])
+                                }}
+                                className="text-game-dim hover:text-game-danger transition-colors text-sm"
+                              >✕</button>
+                            </div>
+                          </div>
+                          <Input
+                            value={art.name}
+                            onChange={(e) => {
+                              const current = getValues('artifacts') || []
+                              current[idx] = { ...current[idx], name: e.target.value }
+                              setValue('artifacts', [...current])
+                            }}
+                            placeholder="物品名称"
+                            className="mt-1 font-bold text-sm h-8"
+                          />
+                        </CardHeader>
+                        <CardContent className="space-y-2 pt-0">
+                          <div className="flex gap-2">
+                            <select
+                              value={art.type}
+                              onChange={(e) => {
+                                const current = getValues('artifacts') || []
+                                current[idx] = { ...current[idx], type: e.target.value as 'personal' | 'faction' | 'world' }
+                                setValue('artifacts', [...current])
+                              }}
+                              className="bg-game-bg border border-game-border rounded-md px-2 py-1 text-xs text-game-text"
+                            >
+                              <option value="personal">个人物品</option>
+                              <option value="faction">势力资产</option>
+                              <option value="world">世界级</option>
+                            </select>
+                            <Input
+                              value={art.ownerId}
+                              onChange={(e) => {
+                                const current = getValues('artifacts') || []
+                                current[idx] = { ...current[idx], ownerId: e.target.value }
+                                setValue('artifacts', [...current])
+                              }}
+                              placeholder="持有者（角色名/势力名）"
+                              className="flex-1 text-xs h-7"
+                            />
+                            <Input
+                              type="number"
+                              value={art.importance}
+                              onChange={(e) => {
+                                const current = getValues('artifacts') || []
+                                current[idx] = { ...current[idx], importance: Math.max(1, Math.min(100, parseInt(e.target.value) || 50)) }
+                                setValue('artifacts', [...current])
+                              }}
+                              className="w-16 text-xs h-7"
+                              placeholder="重要度"
+                            />
+                          </div>
+                          <Input
+                            value={art.description}
+                            onChange={(e) => {
+                              const current = getValues('artifacts') || []
+                              current[idx] = { ...current[idx], description: e.target.value }
+                              setValue('artifacts', [...current])
+                            }}
+                            placeholder="物品描述（用途、背景…）"
+                            className="text-xs h-7"
+                          />
+                          <div className="flex gap-1 flex-wrap">
+                            <TagInput
+                              value={art.tags || []}
+                              onChange={(tags) => {
+                                const current = getValues('artifacts') || []
+                                current[idx] = { ...current[idx], tags }
+                                setValue('artifacts', [...current])
+                              }}
+                              presets={['国宝','机密','武器','货币','信物','钥匙','证据','传家宝']}
+                              placeholder="标签…"
+                              color="accent"
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                  {(getValues('artifacts') || []).length === 0 && (
+                    <p className="text-game-dim text-xs text-center py-4 col-span-2">
+                      暂无关键物品 · 点击「✨ 模块生成」AI 批量生成，或「➕ 添加物品」手动填写
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
 

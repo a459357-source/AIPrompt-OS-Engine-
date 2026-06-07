@@ -27,6 +27,7 @@ async def create_new_story(
     custom_rules: str = Form(""),
     main_goal: str = Form(""),
     rel_system: str = Form(""),
+    artifacts_json: str = Form(""),
 ):
     """Process the new story form and initialize all state."""
     import yaml
@@ -60,6 +61,25 @@ async def create_new_story(
         except Exception:
             pass
 
+    # Parse artifacts
+    artifacts = []
+    if artifacts_json.strip():
+        try:
+            artifacts = json.loads(artifacts_json.strip())
+            # Normalize each artifact
+            for art in artifacts:
+                art.setdefault("type", "personal")
+                art.setdefault("ownerType", "none")
+                art.setdefault("ownerId", "")
+                art.setdefault("importance", 50)
+                art.setdefault("status", "active")
+                art.setdefault("abilities", [])
+                art.setdefault("tags", [])
+                art.setdefault("relatedCharacters", [])
+                art.setdefault("relatedFactions", [])
+        except Exception:
+            pass
+
     # Build world_pack.yaml
     world_pack = {
         "world": {
@@ -76,6 +96,7 @@ async def create_new_story(
             "themes": [],
             "characters": [],
             "relationship_system": rel_config,
+            "artifacts": artifacts,
         }
     }
     if custom:
@@ -301,6 +322,8 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
     elif field == "rel_system":
         ctx = f"标题：{title}，世界观：{world[:200] if world else context[:200]}"
         user = f"为以下 Galgame 推荐关系阶段系统（5-7个递进阶段）：\n{ctx}\n\n输出JSON：{{\"rel_stages\":[\"阶段1\",\"阶段2\",...],\"rel_affection\":0}}"
+    elif field == "artifact":
+        user = f"为以下故事生成一个关键物品（Artifact），用 JSON 格式输出：\n故事标题：{title}\n世界观：{world[:300] if world else context[:300]}\n\n输出格式：{{\"name\":\"物品名称（8字内）\",\"type\":\"personal|faction|world\",\"description\":\"物品描述（20-60字）\",\"ownerType\":\"character|faction|location|none\",\"ownerId\":\"持有者名（与已有角色或势力匹配，或留空）\",\"importance\":50-95,\"abilities\":[\"能力1\",\"能力2\"],\"tags\":[\"标签1\",\"标签2\"]}}\n\n要求：物品要有故事推动力，可以是传家宝、机密文件、武器、货币、信物等。只输出JSON。"
     else:
         return JR({"error": f"未知字段类型: {field}"}, status_code=400)
 
@@ -343,6 +366,35 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
                 except Exception:
                     pass
             return JR({"name": story.strip()[:20], "role_tags": [char_role] if char_role else [], "isMain": False, "personality_tags": [], "appearance": "", "relationship": [], "goal": "", "secret": ""})
+        if field == "artifact":
+            # Normalize artifact result
+            if "name" in result:
+                result.setdefault("type", "personal")
+                result.setdefault("description", "")
+                result.setdefault("ownerType", "none")
+                result.setdefault("ownerId", "")
+                result.setdefault("importance", 50)
+                result.setdefault("abilities", [])
+                result.setdefault("tags", [])
+                for f in ["abilities", "tags"]:
+                    if f in result and not isinstance(result[f], list):
+                        result[f] = [result[f]] if result[f] else []
+                return JR(result)
+            story = result.get("story", "")
+            import re as _re4
+            m = _re4.search(r'\{[^}]+\}', story)
+            if m:
+                import json as _json4
+                try:
+                    art = _json4.loads(m.group())
+                    art.setdefault("type", "personal")
+                    art.setdefault("ownerType", "none")
+                    art.setdefault("ownerId", "")
+                    art.setdefault("importance", 50)
+                    return JR(art)
+                except Exception:
+                    pass
+            return JR({"name": story.strip()[:20], "type": "personal", "description": story.strip()[:60], "ownerType": "none", "ownerId": "", "importance": 50, "abilities": [], "tags": []})
         if field == "genre":
             story = result.get("story", "")
             import re as _re2
