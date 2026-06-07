@@ -218,11 +218,22 @@ RECOMMENDED_STORY_LENGTH = DEFAULT_STORY_LENGTH
 # 与 api 保存字数时的 max_tokens 估算一致：needed ≈ length × ratio，上限受 MAX_TOKENS 顶格约束
 STORY_LENGTH_TOKEN_RATIO = 1.8
 MAX_STORY_LENGTH = int(16384 / STORY_LENGTH_TOKEN_RATIO)  # 9102
+MAX_TOKEN_TIERS = (512, 1024, 2048, 4096, 8192, 16384)
 
 
 def clamp_story_length(length: int) -> int:
     """Clamp target story length to values the engine can honor."""
     return max(MIN_STORY_LENGTH, min(MAX_STORY_LENGTH, int(length)))
+
+
+def tokens_for_story_length(length: int) -> int:
+    """Map target story length to the smallest standard max_tokens tier that fits."""
+    needed = int(clamp_story_length(length) * STORY_LENGTH_TOKEN_RATIO)
+    needed = max(512, min(16384, needed))
+    for tier in MAX_TOKEN_TIERS:
+        if tier >= needed:
+            return tier
+    return 16384
 
 
 def story_length_limits() -> dict[str, int]:
@@ -240,8 +251,9 @@ def _load_story_length() -> int:
 
 
 def save_story_length(length: int) -> None:
-    """Persist story length preference."""
-    _update_settings(story_length=length)
+    """Persist story length and sync max_tokens to match."""
+    length = clamp_story_length(length)
+    _update_settings(story_length=length, max_tokens=tokens_for_story_length(length))
 
 
 def reload_story_length() -> int:

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -107,6 +108,7 @@ export default function Settings() {
   const [apiKey, setApiKey] = useState('')
   const [apiKeyMasked, setApiKeyMasked] = useState('')
   const [model, setModel] = useState('deepseek-chat')
+  const [storyLength, setStoryLength] = useState(1000)
   const [maxTokens, setMaxTokens] = useState(2048)
   const [temperature, setTemperature] = useState(0.8)
   const [topP, setTopP] = useState(0.9)
@@ -144,12 +146,14 @@ export default function Settings() {
     return () => sub.unsubscribe()
   }, [form, isDirty])
 
-  // API settings
-  useEffect(() => {
+  // API settings — refetch when entering settings or tab refocus (sync max_tokens after game page edits)
+  const location = useLocation()
+  const loadEngineSettings = useCallback(() => {
     getEngineSettings()
       .then((data) => {
         if (data.api_key_masked) setApiKeyMasked(data.api_key_masked)
         setModel(data.model)
+        setStoryLength(data.story_length)
         setMaxTokens(data.max_tokens)
         setTemperature(data.temperature)
         setTopP(data.top_p)
@@ -161,6 +165,18 @@ export default function Settings() {
       .catch((e) => logger.error('Settings', 'Load engine settings failed', { error: String(e) }))
   }, [])
 
+  useEffect(() => {
+    loadEngineSettings()
+  }, [location.pathname, loadEngineSettings])
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') loadEngineSettings()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [loadEngineSettings])
+
   const [apiSaving, setApiSaving] = useState(false)
   const [apiSaved, setApiSaved] = useState(false)
 
@@ -171,7 +187,6 @@ export default function Settings() {
       const data = await saveEngineSettings({
         apiKey: apiKey || undefined,
         model,
-        maxTokens,
         temperature,
         topP,
         stream,
@@ -180,6 +195,8 @@ export default function Settings() {
         compressThreshold,
       })
       if (data.api_key_masked) setApiKeyMasked(data.api_key_masked)
+      setStoryLength(data.story_length)
+      setMaxTokens(data.max_tokens)
       setApiKey('')
       setApiSaved(true)
       setSaved(true)
@@ -188,7 +205,7 @@ export default function Settings() {
       logger.error('Settings', 'Save API failed', { error: String(e) })
     }
     setApiSaving(false)
-  }, [apiKey, model, maxTokens, temperature, topP, stream, maxContextMsgs, autoCompress, compressThreshold])
+  }, [apiKey, model, temperature, topP, stream, maxContextMsgs, autoCompress, compressThreshold])
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -456,20 +473,15 @@ export default function Settings() {
                 </div>
                 <div className="space-y-1.5">
                   <Label>AI 最大 Token</Label>
-                  <Select value={String(maxTokens)} onValueChange={(v) => setMaxTokens(parseInt(v))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="512">512 tokens（快速/可能截断）</SelectItem>
-                      <SelectItem value="1024">1024 tokens（较短）</SelectItem>
-                      <SelectItem value="2048">2048 tokens（标准）</SelectItem>
-                      <SelectItem value="4096">4096 tokens（完整/较慢）</SelectItem>
-                      <SelectItem value="8192">8192 tokens（最大/较慢）</SelectItem>
-                      <SelectItem value="16384">16384 tokens（超大/慢）</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-game-dim">控制 AI 回复长度上限，世界观生成会用双倍值</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" size="sm" className="tabular-nums">
+                      {maxTokens.toLocaleString()} tokens
+                    </Badge>
+                    <span className="text-xs text-game-dim">
+                      随游戏页「目标字数」自动匹配（当前 {storyLength.toLocaleString()} 字）
+                    </span>
+                  </div>
+                  <p className="text-xs text-game-dim">请在游戏正文区调整目标字数；Token 上限会同步更新。世界观生成会用双倍值。</p>
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">

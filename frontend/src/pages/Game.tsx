@@ -196,7 +196,7 @@ export default function Game() {
     storyLengthTimerRef.current = setTimeout(async () => {
       try {
         const saved = await updateStoryLength(clamped)
-        setStoryLength(saved)
+        setStoryLength(saved.story_length)
         setStoryLengthSaved(true)
         setTimeout(() => setStoryLengthSaved(false), 1500)
       } catch (e) {

@@ -44,6 +44,7 @@ def settings_payload() -> dict:
         "models": dict(AVAILABLE_MODELS),
         "story_length": config.STORY_LENGTH,
         "max_tokens": config.MAX_TOKENS,
+        "matched_max_tokens": config.tokens_for_story_length(config.STORY_LENGTH),
         "temperature": config.TEMPERATURE,
         "top_p": config.TOP_P,
         "stream": config.STREAM,
@@ -57,7 +58,7 @@ def apply_engine_settings(
     api_key: str = "",
     model: str = "deepseek-chat",
     story_length: int | None = None,
-    max_tokens: int = 2048,
+    max_tokens: int | None = None,
     temperature: float = 0.8,
     top_p: float = 0.9,
     stream: int = 0,
@@ -79,8 +80,10 @@ def apply_engine_settings(
     if story_length is not None:
         save_story_length(clamp_story_length(story_length))
         reload_story_length()
-    save_max_tokens(max(512, min(16384, max_tokens)))
-    reload_max_tokens()
+        reload_max_tokens()
+    elif max_tokens is not None:
+        save_max_tokens(max(512, min(16384, max_tokens)))
+        reload_max_tokens()
     save_temperature(max(0.1, min(2.0, temperature)))
     reload_temperature()
     save_top_p(max(0.0, min(1.0, top_p)))

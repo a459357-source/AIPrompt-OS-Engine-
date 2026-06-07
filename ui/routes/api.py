@@ -482,7 +482,7 @@ async def api_save_settings(
     api_key: str = Form(""),
     model: str = Form("deepseek-chat"),
     story_length: int | None = Form(default=None),
-    max_tokens: int = Form(2048),
+    max_tokens: int | None = Form(default=None),
     temperature: float = Form(0.8),
     top_p: float = Form(0.9),
     stream: int = Form(0),
@@ -525,32 +525,23 @@ async def api_get_story_length():
     """Current target length for generated story text (chars per turn)."""
     payload = config.story_length_limits()
     payload["story_length"] = config.STORY_LENGTH
+    payload["max_tokens"] = config.MAX_TOKENS
+    payload["matched_max_tokens"] = config.tokens_for_story_length(config.STORY_LENGTH)
     return JSONResponse(payload)
 
 
 @router.post("/story-length")
 async def api_set_story_length(story_length: int = Form(...)):
     """Update story length; applies from the next AI generation."""
-    from config import (
-        save_story_length,
-        reload_story_length,
-        save_max_tokens,
-        reload_max_tokens,
-        MAX_TOKENS,
-        clamp_story_length,
-        STORY_LENGTH_TOKEN_RATIO,
-    )
+    from config import save_story_length, reload_story_length, reload_max_tokens, clamp_story_length
     length = clamp_story_length(story_length)
     save_story_length(length)
     reload_story_length()
-    # JSON 回复含 state/options，需留出比正文字数更大的 token 预算
-    needed_tokens = min(16384, max(512, int(length * STORY_LENGTH_TOKEN_RATIO)))
-    if MAX_TOKENS < needed_tokens:
-        save_max_tokens(needed_tokens)
-        reload_max_tokens()
+    reload_max_tokens()
     return JSONResponse({
         "ok": True,
         "story_length": config.STORY_LENGTH,
         "max_tokens": config.MAX_TOKENS,
+        "matched_max_tokens": config.tokens_for_story_length(config.STORY_LENGTH),
     })
 

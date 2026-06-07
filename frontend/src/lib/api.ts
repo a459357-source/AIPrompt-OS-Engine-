@@ -238,6 +238,7 @@ export interface EngineSettings {
   models: Record<string, string>
   story_length: number
   max_tokens: number
+  matched_max_tokens?: number
   temperature: number
   top_p: number
   stream: boolean
@@ -256,7 +257,7 @@ export async function saveEngineSettings(params: {
   apiKey?: string
   model: string
   storyLength?: number
-  maxTokens: number
+  maxTokens?: number
   temperature: number
   topP: number
   stream: boolean
@@ -268,7 +269,7 @@ export async function saveEngineSettings(params: {
   if (params.apiKey) fd.append('api_key', params.apiKey)
   fd.append('model', params.model)
   if (params.storyLength != null) fd.append('story_length', String(params.storyLength))
-  fd.append('max_tokens', String(params.maxTokens))
+  if (params.maxTokens != null) fd.append('max_tokens', String(params.maxTokens))
   fd.append('temperature', String(params.temperature))
   fd.append('top_p', String(params.topP))
   fd.append('stream', params.stream ? '1' : '0')
@@ -288,6 +289,8 @@ export interface StoryLengthSettings {
   min: number
   max: number
   recommended: number
+  max_tokens?: number
+  matched_max_tokens?: number
 }
 
 export async function getStoryLengthSettings(): Promise<StoryLengthSettings> {
@@ -305,20 +308,22 @@ export async function getStoryLengthSettings(): Promise<StoryLengthSettings> {
     min: data.min ?? fallback.min,
     max: data.max ?? fallback.max,
     recommended: data.recommended ?? fallback.recommended,
+    max_tokens: data.max_tokens,
+    matched_max_tokens: data.matched_max_tokens,
   }
 }
 
-/** @deprecated use getStoryLengthSettings */
-export async function getStoryLength(): Promise<number> {
-  const data = await getStoryLengthSettings()
-  return data.story_length
-}
-
-export async function updateStoryLength(length: number): Promise<number> {
+export async function updateStoryLength(length: number): Promise<StoryLengthSettings> {
   const fd = new FormData()
   fd.append('story_length', String(length))
   const res = await fetch('/api/story-length', { method: 'POST', body: fd })
-  const data = await res.json().catch(() => ({})) as { story_length?: number; error?: string }
+  const data = await res.json().catch(() => ({})) as Partial<StoryLengthSettings> & { error?: string }
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
-  return data.story_length ?? length
+  const settings = await getStoryLengthSettings()
+  return {
+    ...settings,
+    story_length: data.story_length ?? settings.story_length,
+    max_tokens: data.max_tokens ?? settings.max_tokens,
+    matched_max_tokens: data.matched_max_tokens ?? settings.matched_max_tokens,
+  }
 }
