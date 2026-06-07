@@ -438,115 +438,11 @@ export default function NewStory() {
               </CardContent>
             </Card>
 
-            {/* Part 2: Relationship System */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-primary/20 text-game-primary text-xs flex items-center justify-center">2</span>
-                  ❤️ 关系系统
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Who's involved — 主角与每个NPC一对一 */}
-                {(() => {
-                  const allChars = watch('characters') || []
-                  const mainChar = allChars.find((c: { isMain?: boolean }) => c.isMain) || allChars[0]
-                  const npcs = allChars.filter((c: { isMain?: boolean }) => !c.isMain && c.name)
-                  return (
-                    <div className="space-y-2">
-                      {npcs.length > 0 ? npcs.map((c: { name: string }) => (
-                        <div key={c.name} className="flex items-center gap-2 text-sm">
-                          <span className="font-bold text-game-accent">{mainChar?.name || '主角'}</span>
-                          <span className="text-game-accent">↔</span>
-                          <Badge variant="primary" size="sm">{c.name}</Badge>
-                        </div>
-                      )) : (
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="font-bold text-game-accent">{mainChar?.name || '主角'}</span>
-                          <span className="text-game-accent">↔</span>
-                          <Badge variant="outline" size="sm">所有角色</Badge>
-                        </div>
-                      )}
-                      <p className="text-xs text-game-muted">
-                        双向关系系统——正面（陌生→信赖→羁绊）和负面（陌生→疏远→崩坏）。AI 会根据剧情推进关系向任意方向发展。
-                      </p>
-                    </div>
-                  )
-                })()}
-
-                {/* Stage chain with descriptions */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-game-muted">关系阶段递进</Label>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {relStages.map((s, i) => (
-                      <span key={i} className="flex items-center gap-1">
-                        <Badge variant="primary" size="sm">{s}</Badge>
-                        {i < relStages.length - 1 && (
-                          <span className="text-game-dim text-[10px]">→</span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Affection slider with visual bar */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs text-game-muted">初始好感度</Label>
-                    <Badge variant="accent" size="sm">
-                      {watch('rel_affection')}/100
-                    </Badge>
-                  </div>
-                  {/* Visual bar */}
-                  <div className="h-3 bg-game-border rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-game-primary via-game-accent to-game-success rounded-full transition-all duration-300"
-                      style={{ width: `${watch('rel_affection')}%` }}
-                    />
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    {...register('rel_affection', { valueAsNumber: true })}
-                    className="w-full accent-game-accent h-1.5"
-                  />
-                  <div className="flex justify-between text-[10px] text-game-dim">
-                    <span className="text-game-danger">崩坏</span>
-                    <span>疏远</span>
-                    <span className="text-game-muted">陌生</span>
-                    <span>信赖</span>
-                    <span className="text-game-success">羁绊</span>
-                  </div>
-                </div>
-
-                {/* Stage-affinity mapping hint */}
-                <div className="bg-game-surface border border-game-border rounded-md p-3 text-xs text-game-muted space-y-1">
-                  <p className="text-game-accent font-medium mb-1">📋 阶段与好感度对应</p>
-                  {relStages.map((s, i) => {
-                    const pct = Math.round((i / Math.max(1, relStages.length - 1)) * 100)
-                    return (
-                      <div key={s} className="flex items-center gap-2">
-                        <Badge variant="outline" size="sm" className="w-16 justify-center">{s}</Badge>
-                        <div className="flex-1 h-1.5 bg-game-border rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-game-primary/40 rounded-full"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <span className="text-game-dim w-8 text-right tabular-nums">{pct}%</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Part 3: Characters */}
+            {/* Part 3: Characters — 编号顺延，Part2已合并到Part4专属规则 */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-primary/20 text-game-primary text-xs flex items-center justify-center">3</span>
+                  <span className="w-6 h-6 rounded-full bg-game-primary/20 text-game-primary text-xs flex items-center justify-center">2</span>
                   角色系统
                 </CardTitle>
                 <Button
@@ -686,52 +582,79 @@ export default function NewStory() {
               </CardContent>
             </Card>
 
-            {/* Part 4: Custom Rules */}
+            {/* Part 3: Custom Rules — 关系系统已合并到此 */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-primary/20 text-game-primary text-xs flex items-center justify-center">4</span>
-                  专属规则
+                  <span className="w-6 h-6 rounded-full bg-game-primary/20 text-game-primary text-xs flex items-center justify-center">3</span>
+                  专属规则 & 多维关系
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                {/* Who's involved */}
+                {(() => {
+                  const allChars = watch('characters') || []
+                  const mainChar = allChars.find((c: { isMain?: boolean }) => c.isMain) || allChars[0]
+                  const npcs = allChars.filter((c: { isMain?: boolean }) => !c.isMain && c.name)
+                  return (
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] text-game-muted">💞 关系对象</span>
+                      {npcs.length > 0 ? npcs.map((c: { name: string }) => (
+                        <div key={c.name} className="flex items-center gap-2 text-sm">
+                          <span className="font-bold text-game-accent">{mainChar?.name || '主角'}</span>
+                          <span className="text-game-accent">↔</span>
+                          <Badge variant="primary" size="sm">{c.name}</Badge>
+                        </div>
+                      )) : (
+                        <p className="text-xs text-game-dim">添加 NPC 后自动显示关系对</p>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                <Separator />
+
+                {/* Multidimensional relationship model */}
+                <div className="bg-game-surface border border-game-border rounded-md p-3 space-y-2">
+                  <span className="text-[10px] text-game-muted">📐 多维关系模型（替代单一好感度+固定阶段）</span>
+                  <div className="grid grid-cols-3 gap-1 text-[10px]">
+                    {[
+                      ['❤️ 好感', 'affection'],
+                      ['🤝 信任', 'trust'],
+                      ['🙏 尊重', 'respect'],
+                      ['🔗 依赖', 'dependence'],
+                      ['⚔️ 敌意', 'hostility'],
+                      ['💫 吸引', 'attraction'],
+                    ].map(([label, key]) => (
+                      <div key={key} className="flex items-center gap-1">
+                        <span className="text-game-dim w-12">{label}</span>
+                        <div className="flex-1 h-1.5 bg-game-border rounded-full overflow-hidden">
+                          <div className="h-full bg-game-accent/60 rounded-full" style={{ width: '50%' }} />
+                        </div>
+                        <span className="text-game-dim w-6 text-right">50</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-game-dim mt-1">
+                    关系由类型（家人/朋友/恋人/师徒/对手/盟友/敌人）+ 六维数值 + 标签 + 关键经历共同定义。AI 优先参考关键经历和关系标签。
+                  </p>
+                </div>
+
                 {/* Current custom stats */}
                 {(() => {
                   const stats = getValues('customStats') || []
-                  const stages = getValues('rel_stages') || []
-                  const hasRules = stats.length > 0 || !stages.every((s: string) => DEFAULT_STAGES.includes(s))
-                  return hasRules ? (
-                    <div className="bg-game-surface border border-game-border rounded-md p-3 space-y-2">
-                      {stats.length > 0 && (
-                        <div>
-                          <span className="text-[10px] text-game-muted">📊 追踪维度</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {stats.map((s: { key: string; label: string; max: number }) => (
-                              <Badge key={s.key} variant="accent" size="sm">{s.label} (0-{s.max})</Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {stages.length > 0 && (
-                        <div>
-                          <span className="text-[10px] text-game-muted">💞 关系阶段 ({stages.length})</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {stages.map((s: string, i: number) => (
-                              <span key={i} className="flex items-center gap-0.5">
-                                <Badge variant="primary" size="sm">{s}</Badge>
-                                {i < stages.length - 1 && <span className="text-game-dim text-[10px]">→</span>}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                  return stats.length > 0 ? (
+                    <div>
+                      <span className="text-[10px] text-game-muted">📊 追踪维度</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {stats.map((s: { key: string; label: string; max: number }) => (
+                          <Badge key={s.key} variant="accent" size="sm">{s.label} (0-{s.max})</Badge>
+                        ))}
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-xs text-game-dim">
-                      📊 默认追踪：好感度 · 双向量表（崩坏↔羁绊）· 点击下方按钮 AI 根据当前故事内容生成专属规则
-                    </p>
-                  )
+                  ) : null
                 })()}
+
                 <AIButton
                   loading={generating === 'rules'}
                   error={fieldErrors.rules}
@@ -768,7 +691,7 @@ export default function NewStory() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-accent/20 text-game-accent text-xs flex items-center justify-center">5</span>
+                  <span className="w-6 h-6 rounded-full bg-game-accent/20 text-game-accent text-xs flex items-center justify-center">4</span>
                   🗝️ 关键物品
                 </CardTitle>
                 <div className="flex gap-1">
@@ -972,7 +895,7 @@ export default function NewStory() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-warning/20 text-game-warning text-xs flex items-center justify-center">6</span>
+                  <span className="w-6 h-6 rounded-full bg-game-warning/20 text-game-warning text-xs flex items-center justify-center">5</span>
                   🏛️ 势力
                 </CardTitle>
                 <div className="flex gap-1">
