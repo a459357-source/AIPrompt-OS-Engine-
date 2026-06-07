@@ -471,33 +471,30 @@ export default function NewStory() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Who's involved — 主角与所有角色的关系 */}
+                {/* Who's involved — 主角与每个NPC一对一 */}
                 {(() => {
                   const allChars = watch('characters') || []
                   const mainChar = allChars.find((c: { isMain?: boolean }) => c.isMain) || allChars[0]
                   const npcs = allChars.filter((c: { isMain?: boolean }) => !c.isMain && c.name)
                   return (
-                    <>
-                      <div className="flex items-center gap-2 text-sm flex-wrap">
-                        <span className="font-bold text-game-accent">
-                          {mainChar?.name || '主角'}
-                        </span>
-                        <span className="text-game-accent text-lg">↔</span>
-                        {npcs.length > 0 ? (
-                          npcs.map((c: { name: string }, i: number) => (
-                            <span key={c.name} className="flex items-center gap-1">
-                              <Badge variant="primary" size="sm">{c.name}</Badge>
-                              {i < npcs.length - 1 && <span className="text-game-dim text-xs">·</span>}
-                            </span>
-                          ))
-                        ) : (
+                    <div className="space-y-2">
+                      {npcs.length > 0 ? npcs.map((c: { name: string }) => (
+                        <div key={c.name} className="flex items-center gap-2 text-sm">
+                          <span className="font-bold text-game-accent">{mainChar?.name || '主角'}</span>
+                          <span className="text-game-accent">↔</span>
+                          <Badge variant="primary" size="sm">{c.name}</Badge>
+                        </div>
+                      )) : (
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="font-bold text-game-accent">{mainChar?.name || '主角'}</span>
+                          <span className="text-game-accent">↔</span>
                           <Badge variant="outline" size="sm">所有角色</Badge>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <p className="text-xs text-game-muted">
                         双向关系系统——正面（陌生→信赖→羁绊）和负面（陌生→疏远→崩坏）。AI 会根据剧情推进关系向任意方向发展。
                       </p>
-                    </>
+                    </div>
                   )
                 })()}
 
