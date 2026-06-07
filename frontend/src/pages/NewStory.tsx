@@ -511,6 +511,21 @@ export default function NewStory() {
                                 />
                               </div>
 
+                              {/* Faction */}
+                              <div>
+                                <Label className="text-[11px]">🏛️ 所属势力</Label>
+                                <select
+                                  value={c?.faction || ''}
+                                  onChange={(e) => setValue(`characters.${idx}.faction`, e.target.value)}
+                                  className="w-full bg-game-bg border border-game-border rounded-md px-2 py-1.5 text-xs text-game-text mt-0.5"
+                                >
+                                  <option value="">无</option>
+                                  {(getValues('factions') || []).map((f: { name: string }) => (
+                                    <option key={f.name} value={f.name}>{f.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+
                               {/* Priority 1: Relationship (NPC only) */}
                               {!isMain && (
                                 <div>

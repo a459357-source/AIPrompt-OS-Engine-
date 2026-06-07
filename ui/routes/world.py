@@ -129,6 +129,7 @@ async def create_new_story(
         char_data = {
             "name": ch.get("name", ""),
             "is_main": ch.get("isMain", False),
+            "faction": ch.get("faction", ""),
             "role_tags": ch.get("role_tags", []),
             "personality_tags": ch.get("personality_tags", []),
             "appearance": ch.get("appearance", ""),
