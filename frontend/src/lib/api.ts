@@ -851,3 +851,23 @@ export async function updateAppSettings(patch: {
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
   return data
 }
+
+export interface SupplementLoreResult {
+  summary?: string
+  changes?: string[]
+  story_prompt_added?: boolean
+  analysis?: { characters: number; factions: number; relations: number }
+  story?: string
+  options?: string[]
+  state?: Record<string, unknown>
+  error?: string
+}
+
+export async function supplementLore(text: string): Promise<SupplementLoreResult> {
+  const fd = new FormData()
+  fd.append('text', text.trim())
+  const res = await apiFetch('/api/supplement-lore', { method: 'POST', body: fd })
+  const data = await res.json().catch(() => ({})) as SupplementLoreResult
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+  return data
+}

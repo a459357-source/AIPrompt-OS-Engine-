@@ -119,6 +119,9 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
         if stages:
             stage_chain = " → ".join(stages)
             custom_rules_text += f"【关系阶段】角色关系阶段为：{stage_chain}。重要事件推进阶段变化。\n"
+        story_prompt = str(custom.get("story_prompt", "")).strip()
+        if story_prompt:
+            custom_rules_text += f"【故事补充设定 — 仅本故事生效】\n{story_prompt}\n"
 
     # ── Main goal ──────────────────────────────────────────────
     world_data = world_pack.get("world", {})

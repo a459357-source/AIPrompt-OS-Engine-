@@ -590,3 +590,28 @@ async def api_set_app_settings(
     )
     return JSONResponse({"ok": True, **payload})
 
+
+@router.post("/supplement-lore")
+async def api_supplement_lore(text: str = Form("")):
+    """Analyze player supplement text and merge into world/state/memory."""
+    from fastapi.responses import JSONResponse
+    from engine.supplement_lore import supplement_lore
+    from engine.deepseek_client import DeepSeekError
+
+    try:
+        result = supplement_lore(text)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except DeepSeekError as exc:
+        return JSONResponse({"error": f"AI 分析失败: {exc}"}, status_code=500)
+    except Exception as exc:
+        return JSONResponse({"error": f"更新失败: {exc}"}, status_code=500)
+
+    try:
+        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+        payload = _game_state_payload(state)
+    except Exception:
+        payload = {}
+
+    return JSONResponse({**result, **payload})
+

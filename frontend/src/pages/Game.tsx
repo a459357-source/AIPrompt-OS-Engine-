@@ -8,11 +8,12 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import { StatusToast } from '@/components/StatusToast'
 import { InspectorPanel } from '@/components/layout/InspectorPanel'
 import { usePageShell } from '@/components/layout/usePageShell'
 import { GlassPanel } from '@/components/neural/GlassPanel'
-import { getGameState, startGameOnce, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, cancelGeneration, getGenerationStatus, waitForGameReady, type HistoryTurn, type GameGenSettings, type ContentWeights } from '@/lib/api'
+import { getGameState, startGameOnce, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, cancelGeneration, getGenerationStatus, waitForGameReady, supplementLore, type HistoryTurn, type GameGenSettings, type ContentWeights } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { parseOptionEffects, parseGameOption, formatOptionStatusMetrics } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
@@ -314,6 +315,11 @@ export default function Game() {
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [showConsequences, setShowConsequences] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [supplementOpen, setSupplementOpen] = useState(false)
+  const [supplementText, setSupplementText] = useState('')
+  const [supplementLoading, setSupplementLoading] = useState(false)
+  const [supplementError, setSupplementError] = useState('')
+  const [supplementSuccess, setSupplementSuccess] = useState('')
   const [history, setHistory] = useState<HistoryTurn[]>([])
   const [historyFocusTurn, setHistoryFocusTurn] = useState<number | null>(null)
   const [historyError, setHistoryError] = useState('')
@@ -905,6 +911,31 @@ export default function Game() {
     setHistoryLoading(false)
   }, [choosing, turn, story, options, status, scene])
 
+  const submitSupplement = useCallback(async () => {
+    const text = supplementText.trim()
+    if (!text || supplementLoading || choosing) return
+    setSupplementLoading(true)
+    setSupplementError('')
+    setSupplementSuccess('')
+    try {
+      const result = await supplementLore(text)
+      if (result.state) {
+        applyTurnData({
+          story: result.story ?? story,
+          options: result.options,
+          state: result.state,
+        })
+      }
+      const detail = result.changes?.length ? result.changes.join('；') : ''
+      setSupplementSuccess(detail ? `${result.summary ?? '设定已更新'}（${detail}）` : (result.summary ?? '设定已更新'))
+      setSupplementText('')
+    } catch (e) {
+      setSupplementError(formatFetchError(e))
+    } finally {
+      setSupplementLoading(false)
+    }
+  }, [supplementText, supplementLoading, choosing, applyTurnData, story])
+
   useEffect(() => {
     if (!historyOpen || historyLoading || historyFocusTurn == null || history.length === 0) return
     const id = `history-turn-${historyFocusTurn}`
@@ -1281,6 +1312,19 @@ export default function Game() {
                     <span className="text-[10px] text-game-success hidden sm:inline">已保存</span>
                   )}
                 </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1 text-game-muted hover:text-game-text"
+                  disabled={choosing || supplementLoading}
+                  onClick={() => {
+                    setSupplementError('')
+                    setSupplementSuccess('')
+                    setSupplementOpen(true)
+                  }}
+                >
+                  📝 补充设定
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -2112,6 +2156,65 @@ export default function Game() {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Supplement Lore Dialog ── */}
+      {supplementOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-12 px-4">
+          <div className="fixed inset-0 bg-black/70" onClick={() => !supplementLoading && setSupplementOpen(false)} />
+          <div className="relative z-50 w-full max-w-xl bg-game-card border border-game-border rounded-lg shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-game-border shrink-0">
+              <h2 className="text-base font-bold text-game-accent">📝 补充设定</h2>
+              <button
+                type="button"
+                disabled={supplementLoading}
+                onClick={() => setSupplementOpen(false)}
+                className="text-game-muted hover:text-game-text text-lg px-1 disabled:opacity-40"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-xs text-game-dim leading-relaxed">
+                填写世界观细节、角色背景、关系变化或叙事规则。提交后 AI 会分析：
+                与 prompt 相关的内容追加到<strong className="text-game-muted">本故事专属 prompt</strong>；
+                角色、势力、关系按分析结果更新到当前故事。
+              </p>
+              <Textarea
+                value={supplementText}
+                onChange={(e) => setSupplementText(e.target.value)}
+                placeholder="例如：艾莉丝其实是邻国间谍；学院禁止夜间外出；后续剧情偏悬疑…"
+                rows={8}
+                disabled={supplementLoading || choosing}
+                className="resize-y min-h-[140px] bg-game-bg/60 border-game-border text-sm"
+              />
+              {supplementError && (
+                <p className="text-xs text-game-danger">❌ {supplementError}</p>
+              )}
+              {supplementSuccess && (
+                <p className="text-xs text-game-success">✅ {supplementSuccess}</p>
+              )}
+              <div className="flex justify-end gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={supplementLoading}
+                  onClick={() => setSupplementOpen(false)}
+                >
+                  关闭
+                </Button>
+                <Button
+                  variant="accent"
+                  size="sm"
+                  disabled={supplementLoading || choosing || !supplementText.trim()}
+                  onClick={() => void submitSupplement()}
+                >
+                  {supplementLoading ? 'AI 分析中…' : '提交分析'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
