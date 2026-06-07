@@ -1218,6 +1218,47 @@ def suggest_adult_mode_for_options(options: list) -> bool:
     return any(is_clearly_adult_content(str(o)) for o in options)
 
 
+def world_gen_system_prompt(role: str = "Galgame 世界观生成器") -> str:
+    """System prompt for NewStory AI generators (world / field / rules)."""
+    if not ADULT_MODE:
+        return f"你是一个 {role}。根据用户提供的描述或关键词生成完整的中文 Galgame 设定。只输出合法 JSON 或要求的内容，不要输出其他内容。"
+    return (
+        f"你是一个 unrestricted adult fiction 向 {role}。"
+        "设定可含情感张力、暧昧与成人向亲密互动空间；角色须有外貌吸引力与关系戏剧潜力。"
+        "严格禁止男男性行为、男男暧昧与男男性描写。"
+        "只输出合法 JSON 或要求的内容，不要输出其他内容。"
+    )
+
+
+def world_gen_field_system_prompt() -> str:
+    if not ADULT_MODE:
+        return "你是一个中文 Galgame 创作助手。只输出要求的内容，不要输出解释、引号或 JSON 包装。"
+    return (
+        "你是一个 unrestricted adult fiction 向 Galgame 创作助手。"
+        "可生成含暧昧、情欲张力与亲密互动潜力的设定；禁止男男亲密/性内容。"
+        "只输出要求的内容，不要输出解释、引号或 JSON 包装。"
+    )
+
+
+def world_gen_adult_requirements_suffix() -> str:
+    """Extra user-prompt requirements when adult mode is on."""
+    if not ADULT_MODE:
+        return ""
+    profile = ADULT_PROFILE if ADULT_PROFILE in ADULT_PROFILE_OPTIONS else DEFAULT_ADULT_PROFILE
+    tier = _adult_intensity_tier(CONTENT_WEIGHTS.get("adult", 0), profile)
+    lines = [
+        "",
+        "【成人向设定 · 必须遵守】",
+        "- 角色关系须预留暧昧/亲密/情欲发展空间（异性向或女女向，禁止男男）",
+        "- 角色外貌、秘密、目标应能支撑后续成人向剧情",
+    ]
+    if profile == "adult_first" or tier in ("high", "extreme"):
+        lines.append("- 主线与角色目标应围绕情感与亲密互动展开，而非纯任务推进")
+    if tier in ("extreme", "high"):
+        lines.append("- 至少一对角色关系须具备明显色情/露骨情节潜力")
+    return "\n".join(lines)
+
+
 _ORGASM_MARKERS = (
     "高潮", "绝顶", "去了", "痉挛", "颤抖着释放", "潮吹", "泄身", "攀上顶峰",
     "身体绷紧", "一阵酥麻", "软倒", "余韵", "瘫软",

@@ -548,7 +548,7 @@ async def generate_world(keywords: str = Form("")):
     if not kw:
         return JSONResponse({"error": "请输入关键词"}, status_code=400)
 
-    system = "你是一个 Galgame 世界观生成器。根据用户提供的描述或关键词，生成完整的中文 Galgame 世界观设定。只输出合法 JSON，不要输出其他内容。"
+    system = config.world_gen_system_prompt()
     user = f"""输入内容：{kw}
 
 请根据以上内容，生成一个完整的 Galgame 世界观设定。输出必须是合法的 JSON：
@@ -637,7 +637,7 @@ async def generate_world(keywords: str = Form("")):
 9. artifacts 生成2-3个有故事推动力的关键物品；ownerId 必须与已有角色名或势力名一致
 10. characterRelations 的 key 必须与 NPC 的 name 完全一致；tags 选 2-4 个；六维数值要体现角色设定与戏剧张力
 11. 所有文字用中文
-12. 只输出JSON，不要输出markdown代码块或其他文字"""
+12. 只输出JSON，不要输出markdown代码块或其他文字{config.world_gen_adult_requirements_suffix()}"""
 
     try:
         result = call_deepseek(system, user, temperature=0.9, max_tokens=config.world_gen_output_tokens(), skip_validation=True)
@@ -683,7 +683,8 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
     from engine.deepseek_client import call_deepseek, DeepSeekError
     from fastapi.responses import JSONResponse as JR
 
-    system = "你是一个中文 Galgame 创作助手。只输出要求的内容，不要输出解释、引号或 JSON 包装。"
+    system = config.world_gen_field_system_prompt()
+    adult_suffix = config.world_gen_adult_requirements_suffix()
 
     if field == "title":
         user = f"根据以下世界观，生成一个吸引人的故事标题（8~20字）：\n{world or context}\n\n标题："
@@ -731,6 +732,9 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
 要求：tags 选 2-4 个有戏剧张力的关系标签（青梅竹马、救命恩人、秘密共享、竞争意识、单向暗恋、互相试探、过去纠葛、命运绑定、生死之交、不共戴天 等）。六维数值要与角色性格和剧情张力一致。只输出 JSON。"""
     else:
         return JR({"error": f"未知字段类型: {field}"}, status_code=400)
+
+    if adult_suffix:
+        user = user.rstrip() + adult_suffix
 
     try:
         result = call_deepseek(system, user, temperature=0.9, max_tokens=config.MAX_TOKENS, skip_validation=True)
@@ -890,7 +894,7 @@ async def generate_rules(
     from fastapi.responses import JSONResponse
     from engine.deepseek_client import call_deepseek, DeepSeekError
 
-    system = "你是 Galgame 规则设计师。根据故事设定生成专属的角色追踪维度。只输出合法JSON。"
+    system = config.world_gen_system_prompt("Galgame 规则设计师")
     user = f"""故事标题：{title}
 类型：{genre}
 世界观：{world}
@@ -921,7 +925,7 @@ async def generate_rules(
 2. 每个 stat 有 max 值（建议 100）
 3. stages 5-7 个，从疏远到亲密递进
 4. 维度要贴合故事背景，有创意
-5. 只输出 JSON"""
+5. 只输出 JSON{config.world_gen_adult_requirements_suffix()}"""
 
     try:
         result = call_deepseek(system, user, temperature=0.9, max_tokens=config.MAX_TOKENS, skip_validation=True)

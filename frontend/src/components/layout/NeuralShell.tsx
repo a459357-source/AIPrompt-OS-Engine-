@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { ParticleBackground } from '@/components/neural/ParticleBackground'
 import { PrivateStoryAtmosphere } from '@/components/neural/PrivateStoryAtmosphere'
 import { WorldNavTree } from './WorldNavTree'
+import { AdultContentControls } from '@/components/AdultContentControls'
 import { useNeuralShell } from './NeuralShellContext'
 import { useAppSettings } from '@/hooks/useAppSettings'
 import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
@@ -39,26 +40,29 @@ function NeuralTopBar() {
           {tTheme('brand.subtitle', lang, adultMode)}
         </span>
       </Link>
-      <nav className="hidden lg:flex items-center gap-1">
-        {ROUTE_NAV.map(({ to, icon: Icon, labelKey, themeKey }) => {
-          const active = location.pathname === to || (to === '/new' && location.pathname === '/')
-          return (
-            <Link
-              key={to}
-              to={to}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-[800ms]',
-                active
-                  ? 'bg-neural-cyan/10 text-neural-cyan border border-neural-cyan/30'
-                  : 'text-game-muted hover:text-game-text hover:bg-neural-glass/50',
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {themeKey ? tTheme(labelKey, lang, adultMode) : tTheme(labelKey, lang, false)}
-            </Link>
-          )
-        })}
-      </nav>
+      <div className="flex items-center gap-2 ml-auto min-w-0">
+        <AdultContentControls />
+        <nav className="hidden lg:flex items-center gap-1">
+          {ROUTE_NAV.map(({ to, icon: Icon, labelKey, themeKey }) => {
+            const active = location.pathname === to || (to === '/new' && location.pathname === '/')
+            return (
+              <Link
+                key={to}
+                to={to}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-[800ms]',
+                  active
+                    ? 'bg-neural-cyan/10 text-neural-cyan border border-neural-cyan/30'
+                    : 'text-game-muted hover:text-game-text hover:bg-neural-glass/50',
+                )}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {themeKey ? tTheme(labelKey, lang, adultMode) : tTheme(labelKey, lang, false)}
+              </Link>
+            )
+          })}
+        </nav>
+      </div>
     </header>
   )
 }

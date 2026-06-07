@@ -18,7 +18,7 @@ import { logger } from '@/lib/logger'
 import { parseOptionEffects, parseGameOption, formatOptionStatusMetrics } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
 import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS, MAX_WIDTH_OPTIONS, storyMaxWidthCSSValue } from '@/lib/settings'
-import { dispatchAdultModeChange, dispatchAdultThemeChange, dispatchVisualThemeChange, getAdultRelationLevel, applyUiTheme, VISUAL_THEME_OPTIONS, VISUAL_THEME_LABELS, type AdultThemeId, type VisualThemeId } from '@/lib/theme'
+import { dispatchAdultModeChange, dispatchAdultThemeChange, dispatchVisualThemeChange, getAdultRelationLevel, applyUiTheme, VISUAL_THEME_OPTIONS, VISUAL_THEME_LABELS, CONTENT_PREFERENCES_SAVED, ADULT_MODE_EVENT, type AdultThemeId, type VisualThemeId } from '@/lib/theme'
 import { t, tTheme } from '@/lib/i18n'
 import { dedupeCharactersByName } from '@/lib/characters'
 import { cn } from '@/lib/utils'
@@ -37,9 +37,9 @@ function AdultModeSuggestBanner({
       className,
     )}>
       <span>
-        检测到较明确的成人向内容。建议在「⚡ 生成快捷设置」中开启
-        <strong className="mx-0.5 font-semibold">成人模式</strong>
-        ，以获得更匹配的情节与选项。
+        检测到较明确的成人向内容。建议在顶栏
+        <strong className="mx-0.5 font-semibold">❤️ 成人</strong>
+        中开启成人模式，以获得更匹配的情节与选项。
       </span>
       <Button
         type="button"
@@ -80,19 +80,7 @@ function countStoryChars(text: string) {
   return text.replace(/\s/g, '').length
 }
 
-function weightsMatchPreset(a: ContentWeights, b: ContentWeights) {
-  return a.story === b.story && a.romance === b.romance && a.adult === b.adult
-}
-
-function detectActiveProfile(weights: ContentWeights, presets: Record<string, ContentWeights>) {
-  for (const [key, preset] of Object.entries(presets)) {
-    if (weightsMatchPreset(weights, preset)) return key
-  }
-  return null
-}
-
 import { storyTargetBounds, storyLengthRangeLabel } from '@/lib/storyLength'
-
 
 interface CharInfo {
   name: string
@@ -281,35 +269,6 @@ function QuickGenRow({ label, children, hint }: { label: string; children: React
   )
 }
 
-/** 内容权重滑块（三滑块联动） */
-function WeightSlider({
-  label,
-  value,
-  disabled,
-  onChange,
-}: {
-  label: string
-  value: number
-  disabled: boolean
-  onChange: (v: number) => void
-}) {
-  return (
-    <div className="flex items-center gap-2 w-full">
-      <span className="text-[11px] text-game-muted w-8 tabular-nums">{label}</span>
-      <Slider
-        value={[value]}
-        min={0}
-        max={100}
-        step={1}
-        disabled={disabled}
-        onValueChange={([v]) => onChange(v)}
-        className="flex-1 min-w-0"
-      />
-      <span className="text-[11px] text-game-text w-8 text-right tabular-nums">{value}</span>
-    </div>
-  )
-}
-
 /** 遮盖游戏主区域，不挡顶部/底部导航（z-30 < 导航 z-40/z-50） */
 function GameBusyOverlay({ message }: { message: string }) {
   return (
@@ -386,7 +345,6 @@ export default function Game() {
   const [adultThemeLabels, setAdultThemeLabels] = useState<Record<string, string>>({})
   const [visualThemeOptions, setVisualThemeOptions] = useState<string[]>([...VISUAL_THEME_OPTIONS])
   const [visualThemeLabels, setVisualThemeLabels] = useState<Record<string, string>>({ ...VISUAL_THEME_LABELS })
-  const [adultAdvancedOpen, setAdultAdvancedOpen] = useState(false)
   const [expressionStyle, setExpressionStyle] = useState('light_novel')
   const [expressionStyleOptions, setExpressionStyleOptions] = useState<string[]>(['literary', 'romantic', 'light_novel', 'direct'])
   const [expressionStyleLabels, setExpressionStyleLabels] = useState<Record<string, string>>({})
@@ -654,6 +612,24 @@ export default function Game() {
     if (!adultMode && readingMode) setReadingMode(false)
   }, [adultMode, readingMode])
 
+  useEffect(() => {
+    const onPrefsSaved = (e: Event) => {
+      const detail = (e as CustomEvent<{ options?: string[]; options_regenerated?: boolean }>).detail
+      if (detail?.options?.length) setOptions(detail.options)
+      getGameGenSettings().then(applyGenSettings).catch(() => {})
+    }
+    const onAdultMode = (e: Event) => {
+      const mode = !!(e as CustomEvent<{ adultMode: boolean }>).detail?.adultMode
+      setAdultMode(mode)
+    }
+    window.addEventListener(CONTENT_PREFERENCES_SAVED, onPrefsSaved)
+    window.addEventListener(ADULT_MODE_EVENT, onAdultMode)
+    return () => {
+      window.removeEventListener(CONTENT_PREFERENCES_SAVED, onPrefsSaved)
+      window.removeEventListener(ADULT_MODE_EVENT, onAdultMode)
+    }
+  }, [applyGenSettings])
+
   const markGenSettingsSaved = useCallback(() => {
     setGenSettingsSaveError('')
     setGenSettingsSaved(true)
@@ -813,11 +789,16 @@ export default function Game() {
     genSettingsTimerRef.current = setTimeout(() => scheduleFlush(), 600)
   }, [normalizeGenPatch, flushGenSettings])
 
-  const enableAdultModeFromHint = useCallback(() => {
-    setGenSettingsOpen(true)
-    queueGenSettingsSave({ adultMode: true }, true)
-    setSupplementAdultHint(false)
-  }, [queueGenSettingsSave])
+  const enableAdultModeFromHint = useCallback(async () => {
+    try {
+      const saved = await updateGameGenSettings({ adultMode: true })
+      applyGenSettings(saved)
+      if (saved.options?.length) setOptions(saved.options)
+      setSupplementAdultHint(false)
+    } catch (e) {
+      logger.error('Game', 'Enable adult mode from hint failed', { error: String(e) })
+    }
+  }, [applyGenSettings])
 
   const optionsSuggestAdult = useMemo(
     () => !adultMode && options.length > 0 && suggestsAdultModeForOptions(options),
@@ -847,11 +828,6 @@ export default function Game() {
     const length = parseDraftLength(storyLengthDraft, storyLength)
     return estimateCompressThreshold(length, storyLengthMin, storyLengthMax, contextTokens)
   }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, contextTokens])
-
-  const activeAdultProfile = useMemo(
-    () => detectActiveProfile(contentWeights, presetWeights),
-    [contentWeights, presetWeights],
-  )
 
   const commitStoryLengthDraft = useCallback(() => {
     const parsed = parseInt(storyLengthDraft, 10)
@@ -1619,204 +1595,17 @@ export default function Game() {
                     ))}
                   </QuickGenRow>
 
-                  {/* ── 内容偏好 ── */}
-                  <div className="col-span-full mt-3 mb-1">
-                    <Separator className="mb-2" />
-                    <Label className="text-xs text-game-accent font-semibold">🎭 内容偏好</Label>
-                  </div>
-
-                  <QuickGenRow label="❤️ 成人模式" hint="开启后进入私人故事模式，界面与内容倾向同步切换">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        size="xs"
-                        variant={!adultMode ? 'primary' : 'ghost'}
-                        disabled={choosing}
-                        onClick={() => queueGenSettingsSave({ adultMode: false }, true)}
-                      >
-                        关闭
-                      </Button>
-                      <Button
-                        type="button"
-                        size="xs"
-                        variant={adultMode ? 'primary' : 'ghost'}
-                        disabled={choosing}
-                        onClick={() => queueGenSettingsSave({ adultMode: true }, true)}
-                      >
-                        开启
-                      </Button>
-                    </div>
-                  </QuickGenRow>
-
                   {adultMode && (
-                    <>
-                      <div className="col-span-full private-mode-banner rounded-xl border px-4 py-3 my-1 space-y-2">
-                        <p className="text-sm font-semibold text-game-accent">🌙 私人故事模式已启用</p>
-                        <p className="text-xs text-game-muted">故事将更关注：</p>
-                        <ul className="text-xs text-game-text space-y-0.5">
-                          <li>✓ 人物关系</li>
-                          <li>✓ 情感发展</li>
-                          <li>✓ 亲密互动</li>
-                        </ul>
-                      </div>
-
-                      <QuickGenRow label={tTheme('game.readingMode', lang, false)} hint="隐藏侧栏与快捷设置，聚焦正文阅读">
-                        <Switch
-                          checked={readingMode}
-                          disabled={choosing}
-                          onCheckedChange={setReadingMode}
-                        />
-                        <Badge variant={readingMode ? 'default' : 'outline'} size="sm">
-                          {readingMode ? '沉浸中' : '关闭'}
-                        </Badge>
-                      </QuickGenRow>
-
-                      <div className="col-span-full py-2 space-y-2 border-b border-game-border/40">
-                        <Label className="text-xs text-game-muted">内容倾向</Label>
-                        <div className="flex flex-col gap-2">
-                          {adultProfileOptions.map((profileId) => (
-                            <button
-                              key={profileId}
-                              type="button"
-                              disabled={choosing}
-                              onClick={() => queueGenSettingsSave({ adultProfile: profileId }, true)}
-                              className={cn(
-                                'text-left rounded-lg border px-3 py-2 transition-colors',
-                                activeAdultProfile === profileId
-                                  ? 'border-game-accent bg-game-accent/10'
-                                  : 'border-game-border/50 hover:border-game-accent/40',
-                              )}
-                            >
-                              <span className="text-xs font-medium text-game-text flex items-center gap-2">
-                                <span className={cn(
-                                  'inline-block w-3 h-3 rounded-full border',
-                                  activeAdultProfile === profileId ? 'border-game-accent bg-game-accent' : 'border-game-muted',
-                                )} />
-                                {adultProfileLabels[profileId] || profileId}
-                              </span>
-                              {adultProfileDescriptions[profileId] && (
-                                <p className="text-[11px] text-game-muted mt-1 ml-5">
-                                  {adultProfileDescriptions[profileId]}
-                                </p>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <QuickGenRow label="表达风格" hint="与上方「文风」独立叠加，例如快节奏 + 浪漫表达">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {expressionStyleOptions.map((opt) => (
-                            <Button
-                              key={opt}
-                              type="button"
-                              size="xs"
-                              variant={expressionStyle === opt ? 'primary' : 'ghost'}
-                              disabled={choosing}
-                              onClick={() => queueGenSettingsSave({ expressionStyle: opt }, true)}
-                            >
-                              {expressionStyleLabels[opt] || opt}
-                            </Button>
-                          ))}
-                        </div>
-                      </QuickGenRow>
-
-                      <QuickGenRow label="视觉主题" hint="Adult / Desire+ 为界面风格；配色方案可叠加切换">
-                        <div className="flex flex-col gap-2 w-full">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {(visualThemeOptions.length ? visualThemeOptions : VISUAL_THEME_OPTIONS).map((themeId) => (
-                              <Button
-                                key={themeId}
-                                type="button"
-                                size="xs"
-                                variant={visualTheme === themeId ? 'primary' : 'ghost'}
-                                disabled={choosing}
-                                onClick={() => queueGenSettingsSave({ visualTheme: themeId }, true, true)}
-                              >
-                                {visualThemeLabels[themeId] || VISUAL_THEME_LABELS[themeId as VisualThemeId] || themeId}
-                              </Button>
-                            ))}
-                          </div>
-                          <div className={cn(
-                            'flex flex-wrap items-center gap-1.5 transition-opacity',
-                            visualTheme === 'desire' ? 'opacity-100' : 'opacity-40 pointer-events-none',
-                          )}>
-                            <span className="text-[10px] text-game-dim shrink-0 w-full">
-                              配色方案（Desire+）
-                              {visualTheme !== 'desire' && (
-                                <span className="ml-1 text-game-muted">— 切换至 Desire+ 后可选</span>
-                              )}
-                            </span>
-                            {adultThemeOptions.map((themeId) => (
-                              <Button
-                                key={themeId}
-                                type="button"
-                                size="xs"
-                                variant={adultTheme === themeId ? 'primary' : 'ghost'}
-                                disabled={choosing || visualTheme !== 'desire'}
-                                onClick={() => queueGenSettingsSave({ adultTheme: themeId }, true, true)}
-                              >
-                                {adultThemeLabels[themeId] || themeId}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                      </QuickGenRow>
-
-                      <div className="col-span-full py-1 border-b border-game-border/40">
-                        <button
-                          type="button"
-                          className="flex items-center gap-1.5 text-xs text-game-muted hover:text-game-accent transition-colors py-1"
-                          onClick={() => setAdultAdvancedOpen((v) => !v)}
-                        >
-                          <span>{adultAdvancedOpen ? '▼' : '▶'}</span>
-                          <span>高级设置</span>
-                          {!activeAdultProfile && (
-                            <Badge variant="outline" size="sm" className="ml-1 text-[10px]">自定义权重</Badge>
-                          )}
-                        </button>
-                        {adultAdvancedOpen && (
-                          <div className="mt-2 mb-2 space-y-2 pl-1">
-                            <WeightSlider
-                              label="剧情"
-                              value={contentWeights.story}
-                              disabled={choosing}
-                              onChange={(v) => {
-                                const remaining = 100 - v
-                                const ratio = contentWeights.romance + contentWeights.adult || 1
-                                const newRomance = Math.round(remaining * contentWeights.romance / ratio)
-                                const newAdult = remaining - newRomance
-                                queueGenSettingsSave({ contentWeights: { story: v, romance: newRomance, adult: newAdult } })
-                              }}
-                            />
-                            <WeightSlider
-                              label="感情"
-                              value={contentWeights.romance}
-                              disabled={choosing}
-                              onChange={(v) => {
-                                const remaining = 100 - v
-                                const ratio = contentWeights.story + contentWeights.adult || 1
-                                const newStory = Math.round(remaining * contentWeights.story / ratio)
-                                const newAdult = remaining - newStory
-                                queueGenSettingsSave({ contentWeights: { story: newStory, romance: v, adult: newAdult } })
-                              }}
-                            />
-                            <WeightSlider
-                              label="成人"
-                              value={contentWeights.adult}
-                              disabled={choosing}
-                              onChange={(v) => {
-                                const remaining = 100 - v
-                                const ratio = contentWeights.story + contentWeights.romance || 1
-                                const newStory = Math.round(remaining * contentWeights.story / ratio)
-                                const newRomance = remaining - newStory
-                                queueGenSettingsSave({ contentWeights: { story: newStory, romance: newRomance, adult: v } })
-                              }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </>
+                    <QuickGenRow label={tTheme('game.readingMode', lang, false)} hint="隐藏侧栏与快捷设置，聚焦正文阅读">
+                      <Switch
+                        checked={readingMode}
+                        disabled={choosing}
+                        onCheckedChange={setReadingMode}
+                      />
+                      <Badge variant={readingMode ? 'default' : 'outline'} size="sm">
+                        {readingMode ? '沉浸中' : '关闭'}
+                      </Badge>
+                    </QuickGenRow>
                   )}
               </div>
             )}

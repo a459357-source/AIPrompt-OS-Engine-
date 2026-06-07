@@ -943,6 +943,11 @@ export default function NewStory() {
                     <CardTitle className="text-sm text-neural-cyan">{t('world.aiGen', lang)}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
+                    {adultMode && (
+                      <p className="text-[11px] text-pink-300/90 rounded-md border border-pink-500/25 bg-pink-500/10 px-2.5 py-1.5">
+                        ❤️ 成人模式已开启：一键生成与各字段「生成」将按成人向设定输出
+                      </p>
+                    )}
                     <Textarea
                       id="kw-input"
                       value={keywords}

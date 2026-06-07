@@ -107,6 +107,7 @@ export function applyUiTheme(theme: UiTheme, adultThemePack?: AdultThemeId | nul
 export const ADULT_MODE_EVENT = 'adult-mode-changed'
 export const ADULT_THEME_EVENT = 'adult-theme-changed'
 export const VISUAL_THEME_EVENT = 'visual-theme-changed'
+export const CONTENT_PREFERENCES_SAVED = 'content-preferences-saved'
 
 export function dispatchAdultModeChange(adultMode: boolean) {
   window.dispatchEvent(new CustomEvent(ADULT_MODE_EVENT, { detail: { adultMode } }))
@@ -118,4 +119,8 @@ export function dispatchAdultThemeChange(adultTheme: AdultThemeId) {
 
 export function dispatchVisualThemeChange(visualTheme: VisualThemeId) {
   window.dispatchEvent(new CustomEvent(VISUAL_THEME_EVENT, { detail: { visualTheme } }))
+}
+
+export function dispatchContentPreferencesSaved(detail?: { options?: string[]; options_regenerated?: boolean }) {
+  window.dispatchEvent(new CustomEvent(CONTENT_PREFERENCES_SAVED, { detail: detail ?? {} }))
 }
