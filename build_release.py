@@ -108,7 +108,23 @@ def build_exe() -> Path:
     if not exe_path.exists():
         raise FileNotFoundError(f"Build failed: {exe_path} not found")
     sanitize_exe_dir(exe_dir)
+    verify_bundle(exe_dir)
     return exe_dir
+
+
+def verify_bundle(exe_dir: Path) -> None:
+    """Fail fast if PyInstaller did not ship read-only assets under _internal."""
+    internal = exe_dir / "_internal"
+    required = [
+        internal / "engine.yaml",
+        internal / "prompt_template.yaml",
+        internal / "frontend" / "dist" / "index.html",
+        internal / "packaging" / "defaults" / "apikey.json",
+    ]
+    missing = [p for p in required if not p.is_file()]
+    if missing:
+        lines = "\n  ".join(str(p) for p in missing)
+        raise FileNotFoundError(f"Bundle verification failed — missing:\n  {lines}")
 
 
 def sanitize_exe_dir(exe_dir: Path) -> None:

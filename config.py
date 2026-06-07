@@ -20,17 +20,39 @@ else:
     BUNDLE_ROOT = ROOT
 
 
-def bundled_asset(name: str) -> Path:
-    """Read-only shipped assets (engine.yaml, prompt_template.yaml).
+def bundle_path(*parts: str) -> Path:
+    """Resolve a read-only shipped asset under PyInstaller _MEIPASS (_internal).
 
-    PyInstaller --onedir places --add-data files under _MEIPASS/_internal,
-    not next to the exe. Runtime YAML (world_pack, session) stays under ROOT.
+    Runtime/user files (world_pack, session, data/*) stay under ROOT next to exe.
     """
     if getattr(sys, "frozen", False):
-        candidate = BUNDLE_ROOT / name
-        if candidate.exists():
-            return candidate
-    return ROOT / name
+        return BUNDLE_ROOT.joinpath(*parts)
+    return ROOT.joinpath(*parts)
+
+
+def bundled_asset(name: str) -> Path:
+    """Shorthand for bundle_path with a single filename at bundle root."""
+    return bundle_path(name)
+
+
+BUNDLE_DEFAULTS_DIR = bundle_path("packaging", "defaults")
+
+
+def required_bundle_files() -> tuple[Path, ...]:
+    """Files from build_release.py --add-data."""
+    return (
+        bundle_path("engine.yaml"),
+        bundle_path("prompt_template.yaml"),
+        bundle_path("frontend", "dist", "index.html"),
+        bundle_path("packaging", "defaults", "apikey.json"),
+    )
+
+
+def validate_bundle_assets() -> list[str]:
+    """Return paths of bundled files missing when running as frozen exe."""
+    if not getattr(sys, "frozen", False):
+        return []
+    return [str(p) for p in required_bundle_files() if not p.is_file()]
 
 
 WORLD_PACK_PATH      = ROOT / "world_pack.yaml"
@@ -72,8 +94,8 @@ STORY_LENGTH_MIN_RATIO_SHORT = 0.80   # target 0–1000
 STORY_LENGTH_MIN_RATIO_MEDIUM = 0.85  # 1000–3000
 STORY_LENGTH_MIN_RATIO_LONG = 0.90    # 3000+
 
-FRONTEND_DIST        = BUNDLE_ROOT / "frontend" / "dist"
-if not (FRONTEND_DIST / "index.html").exists():
+FRONTEND_DIST        = bundle_path("frontend", "dist")
+if not getattr(sys, "frozen", False) and not (FRONTEND_DIST / "index.html").exists():
     FRONTEND_DIST    = ROOT / "frontend" / "dist"
 
 
@@ -84,7 +106,16 @@ def has_bundled_frontend() -> bool:
 
 def ensure_runtime_files() -> None:
     """Copy factory defaults next to exe on first run."""
-    defaults = BUNDLE_ROOT / "packaging" / "defaults"
+    missing = validate_bundle_assets()
+    if missing:
+        msg = (
+            "打包资源不完整，请重新解压完整 release 包（勿只复制 exe）：\n  "
+            + "\n  ".join(missing)
+        )
+        print(f"\n[ERROR] {msg}\n", file=sys.stderr)
+        raise FileNotFoundError(msg)
+
+    defaults = BUNDLE_DEFAULTS_DIR
     if not defaults.is_dir():
         defaults = ROOT / "packaging" / "defaults"
     if not defaults.is_dir():

@@ -22,12 +22,11 @@ from datetime import datetime
 
 import config as _config
 
+# Bundled YAML + world_pack only. Mutable data/* JSON is cleared each turn.
 RUNTIME_STATIC_PATHS = frozenset({
     str(_config.WORLD_PACK_PATH),
     str(_config.ENGINE_CONFIG_PATH),
     str(_config.PROMPT_TEMPLATE_PATH),
-    str(_config.WORLD_SUMMARY_PATH),
-    str(_config.CHAPTER_SUMMARIES_PATH),
 })
 
 _thread_local = threading.local()
