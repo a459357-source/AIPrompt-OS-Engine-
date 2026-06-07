@@ -646,7 +646,7 @@ export default function NewStory() {
                                     <input
                                       type="number"
                                       min={0} max={100} value={val}
-                                      onChange={(e) => update(key, Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                                      onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) update(key, Math.max(0, Math.min(100, v))) }}
                                       onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
                                       className="w-12 text-center text-[11px] h-6 bg-game-bg border border-game-border rounded text-game-text"
                                       style={{minWidth: '36px'}}
