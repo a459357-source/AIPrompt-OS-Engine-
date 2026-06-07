@@ -394,6 +394,7 @@ export default function Game() {
   const [showConsequences, setShowConsequences] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState<HistoryTurn[]>([])
+  const [historyFocusTurn, setHistoryFocusTurn] = useState<number | null>(null)
   const [historyError, setHistoryError] = useState('')
   const [historyLoading, setHistoryLoading] = useState(false)
   const [storyLength, setStoryLength] = useState(1000)
@@ -899,6 +900,52 @@ export default function Game() {
 
   persistGenSettingsBeforeTurnRef.current = persistGenSettingsBeforeTurn
 
+  const closeHistoryReview = useCallback(() => {
+    setHistoryOpen(false)
+    setHistoryFocusTurn(null)
+  }, [])
+
+  const openHistoryReview = useCallback(async (focusTurn?: number) => {
+    if (choosing) return
+    setHistoryFocusTurn(focusTurn ?? null)
+    setHistoryOpen(true)
+    setHistoryError('')
+    setHistory([])
+    setHistoryLoading(true)
+    try {
+      const data = await getHistory()
+      if (data.error) {
+        setHistoryError(data.error)
+      } else {
+        let turns = data.turns
+        if (focusTurn != null && focusTurn === turn && story.trim()) {
+          const current: HistoryTurn = {
+            turn,
+            story,
+            options,
+            choice: '',
+            status,
+            scene,
+          }
+          const idx = turns.findIndex((t) => t.turn === turn)
+          turns = idx >= 0 ? turns.map((t, i) => (i === idx ? current : t)) : [...turns, current]
+        }
+        setHistory(turns)
+      }
+    } catch (e) {
+      setHistoryError(formatFetchError(e))
+    }
+    setHistoryLoading(false)
+  }, [choosing, turn, story, options, status, scene])
+
+  useEffect(() => {
+    if (!historyOpen || historyLoading || historyFocusTurn == null || history.length === 0) return
+    const id = `history-turn-${historyFocusTurn}`
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    })
+  }, [historyOpen, historyLoading, historyFocusTurn, history])
+
   useEffect(() => {
     const parsed = parseInt(storyLengthDraft, 10)
     if (!Number.isFinite(parsed)) return
@@ -1109,21 +1156,27 @@ export default function Game() {
         {Array.from({ length: Math.max(turn, 1) }, (_, i) => {
           const n = i + 1
           return (
-            <div
+            <button
+              type="button"
               key={n}
-              className={`text-xs py-1.5 pl-3 border-l-2 transition-colors ${
+              disabled={choosing}
+              onClick={() => void openHistoryReview(n)}
+              title={`回顾第 ${n} 轮`}
+              className={cn(
+                'w-full text-left text-xs py-1.5 pl-3 border-l-2 transition-colors rounded-r-md',
+                'hover:bg-neural-cyan/5 disabled:opacity-50 disabled:pointer-events-none',
                 n === turn
                   ? 'border-neural-cyan text-neural-cyan bg-neural-cyan/5'
-                  : 'border-game-border/50 text-game-muted'
-              }`}
+                  : 'border-game-border/50 text-game-muted hover:text-game-text hover:border-neural-cyan/40',
+              )}
             >
               第 {n} 轮 {n === turn ? '◆' : ''}
-            </div>
+            </button>
           )
         })}
       </div>
     )
-  }, [hasGame, readingMode, turn, lang, adultMode])
+  }, [hasGame, readingMode, turn, lang, adultMode, choosing, openHistoryReview])
 
   const gameInspector = useMemo(() => {
     if (!hasGame || !showCharPanel || readingMode) return null
@@ -1238,23 +1291,8 @@ export default function Game() {
                   variant="ghost"
                   size="sm"
                   className="gap-1 text-game-muted hover:text-game-text"
-                  onClick={async () => {
-                    setHistoryOpen(true)
-                    setHistoryError('')
-                    setHistory([])
-                    setHistoryLoading(true)
-                    try {
-                      const data = await getHistory()
-                      if (data.error) {
-                        setHistoryError(data.error)
-                      } else {
-                        setHistory(data.turns)
-                      }
-                    } catch (e) {
-                      setHistoryError(formatFetchError(e))
-                    }
-                    setHistoryLoading(false)
-                  }}
+                  disabled={choosing}
+                  onClick={() => void openHistoryReview()}
                 >
                   📜 回顾
                 </Button>
@@ -1918,7 +1956,7 @@ export default function Game() {
       {/* ── History Dialog ── */}
       {historyOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-12 px-4">
-          <div className="fixed inset-0 bg-black/70" onClick={() => setHistoryOpen(false)} />
+          <div className="fixed inset-0 bg-black/70" onClick={closeHistoryReview} />
           <div className="relative z-50 w-full max-w-2xl max-h-[85vh] bg-game-card border border-game-border rounded-lg shadow-2xl flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-game-border shrink-0">
@@ -1959,7 +1997,7 @@ export default function Game() {
                 >
                   ⬇ 纯正文
                 </Button>
-                <button onClick={() => setHistoryOpen(false)} className="text-game-muted hover:text-game-text text-lg px-1">✕</button>
+                <button onClick={closeHistoryReview} className="text-game-muted hover:text-game-text text-lg px-1">✕</button>
               </div>
             </div>
 
@@ -1993,7 +2031,14 @@ export default function Game() {
                 <p className="text-game-muted text-center py-8">暂无剧情记录</p>
               ) : (
                 history.map((h, i) => (
-                  <div key={i} className="space-y-2">
+                  <div
+                    key={h.turn}
+                    id={`history-turn-${h.turn}`}
+                    className={cn(
+                      'space-y-2 scroll-mt-4',
+                      historyFocusTurn === h.turn && 'rounded-lg ring-1 ring-game-accent/50 bg-game-accent/5 p-3 -mx-1',
+                    )}
+                  >
                     <div className="flex items-center gap-2 text-xs text-game-muted">
                       <Badge variant="primary" size="sm">第{h.turn}轮</Badge>
                       <Badge variant="outline" size="sm">{h.status}</Badge>
