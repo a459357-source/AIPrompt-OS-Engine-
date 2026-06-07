@@ -56,7 +56,7 @@ echo.
 :: ── Start backend (must run in project root for data\*.log) ──
 start "PromptOS-Backend" cmd /c "cd /d "%~dp0" && python -m uvicorn ui.web_app:app --host 127.0.0.1 --port 8000"
 
-:: ── Start frontend ──
+:: ── Start frontend (Vite 就绪后会自动打开浏览器) ──
 cd frontend
 call npm run dev
 cd ..

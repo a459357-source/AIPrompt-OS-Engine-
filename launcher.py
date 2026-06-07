@@ -26,10 +26,30 @@ config.setup_logging(console=True)
 logger = logging.getLogger("launcher")
 
 
-def _open_browser() -> None:
-    time.sleep(2.5)
+def _open_browser(port: int) -> None:
+    """Open UI after the local server is accepting connections."""
     url = config.frontend_url("/")
-    webbrowser.open(url)
+
+    def _open() -> None:
+        import socket
+        for _ in range(30):
+            time.sleep(0.5)
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(0.5)
+                s.connect(("127.0.0.1", port))
+                s.close()
+                break
+            except (ConnectionRefusedError, OSError):
+                continue
+        logger.info("Opening browser → %s", url)
+        try:
+            webbrowser.open(url)
+        except Exception as exc:
+            logger.warning("Failed to open browser: %s", exc)
+            print(f"  请手动打开: {url}")
+
+    threading.Thread(target=_open, daemon=True).start()
 
 
 def main() -> None:
@@ -40,15 +60,16 @@ def main() -> None:
     print(f"  错误日志: {config.ERROR_LOG_PATH}")
     print("  关闭本窗口即停止服务\n")
 
-    logger.info("PromptOS exe starting — UI %s", config.frontend_url("/"))
+    logger.info("PromptOS starting — UI %s", config.frontend_url("/"))
 
-    threading.Thread(target=_open_browser, daemon=True).start()
+    port = int(os.environ.get("PROMPTOS_PORT", "8000"))
+    _open_browser(port)
 
     import uvicorn
     uvicorn.run(
         "ui.web_app:app",
         host="127.0.0.1",
-        port=int(os.environ.get("PROMPTOS_PORT", "8000")),
+        port=port,
         log_level="info",
     )
 
