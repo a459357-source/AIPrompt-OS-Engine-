@@ -126,14 +126,19 @@ async def npc_page():
             is_main = key in ("A", "B")
             tag = '<span class="tag main">主角</span>' if is_main else '<span class="tag npc">NPC</span>'
             del_btn = '' if is_main else '<a class="del-btn" href="/npcs/delete?key=' + key + '" onclick="return confirm(&quot;delete ' + c.get('name', key) + '?&quot;)" title="delete">X</a>'
+            safe_name = c.get("name", key).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            safe_role = c.get("role", "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            safe_level = c.get("level", "L0").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            safe_rel = c.get("relation", "初识").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            safe_note = c.get("note", "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             cards_list.append(
                 f'<div class="npc-card">'
                 f'{del_btn}'
-                f'<div class="name">{c.get("name", key)}{tag}</div>'
-                f'<div class="role">{c.get("role", "")}</div>'
-                f'<div class="level">⭐ {c.get("level", "L0")}</div>'
-                f'<div class="trust">🤝 {c.get("relation", "初识")}</div>'
-                f'<div class="note">{c.get("note", "")}</div>'
+                f'<div class="name">{safe_name}{tag}</div>'
+                f'<div class="role">{safe_role}</div>'
+                f'<div class="level">⭐ {safe_level}</div>'
+                f'<div class="trust">🤝 {safe_rel}</div>'
+                f'<div class="note">{safe_note}</div>'
                 f'</div>'
             )
         cards = "\n".join(cards_list)

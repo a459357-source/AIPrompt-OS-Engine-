@@ -105,6 +105,9 @@ def step(choice: str | None = None) -> dict | None:
     """
     logger.info("═══ TURN START ═══")
 
+    # Clear the IO cache so every turn starts with fresh disk state
+    io_utils.clear_cache()
+
     # 1. Build prompt
     try:
         system_prompt, user_prompt = build_prompt()
@@ -144,6 +147,9 @@ def step(choice: str | None = None) -> dict | None:
                response, new_state, choice)
     _safe_call(_log_turn, "turn log append", response, choice)
     _safe_call(do_autosave, "autosave")
+
+    # Clear cache after all post-turn steps to ensure next turn reads fresh data
+    io_utils.clear_cache()
 
     logger.info("═══ TURN COMPLETE ═══")
 

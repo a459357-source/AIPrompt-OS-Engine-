@@ -334,9 +334,12 @@ async def api_dashboard():
     total_tokens = 0
     try:
         if config.API_USAGE_PATH.exists():
-            for line in config.API_USAGE_PATH.read_text(encoding="utf-8").strip().split("\n"):
-                if line.strip():
-                    import json as _json
+            import json as _json
+            with open(config.API_USAGE_PATH, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
                     entry = _json.loads(line)
                     api_calls += 1
                     total_tokens += entry.get("total_tokens", 0)
@@ -371,8 +374,10 @@ async def api_next_turn(choice: str = Form("A")):
 
     try:
         result = step(choice)
-    except Exception as e:
-        return JSONResponse({"error": f"生成失败: {e}"}, status_code=500)
+    except Exception:
+        import logging
+        logging.getLogger("api").error("next_turn failed", exc_info=True)
+        return JSONResponse({"error": "AI 生成失败，请重试"}, status_code=500)
 
     if result is None:
         return JSONResponse({"error": "AI 生成失败，请重试"}, status_code=500)

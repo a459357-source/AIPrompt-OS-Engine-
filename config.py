@@ -318,9 +318,11 @@ def setup_logging():
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
 
-    # File handler — all logs (rotating: 5 files × 2 MB)
+    from engine.constants import LOG_MAX_BYTES, LOG_BACKUP_COUNT
+
+    # File handler — all logs (rotating)
     fh = RotatingFileHandler(
-        str(LOG_PATH), maxBytes=2 * 1024 * 1024, backupCount=5, encoding="utf-8"
+        str(LOG_PATH), maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8"
     )
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(logging.Formatter(
@@ -328,9 +330,11 @@ def setup_logging():
     ))
     root_logger.addHandler(fh)
 
+    from engine.constants import ERROR_LOG_MAX_BYTES, ERROR_LOG_BACKUP_COUNT
+
     # Error file handler — errors only
     efh = RotatingFileHandler(
-        str(ERROR_LOG_PATH), maxBytes=1 * 1024 * 1024, backupCount=3, encoding="utf-8"
+        str(ERROR_LOG_PATH), maxBytes=ERROR_LOG_MAX_BYTES, backupCount=ERROR_LOG_BACKUP_COUNT, encoding="utf-8"
     )
     efh.setLevel(logging.ERROR)
     efh.setFormatter(logging.Formatter(

@@ -105,8 +105,12 @@ async def next_turn(choice: str = Form(..., min_length=1, max_length=1)):
     """
     # Accept A/B/C/D or free-text (URL-encoded)
     if choice not in ("A", "B", "C", "D"):
-        # Free-text choice — pass through as-is
-        pass
+        # Free-text choice — validate length and reject dangerous chars
+        if len(choice) > 200 or any(c in choice for c in "<>"):
+            return _render_template(
+                error="无效的输入，请使用 A-D 或简短的自定义文本。",
+                turn=0, status="?", scene="?",
+            )
 
     result = step(choice)
 
@@ -290,13 +294,15 @@ async def history_page():
 
         status_cn = {"SETUP": "序章", "BUILD": "展开", "TENSION": "张力", "CLIMAX": "高潮", "COOLDOWN": "余韵"}.get(s, s)
 
+        # HTML-escape story to prevent XSS via AI-generated content
+        safe_story = story.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         blocks.append(
             f'<div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #30363d;">'
             f'<div style="color:#8b949e;font-size:0.8em;margin-bottom:6px;">'
             f'📖 第{t}轮 · {status_cn} · {sc}'
             f'{(" · 选择: " + choice) if choice else ""}'
             f'</div>'
-            f'<div style="line-height:1.8;white-space:pre-wrap;">{story}</div>'
+            f'<div style="line-height:1.8;white-space:pre-wrap;">{safe_story}</div>'
             f'</div>'
         )
 

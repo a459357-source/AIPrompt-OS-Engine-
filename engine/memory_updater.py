@@ -29,6 +29,11 @@ from engine.memory import (
 )
 from engine.events import init_events, check_event_triggers, seed_default_events
 from engine.world_driver import passive_faction_drift
+from engine.constants import (
+    FACTION_REPUTATION_DELTA,
+    INTER_FACTION_ATTITUDE_DELTA, INTER_FACTION_ATTITUDE_DELTA_REVERSE,
+    INTER_FACTION_ATTITUDE_DELTA_NEG, INTER_FACTION_ATTITUDE_DELTA_NEG_REVERSE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -247,9 +252,9 @@ def update_factions(memory: dict, story: str, turn: int) -> None:
                 "敌对", "攻击", "背叛", "威胁", "警告",
             ])
             if pos and not neg:
-                update_faction_reputation(memory, fname, 0.05, turn)
+                update_faction_reputation(memory, fname, FACTION_REPUTATION_DELTA, turn)
             elif neg and not pos:
-                update_faction_reputation(memory, fname, -0.05, turn)
+                update_faction_reputation(memory, fname, -FACTION_REPUTATION_DELTA, turn)
 
     # (b) Inter-faction attitudes from story
     fnames = list(mem_factions.keys())
@@ -268,11 +273,11 @@ def update_factions(memory: dict, story: str, turn: int) -> None:
                         "冲突", "对抗", "撕毁", "决裂", "宣战",
                     ])
                     if pos and not neg:
-                        update_faction_attitude(memory, fa, fb, 0.03, turn)
-                        update_faction_attitude(memory, fb, fa, 0.02, turn)
+                        update_faction_attitude(memory, fa, fb, INTER_FACTION_ATTITUDE_DELTA, turn)
+                        update_faction_attitude(memory, fb, fa, INTER_FACTION_ATTITUDE_DELTA_REVERSE, turn)
                     elif neg and not pos:
-                        update_faction_attitude(memory, fa, fb, -0.05, turn)
-                        update_faction_attitude(memory, fb, fa, -0.04, turn)
+                        update_faction_attitude(memory, fa, fb, INTER_FACTION_ATTITUDE_DELTA_NEG, turn)
+                        update_faction_attitude(memory, fb, fa, INTER_FACTION_ATTITUDE_DELTA_NEG_REVERSE, turn)
 
     # (c) Passive drift
     passive_faction_drift(memory, turn)

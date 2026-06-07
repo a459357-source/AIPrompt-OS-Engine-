@@ -169,16 +169,36 @@ def _write_chapter_file(
 
 
 def _update_full_story(vault: Path) -> None:
-    """Concatenate all chapters into one full-story file."""
+    """Append the latest chapter to the full-story file.
+
+    Previously rewrote the entire file every turn (O(n²) I/O after N turns).
+    Now only appends the newest chapter, rewriting the header + character
+    summary section each time (O(1) per turn for the body).
+    """
     chapters_dir = vault / CHAPTERS_DIR
+    path = vault / STORY_DIR / "完整叙事.md"
 
     state = io_utils.read_yaml(config.SESSION_STATE_PATH)
     memory = io_utils.read_json(config.MEMORY_PATH)
+    turn = state.get("turn", 0)
 
+    # If we already have the file, just append the latest chapter
+    if path.exists() and turn > 1:
+        latest_chapter = chapters_dir / _chapter_filename(turn)
+        if latest_chapter.exists():
+            text = latest_chapter.read_text(encoding="utf-8")
+            clean = _strip_frontmatter(text)
+            with open(path, "a", encoding="utf-8") as f:
+                f.write("\n" + clean + "\n")
+        # Update header metadata in-place (first ~15 lines)
+        _update_story_header(path, state)
+        return
+
+    # First turn — create the full file
     lines: list[str] = []
     lines.append("---")
     lines.append("title: 星痕纪元 — 完整叙事")
-    lines.append(f"turns: {state.get('turn', 0)}")
+    lines.append(f"turns: {turn}")
     lines.append(f"status: {state.get('status', '?')}")
     lines.append(f"updated: {datetime.now().isoformat()}")
     lines.append("tags: [story, full-narrative]")
@@ -206,13 +226,31 @@ def _update_full_story(vault: Path) -> None:
     if chapters_dir.exists():
         for chap in sorted(chapters_dir.glob("*.md")):
             text = chap.read_text(encoding="utf-8")
-            # Strip frontmatter for clean reading
             clean = _strip_frontmatter(text)
             lines.append(clean)
             lines.append("")
 
-    path = vault / STORY_DIR / "完整叙事.md"
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _update_story_header(path: Path, state: dict) -> None:
+    """Update turns/status/updated in the YAML frontmatter of the full story."""
+    try:
+        content = path.read_text(encoding="utf-8")
+        lines = content.split("\n")
+        new_lines: list[str] = []
+        for line in lines:
+            if line.startswith("turns:"):
+                new_lines.append(f"turns: {state.get('turn', 0)}")
+            elif line.startswith("status:"):
+                new_lines.append(f"status: {state.get('status', '?')}")
+            elif line.startswith("updated:"):
+                new_lines.append(f"updated: {datetime.now().isoformat()}")
+            else:
+                new_lines.append(line)
+        path.write_text("\n".join(new_lines), encoding="utf-8")
+    except Exception:
+        pass  # best-effort
 
 
 def _update_characters(vault: Path) -> None:

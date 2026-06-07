@@ -23,6 +23,11 @@ import logging
 
 import config
 from engine import io_utils
+from engine.constants import (
+    TRUST_KEYWORDS_POSITIVE, TRUST_KEYWORDS_NEGATIVE, FLAG_KEYWORDS,
+    COMMON_WORDS, RELATIONSHIP_TRUST, RELATION_TO_PLAYER_MAP,
+    DEFAULT_INITIAL_TRUST, DEFAULT_NEUTRAL_TRUST, STORY_DETECTED_TRUST_FACTOR,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -198,12 +203,8 @@ def init_factions(memory: dict) -> None:
             continue
         if name not in mem_factions:
             # Compute initial reputation from relation_to_player
-            rel_map = {
-                "ally": 0.70, "friendly": 0.60, "neutral": 0.50,
-                "hostile": 0.25, "enemy": 0.10,
-            }
             rel = faction.get("relation_to_player", "neutral")
-            init_rep = rel_map.get(rel, 0.50)
+            init_rep = RELATION_TO_PLAYER_MAP.get(rel, 0.50)
             influence = faction.get("influence", 50)
             mem_factions[name] = {
                 "reputation": init_rep,
@@ -429,17 +430,9 @@ def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | Non
 
     results: list[tuple[str, float, str | None]] = []
 
-    # Use the expanded keyword dictionaries defined above
-    positive_keywords = _TRUST_KEYWORDS_POSITIVE
-    negative_keywords = _TRUST_KEYWORDS_NEGATIVE
-    flag_keywords = {
-        "遗迹核心": "接触遗迹核心",
-        "星痕": "感知星痕能量",
-        "守护者": "遭遇守护者",
-        "星联": "星联介入",
-        "自由航行": "自由航行者介入",
-        "牺牲": "重大牺牲事件",
-    }
+    positive_keywords = TRUST_KEYWORDS_POSITIVE
+    negative_keywords = TRUST_KEYWORDS_NEGATIVE
+    flag_keywords = FLAG_KEYWORDS
 
     def _find_nearby_char(kw: str) -> str | None:
         """Find a known character name within ~30 chars of the keyword."""
@@ -452,20 +445,7 @@ def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | Non
         # Look for 2-4 char Chinese names (simple heuristic)
         for m in re.finditer(r'[\u4e00-\u9fff]{2,4}', window):
             name = m.group()
-            # Skip very common particles and non-name sequences
-            _COMMON_WORDS = frozenset({
-                '的是', '我也', '这不', '一个', '他们', '我们', '自己', '可以',
-                '什么', '没有', '已经', '因为', '所以', '但是', '如果', '虽然',
-                '这个', '那个', '这里', '那里', '怎么', '这样', '那样',
-                '不过', '而且', '或者', '还是', '只是', '就是', '不是',
-                '不能', '不会', '不要', '应该', '可能', '一定', '必须',
-                '之间', '之中', '之后', '之前', '之上', '之下',
-                '的时候', '有时候', '周围', '所有', '一些', '很多',
-                '主角', '两人', '他们', '这时', '突然', '然后', '接着',
-                '其中', '某种', '任何', '什么', '怎么', '怎样',
-                '觉得', '知道', '看到', '听到', '感到', '想到',
-            })
-            if name in _COMMON_WORDS:
+            if name in COMMON_WORDS:
                 continue
             # Also skip if the name contains only extremely common chars
             if all(c in '的一是不了在有人我他这来们说个到和地着就你也那要看没' for c in name):
@@ -501,65 +481,7 @@ def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | Non
 
 # ── Initial trust from world_pack relationships ─────────────────
 
-# Relationship → initial trust mapping.
-# "自身" = protagonist; positive relationships start higher;
-# negative/hostile relationships start lower.
-_RELATIONSHIP_TRUST: dict[str, float] = {
-    # Positive / allied
-    "自身": 0.50,
-    "盟友": 0.55,
-    "挚友": 0.60,
-    "恋人": 0.65,
-    "灵魂伴侣": 0.70,
-    "潜在合作者": 0.40,
-    "合作": 0.45,
-    "同盟": 0.50,
-    "羁绊": 0.55,
-    # Neutral
-    "试探": 0.35,
-    "认识": 0.35,
-    "熟悉": 0.40,
-    "朋友": 0.45,
-    # Negative / hostile
-    "疏远": 0.25,
-    "商业对手": 0.30,
-    "竞争": 0.30,
-    "对手": 0.25,
-    "冷漠": 0.20,
-    "对立": 0.15,
-    "敌视": 0.10,
-    "崩坏": 0.05,
-    "终极敌人": 0.10,
-}
-
-# Keyword-based trust detection: expanded vocabulary for diverse story genres.
-_TRUST_KEYWORDS_POSITIVE: dict[str, float] = {
-    # Universal
-    "信任": 0.08, "感激": 0.10, "坦诚": 0.08, "理解": 0.08,
-    "共鸣": 0.10, "微笑": 0.03, "并肩": 0.08, "保护": 0.10,
-    "拯救": 0.15, "牺牲": 0.20,
-    # Romance / relationship
-    "握住": 0.08, "拥抱": 0.12, "牵手": 0.08, "告白": 0.15,
-    "心动": 0.08, "温柔": 0.05,
-    # Business / political
-    "合作": 0.06, "结盟": 0.10, "支援": 0.08, "投资": 0.05,
-    "共赢": 0.08, "守信": 0.10, "赏识": 0.08, "提拔": 0.10,
-    # Conflict resolution
-    "和解": 0.12, "道歉": 0.08, "原谅": 0.12, "让步": 0.06,
-}
-_TRUST_KEYWORDS_NEGATIVE: dict[str, float] = {
-    # Universal
-    "怀疑": -0.08, "背叛": -0.25, "隐瞒": -0.08, "欺骗": -0.20,
-    "愤怒": -0.08, "冷漠": -0.08, "伤害": -0.15, "威胁": -0.10,
-    # Romance / relationship
-    "离开": -0.10, "分手": -0.20, "失望": -0.10, "疏远": -0.08,
-    "嫉妒": -0.08,
-    # Business / political
-    "算计": -0.10, "利用": -0.12, "出卖": -0.20, "毁约": -0.15,
-    "打压": -0.10, "陷害": -0.20, "窃取": -0.15, "背刺": -0.25,
-    # Hostile
-    "攻击": -0.12, "敌对": -0.10, "警告": -0.06,
-}
+# All hardcoded dicts moved to engine/constants.py — imported at top of file.
 
 
 def get_initial_trust(name: str, world_pack: dict | None = None) -> float:
@@ -579,12 +501,12 @@ def get_initial_trust(name: str, world_pack: dict | None = None) -> float:
             # Use the best-matching relationship tag
             best = 0.30
             for rel in relationships:
-                if rel in _RELATIONSHIP_TRUST:
-                    best = max(best, _RELATIONSHIP_TRUST[rel])
+                if rel in RELATIONSHIP_TRUST:
+                    best = max(best, RELATIONSHIP_TRUST[rel])
             # Also check negative tags — take the minimum
             for rel in relationships:
-                if rel in _RELATIONSHIP_TRUST:
-                    val = _RELATIONSHIP_TRUST[rel]
+                if rel in RELATIONSHIP_TRUST:
+                    val = RELATIONSHIP_TRUST[rel]
                     if val < 0.35:  # negative relationship
                         best = min(best, val)
             return round(best, 2)

@@ -24,8 +24,10 @@ from engine import io_utils
 
 logger = logging.getLogger(__name__)
 
+from engine.constants import MAX_CHAPTER_BYTES_IN_SAVE
+
 # Maximum chapter content to include in a save (avoid giant save files)
-_MAX_CHAPTER_BYTES = 50_000
+_MAX_CHAPTER_BYTES = MAX_CHAPTER_BYTES_IN_SAVE
 
 
 # ── Public API ─────────────────────────────────────────────────────

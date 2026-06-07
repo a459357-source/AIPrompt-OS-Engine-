@@ -3,6 +3,23 @@
 
 import json
 
+
+def _escape_html(text: str) -> str:
+    """HTML-entity-escape user/AI-driven text to prevent XSS injection.
+
+    Replaces &, <, >, " with their named entities.  Safe to call on
+    already-escaped text (idempotent for the common case).
+    """
+    if not isinstance(text, str):
+        return str(text)
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -598,7 +615,7 @@ def _render_template(
     char_parts = []
     if char_stats:
         for cs in char_stats:
-            name = cs.get("name", "")
+            name = _escape_html(cs.get("name", ""))
             level = cs.get("level", "L0")
             stage = cs.get("stage", "")
             trust_pct = cs.get("trust_pct", 0)
@@ -671,7 +688,7 @@ def _render_template(
 
             widgets.append(
                 f'<div class="char-widget">'
-                f'<div class="cw-name">{cs["name"]}</div>'
+                f'<div class="cw-name">{_escape_html(cs["name"])}</div>'
                 f'<div class="cw-role">{cs["role"]}</div>'
                 f'<div class="cw-level">⭐ {cs["level"]}</div>'
                 f'<div class="cw-hearts">{cs["hearts"]}</div>'
@@ -687,13 +704,13 @@ def _render_template(
 
     return (
         HTML_TEMPLATE
-        .replace("{{STORY}}", story or "点击下方按钮开始故事…")
+        .replace("{{STORY}}", _escape_html(story) if story else "点击下方按钮开始故事…")
         .replace("{{OPTIONS}}", options_html)
         .replace("{{STATE_ROW}}", state_row_html)
         .replace("{{SIDEBAR}}", sidebar_html)
-        .replace("{{ERROR}}", error_html)
-        .replace("{{TITLE}}", title or "Galgame")
-        .replace("{{SUBTITLE}}", subtitle or "AI Narrative Engine")
+        .replace("{{ERROR}}", _escape_html(error) if error else "")
+        .replace("{{TITLE}}", _escape_html(title) if title else "Galgame")
+        .replace("{{SUBTITLE}}", _escape_html(subtitle) if subtitle else "AI Narrative Engine")
     )
 
 
@@ -1461,7 +1478,7 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
             <label>🔑 DeepSeek API Key</label>
             <input name="api_key" type="password" id="keyInput"
                    placeholder="sk-xxxxxxxxxxxxxxxx"
-                   value="{{CURRENT_KEY}}">
+                   value="{{MASKED_KEY}}">
             <div class="hint">Key 仅存储在本地 <code>data/apikey.json</code>，不会上传</div>
             <label style="margin-top:14px;">🧠 模型选择</label>
             <select name="model" id="modelSelect" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.9em;">

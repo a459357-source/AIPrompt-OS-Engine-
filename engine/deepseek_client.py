@@ -167,7 +167,6 @@ def _extract_json_from_markdown(text: str) -> str | None:
 def _log_usage(body: dict, result: dict) -> None:
     """Append API usage stats to api_usage.jsonl (non-blocking, best-effort)."""
     try:
-        import config as cfg
         from datetime import datetime
         from pathlib import Path
 
@@ -181,9 +180,8 @@ def _log_usage(body: dict, result: dict) -> None:
             "story_chars": len(result.get("story", "")),
             "api_id": body.get("id", ""),
         }
-        path = Path(cfg.API_USAGE_PATH)
+        path = Path(config.API_USAGE_PATH)
         path.parent.mkdir(parents=True, exist_ok=True)
-        import json
         with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception:

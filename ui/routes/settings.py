@@ -31,6 +31,9 @@ async def settings_page():
     status_class = "ok" if key else "empty"
     status_text = f"✅ 已配置 ({masked})" if key else "❌ 未设置 — 请在下方输入 API Key"
 
+    # NEVER echo full key to HTML — use masked or empty placeholder
+    display_key = masked if key else ""
+
     # Model options
     current_model = config.DEEPSEEK_MODEL
     model_opts = []
@@ -68,7 +71,7 @@ async def settings_page():
 
     page = (
         _SETTINGS_PAGE
-        .replace("{{CURRENT_KEY}}", key)
+        .replace("{{MASKED_KEY}}", display_key)
         .replace("{{STATUS_CLASS}}", status_class)
         .replace("{{STATUS_TEXT}}", status_text)
         .replace("{{MODEL_OPTIONS}}", "\n".join(model_opts))

@@ -13,7 +13,17 @@ Each turn:
 import logging
 import random
 
+from engine.constants import (
+    PASSIVE_DRIFT_ALLIED_MAX, PASSIVE_DRIFT_HOSTILE_MIN,
+    PASSIVE_DRIFT_NEUTRAL_RANGE, PASSIVE_DRIFT_THRESHOLD,
+)
+
 logger = logging.getLogger(__name__)
+
+# Dedicated random instance for faction dynamics — isolated from the global
+# random module so that passive drift does not pollute seed-dependent event
+# generation (events.py uses random.Random(seed) for determinism).
+_drift_random = random.Random()
 
 
 # ── Public API ──────────────────────────────────────────────────────
@@ -84,13 +94,13 @@ def passive_faction_drift(memory: dict, turn: int) -> None:
             # If already hostile (<0.3), drift slightly more hostile
             # Middle values drift randomly
             if att >= 0.7:
-                delta = random.uniform(0.0, 0.02)
+                delta = _drift_random.uniform(0.0, PASSIVE_DRIFT_ALLIED_MAX)
             elif att <= 0.3:
-                delta = random.uniform(-0.02, 0.0)
+                delta = _drift_random.uniform(PASSIVE_DRIFT_HOSTILE_MIN, 0.0)
             else:
-                delta = random.uniform(-0.01, 0.01)
+                delta = _drift_random.uniform(-PASSIVE_DRIFT_NEUTRAL_RANGE, PASSIVE_DRIFT_NEUTRAL_RANGE)
 
-            if abs(delta) > 0.001:
+            if abs(delta) > PASSIVE_DRIFT_THRESHOLD:
                 update_faction_attitude(memory, a, b, round(delta, 3), turn)
 
 
@@ -172,11 +182,11 @@ def _build_hook(
             f"{name} 为主角的「{goal}」提供了{_pick(resources, '支援')}。"
         )
 
-    return random.choice(templates) if templates else None
+    return _drift_random.choice(templates) if templates else None
 
 
 def _pick(items: list[str], fallback: str) -> str:
     """Pick a random item or return fallback."""
     if not items:
         return fallback
-    return random.choice(items)
+    return _drift_random.choice(items)

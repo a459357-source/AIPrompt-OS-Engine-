@@ -186,7 +186,8 @@ def build_prompt() -> tuple[str, str]:
         state_for_prompt = session_state
 
     # ── Estimate token usage and warn ───────────────────────────
-    _warn_if_approaching_limit(system_prompt, state_for_prompt, world_pack,
+    _warn_if_approaching_limit(system_prompt, user_prompt,
+                                state_for_prompt, world_pack,
                                 memory_context, tier_context, faction_attitude_context,
                                 event_context, world_state_context)
 
@@ -282,17 +283,20 @@ def _min_level_index(levels: list[str]) -> int:
 
 
 def _warn_if_approaching_limit(
-    system_prompt: str, state: dict, world_pack: dict,
+    system_prompt: str, user_prompt: str,
+    state: dict, world_pack: dict,
     memory_context: str, tier_context: str, faction_context: str,
     event_context: str, world_state_context: str,
 ) -> None:
-    """Estimate total prompt tokens and warn if approaching 128K limit."""
+    """Estimate total prompt tokens and warn if approaching 128K limit.
+
+    Now includes both system and user prompts in the estimation —
+    previously only counted the system side, underestimating by ~40%.
+    """
     # Rough estimate: Chinese ≈ 0.5 tokens/char, English ≈ 0.25 tokens/char
     # Conservative: use 0.6 to be safe
     total_chars = (
-        len(system_prompt) +
-        len(json.dumps(world_pack, ensure_ascii=False)) +
-        len(json.dumps(state, ensure_ascii=False)) +
+        len(system_prompt) + len(user_prompt) +
         len(memory_context) + len(tier_context) + len(faction_context) +
         len(event_context) + len(world_state_context)
     )
