@@ -72,7 +72,7 @@ python build_release.py
 - exe 不会读取打包者机器上的 `DEEPSEEK_API_KEY` 环境变量
 - 在本机测试 zip 前，建议临时删除环境变量 `DEEPSEEK_API_KEY`，避免误判
 
-详见 `release/使用说明.txt`。
+详见 `release/使用说明.txt` 与 **`release/PromptOS-用户手册.html`**（完整图文手册）。
 
 ## 测试
 

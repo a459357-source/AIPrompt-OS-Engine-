@@ -1,6 +1,9 @@
 PromptOS 发布包使用说明
 ====================
 
+【完整图文手册】
+  打开 release\PromptOS-用户手册.html（浏览器即可，无需联网）
+
 【给别人用】
 1. 只发送 release\PromptOS-win64-v{版本}.zip（不要附带 data 文件夹）
    例：PromptOS-win64-v2.0.1.zip

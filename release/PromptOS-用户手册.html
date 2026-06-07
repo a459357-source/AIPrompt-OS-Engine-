@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromptOS v2 用户手册</title>
+  <style>
+    :root {
+      --bg: #0c0e14;
+      --surface: #151820;
+      --card: #1c2030;
+      --border: #2a3045;
+      --text: #e8eaf2;
+      --muted: #9399b0;
+      --dim: #6b7289;
+      --primary: #7c6cf0;
+      --accent: #863bff;
+      --glow: rgba(124, 108, 240, 0.35);
+      --success: #4ade80;
+      --warning: #fbbf24;
+      --danger: #f87171;
+      --info: #60a5fa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.75;
+    }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      background: var(--card);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 0.88em;
+      color: #b8a9ff;
+    }
+    .hero {
+      background: linear-gradient(135deg, #12152a 0%, #1a1040 50%, #0c0e14 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 3.5rem 2rem 3rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 30% 40%, var(--glow), transparent 55%);
+      pointer-events: none;
+    }
+    .hero-inner { position: relative; max-width: 820px; margin: 0 auto; }
+    .logo-svg { margin-bottom: 1.25rem; }
+    .hero h1 {
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      background: linear-gradient(90deg, #fff, #b8a9ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+    .hero .tagline { color: var(--muted); font-size: 1.05rem; max-width: 560px; margin: 0 auto 1.5rem; }
+    .badge-row { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: rgba(124,108,240,0.12);
+      color: #c4b5fd;
+    }
+    .layout { display: flex; max-width: 1280px; margin: 0 auto; gap: 0; }
+    .toc {
+      width: 260px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 1.5rem 1rem;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .toc h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); margin-bottom: 0.75rem; }
+    .toc ul { list-style: none; }
+    .toc li { margin: 0.15rem 0; }
+    .toc a {
+      display: block;
+      padding: 0.35rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.86rem;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    .toc a:hover { background: var(--card); color: var(--text); }
+    .toc .sub { padding-left: 1rem; font-size: 0.8rem; }
+    main { flex: 1; min-width: 0; padding: 2rem 2.5rem 4rem; }
+    section { margin-bottom: 3.5rem; scroll-margin-top: 1rem; }
+    h2 {
+      font-size: 1.55rem;
+      color: var(--primary);
+      margin-bottom: 1rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--border);
+    }
+    h3 { font-size: 1.1rem; color: #c4b5fd; margin: 1.5rem 0 0.75rem; }
+    h4 { font-size: 0.95rem; color: var(--text); margin: 1rem 0 0.5rem; }
+    p, li { color: var(--muted); }
+    ul, ol { padding-left: 1.4rem; margin: 0.5rem 0 1rem; }
+    li { margin: 0.3rem 0; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin: 1rem 0;
+    }
+    .card.highlight { border-color: rgba(124,108,240,0.4); box-shadow: 0 0 24px var(--glow); }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin: 1rem 0; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem 0; }
+    .stat {
+      text-align: center;
+      padding: 1.25rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .stat-num { font-size: 1.8rem; font-weight: 700; color: var(--primary); }
+    .stat-label { font-size: 0.82rem; color: var(--dim); margin-top: 0.25rem; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+      background: var(--surface);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td { padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: var(--card); color: var(--text); font-weight: 600; }
+    .fig {
+      margin: 1.25rem 0;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #0a0c12;
+    }
+    .fig-caption {
+      padding: 0.6rem 1rem;
+      font-size: 0.82rem;
+      color: var(--dim);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+    .fig svg { display: block; width: 100%; height: auto; }
+    .steps { counter-reset: step; list-style: none; padding: 0; }
+    .steps li {
+      counter-increment: step;
+      position: relative;
+      padding: 0.85rem 1rem 0.85rem 3rem;
+      margin: 0.5rem 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+    }
+    .steps li::before {
+      content: counter(step);
+      position: absolute;
+      left: 1rem;
+      top: 0.85rem;
+      width: 1.5rem;
+      height: 1.5rem;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 50%;
+      font-size: 0.78rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .callout {
+      border-left: 4px solid var(--primary);
+      padding: 0.85rem 1rem;
+      margin: 1rem 0;
+      background: rgba(124,108,240,0.08);
+      border-radius: 0 8px 8px 0;
+    }
+    .callout.warn { border-color: var(--warning); background: rgba(251,191,36,0.08); }
+    .callout.danger { border-color: var(--danger); background: rgba(248,113,113,0.08); }
+    .callout.success { border-color: var(--success); background: rgba(74,222,128,0.08); }
+    .callout strong { color: var(--text); }
+    .nav-mock .bar { fill: #151820; stroke: #2a3045; }
+    .nav-mock .tab-active { fill: rgba(124,108,240,0.25); stroke: #7c6cf0; }
+    .nav-mock .tab { fill: #1c2030; stroke: #2a3045; }
+    .nav-mock text { fill: #9399b0; font-size: 11px; font-family: sans-serif; }
+    .nav-mock .tab-active-text { fill: #c4b5fd; font-weight: 600; }
+    .screen { fill: #0a0c12; }
+    .panel { fill: #151820; stroke: #2a3045; }
+    .panel-accent { fill: rgba(134,59,255,0.12); stroke: #863bff; }
+    .btn { fill: #7c6cf0; }
+    .btn-text { fill: #fff; font-size: 11px; }
+    .story-text { fill: #c8cad6; font-size: 10px; }
+    .option-box { fill: #1c2030; stroke: #3d4460; }
+    .footer-nav { fill: #121520; stroke: #2a3045; }
+    @media (max-width: 900px) {
+      .layout { flex-direction: column; }
+      .toc { width: 100%; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--border); }
+      main { padding: 1.5rem 1rem 3rem; }
+    }
+    @media print {
+      .toc { display: none; }
+      .hero { padding: 1.5rem; }
+      body { background: #fff; color: #111; }
+      p, li { color: #333; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <svg class="logo-svg" width="72" height="68" viewBox="0 0 48 46" aria-hidden="true">
+      <path fill="#863bff" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z"/>
+    </svg>
+    <h1>PromptOS v2 用户手册</h1>
+    <p class="tagline">AI 驱动的交互式叙事引擎 — 每回合生成分支剧情，维护角色记忆、势力关系与世界状态。</p>
+    <div class="badge-row">
+      <span class="badge">版本 2.0.0+</span>
+      <span class="badge">DeepSeek API</span>
+      <span class="badge">Windows exe / 开发模式</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="toc" aria-label="目录">
+    <h2>目录</h2>
+    <ul>
+      <li><a href="#intro">1. 产品简介</a></li>
+      <li><a href="#install">2. 安装与启动</a></li>
+      <li class="sub"><a href="#install-exe">Windows 发布包</a></li>
+      <li class="sub"><a href="#install-dev">开发者模式</a></li>
+      <li><a href="#apikey">3. 配置 API Key</a></li>
+      <li><a href="#nav">4. 界面导航</a></li>
+      <li><a href="#world">5. 世界 / 新故事</a></li>
+      <li><a href="#game">6. 模拟（游戏）</a></li>
+      <li class="sub"><a href="#game-quick">快捷设置</a></li>
+      <li><a href="#npcs">7. 角色页</a></li>
+      <li><a href="#dashboard">8. 势力 / 仪表盘</a></li>
+      <li><a href="#settings">9. 设置</a></li>
+      <li><a href="#save">10. 存档与导出</a></li>
+      <li><a href="#flow">11. 完整流程图</a></li>
+      <li><a href="#trouble">12. 常见问题</a></li>
+      <li><a href="#files">13. 文件与日志</a></li>
+    </ul>
+  </nav>
+
+  <main>
+
+    <!-- 1 简介 -->
+    <section id="intro">
+      <h2>1. 产品简介</h2>
+      <div class="grid-3">
+        <div class="stat"><div class="stat-num">🏰</div><div class="stat-label">世界构建<br>角色 · 势力 · 关系</div></div>
+        <div class="stat"><div class="stat-num">🎮</div><div class="stat-label">回合推进<br>AI 叙事 + 分支选项</div></div>
+        <div class="stat"><div class="stat-num">📊</div><div class="stat-label">世界状态<br>关系网 · 分支图 · 时间线</div></div>
+      </div>
+      <p>PromptOS（Prompt OS Galgame Runtime）是一款面向<strong>互动小说 / Galgame 式叙事</strong>的创作与游玩工具。你设定世界观与角色，由 DeepSeek 大模型每回合生成小说正文与后续选项，引擎自动维护记忆、关系指标与剧情图。</p>
+      <h3>v2 主要能力</h3>
+      <ul>
+        <li><strong>分层记忆</strong>：长对话下自动压缩历史，保留关键情节</li>
+        <li><strong>世界状态 V2</strong>：仪表盘展示势力、关系网、分支图、时间线</li>
+        <li><strong>生成参数联动</strong>：目标字数与 Token 上限自动匹配</li>
+        <li><strong>成人模式</strong>（可选）：顶栏切换，世界生成与叙事风格跟随</li>
+        <li><strong>一键 AI 辅助</strong>：世界观、角色、势力、规则字段可 AI 生成</li>
+      </ul>
+    </section>
+
+    <!-- 2 安装 -->
+    <section id="install">
+      <h2>2. 安装与启动</h2>
+
+      <h3 id="install-exe">Windows 发布包（推荐给普通用户）</h3>
+      <ol class="steps">
+        <li>解压 <code>PromptOS-win64-v2.x.x.zip</code>（勿附带他人的 <code>data/</code> 文件夹）</li>
+        <li>双击 <code>PromptOS.exe</code>，或运行同目录下的 <code>启动 PromptOS.bat</code></li>
+        <li>浏览器会自动打开 <code>http://127.0.0.1:8000</code>（内置前端，单端口）</li>
+        <li>首次使用按弹窗填写 DeepSeek API Key（见下一章）</li>
+        <li>进入「世界」页创建故事并开始模拟</li>
+      </ol>
+      <div class="callout warn">
+        <strong>注意：</strong>发布包不含任何 API Key；exe 不会读取打包者电脑上的 <code>DEEPSEEK_API_KEY</code> 环境变量。在本机测试 zip 前，建议临时删除该环境变量，避免误用他人 Key。
+      </div>
+
+      <h3 id="install-dev">开发者模式</h3>
+      <div class="card">
+        <pre style="color:#b8a9ff;font-size:0.85rem;line-height:1.6;overflow-x:auto"><code># 后端
+pip install -r requirements.txt
+python engine/run.py --mode web    # → http://localhost:8000
+
+# 前端（另开终端）
+cd frontend && npm install && npm run dev   # → http://localhost:5173</code></pre>
+      </div>
+      <table>
+        <tr><th>模式</th><th>地址</th><th>说明</th></tr>
+        <tr><td>exe 发布包</td><td><code>127.0.0.1:8000</code></td><td>前后端一体</td></tr>
+        <tr><td>开发</td><td>后端 8000 + 前端 5173</td><td>前端代理到后端 API</td></tr>
+      </table>
+    </section>
+
+    <!-- 3 API Key -->
+    <section id="apikey">
+      <h2>3. 配置 API Key</h2>
+      <div class="fig">
+        <svg viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg" aria-label="API Key 配置示意">
+          <rect width="640" height="220" class="screen"/>
+          <rect x="120" y="20" width="400" height="180" rx="12" class="panel-accent"/>
+          <text x="320" y="52" text-anchor="middle" fill="#c4b5fd" font-size="14" font-weight="600">🔑 欢迎使用 PromptOS</text>
+          <text x="320" y="78" text-anchor="middle" fill="#9399b0" font-size="11">请填写 DeepSeek API Key 以开始生成</text>
+          <rect x="160" y="95" width="320" height="32" rx="6" fill="#0a0c12" stroke="#3d4460"/>
+          <text x="175" y="115" fill="#6b7289" font-size="11">sk-xxxxxxxxxxxxxxxx</text>
+          <rect x="260" y="145" width="120" height="32" rx="6" class="btn"/>
+          <text x="320" y="165" text-anchor="middle" class="btn-text">保存并继续</text>
+        </svg>
+        <div class="fig-caption">图 3-1　首次启动时的 API Key 引导弹窗</div>
+      </div>
+      <h4>获取 Key</h4>
+      <p>在 <a href="https://platform.deepseek.com/" target="_blank" rel="noopener">DeepSeek 开放平台</a> 注册并创建 API Key（格式 <code>sk-...</code>）。</p>
+      <h4>填写方式（二选一）</h4>
+      <ul>
+        <li><strong>首次弹窗</strong>：启动后自动出现，保存至本机 <code>data/apikey.json</code></li>
+        <li><strong>设置 → API</strong>：可随时修改、清除 Key；清除后弹窗会再次出现</li>
+        <li><strong>环境变量</strong>（仅开发）：<code>DEEPSEEK_API_KEY=sk-...</code></li>
+      </ul>
+      <div class="callout success">
+        <strong>隐私：</strong>Key 仅保存在本机，不会随 zip 发布包分发。请勿将含 Key 的 <code>data/</code> 文件夹发给他人。
+      </div>
+    </section>
+
+    <!-- 4 导航 -->
+    <section id="nav">
+      <h2>4. 界面导航</h2>
+      <p>顶部（桌面）或底部（手机）主导航共五个入口：</p>
+      <div class="fig">
+        <svg viewBox="0 0 640 120" class="nav-mock" xmlns="http://www.w3.org/2000/svg" aria-label="主导航示意">
+          <rect width="640" height="120" class="screen"/>
+          <rect x="0" y="0" width="640" height="48" class="bar"/>
+          <text x="24" y="30" fill="#863bff" font-size="14" font-weight="700">PromptOS</text>
+          <rect x="130" y="10" width="72" height="28" rx="6" class="tab"/>
+          <text x="166" y="28" text-anchor="middle" class="tab-active-text">🏰 世界</text>
+          <rect x="210" y="10" width="72" height="28" rx="6" class="tab-active"/>
+          <text x="246" y="28" text-anchor="middle" class="tab-active-text">🎮 模拟</text>
+          <rect x="290" y="10" width="72" height="28" rx="6" class="tab"/>
+          <text x="326" y="28" text-anchor="middle">👤 角色</text>
+          <rect x="370" y="10" width="72" height="28" rx="6" class="tab"/>
+          <text x="406" y="28" text-anchor="middle">⚔ 势力</text>
+          <rect x="450" y="10" width="72" height="28" rx="6" class="tab"/>
+          <text x="486" y="28" text-anchor="middle">⚙ 设置</text>
+          <rect x="0" y="72" width="640" height="48" class="footer-nav"/>
+          <text x="64" y="102" text-anchor="middle" fill="#7c6cf0" font-size="10">世界</text>
+          <text x="192" y="102" text-anchor="middle" fill="#9399b0" font-size="10">模拟</text>
+          <text x="320" y="102" text-anchor="middle" fill="#9399b0" font-size="10">角色</text>
+          <text x="448" y="102" text-anchor="middle" fill="#9399b0" font-size="10">势力</text>
+          <text x="576" y="102" text-anchor="middle" fill="#9399b0" font-size="10">设置</text>
+        </svg>
+        <div class="fig-caption">图 4-1　桌面顶栏导航（上）与移动端底栏导航（下）</div>
+      </div>
+      <table>
+        <tr><th>入口</th><th>路径</th><th>用途</th></tr>
+        <tr><td>🏰 世界</td><td><code>/new</code></td><td>创建/编辑世界观、角色、势力，开始新故事</td></tr>
+        <tr><td>🎮 模拟</td><td><code>/game</code></td><td>主游玩界面：阅读正文、选择选项、快捷生成设置</td></tr>
+        <tr><td>👤 角色</td><td><code>/npcs</code></td><td>查看 NPC 列表、关系指标、AI 生成新 NPC</td></tr>
+        <tr><td>⚔ 势力</td><td><code>/dashboard</code></td><td>仪表盘：概览、时间线、关系网、分支图、势力</td></tr>
+        <tr><td>⚙ 设置</td><td><code>/settings</code></td><td>阅读样式、存档、API、界面偏好</td></tr>
+      </table>
+    </section>
+
+    <!-- 5 世界 -->
+    <section id="world">
+      <h2>5. 世界 / 新故事</h2>
+      <div class="fig">
+        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg" aria-label="世界构建页示意">
+          <rect width="640" height="320" class="screen"/>
+          <rect x="0" y="0" width="140" height="320" class="panel"/>
+          <text x="20" y="40" fill="#7c6cf0" font-size="10" font-weight="600">侧栏导航</text>
+          <text x="20" y="65" fill="#c4b5fd" font-size="10">● 核心设定</text>
+          <text x="20" y="85" fill="#9399b0" font-size="10">○ 势力</text>
+          <text x="20" y="105" fill="#9399b0" font-size="10">○ 角色</text>
+          <text x="20" y="125" fill="#9399b0" font-size="10">○ 关系</text>
+          <text x="20" y="145" fill="#9399b0" font-size="10">○ 关键物品</text>
+          <rect x="155" y="15" width="470" height="290" rx="8" class="panel"/>
+          <text x="175" y="42" fill="#e8eaf2" font-size="12" font-weight="600">故事标题 · 类型标签 · 开局地点</text>
+          <rect x="175" y="55" width="430" height="50" rx="4" fill="#0a0c12" stroke="#2a3045"/>
+          <text x="185" y="85" class="story-text">世界观描述（最多 300 字）…</text>
+          <rect x="175" y="120" width="100" height="28" rx="4" class="btn"/>
+          <text x="225" y="138" text-anchor="middle" class="btn-text" font-size="10">✨ 一键生成</text>
+          <rect x="285" y="120" width="100" height="28" rx="4" fill="#1c2030" stroke="#7c6cf0"/>
+          <text x="335" y="138" text-anchor="middle" fill="#c4b5fd" font-size="10">▶ 开始故事</text>
+          <rect x="175" y="165" width="200" height="120" rx="6" fill="#121520" stroke="#2a3045"/>
+          <text x="185" y="185" fill="#9399b0" font-size="10">角色卡片 × N</text>
+          <rect x="390" y="165" width="215" height="120" rx="6" fill="#121520" stroke="#2a3045"/>
+          <text x="400" y="185" fill="#9399b0" font-size="10">关系图谱预览</text>
+        </svg>
+        <div class="fig-caption">图 5-1　世界构建页：左侧分节导航 + 右侧表单与关系图</div>
+      </div>
+      <h3>推荐流程</h3>
+      <ol class="steps">
+        <li><strong>核心设定</strong>：填写标题（≤20 字）、类型标签、开局地点、世界观、主线目标</li>
+        <li><strong>势力</strong>：添加组织/阵营，可 AI 生成名称与关系</li>
+        <li><strong>角色</strong>：至少 1 名角色；可设主角色、外貌、性格标签、背景、秘密、能力</li>
+        <li><strong>关系</strong>：配置关系阶段轴（如「陌生→信赖→羁绊」）与初始好感</li>
+        <li><strong>关键物品</strong>（可选）：剧情道具与归属</li>
+        <li>点击 <strong>「开始故事」</strong> — 会覆盖当前对局进度，操作不可撤销</li>
+      </ol>
+      <h3>AI 辅助按钮</h3>
+      <ul>
+        <li><strong>✨ 一键生成</strong>：用 AI 填充整表（会覆盖当前全部设定，需确认）</li>
+        <li>各字段旁的 <strong>AI 按钮</strong>：单独生成世界观片段、角色、势力等</li>
+        <li>表单内容会自动本地草稿保存，刷新页面可恢复</li>
+      </ul>
+      <div class="callout warn">
+        <strong>开始新故事</strong>将初始化全新对局，当前进度、剧情记录与相关存档会被覆盖。
+      </div>
+    </section>
+
+    <!-- 6 游戏 -->
+    <section id="game">
+      <h2>6. 模拟（游戏）</h2>
+      <div class="fig">
+        <svg viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg" aria-label="游戏页示意">
+          <rect width="640" height="360" class="screen"/>
+          <rect x="0" y="0" width="160" height="360" class="panel"/>
+          <text x="15" y="30" fill="#9399b0" font-size="10">角色状态 / 关系</text>
+          <rect x="10" y="40" width="140" height="45" rx="4" fill="#121520" stroke="#2a3045"/>
+          <rect x="175" y="10" width="455" height="200" rx="8" class="panel"/>
+          <text x="190" y="35" fill="#e8eaf2" font-size="11" font-weight="600">第 3 轮 · TENSION · 📍 图书馆</text>
+          <text x="190" y="60" class="story-text">月光透过彩色玻璃，在书页上投下斑驳的影子。</text>
+          <text x="190" y="78" class="story-text">她合上手中的古籍，抬眼望向你——</text>
+          <text x="190" y="96" class="story-text">「你确定要打开那扇门吗？」</text>
+          <rect x="190" y="230" width="210" height="36" rx="6" class="option-box"/>
+          <text x="200" y="252" fill="#c4b5fd" font-size="10">A. 推开门，一探究竟</text>
+          <rect x="410" y="230" width="210" height="36" rx="6" class="option-box"/>
+          <text x="420" y="252" fill="#9399b0" font-size="10">B. 先询问她的来历</text>
+          <rect x="190" y="275" width="210" height="36" rx="6" class="option-box"/>
+          <text x="200" y="297" fill="#9399b0" font-size="10">C. 转身离开</text>
+          <rect x="410" y="275" width="210" height="36" rx="6" class="option-box"/>
+          <text x="420" y="297" fill="#9399b0" font-size="10">D. 观察周围环境</text>
+          <rect x="520" y="10" width="110" height="28" rx="4" fill="#1c2030" stroke="#fbbf24"/>
+          <text x="575" y="28" text-anchor="middle" fill="#fbbf24" font-size="10">⚡ 快捷设置</text>
+        </svg>
+        <div class="fig-caption">图 6-1　模拟页：左侧关系面板 · 中央叙事正文 · 底部四选项 · 快捷设置</div>
+      </div>
+      <h3>基本操作</h3>
+      <ul>
+        <li>阅读 AI 生成的 Markdown 正文（支持打字机效果，可在设置中关闭动画）</li>
+        <li>点击 <strong>A / B / C / D</strong> 选项推进下一回合</li>
+        <li>左侧面板显示当前角色关系指标（信任、好感、敌意等）</li>
+        <li>顶栏显示当前回合数、剧情状态机（SETUP → BUILD → TENSION → CLIMAX → COOLDOWN）、场景</li>
+      </ul>
+      <h3 id="game-quick">⚡ 快捷设置（游戏页）</h3>
+      <p>展开「⚡ 快捷设置」可调整<strong>下一回合生效</strong>的生成参数：</p>
+      <table>
+        <tr><th>参数</th><th>说明</th></tr>
+        <tr><td>目标字数</td><td>每轮期望叙事长度；变更后 <strong>最大 Token 自动联动</strong></td></tr>
+        <tr><td>最大 Token</td><td>单次 API 输出上限（含选项与状态 JSON）</td></tr>
+        <tr><td>温度 / Top P</td><td>创意度；推荐温度 0.8–1.0</td></tr>
+        <tr><td>选项数量</td><td>每轮 3–5 个选项</td></tr>
+        <tr><td>叙事视角 / 文风</td><td>第一/第三人称、细腻/快节奏等</td></tr>
+        <tr><td>重复检测</td><td>严格模式下相似度过高会重试</td></tr>
+        <tr><td>沉浸阅读</td><td>隐藏侧栏与快捷设置，专注正文</td></tr>
+      </table>
+      <p>模型选择、流式输出、上下文上限、<strong>自动压缩</strong>开关在 <strong>设置 → API</strong> 中配置。</p>
+      <div class="callout">
+        <strong>输出过短？</strong>若提示 token 不足，请展开快捷设置提高「目标字数」或「最大 Token」。
+      </div>
+    </section>
+
+    <!-- 7 NPCs -->
+    <section id="npcs">
+      <h2>7. 角色页</h2>
+      <ul>
+        <li>列出对局中所有角色（主角 / NPC），显示出场次数、平均信任等统计</li>
+        <li>支持按类型筛选、名称搜索</li>
+        <li>点击卡片查看详细关系指标与标签</li>
+        <li><strong>AI 生成 NPC</strong>：一键添加新角色到当前世界（消耗 API）</li>
+      </ul>
+      <p>需先开始一个故事后，本页才有数据。</p>
+    </section>
+
+    <!-- 8 Dashboard -->
+    <section id="dashboard">
+      <h2>8. 势力 / 仪表盘</h2>
+      <div class="fig">
+        <svg viewBox="0 0 640 240" xmlns="http://www.w3.org/2000/svg" aria-label="仪表盘示意">
+          <rect width="640" height="240" class="screen"/>
+          <rect x="10" y="10" width="120" height="220" rx="6" class="panel"/>
+          <text x="25" y="35" fill="#c4b5fd" font-size="10">● 概览</text>
+          <text x="25" y="55" fill="#9399b0" font-size="10">○ 时间线</text>
+          <text x="25" y="75" fill="#9399b0" font-size="10">○ 关系网</text>
+          <text x="25" y="95" fill="#9399b0" font-size="10">○ 分支图</text>
+          <text x="25" y="115" fill="#9399b0" font-size="10">○ 势力</text>
+          <rect x="145" y="10" width="485" height="100" rx="6" class="panel"/>
+          <text x="160" y="35" fill="#9399b0" font-size="10">回合 · 字数 · 状态分布</text>
+          <circle cx="220" cy="70" r="25" fill="none" stroke="#7c6cf0" stroke-width="8" stroke-dasharray="100 60"/>
+          <rect x="145" y="120" width="235" height="110" rx="6" fill="#121520" stroke="#2a3045"/>
+          <text x="160" y="145" fill="#9399b0" font-size="10">关系网络图</text>
+          <circle cx="220" cy="185" r="8" fill="#7c6cf0"/>
+          <circle cx="260" cy="175" r="6" fill="#863bff"/>
+          <line x1="220" y1="185" x2="260" y2="175" stroke="#3d4460"/>
+          <rect x="390" y="120" width="240" height="110" rx="6" fill="#121520" stroke="#2a3045"/>
+          <text x="405" y="145" fill="#9399b0" font-size="10">Mermaid 分支图</text>
+          <text x="405" y="170" fill="#6b7289" font-size="9">节点 · 分支路径</text>
+        </svg>
+        <div class="fig-caption">图 8-1　仪表盘：概览统计 + 关系网 + 剧情分支图</div>
+      </div>
+      <table>
+        <tr><th>分节</th><th>内容</th></tr>
+        <tr><td>概览</td><td>回合数、总字数、剧情状态、场景</td></tr>
+        <tr><td>时间线</td><td>状态机变化与关键事件记录</td></tr>
+        <tr><td>关系网</td><td>角色节点与关系边可视化</td></tr>
+        <tr><td>分支图</td><td>基于 Mermaid 的选项分支树</td></tr>
+        <tr><td>势力</td><td>各阵营影响力与声誉</td></tr>
+      </table>
+    </section>
+
+    <!-- 9 Settings -->
+    <section id="settings">
+      <h2>9. 设置</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h4>📖 阅读</h4>
+          <p>字体大小、行高、正文字体、最大宽度、背景色调（深色/护眼/灰）、段落间距；含实时预览。</p>
+        </div>
+        <div class="card">
+          <h4>💾 数据</h4>
+          <p>自动保存间隔、最大存档槽位、导出格式、自动导出频率；手动存档槽；重置游戏进度；Obsidian 导出。</p>
+        </div>
+        <div class="card">
+          <h4>🎨 界面</h4>
+          <p>动画开关、侧栏默认状态、角色面板位置、语言（中/英/日部分支持）。</p>
+        </div>
+        <div class="card">
+          <h4>🔑 API</h4>
+          <p>DeepSeek Key、模型（V4-Flash / V4-Pro）、流式输出、上下文消息上限、自动压缩。</p>
+        </div>
+      </div>
+      <h3>成人模式（可选）</h3>
+      <p>顶栏可切换成人主题与内容权重（故事 / 恋爱 / 成人）。开启后导航文案与视觉主题会变化，世界一键生成与叙事风格会跟随成人配置。</p>
+    </section>
+
+    <!-- 10 存档 -->
+    <section id="save">
+      <h2>10. 存档与导出</h2>
+      <table>
+        <tr><th>类型</th><th>说明</th></tr>
+        <tr><td>自动存档</td><td>引擎按间隔写入 <code>data/saves/autosave.json</code></td></tr>
+        <tr><td>手动槽位</td><td>设置页可保存/加载多个命名槽位</td></tr>
+        <tr><td>回合快照</td><td>特定回合自动快照（如 T5、T10）</td></tr>
+        <tr><td>导出</td><td>手动导出故事为 Markdown（Obsidian）；自动导出写入 <code>output/exports/</code></td></tr>
+        <tr><td>重置进度</td><td>从 <code>world_init.json</code> 恢复初始状态，保留世界观设定</td></tr>
+      </table>
+      <div class="callout warn">
+        <strong>重置游戏进度</strong>与<strong>开始新故事</strong>不同：前者保留 world_pack 设定，后者可能完全重建世界。
+      </div>
+    </section>
+
+    <!-- 11 流程图 -->
+    <section id="flow">
+      <h2>11. 完整流程图</h2>
+      <div class="fig">
+        <svg viewBox="0 0 640 480" xmlns="http://www.w3.org/2000/svg" aria-label="使用流程">
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#7c6cf0"/>
+            </marker>
+          </defs>
+          <rect width="640" height="480" class="screen"/>
+          <!-- nodes -->
+          <rect x="240" y="20" width="160" height="40" rx="8" class="btn"/>
+          <text x="320" y="45" text-anchor="middle" class="btn-text">启动 PromptOS</text>
+          <line x1="320" y1="60" x2="320" y2="85" stroke="#7c6cf0" marker-end="url(#arrow)"/>
+          <rect x="220" y="85" width="200" height="40" rx="8" class="panel-accent"/>
+          <text x="320" y="110" text-anchor="middle" fill="#c4b5fd" font-size="11">填写 API Key</text>
+          <line x1="320" y1="125" x2="320" y2="150" stroke="#7c6cf0" marker-end="url(#arrow)"/>
+          <rect x="210" y="150" width="220" height="40" rx="8" class="panel"/>
+          <text x="320" y="175" text-anchor="middle" fill="#9399b0" font-size="11">世界页 · 构建设定</text>
+          <line x1="320" y1="190" x2="320" y2="215" stroke="#7c6cf0" marker-end="url(#arrow)"/>
+          <rect x="210" y="215" width="220" height="40" rx="8" class="panel"/>
+          <text x="320" y="240" text-anchor="middle" fill="#9399b0" font-size="11">点击「开始故事」</text>
+          <line x1="320" y1="255" x2="320" y2="280" stroke="#7c6cf0" marker-end="url(#arrow)"/>
+          <rect x="200" y="280" width="240" height="40" rx="8" fill="#1a2540" stroke="#60a5fa"/>
+          <text x="320" y="305" text-anchor="middle" fill="#93c5fd" font-size="11">模拟页 · 阅读 + 选择选项</text>
+          <line x1="320" y1="320" x2="320" y2="345" stroke="#7c6cf0" marker-end="url(#arrow)"/>
+          <rect x="180" y="345" width="280" height="40" rx="8" class="panel"/>
+          <text x="320" y="370" text-anchor="middle" fill="#9399b0" font-size="11">循环生成 · 自动记忆 · 关系更新</text>
+          <line x1="320" y1="385" x2="320" y2="410" stroke="#7c6cf0" marker-end="url(#arrow)"/>
+          <!-- branch -->
+          <rect x="60" y="410" width="150" height="50" rx="8" class="panel"/>
+          <text x="135" y="432" text-anchor="middle" fill="#9399b0" font-size="10">角色 / 势力页</text>
+          <text x="135" y="448" text-anchor="middle" fill="#6b7289" font-size="9">查看状态</text>
+          <rect x="430" y="410" width="150" height="50" rx="8" class="panel"/>
+          <text x="505" y="432" text-anchor="middle" fill="#9399b0" font-size="10">设置页</text>
+          <text x="505" y="448" text-anchor="middle" fill="#6b7289" font-size="9">存档 · 导出</text>
+          <line x1="280" y1="430" x2="210" y2="430" stroke="#3d4460" marker-end="url(#arrow)"/>
+          <line x1="360" y1="430" x2="430" y2="430" stroke="#3d4460" marker-end="url(#arrow)"/>
+          <line x1="135" y1="410" x2="135" y2="365" stroke="#3d4460" stroke-dasharray="4 3"/>
+          <line x1="505" y1="410" x2="505" y2="365" stroke="#3d4460" stroke-dasharray="4 3"/>
+          <line x1="135" y1="365" x2="200" y2="365" stroke="#3d4460"/>
+          <line x1="505" y1="365" x2="440" y2="365" stroke="#3d4460"/>
+        </svg>
+        <div class="fig-caption">图 11-1　从安装到循环游玩的主流程</div>
+      </div>
+    </section>
+
+    <!-- 12 FAQ -->
+    <section id="trouble">
+      <h2>12. 常见问题</h2>
+      <div class="card">
+        <h4>❓ 启动后浏览器空白或无法连接</h4>
+        <p>确认 <code>PromptOS.exe</code> 窗口未关闭；检查 8000 端口是否被占用。可先运行「停止.bat」再重启。</p>
+      </div>
+      <div class="card">
+        <h4>❓ API 报错 / 401 / 余额不足</h4>
+        <p>检查 Key 是否正确、DeepSeek 账户是否有余额。在设置 → API 重新保存 Key。</p>
+      </div>
+      <div class="card">
+        <h4>❓ 生成内容过短或被截断</h4>
+        <p>在游戏页 ⚡ 快捷设置中提高「目标字数」和「最大 Token」；必要时在设置 → API 关闭或调整自动压缩。</p>
+      </div>
+      <div class="card">
+        <h4>❓ 历史太长导致变慢或超上下文</h4>
+        <p>开启「自动压缩」并适当降低「上下文消息上限」；压缩阈值可在游戏快捷设置中预览。</p>
+      </div>
+      <div class="card">
+        <h4>❓ 如何完全重新开始</h4>
+        <p>在世界页点击「开始故事」（重建对局），或在设置 → 数据 →「重置游戏进度」（保留 world_pack）。</p>
+      </div>
+      <div class="card">
+        <h4>❓ 关闭程序</h4>
+        <p>直接关闭 <code>PromptOS.exe</code> 的黑色控制台窗口即可停止服务。开发模式下设置页提供「关闭服务」。</p>
+      </div>
+    </section>
+
+    <!-- 13 文件 -->
+    <section id="files">
+      <h2>13. 文件与日志</h2>
+      <p>以下路径相对于 exe 所在目录（开发模式下为 <code>prompt-os-engine/</code>）：</p>
+      <table>
+        <tr><th>路径</th><th>内容</th><th>可否分享</th></tr>
+        <tr><td><code>data/apikey.json</code></td><td>API Key 与引擎设置</td><td>❌ 含密钥</td></tr>
+        <tr><td><code>data/memory.json</code></td><td>分层记忆</td><td>⚠️ 个人剧情</td></tr>
+        <tr><td><code>session_state.yaml</code></td><td>当前回合状态</td><td>⚠️ 个人进度</td></tr>
+        <tr><td><code>world_pack.yaml</code></td><td>世界观设定</td><td>视内容而定</td></tr>
+        <tr><td><code>data/saves/</code></td><td>存档槽</td><td>⚠️ 个人进度</td></tr>
+        <tr><td><code>data/app.log</code></td><td>运行日志</td><td>排查时可截取</td></tr>
+        <tr><td><code>data/error.log</code></td><td>错误日志</td><td>排查时可截取</td></tr>
+        <tr><td><code>output/</code></td><td>章节导出、仪表盘 HTML 等</td><td>视内容而定</td></tr>
+      </table>
+      <div class="callout success">
+        <strong>分发 zip 给他人时</strong>：只发送 <code>PromptOS-win64-vX.Y.Z.zip</code>，不要附带 <code>data/</code> 文件夹。
+      </div>
+    </section>
+
+    <footer style="margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border);text-align:center;color:var(--dim);font-size:0.82rem">
+      <p>PromptOS v2 · 用户手册 · 随发布包附带 · 更新日期 2026-06-08</p>
+      <p style="margin-top:0.5rem">版本规则见仓库 <code>RELEASE_VERSIONING.md</code></p>
+    </footer>
+  </main>
+</div>
+
+</body>
+</html>
