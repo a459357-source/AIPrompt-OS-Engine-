@@ -23,7 +23,7 @@ router = APIRouter(tags=["settings"])
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page():
     """Show API key settings page."""
-    key = config.DEEPSEEK_API_KEY
+    key = config._read_stored_api_key()
     masked = ""
     if key:
         masked = key[:8] + "…" + key[-4:] if len(key) > 12 else "***"

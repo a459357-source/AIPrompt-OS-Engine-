@@ -12,6 +12,32 @@ import config
 
 router = APIRouter(prefix="/api", tags=["api"])
 
+_REL_METRICS = ("trust", "affection", "respect", "dependence", "hostility", "attraction")
+
+
+def _merge_characters_with_memory(raw_chars: dict, mem_chars: dict, faction_map: dict) -> dict[str, dict]:
+    """Merge session characters with memory metrics for API responses."""
+    result: dict[str, dict] = {}
+    for key, sc in raw_chars.items():
+        name = sc.get("name", key)
+        mem = mem_chars.get(name, {})
+        trust = mem.get("trust", 0.5)
+        trust_pct = round(trust * 100)
+        merged = {
+            **sc,
+            "trust": trust,
+            "trust_pct": trust_pct,
+            "flags": mem.get("flags", []),
+            "tier": mem.get("tier", ""),
+            "faction": faction_map.get(name, mem.get("faction", "")),
+        }
+        for metric in _REL_METRICS:
+            if metric in mem and isinstance(mem[metric], (int, float)):
+                merged[metric] = round(float(mem[metric]) * 100)
+        merged["affection"] = merged.get("affection", trust_pct)
+        result[key] = merged
+    return result
+
 
 @router.get("/game-state")
 async def api_game_state():
@@ -52,6 +78,7 @@ async def api_game_state():
     last = history[-1]
     story = last.get("story", last.get("summary", ""))
     options = last.get("options", [])
+    raw_chars = state.get("characters", {})
 
     # Merge trust data from memory.json into characters
     try:
@@ -64,22 +91,7 @@ async def api_game_state():
         mem_chars = {}
         faction_map = {}
 
-    chars_with_trust: dict[str, dict] = {}
-    raw_chars = state.get("characters", {})
-    for key, sc in raw_chars.items():
-        name = sc.get("name", key)
-        mem = mem_chars.get(name, {})
-        trust = mem.get("trust", 0.5)
-        trust_pct = round(trust * 100)  # 0-100, 50=neutral
-        chars_with_trust[key] = {
-            **sc,
-            "trust": trust,
-            "affection": trust_pct,   # same scale now
-            "trust_pct": trust_pct,
-            "flags": mem.get("flags", []),
-            "tier": mem.get("tier", ""),
-            "faction": faction_map.get(name, mem.get("faction", "")),
-        }
+    chars_with_trust = _merge_characters_with_memory(raw_chars, mem_chars, faction_map)
 
     # Faction data
     factions_data: list[dict] = []
@@ -127,17 +139,7 @@ async def api_start_game():
     except Exception:
         faction_map = {}
 
-    chars_with_trust: dict[str, dict] = {}
-    raw_chars = state.get("characters", {})
-    for key, sc in raw_chars.items():
-        name = sc.get("name", key)
-        mem = mem_chars.get(name, {})
-        trust = mem.get("trust", 0.5)
-        chars_with_trust[key] = {
-            **sc, "trust": trust, "trust_pct": round(trust * 100),
-            "flags": mem.get("flags", []), "tier": mem.get("tier", ""),
-            "faction": faction_map.get(name, mem.get("faction", "")),
-        }
+    chars_with_trust = _merge_characters_with_memory(state.get("characters", {}), mem_chars, faction_map)
 
     # Faction data (consistent with /api/game-state)
     factions_data: list[dict] = []
@@ -416,22 +418,7 @@ async def api_next_turn(choice: str = Form("A")):
         faction_map = {wc["name"]: wc.get("faction", "") for wc in world_chars if "name" in wc}
     except Exception:
         faction_map = {}
-    chars_with_trust: dict[str, dict] = {}
-    raw_chars = state.get("characters", {})
-    for key, sc in raw_chars.items():
-        name = sc.get("name", key)
-        mem = mem_chars.get(name, {})
-        trust = mem.get("trust", 0.5)
-        trust_pct = round(trust * 100)
-        chars_with_trust[key] = {
-            **sc,
-            "trust": trust,
-            "affection": trust_pct,
-            "trust_pct": trust_pct,
-            "flags": mem.get("flags", []),
-            "tier": mem.get("tier", ""),
-            "faction": faction_map.get(name, mem.get("faction", "")),
-        }
+    chars_with_trust = _merge_characters_with_memory(state.get("characters", {}), mem_chars, faction_map)
 
     # Faction data (consistent with /api/game-state)
     factions_data: list[dict] = []
@@ -456,4 +443,19 @@ async def api_next_turn(choice: str = Form("A")):
 
 
 
+@router.get("/settings-status")
+async def api_settings_status():
+    """Whether a DeepSeek API key is saved locally (not env var)."""
+    return JSONResponse({"configured": bool(config._read_stored_api_key())})
+
+
+@router.post("/settings-key")
+async def api_save_settings_key(api_key: str = Form(...)):
+    """Save API key from first-run prompt or settings."""
+    key = api_key.strip()
+    if not key:
+        return JSONResponse({"error": "API Key 不能为空"}, status_code=400)
+    config.save_api_key(key)
+    config.reload_api_key()
+    return JSONResponse({"ok": True, "configured": True})
 
