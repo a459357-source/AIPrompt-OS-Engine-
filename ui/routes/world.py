@@ -47,6 +47,38 @@ def _apply_character_personality_from_ai(result: dict) -> None:
         result["personality"] = seed_personality_from_world(result)
 
 
+def _finalize_character_field_result(result: dict, *, context: str = "") -> dict:
+    """Normalize single-character AI field output (main path + regex fallback)."""
+    if "role_tags" not in result and "role" in result:
+        role = result.pop("role")
+        result["role_tags"] = [role] if isinstance(role, str) else role
+    _apply_character_personality_from_ai(result)
+    if "relationship" in result and isinstance(result["relationship"], str):
+        result["relationship"] = [result["relationship"]]
+    for f in ("role_tags", "personality_tags", "relationship"):
+        if f in result and not isinstance(result[f], list):
+            result[f] = [result[f]] if result[f] else []
+    result.setdefault("role_tags", [])
+    result.setdefault("personality_tags", [])
+    result.setdefault("appearance", "")
+    result.setdefault("relationship", [])
+    result.setdefault("goal", "")
+    result.setdefault("secret", "")
+    result.setdefault("faction", "")
+    result.setdefault("factionMemberships", [])
+    if context.strip():
+        try:
+            fac_list = json.loads(context)
+            if isinstance(fac_list, list):
+                linked = _link_character_factions([result], fac_list)
+                if linked:
+                    result["factionMemberships"] = linked[0].get("factionMemberships", [])
+                    result["faction"] = linked[0].get("faction", result.get("faction", ""))
+        except json.JSONDecodeError:
+            pass
+    return result
+
+
 def _clamp_rel_metric(value, default: int = 50) -> int:
     try:
         n = int(value)
@@ -699,7 +731,7 @@ async def generate_world(keywords: str = Form(""), adult_mode: str = Form("")):
 1. 先设计 factions（至少2个互相对立的势力），再为 characters 分配隶属；优先用 factionMemberships（可多个，visibility 为 public 或 hidden）；至少有一个 public 隶属；faction 字段可填主要明面势力名
 2. factions[].leader 应填写该势力首领的角色姓名；首领通常 public 隶属本势力，也可有 hidden 双重身份
 3. characters 必须包含 1 名主角（isMain:true）和至少 1 名 NPC（isMain:false）
-4. 角色要有个性，包含外貌、性格标签、目标、隐藏秘密，以及 personality 人格核心（desire/fear/taboo/secret/values）
+4. 角色要有个性，包含外貌、性格标签、目标、隐藏秘密，以及 personality 人格核心（desire/fear/taboo/secret/values）；每个 NPC 的 taboo 须明确非空
 5. 主角和至少1个NPC之间要有潜在的戏剧冲突或情感张力
 6. 初始场景要具体、有画面感；world 不超过 300 字
 7. stats 根据故事类型设计2-3个专属追踪维度
@@ -833,48 +865,22 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
             # The result might already be the character object (skip_validation mode)
             # or wrapped in a {"story": "..."} envelope
             if "name" in result:
-                # Normalize: AI might return singular strings instead of lists
-                if "role_tags" not in result and "role" in result:
-                    result["role_tags"] = [result.pop("role")] if isinstance(result.get("role"), str) else result.pop("role")
-                _apply_character_personality_from_ai(result)
-                if "relationship" in result and isinstance(result["relationship"], str):
-                    result["relationship"] = [result["relationship"]]
-                # Ensure list fields are lists
-                for f in ["role_tags", "personality_tags", "relationship"]:
-                    if f in result and not isinstance(result[f], list):
-                        result[f] = [result[f]] if result[f] else []
-                if "name" in result and ("role_tags" in result or "role" not in result):
-                    result.setdefault("role_tags", [])
-                    result.setdefault("personality_tags", [])
-                    result.setdefault("appearance", "")
-                    result.setdefault("relationship", [])
-                    result.setdefault("goal", "")
-                    result.setdefault("secret", "")
-                    result.setdefault("faction", "")
-                    result.setdefault("factionMemberships", [])
-                    if context.strip():
-                        try:
-                            fac_list = json.loads(context)
-                            if isinstance(fac_list, list):
-                                linked = _link_character_factions([result], fac_list)
-                                if linked:
-                                    result["factionMemberships"] = linked[0].get("factionMemberships", [])
-                                    result["faction"] = linked[0].get("faction", result.get("faction", ""))
-                        except json.JSONDecodeError:
-                            pass
-                    return JR(result)
+                return JR(_finalize_character_field_result(result, context=context))
             story = result.get("story", "") or result.get("name", "") or ""
-            import re as _re
-            m = _re.search(r'\{[^{}]*\{[^{}]*\}[^{}]*\}', story)
-            if not m:
-                m = _re.search(r'\{[^}]+\}', story)
-            if m:
-                import json as _json
-                try:
-                    return JR(_json.loads(m.group()))
-                except Exception:
-                    pass
-            return JR({"name": story.strip()[:20], "role_tags": [char_role] if char_role else [], "isMain": False, "personality_tags": [], "appearance": "", "relationship": [], "goal": "", "secret": ""})
+            parsed = _parse_json_object_from_story(story)
+            if parsed and parsed.get("name"):
+                return JR(_finalize_character_field_result(parsed, context=context))
+            fallback = {
+                "name": story.strip()[:20],
+                "role_tags": [char_role] if char_role else [],
+                "isMain": False,
+                "personality_tags": [],
+                "appearance": "",
+                "relationship": [],
+                "goal": "",
+                "secret": "",
+            }
+            return JR(_finalize_character_field_result(fallback, context=context))
         if field == "artifact":
             # Normalize artifact result
             if "name" in result:

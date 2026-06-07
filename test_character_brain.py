@@ -42,6 +42,34 @@ def test_seed_personality_preserves_explicit_brain():
     assert p["secret"] == "私藏禁书"
 
 
+def test_finalize_character_field_result_applies_personality():
+    from ui.routes.world import _finalize_character_field_result
+
+    result = {
+        "name": "甲",
+        "goal": "复仇",
+        "personality": {
+            "desire": "",
+            "fear": "失败",
+            "taboo": "被命令",
+            "secret": "卧底",
+            "values": ["荣誉"],
+        },
+    }
+    out = _finalize_character_field_result(result)
+    assert out["personality"]["taboo"] == "被命令"
+    assert out["personality"]["secret"] == "卧底"
+    assert isinstance(out["personality_tags"], list)
+
+
+def test_finalize_character_field_result_seeds_from_goal():
+    from ui.routes.world import _finalize_character_field_result
+
+    out = _finalize_character_field_result({"name": "乙", "goal": "自由", "secret": "禁书"})
+    assert out["personality"]["desire"] == "自由"
+    assert out["personality"]["secret"] == "禁书"
+
+
 def test_hybrid_filter_core_always_recent_background_only():
     session = {
         "turn": 20,

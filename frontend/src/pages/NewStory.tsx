@@ -118,6 +118,48 @@ function normalizeFormPersonality(
   }
 }
 
+function syncCharacterGoalSecret(char: FormValues['characters'][number]): void {
+  const desire = (char.personality?.desire || '').trim()
+  const pSecret = (char.personality?.secret || '').trim()
+  const goal = (char.goal || '').trim()
+  const secret = (char.secret || '').trim()
+  if (desire && !goal) char.goal = desire
+  else if (goal && !desire) char.personality.desire = goal
+  if (pSecret && !secret) char.secret = pSecret
+  else if (secret && !pSecret) char.personality.secret = secret
+}
+
+function mapGeneratedCharacter(
+  c: Partial<Character & { personality?: PersonalityBrain; factionMemberships?: FactionMembership[] }>,
+  facs: FactionRow[],
+  index: number,
+): FormValues['characters'][number] {
+  const personality = normalizeFormPersonality(c)
+  const goal = c.goal || personality.desire || ''
+  const secret = c.secret || personality.secret || ''
+  const mapped = mapFormCharacter({
+    name: c.name || '',
+    isMain: c.isMain ?? index === 0,
+    faction: c.faction,
+    factionMemberships: c.factionMemberships,
+    role_tags: Array.isArray(c.role_tags) ? c.role_tags : (c.role_tags ? [c.role_tags as string] : []),
+    personality_tags: Array.isArray(c.personality_tags) ? c.personality_tags : [],
+    appearance: c.appearance || '',
+    relationship: Array.isArray(c.relationship) ? c.relationship : [],
+    goal,
+    secret,
+    personality: {
+      ...personality,
+      desire: personality.desire || goal,
+      secret: personality.secret || secret,
+    },
+    background: c.background || '',
+    special_ability: c.special_ability || '',
+  }, facs)
+  syncCharacterGoalSecret(mapped)
+  return mapped
+}
+
 function applyGeneratedPersonality(
   target: FormValues['characters'][number],
   data: Partial<Character & { personality?: PersonalityBrain }>,
@@ -138,6 +180,7 @@ function applyGeneratedPersonality(
       secret: data.secret || target.secret,
     })
   }
+  syncCharacterGoalSecret(target)
 }
 
 const formSchema = z.object({
@@ -439,6 +482,14 @@ function assessWorldGenCompleteness(data: WorldGenResponse): string[] {
   if (npcNames.length) {
     const rels = (data.characterRelations || {}) as Record<string, { tags?: string[] }>
     if (npcNames.some((n) => !rels[n]?.tags?.length)) warnings.push('部分关系标签未生成')
+    const missingTaboo = npcNames.filter((n) => {
+      const ch = (data.characters || []).find((c) => c.name === n)
+      if (!ch) return true
+      return !normalizeFormPersonality(ch).taboo.trim()
+    })
+    if (missingTaboo.length) {
+      warnings.push(`${missingTaboo.length} 名 NPC 缺少行为禁忌(taboo)，可在角色页补全`)
+    }
   }
   return warnings
 }
@@ -570,22 +621,24 @@ export default function NewStory() {
     setValue('title', seed.title.slice(0, 20))
     setValue('scene', seed.scene)
     setValue('main_goal', seed.main_goal)
-    setFactions(mapGeneratedFactions(seed.factions as unknown as Array<Record<string, unknown>>))
+    const facRows = mapGeneratedFactions(seed.factions as unknown as Array<Record<string, unknown>>)
+    setFactions(facRows)
     const base = getValues('characters')
-    const emptyChar = (): FormValues['characters'][number] => emptyCharacter(false)
-    const merged = (seed.characters || []).map((c, i) => ({
-      ...(base[i] || emptyChar()),
-      ...c,
-    }))
+    const merged = (seed.characters || []).map((c, i) =>
+      mapGeneratedCharacter(
+        { ...(base[i] || emptyCharacter(false)), ...c },
+        facRows,
+        i,
+      ),
+    )
     setValue('characters', merged)
     if (seed.characterRelations) {
       setCharacterRelations(seed.characterRelations as typeof characterRelations)
     }
     if (seed.artifacts?.length) {
-      const facRows = mapGeneratedFactions(seed.factions as unknown as Array<Record<string, unknown>>)
       setArtifacts(mapGeneratedArtifacts(
         seed.artifacts as unknown as Array<Record<string, unknown>>,
-        (seed.characters || []).map((c) => c.name),
+        merged.map((c) => c.name).filter(Boolean),
         facRows,
       ))
     }
@@ -640,23 +693,7 @@ export default function NewStory() {
     setFactions(facs)
 
     let charNames: string[] = []
-    const chars = data.characters.map((c, i) =>
-      mapFormCharacter({
-        name: c.name || '',
-        isMain: c.isMain ?? i === 0,
-        faction: c.faction,
-        factionMemberships: (c as { factionMemberships?: FactionMembership[] }).factionMemberships,
-        role_tags: Array.isArray(c.role_tags) ? c.role_tags : (c.role_tags ? [c.role_tags] : []),
-        personality_tags: Array.isArray(c.personality_tags) ? c.personality_tags : [],
-        appearance: c.appearance || '',
-        relationship: Array.isArray(c.relationship) ? c.relationship : [],
-        goal: c.goal || '',
-        secret: c.secret || '',
-        personality: normalizeFormPersonality(c as Character & { personality?: PersonalityBrain }),
-        background: c.background || '',
-        special_ability: c.special_ability || '',
-      }, facs),
-    )
+    const chars = data.characters.map((c, i) => mapGeneratedCharacter(c, facs, i))
     setValue('characters', chars)
     charNames = chars.map((c) => c.name).filter(Boolean)
     const npcNames = chars.filter((c) => !c.isMain && c.name).map((c) => c.name)
@@ -1574,16 +1611,13 @@ export default function NewStory() {
                                 <Input
                                   {...register(`characters.${idx}.goal`)}
                                   placeholder="角色想要达成的事…"
-                                />
-                              </div>
-
-                              {/* Priority 3: Secret */}
-                              <div>
-                                <Label className="text-[11px] text-game-accent">🔒 隐藏秘密</Label>
-                                <Input
-                                  {...register(`characters.${idx}.secret`)}
-                                  placeholder="用于制造剧情爆点…"
-                                  className="border-game-secret/40 bg-game-secret/10 text-game-accent placeholder:text-game-dim"
+                                  onChange={(e) => {
+                                    const v = e.target.value
+                                    setValue(`characters.${idx}.goal`, v)
+                                    if (!c?.personality?.desire || c.personality.desire === c?.goal) {
+                                      setValue(`characters.${idx}.personality.desire`, v)
+                                    }
+                                  }}
                                 />
                               </div>
 
@@ -1595,6 +1629,13 @@ export default function NewStory() {
                                     {...register(`characters.${idx}.personality.desire`)}
                                     placeholder="角色最想要什么…"
                                     className="text-xs h-8 mt-0.5"
+                                    onChange={(e) => {
+                                      const v = e.target.value
+                                      setValue(`characters.${idx}.personality.desire`, v)
+                                      if (!c?.goal || c.goal === c?.personality?.desire) {
+                                        setValue(`characters.${idx}.goal`, v)
+                                      }
+                                    }}
                                   />
                                 </div>
                                 <div>
@@ -1611,6 +1652,20 @@ export default function NewStory() {
                                     {...register(`characters.${idx}.personality.taboo`)}
                                     placeholder="触犯时即使高好感也会拒绝…"
                                     className="text-xs h-8 mt-0.5 border-game-secret/40"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-[10px] text-game-accent">🔒 秘密</Label>
+                                  <Textarea
+                                    value={c?.personality?.secret ?? c?.secret ?? ''}
+                                    onChange={(e) => {
+                                      const v = e.target.value
+                                      setValue(`characters.${idx}.secret`, v)
+                                      setValue(`characters.${idx}.personality.secret`, v)
+                                    }}
+                                    placeholder="隐藏秘密，用于制造剧情爆点…"
+                                    rows={2}
+                                    className="text-xs border-game-secret/40 bg-game-secret/10 text-game-accent placeholder:text-game-dim"
                                   />
                                 </div>
                                 <div>

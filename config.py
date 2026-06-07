@@ -1384,15 +1384,16 @@ def world_gen_adult_requirements_body(*, adult_mode: bool | None = None) -> str:
     lines = [
         "13. genre 须包含「恋爱」「后宫」「成人向」中至少一项（可叠加其他风格）",
         "14. 女角色外貌须具体、有吸引力；personality_tags 含情感/欲望相关特质",
-        "15. 主角与至少 1 名女 NPC 的 goal/secret 须含情感、暧昧或禁忌关系张力",
+        "15. 主角与至少 1 名女 NPC 的 goal/secret 须含情感、暧昧或禁忌关系张力；主推女 NPC 的 personality.taboo 须明确（行为红线，非空）",
         "16. characterRelations 对主推女 NPC：attraction 建议 40–75，tags 含「暧昧/禁忌/暗恋/身体吸引」等 2–4 个",
         "17. stats 维度优先「吸引力/信任/亲密」类，勿用纯战斗/政务维度",
         "18. main_goal 须与推进亲密关系或情欲线相关，勿写成纯任务/调查主线",
+        "19. 每个 NPC 的 personality 须含 desire、fear、taboo、values（secret 可与顶层 secret 一致）",
     ]
     if profile == "adult_first" or tier in ("high", "extreme"):
-        lines.append("19. 整体设定以亲密/成人互动为叙事引擎，势力冲突仅作背景")
+        lines.append("20. 整体设定以亲密/成人互动为叙事引擎，势力冲突仅作背景")
     if tier in ("extreme", "high"):
-        lines.append("20. 至少一对角色关系须具备可导向露骨色情情节的 secret 或 goal")
+        lines.append("21. 至少一对角色关系须具备可导向露骨色情情节的 secret 或 goal")
     return "\n".join(lines)
 
 
