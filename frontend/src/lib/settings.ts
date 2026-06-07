@@ -119,11 +119,15 @@ export function initSettings(): AppSettings {
   return _settings
 }
 
+export function storyMaxWidthCSSValue(maxWidth: number): string {
+  return maxWidth === 100 ? '100%' : `${maxWidth}px`
+}
+
 export function applySettings(s: AppSettings) {
   const root = document.documentElement.style
   root.setProperty('--story-font-size', `${s.fontSize}px`)
   root.setProperty('--story-line-height', String(s.lineHeight))
-  root.setProperty('--story-max-width', s.maxWidth === 100 ? '100%' : `${s.maxWidth}px`)
+  root.setProperty('--story-max-width', storyMaxWidthCSSValue(normalizeMaxWidth(s.maxWidth)))
   root.setProperty('--story-font-family', FONT_FAMILIES[s.fontFamily] || 'system-ui')
   root.setProperty('--story-paragraph-spacing', PARAGRAPH_SPACING[s.paragraphSpacing] || '1.5em')
 

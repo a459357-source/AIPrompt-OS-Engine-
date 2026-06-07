@@ -16,7 +16,7 @@ import { getGameState, startGameOnce, nextTurn, getHistory, getGameGenSettings, 
 import { logger } from '@/lib/logger'
 import { parseOptionEffects, deltaArrow, type RelationHint } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
-import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS, MAX_WIDTH_OPTIONS } from '@/lib/settings'
+import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS, MAX_WIDTH_OPTIONS, storyMaxWidthCSSValue } from '@/lib/settings'
 import { dispatchAdultModeChange, dispatchAdultThemeChange, dispatchVisualThemeChange, getAdultRelationLevel, applyUiTheme, VISUAL_THEME_OPTIONS, VISUAL_THEME_LABELS, type AdultThemeId, type VisualThemeId } from '@/lib/theme'
 import { t, tTheme } from '@/lib/i18n'
 import { dedupeCharactersByName } from '@/lib/characters'
@@ -1204,6 +1204,7 @@ export default function Game() {
     fontFamily: 'var(--story-font-family)',
     marginBottom: 'var(--story-paragraph-spacing)',
   } as const
+  const storyContentMaxWidth = storyMaxWidthCSSValue(appSettings.maxWidth)
 
   const gameLeftPanel = useMemo(() => {
     if (!hasGame || readingMode) return null
@@ -1802,7 +1803,7 @@ export default function Game() {
             <Card className={cn('border-neural-cyan/15 glass-panel-glow w-full', adultMode && 'theme-card-enter')}>
               <CardContent
                 className={cn('pt-4 pb-6 px-4 md:px-8 w-full mx-auto game-story-focus', readingMode && 'px-6 md:px-12')}
-                style={{ maxWidth: adultMode ? '760px' : 'var(--story-max-width)' }}
+                style={{ maxWidth: storyContentMaxWidth }}
               >
                 {appSettings.animations ? (
                   <motion.div key={viewingTurn ?? turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>

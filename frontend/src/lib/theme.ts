@@ -99,18 +99,8 @@ export function applyUiTheme(theme: UiTheme, adultThemePack?: AdultThemeId | nul
   document.documentElement.setAttribute(UI_THEME_ATTR, theme)
   if (theme === 'adult' || theme === 'desire') {
     applyAdultThemePack(resolveAdultThemePack(theme, adultThemePack))
-    document.documentElement.style.setProperty('--story-max-width', '800px')
   } else {
     applyAdultThemePack(null)
-    const saved = localStorage.getItem('app-settings')
-    let maxWidth = 960
-    try {
-      if (saved) maxWidth = JSON.parse(saved).maxWidth ?? 960
-    } catch { /* ignore */ }
-    document.documentElement.style.setProperty(
-      '--story-max-width',
-      maxWidth === 100 ? '100%' : `${maxWidth}px`,
-    )
   }
 }
 
