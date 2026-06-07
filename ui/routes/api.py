@@ -127,6 +127,13 @@ async def api_start_game():
             "flags": mem.get("flags", []), "tier": mem.get("tier", ""),
         }
 
+    # Faction data (consistent with /api/game-state)
+    factions_data: list[dict] = []
+    try:
+        factions_data = get_faction_stats_for_ui(memory)
+    except Exception:
+        pass
+
     return JSONResponse({
         "story": result["story"],
         "options": result["options"],
@@ -135,7 +142,7 @@ async def api_start_game():
             "status": state.get("status", result.get("status", "SETUP")),
             "scene": state.get("scene", result.get("scene", "")),
             "characters": chars_with_trust,
-            "factions": [],
+            "factions": factions_data,
             "force_event_pending": False,
             "chapter": state.get("chapter", 1),
         },
@@ -387,6 +394,32 @@ async def api_next_turn(choice: str = Form("A")):
     except Exception:
         state = {}
 
+    # Merge trust data into characters (consistent with /api/game-state)
+    memory = load_memory()
+    mem_chars = memory.get("characters", {})
+    chars_with_trust: dict[str, dict] = {}
+    raw_chars = state.get("characters", {})
+    for key, sc in raw_chars.items():
+        name = sc.get("name", key)
+        mem = mem_chars.get(name, {})
+        trust = mem.get("trust", 0.5)
+        trust_pct = round(trust * 100)
+        chars_with_trust[key] = {
+            **sc,
+            "trust": trust,
+            "affection": trust_pct,
+            "trust_pct": trust_pct,
+            "flags": mem.get("flags", []),
+            "tier": mem.get("tier", ""),
+        }
+
+    # Faction data (consistent with /api/game-state)
+    factions_data: list[dict] = []
+    try:
+        factions_data = get_faction_stats_for_ui(memory)
+    except Exception:
+        pass
+
     return JSONResponse({
         "story": result["story"],
         "options": result["options"],
@@ -394,7 +427,8 @@ async def api_next_turn(choice: str = Form("A")):
             "turn": state.get("turn", result.get("turn", 0)),
             "status": state.get("status", result.get("status", "SETUP")),
             "scene": state.get("scene", result.get("scene", "")),
-            "characters": state.get("characters", {}),
+            "characters": chars_with_trust,
+            "factions": factions_data,
             "force_event_pending": state.get("force_event_pending", False),
             "chapter": state.get("chapter", 1),
         },

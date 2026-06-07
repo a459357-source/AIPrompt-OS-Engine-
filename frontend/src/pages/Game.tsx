@@ -30,7 +30,9 @@ interface FactionInfo {
 }
 
 function AffectionBar({ value }: { value: number; name?: string }) {
-  const filled = Math.floor(value / 10)
+  // 防御 NaN / undefined / 负数（避免 '█'.repeat(NaN) 崩溃）
+  const safe = Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 50
+  const filled = Math.floor(safe / 10)
   const empty = 10 - filled
   return (
     <span className="text-xs text-game-accent tracking-[2px] select-none">
@@ -163,11 +165,11 @@ export default function Game() {
           </div>
           {f.role && <p className="text-xs text-game-muted">{f.role}</p>}
           <div className="flex items-center gap-2">
-            <AffectionBar value={f.reputation * 100} />
-            <span className="text-xs text-game-dim tabular-nums">{Math.round(f.reputation * 100)}%</span>
+            <AffectionBar value={(f.reputation ?? 0.5) * 100} />
+            <span className="text-xs text-game-dim tabular-nums">{Math.round((f.reputation ?? 0.5) * 100)}%</span>
           </div>
-          {/* Inter-faction attitudes (top 3) */}
-          {f.attitudes.filter(a => Math.abs(a.attitude - 0.5) >= 0.15).slice(0, 3).map(a => (
+          {/* Inter-faction attitudes (top 3) — safe guarded against missing data */}
+          {(f.attitudes || []).filter(a => Math.abs((a.attitude ?? 0.5) - 0.5) >= 0.15).slice(0, 3).map(a => (
             <div key={a.target} className="flex items-center gap-1 text-[10px]">
               <span className="text-game-dim">→ {a.target}</span>
               <span className={a.label === '敌对' || a.label === '冷淡' ? 'text-red-400' : a.label === '同盟' || a.label === '友好' ? 'text-green-400' : 'text-game-muted'}>
