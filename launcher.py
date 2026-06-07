@@ -27,7 +27,7 @@ logger = logging.getLogger("launcher")
 
 
 def _open_browser(port: int) -> None:
-    """Open UI after the local server is accepting connections."""
+    """Open UI after our server is listening on *port*."""
     url = config.frontend_url("/")
 
     def _open() -> None:
@@ -52,6 +52,20 @@ def _open_browser(port: int) -> None:
     threading.Thread(target=_open, daemon=True).start()
 
 
+def _ensure_port_free(port: int) -> None:
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", port))
+    except OSError:
+        print(f"\n[ERROR] 端口 {port} 已被占用，无法启动。")
+        print("  请先运行「停止.bat」关闭旧进程后重试。\n")
+        input("按回车键退出...")
+        sys.exit(1)
+    finally:
+        s.close()
+
+
 def main() -> None:
     print("PromptOS — 启动中…")
     print(f"  数据目录: {config.DATA_DIR}")
@@ -63,6 +77,7 @@ def main() -> None:
     logger.info("PromptOS starting — UI %s", config.frontend_url("/"))
 
     port = int(os.environ.get("PROMPTOS_PORT", "8000"))
+    _ensure_port_free(port)
     _open_browser(port)
 
     import uvicorn

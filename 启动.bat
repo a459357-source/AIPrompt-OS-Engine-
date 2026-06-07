@@ -46,17 +46,32 @@ if not exist "frontend\node_modules" (
 
 if not exist "data" mkdir data
 
+:: ── Port check ──
+python scripts\port_guard.py 8000
+if %errorlevel% neq 0 (
+    pause
+    exit /b 1
+)
+python scripts\port_guard.py 5173
+if %errorlevel% neq 0 (
+    pause
+    exit /b 1
+)
+
 echo.
-echo [INFO] Starting backend  (API)  -^> http://localhost:8000
-echo [INFO] Starting frontend (UI)  -^> http://localhost:5173
+echo [INFO] Starting backend  (API)  -^> http://127.0.0.1:8000
+echo [INFO] Starting frontend (UI)  -^> http://127.0.0.1:5173
+echo        若端口被占用，请先运行「停止.bat」
 echo.
 echo        Close this window to stop both servers.
 echo.
 
-:: ── Start backend (must run in project root for data\*.log) ──
-start "PromptOS-Backend" cmd /c "cd /d "%~dp0" && python -m uvicorn ui.web_app:app --host 127.0.0.1 --port 8000"
+:: ── Start backend (keep window open on error) ──
+start "PromptOS-Backend" cmd /k "cd /d "%~dp0" && python -m uvicorn ui.web_app:app --host 127.0.0.1 --port 8000"
 
-:: ── Start frontend (Vite 就绪后会自动打开浏览器) ──
+:: ── Wait for backend then start frontend ──
+ping 127.0.0.1 -n 3 >nul
+
 cd frontend
 call npm run dev
 cd ..

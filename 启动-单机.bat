@@ -19,15 +19,36 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+python scripts\port_guard.py 8000
+if %errorlevel% neq 0 (
+    pause
+    exit /b 1
+)
+
 if not exist "frontend\dist\index.html" (
     echo [INFO] 首次运行，正在构建前端...
+    node --version >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo [ERROR] 构建前端需要 Node.js，请安装后重试
+        pause
+        exit /b 1
+    )
     cd frontend
     call npm install
     call npm run build
     cd ..
+    if not exist "frontend\dist\index.html" (
+        echo [ERROR] 前端构建失败，请检查上方 npm 输出
+        pause
+        exit /b 1
+    )
 )
 
 if not exist "data" mkdir data
 
 python launcher.py
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] 启动失败，详见 data\error.log
+)
 pause
