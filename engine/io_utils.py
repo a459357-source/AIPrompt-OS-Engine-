@@ -16,9 +16,13 @@ from pathlib import Path
 from datetime import datetime
 
 
-# ── Per-thread file cache ──────────────────────────────────────────
+# ── Process-wide file cache ────────────────────────────────────────
 # Static YAML (world/engine/prompt) persists across turns (V2 runtime_cache).
 # Session/memory paths are invalidated each turn via clear_cache(session_only=True).
+#
+# Must be process-wide (not thread-local): SSE turn workers commit on a
+# background thread while /api/history and /api/game-state run on the main
+# thread. Thread-local invalidation left stale empty history in release builds.
 
 import config as _config
 
@@ -29,38 +33,30 @@ RUNTIME_STATIC_PATHS = frozenset({
     str(_config.PROMPT_TEMPLATE_PATH),
 })
 
-_thread_local = threading.local()
-
-
-def _get_cache() -> dict:
-    """Return the current thread's file cache dict, creating it lazily."""
-    cache = getattr(_thread_local, "file_cache", None)
-    if cache is None:
-        cache = {}
-        _thread_local.file_cache = cache
-    return cache
+_FILE_CACHE: dict = {}
+_CACHE_LOCK = threading.Lock()
 
 
 def clear_cache(*, session_only: bool = False) -> None:
     """Discard cache entries. session_only keeps static runtime YAML cached."""
-    if not session_only:
-        _thread_local.file_cache = {}
-        return
-    cache = _get_cache()
-    for key in list(cache.keys()):
-        if key not in RUNTIME_STATIC_PATHS:
-            cache.pop(key, None)
+    with _CACHE_LOCK:
+        if not session_only:
+            _FILE_CACHE.clear()
+            return
+        for key in list(_FILE_CACHE.keys()):
+            if key not in RUNTIME_STATIC_PATHS:
+                _FILE_CACHE.pop(key, None)
 
 
 def _cached_read(path: Path, reader) -> dict:
     """Return cached data or read + cache + return."""
-    cache = _get_cache()
     key = str(path)
-    if key in cache:
-        return cache[key]
-    data = reader(path)
-    cache[key] = data
-    return data
+    with _CACHE_LOCK:
+        if key in _FILE_CACHE:
+            return _FILE_CACHE[key]
+        data = reader(path)
+        _FILE_CACHE[key] = data
+        return data
 
 
 # ── YAML ───────────────────────────────────────────────────────────
@@ -85,8 +81,8 @@ def write_yaml(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
         yaml.dump(data, fh, allow_unicode=True, default_flow_style=False, sort_keys=False)
-    # Invalidate cache for this path
-    _get_cache().pop(str(path), None)
+    with _CACHE_LOCK:
+        _FILE_CACHE.pop(str(path), None)
 
 
 # ── JSON ───────────────────────────────────────────────────────────
@@ -109,7 +105,8 @@ def write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False, indent=2)
-    _get_cache().pop(str(path), None)
+    with _CACHE_LOCK:
+        _FILE_CACHE.pop(str(path), None)
 
 
 # ── Markdown ───────────────────────────────────────────────────────
