@@ -211,12 +211,18 @@ export async function shutdownServer(): Promise<void> {
   }
 }
 
-export async function getGameState(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; not_started?: boolean; generating?: boolean; suggest_adult_mode?: boolean; error?: string }> {
+export async function getGameState(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; world_title?: string; not_started?: boolean; generating?: boolean; suggest_adult_mode?: boolean; error?: string }> {
   const res = await apiFetch('/api/game-state')
   if (!res.ok) {
     const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
     return { story: '', options: [], state: {}, error: (data as { error?: string }).error || 'Failed to load game' }
   }
+  return res.json()
+}
+
+export async function getWorldMeta(): Promise<{ world_title: string; app_name?: string }> {
+  const res = await apiFetch('/api/world-meta')
+  if (!res.ok) return { world_title: '' }
   return res.json()
 }
 

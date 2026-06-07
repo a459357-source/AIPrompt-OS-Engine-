@@ -100,6 +100,20 @@ def test_game_state_readonly():
     print("✅ game-state 只读: PASS")
 
 
+def test_world_meta_endpoint():
+    """GET /api/world-meta 返回 world_pack 标题"""
+    from ui.web_app import app
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    resp = client.get("/api/world-meta")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "world_title" in data
+    assert isinstance(data["world_title"], str)
+    print("✅ world-meta 端点: PASS")
+
+
 def test_dashboard_endpoint():
     """仪表盘数据端点"""
     from ui.web_app import app

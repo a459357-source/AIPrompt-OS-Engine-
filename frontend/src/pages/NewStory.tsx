@@ -7,6 +7,7 @@ import { Globe, Network, Users, GitBranch, Gem } from 'lucide-react'
 import { generateWorld, generateField, generateRules, createStory } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { useAutoSave } from '@/hooks/useAutoSave'
+import { notifyDraftTitle, notifyWorldTitleChanged } from '@/hooks/useDocumentTitle'
 import { useAppSettings } from '@/hooks/useAppSettings'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -808,6 +809,7 @@ export default function NewStory() {
     showStatus('正在创建故事…', 'loading')
     try {
       await createStory(fd)
+      notifyWorldTitleChanged()
       clearSaved()
       window.location.href = '/game'
     } catch (e) {
@@ -817,8 +819,13 @@ export default function NewStory() {
 
   const genre = watch('genre')
   const relStages = watch('rel_stages')
-  const titleLen = (watch('title') || '').length
+  const watchedTitle = watch('title')
+  const titleLen = (watchedTitle || '').length
   const worldLen = (watch('world') || '').length
+
+  useEffect(() => {
+    notifyDraftTitle(watchedTitle || '')
+  }, [watchedTitle])
 
   const graphInput = useMemo(() => ({
     title: watchAll.title || '',

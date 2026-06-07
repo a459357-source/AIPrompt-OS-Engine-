@@ -13,6 +13,16 @@ import config
 router = APIRouter(prefix="/api", tags=["api"])
 
 _REL_METRICS = ("trust", "affection", "respect", "dependence", "hostility", "attraction")
+_APP_DISPLAY_NAME = "World Builder"
+
+
+def _read_world_title() -> str:
+    """Story title from world_pack (browser tab / meta)."""
+    try:
+        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        return str((world_pack.get("world") or {}).get("title") or "").strip()
+    except Exception:
+        return ""
 
 
 def _merge_characters_with_memory(raw_chars: dict, mem_chars: dict, faction_map: dict) -> dict[str, dict]:
@@ -66,6 +76,7 @@ def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
         }
         if not_started:
             payload["not_started"] = True
+        payload["world_title"] = _read_world_title()
         return payload
 
     history = state.get("history", [])
@@ -108,7 +119,15 @@ def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
     }
     if not config.ADULT_MODE:
         payload["suggest_adult_mode"] = config.suggest_adult_mode_for_options(options)
+    payload["world_title"] = _read_world_title()
     return payload
+
+
+@router.get("/world-meta")
+async def api_world_meta():
+    """Lightweight story title for document.title and UI chrome."""
+    title = _read_world_title()
+    return JSONResponse({"world_title": title, "app_name": _APP_DISPLAY_NAME})
 
 
 @router.get("/game-state")

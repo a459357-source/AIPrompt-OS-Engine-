@@ -6,6 +6,7 @@ import { NeuralShellProvider } from '@/components/layout/NeuralShellContext'
 import { NeuralShell } from '@/components/layout/NeuralShell'
 import { AdultThemeProvider } from '@/contexts/AdultThemeContext'
 import { ApiKeyPrompt } from '@/components/ApiKeyPrompt'
+import { DocumentTitle } from '@/components/DocumentTitle'
 import NewStory from './pages/NewStory'
 import Game from './pages/Game'
 import NPCs from './pages/NPCs'
@@ -52,6 +53,7 @@ function App() {
     <AdultThemeProvider>
       <NeuralShellProvider>
         <div className="h-screen overflow-hidden bg-neural-void text-game-text">
+          <DocumentTitle />
           <ApiKeyPrompt />
           <NeuralShell>
             <AppRoutes />
