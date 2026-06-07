@@ -149,6 +149,8 @@ def export_graph_view(output_path: Path | None = None) -> Path:
 
 def _generate_mermaid() -> list[str]:
     """Build Mermaid flowchart lines from the story graph."""
+    from engine.dashboard import _sanitize_mermaid
+
     graph = load_graph()
     nodes = graph.get("nodes", {})
     edges = graph.get("edges", [])
@@ -158,18 +160,16 @@ def _generate_mermaid() -> list[str]:
     # Define nodes with labels
     for nid, node in nodes.items():
         turn = node.get("turn", "?")
-        scene = node.get("scene", "?")[:20]
         text = node.get("text", "")[:40]
-        # Escape quotes
-        label = f"T{turn}: {text}".replace('"', "'")
+        label = _sanitize_mermaid(f"T{turn}: {text}")
         mm.append(f'  n{nid}["{label}"]')
 
     # Define edges
     for edge in edges:
         frm = edge["from"]
         to = edge["to"]
-        choice = edge.get("choice", "")
-        mm.append(f"  n{frm} -- {choice} --> n{to}")
+        choice = _sanitize_mermaid(edge.get("choice", ""))
+        mm.append(f'  n{frm} -->|{choice}| n{to}')
 
     return mm
 

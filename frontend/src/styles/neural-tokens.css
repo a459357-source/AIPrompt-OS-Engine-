@@ -1,0 +1,64 @@
+@theme {
+  --color-neural-void: #050810;
+  --color-neural-glass: rgba(12, 18, 32, 0.55);
+  --color-neural-cyan: #00f0ff;
+  --color-neural-magenta: #ff2d95;
+  --color-neural-violet: #7b5cff;
+  --color-neural-grid: rgba(0, 240, 255, 0.06);
+  --color-neural-glow: rgba(0, 240, 255, 0.15);
+  --font-neural-display: 'Orbitron', 'Share Tech Mono', monospace;
+  --font-neural-mono: 'Share Tech Mono', monospace;
+}
+
+.neural-grid-bg {
+  background-image:
+    linear-gradient(var(--color-neural-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-neural-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.glass-panel {
+  background: var(--color-neural-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 240, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 24px rgba(0, 240, 255, 0.04);
+}
+
+.glass-panel-glow {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 32px rgba(123, 92, 255, 0.12),
+    0 0 8px rgba(0, 240, 255, 0.08);
+}
+
+.neural-text-glow {
+  text-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+}
+
+@keyframes neural-scan {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.neural-scan-hover:hover {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 240, 255, 0.08),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: neural-scan 1.5s ease infinite;
+}
+
+@keyframes pulse-neural {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--color-neural-cyan); }
+  50% { opacity: 0.6; box-shadow: 0 0 12px var(--color-neural-cyan); }
+}
+
+.neural-pulse-dot {
+  animation: pulse-neural 2s ease-in-out infinite;
+}

@@ -40,11 +40,17 @@ def _sanitize_mermaid(text: str) -> str:
     text = text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
     # 4. HTML tag brackets — prevent injection of <script>, <img onerror=…>, etc.
     text = text.replace("<", "‹").replace(">", "›")
-    # 5. Mermaid arrow syntax — prevent label text from being parsed as graph edges
+    # 5. Brackets / braces / pipe / hash — break node or edge label delimiters in Mermaid 11
+    text = text.replace("[", "［").replace("]", "］")
+    text = text.replace("{", "｛").replace("}", "｝")
+    text = text.replace("|", "｜")
+    text = text.replace("#", "＃")
+    text = text.replace(";", "；")
+    # 6. Mermaid arrow syntax — prevent label text from being parsed as graph edges
     text = re.sub(r"-{2,}>", "→", text)
     text = re.sub(r"<-{2,}", "←", text)
-    # 6. Mermaid link syntax `-- text -->` already handled by arrow substitution above
-    # 7. Truncate to reasonable length
+    # 7. Mermaid link syntax `-- text -->` already handled by arrow substitution above
+    # 8. Truncate to reasonable length
     if len(text) > 200:
         text = text[:197] + "…"
     return text
@@ -211,7 +217,7 @@ def _build_mermaid(nodes: dict, edges: list, chars: dict) -> str:
         char_ids[name] = cid
         trust_pct = round(data.get("trust", 0.5) * 100)
         label = _sanitize_mermaid(f"{name} ({trust_pct}%)")
-        mm.append(f'  {cid}("{label}")')
+        mm.append(f'  {cid}["{label}"]')
         for nid in char_to_nodes.get(name, []):
             mm.append(f"  {cid} -.-> n{nid}")
 
@@ -220,7 +226,7 @@ def _build_mermaid(nodes: dict, edges: list, chars: dict) -> str:
         frm = edge["from"]
         to = edge["to"]
         choice = _sanitize_mermaid(edge.get("choice", ""))
-        mm.append(f"  n{frm} -- {choice} --> n{to}")
+        mm.append(f'  n{frm} -->|{choice}| n{to}')
 
     # Styles
     mm.append("")
@@ -375,7 +381,7 @@ def _build_faction_graph(memory: dict) -> str:
             style = "fill:#332a14,stroke:#d29922,color:#d29922"
         else:
             style = "fill:#331414,stroke:#da3633,color:#da3633"
-        mm.append(f'  {fid}("{label}")')
+        mm.append(f'  {fid}["{label}"]')
         mm.append(f"  style {fid} {style}")
 
     # Attitude edges (only show non-trivial ones)
@@ -406,8 +412,9 @@ def _build_faction_graph(memory: dict) -> str:
             flags_str = " | ".join(data.get("flags", [])[:2])
             edge_label = f"{label}"
             if flags_str:
-                edge_label += f"\\n{flags_str}"
-            mm.append(f'  {fa} -- "{edge_label}" --> {fb}')
+                edge_label += f"\\n{_sanitize_mermaid(flags_str)}"
+            edge_label = _sanitize_mermaid(edge_label)
+            mm.append(f'  {fa} -->|{edge_label}| {fb}')
             mm.append(f"  linkStyle {edge_count} {style}")
             edge_count += 1
 

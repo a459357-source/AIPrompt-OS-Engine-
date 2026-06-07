@@ -318,7 +318,7 @@ def _update_graph_view(vault: Path) -> None:
         frm = edge["from"]
         to = edge["to"]
         choice = _sanitize_mermaid(edge.get("choice", ""))
-        lines.append(f"  n{frm} -- {choice} --> n{to}")
+        lines.append(f'  n{frm} -->|{choice}| n{to}')
 
     lines.append("```")
     lines.append("")

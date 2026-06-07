@@ -25,7 +25,7 @@ export function CharacterCard({ character, index, isMain, onRemove, className, t
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.2 }}
     >
-      <Card className={`overflow-hidden ${isMain ? 'border-game-accent/50 bg-game-accent/[0.03]' : ''} ${className || ''}`}>
+      <Card className={`overflow-hidden border-neural-cyan/20 ${isMain ? 'border-neural-magenta/40 bg-neural-magenta/5 glass-panel-glow' : 'glass-panel'} ${className || ''}`}>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 flex-wrap">

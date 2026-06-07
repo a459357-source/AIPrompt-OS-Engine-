@@ -9,7 +9,10 @@ import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { StatusToast } from '@/components/StatusToast'
-import { getGameState, startGame, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, cancelGeneration, type HistoryTurn, type GameGenSettings } from '@/lib/api'
+import { InspectorPanel } from '@/components/layout/InspectorPanel'
+import { usePageShell } from '@/components/layout/usePageShell'
+import { GlassPanel } from '@/components/neural/GlassPanel'
+import { getGameState, startGame, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, cancelGeneration, type HistoryTurn, type GameGenSettings, type ContentWeights } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { parseOptionEffects, deltaArrow, type RelationHint } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
@@ -228,6 +231,35 @@ function QuickGenRow({ label, children, hint }: { label: string; children: React
   )
 }
 
+/** 内容权重滑块（三滑块联动） */
+function WeightSlider({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string
+  value: number
+  disabled: boolean
+  onChange: (v: number) => void
+}) {
+  return (
+    <div className="flex items-center gap-2 w-full">
+      <span className="text-[11px] text-game-muted w-8 tabular-nums">{label}</span>
+      <Slider
+        value={[value]}
+        min={0}
+        max={100}
+        step={1}
+        disabled={disabled}
+        onValueChange={([v]) => onChange(v)}
+        className="flex-1 min-w-0"
+      />
+      <span className="text-[11px] text-game-text w-8 text-right tabular-nums">{value}</span>
+    </div>
+  )
+}
+
 /** 遮盖游戏主区域，不挡顶部/底部导航（z-30 < 导航 z-40/z-50） */
 function GameBusyOverlay({ message }: { message: string }) {
   return (
@@ -284,6 +316,12 @@ export default function Game() {
   const [narrativePov, setNarrativePov] = useState('auto')
   const [stylePreference, setStylePreference] = useState('balanced')
   const [repetitionCheck, setRepetitionCheck] = useState('standard')
+  const [adultMode, setAdultMode] = useState(false)
+  const [expressionStyle, setExpressionStyle] = useState('light_novel')
+  const [expressionStyleOptions, setExpressionStyleOptions] = useState<string[]>(['literary', 'romantic', 'light_novel', 'direct'])
+  const [expressionStyleLabels, setExpressionStyleLabels] = useState<Record<string, string>>({})
+  const [contentWeights, setContentWeights] = useState<ContentWeights>({ story: 50, romance: 30, adult: 20 })
+  const [presetWeights, setPresetWeights] = useState<Record<string, ContentWeights>>({})
   const [genSettingsOpen, setGenSettingsOpen] = useState(
     () => getSettings().sidebarDefault === 'expanded',
   )
@@ -345,6 +383,9 @@ export default function Game() {
     narrativePov?: string
     stylePreference?: string
     repetitionCheck?: string
+    adultMode?: boolean
+    expressionStyle?: string
+    contentWeights?: ContentWeights
   }>({})
   const [autoAdvancePaused, setAutoAdvancePaused] = useState(true)
   const [autoAdvanceRemaining, setAutoAdvanceRemaining] = useState(0)
@@ -445,6 +486,12 @@ export default function Game() {
     setNarrativePov(data.narrative_pov)
     setStylePreference(data.style_preference)
     setRepetitionCheck(data.repetition_check)
+    setAdultMode(data.adult_mode)
+    setExpressionStyle(data.expression_style)
+    setExpressionStyleOptions(data.expression_style_options)
+    setExpressionStyleLabels(data.expression_style_labels)
+    setContentWeights(data.content_weights)
+    setPresetWeights(data.preset_weights)
   }, [])
 
   useEffect(() => {
@@ -469,6 +516,9 @@ export default function Game() {
     narrativePov?: string
     stylePreference?: string
     repetitionCheck?: string
+    adultMode?: boolean
+    expressionStyle?: string
+    contentWeights?: ContentWeights
   }) => {
     const next = { ...patch }
     if (next.storyLength != null) {
@@ -498,6 +548,9 @@ export default function Game() {
     if (next.narrativePov != null) setNarrativePov(next.narrativePov)
     if (next.stylePreference != null) setStylePreference(next.stylePreference)
     if (next.repetitionCheck != null) setRepetitionCheck(next.repetitionCheck)
+    if (next.adultMode != null) setAdultMode(next.adultMode)
+    if (next.expressionStyle != null) setExpressionStyle(next.expressionStyle)
+    if (next.contentWeights != null) setContentWeights({ ...next.contentWeights })
     return next
   }, [storyLengthMin, storyLengthMax, contextTokens, maxOutputTokens])
 
@@ -538,6 +591,9 @@ export default function Game() {
     narrativePov?: string
     stylePreference?: string
     repetitionCheck?: string
+    adultMode?: boolean
+    expressionStyle?: string
+    contentWeights?: ContentWeights
   }, immediate = false) => {
     const normalized = normalizeGenPatch(patch)
     pendingGenPatchRef.current = { ...pendingGenPatchRef.current, ...normalized }
@@ -847,8 +903,41 @@ export default function Game() {
     </div>
   )
 
+  usePageShell({
+    leftPanel: hasGame ? (
+      <div className="p-3 space-y-1 overflow-y-auto h-full">
+        <h3 className="text-[10px] font-neural-mono text-neural-cyan uppercase tracking-widest mb-3">
+          {t('game.timeline', lang)}
+        </h3>
+        {Array.from({ length: Math.max(turn, 1) }, (_, i) => {
+          const n = i + 1
+          return (
+            <div
+              key={n}
+              className={`text-xs py-1.5 pl-3 border-l-2 transition-colors ${
+                n === turn
+                  ? 'border-neural-cyan text-neural-cyan bg-neural-cyan/5'
+                  : 'border-game-border/50 text-game-muted'
+              }`}
+            >
+              第 {n} 轮 {n === turn ? '◆' : ''}
+            </div>
+          )
+        })}
+      </div>
+    ) : null,
+    inspector: hasGame && showCharPanel ? (
+      <InspectorPanel title={t('game.status', lang)}>
+        <StatusList />
+      </InspectorPanel>
+    ) : null,
+    showLeftPanel: !!hasGame,
+    showRightPanel: !!(hasGame && showCharPanel),
+    hideShellPanels: !hasGame,
+  })
+
   return (
-    <div className="w-full">
+    <div className="w-full h-full">
       <StatusToast
         message={loading ? '正在生成开篇剧情…' : error ? `❌ ${error}` : ''}
         type={loading ? 'loading' : error ? 'error' : 'info'}
@@ -889,7 +978,7 @@ export default function Game() {
 
       {/* Game */}
       {hasGame && (
-        <div className="flex gap-0" style={{ height: 'calc(100vh - 80px)' }}>
+        <div className="flex gap-0 h-full">
           {/* Main content */}
           <div className="flex-1 min-w-0 flex flex-col">
             {/* Top status bar */}
@@ -1182,9 +1271,114 @@ export default function Game() {
                       </Button>
                     ))}
                   </QuickGenRow>
+
+                  {/* ── 内容偏好 ── */}
+                  <div className="col-span-full mt-3 mb-1">
+                    <Separator className="mb-2" />
+                    <Label className="text-xs text-game-accent font-semibold">🎭 内容偏好</Label>
+                  </div>
+
+                  <QuickGenRow label="成人模式" hint="开启后启用内容强度调节与表达风格选择">
+                    <Switch
+                      checked={adultMode}
+                      disabled={choosing}
+                      onCheckedChange={(v) => queueGenSettingsSave({ adultMode: v }, true)}
+                    />
+                    <Badge variant={adultMode ? 'default' : 'outline'} size="sm">
+                      {adultMode ? '开启' : '关闭'}
+                    </Badge>
+                  </QuickGenRow>
+
+                  {adultMode && (
+                    <>
+                      <QuickGenRow label="表达风格" hint="成人模式下覆盖文风偏好；可选预设或自行输入">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {expressionStyleOptions.map((opt) => (
+                            <Button
+                              key={opt}
+                              type="button"
+                              size="xs"
+                              variant={expressionStyle === opt ? 'primary' : 'ghost'}
+                              disabled={choosing}
+                              onClick={() => queueGenSettingsSave({ expressionStyle: opt }, true)}
+                            >
+                              {expressionStyleLabels[opt] || opt}
+                            </Button>
+                          ))}
+                        </div>
+                      </QuickGenRow>
+
+                      <QuickGenRow label="内容权重" hint="剧情 / 感情 / 成人，总和自动保持 100">
+                        <div className="flex flex-col gap-2 w-full">
+                          <WeightSlider
+                            label="剧情"
+                            value={contentWeights.story}
+                            disabled={choosing}
+                            onChange={(v) => {
+                              const remaining = 100 - v
+                              const ratio = contentWeights.romance + contentWeights.adult || 1
+                              const newRomance = Math.round(remaining * contentWeights.romance / ratio)
+                              const newAdult = remaining - newRomance
+                              queueGenSettingsSave({ contentWeights: { story: v, romance: newRomance, adult: newAdult } })
+                            }}
+                          />
+                          <WeightSlider
+                            label="感情"
+                            value={contentWeights.romance}
+                            disabled={choosing}
+                            onChange={(v) => {
+                              const remaining = 100 - v
+                              const ratio = contentWeights.story + contentWeights.adult || 1
+                              const newStory = Math.round(remaining * contentWeights.story / ratio)
+                              const newAdult = remaining - newStory
+                              queueGenSettingsSave({ contentWeights: { story: newStory, romance: v, adult: newAdult } })
+                            }}
+                          />
+                          <WeightSlider
+                            label="成人"
+                            value={contentWeights.adult}
+                            disabled={choosing}
+                            onChange={(v) => {
+                              const remaining = 100 - v
+                              const ratio = contentWeights.story + contentWeights.romance || 1
+                              const newStory = Math.round(remaining * contentWeights.story / ratio)
+                              const newRomance = remaining - newStory
+                              queueGenSettingsSave({ contentWeights: { story: newStory, romance: newRomance, adult: v } })
+                            }}
+                          />
+                        </div>
+                      </QuickGenRow>
+
+                      {/* 预设模式 */}
+                      {Object.keys(presetWeights).length > 0 && (
+                        <QuickGenRow label="预设模式" hint="一键切换内容权重组合">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {Object.entries(presetWeights).map(([key, w]) => (
+                              <Button
+                                key={key}
+                                type="button"
+                                size="xs"
+                                variant={
+                                  contentWeights.story === w.story &&
+                                  contentWeights.romance === w.romance &&
+                                  contentWeights.adult === w.adult
+                                    ? 'primary'
+                                    : 'ghost'
+                                }
+                                disabled={choosing}
+                                onClick={() => queueGenSettingsSave({ contentWeights: { ...w } }, true)}
+                              >
+                                {key.replace(/_/g, ' ')}
+                              </Button>
+                            ))}
+                          </div>
+                        </QuickGenRow>
+                      )}
+                    </>
+                  )}
               </div>
             )}
-            <Card className="border-game-border/70 w-full">
+            <Card className="border-neural-cyan/15 glass-panel-glow w-full">
               <CardContent
                 className="pt-4 pb-6 px-4 md:px-8 w-full mx-auto"
                 style={{ maxWidth: 'var(--story-max-width)' }}
@@ -1224,7 +1418,7 @@ export default function Game() {
             </div>{/* end scrollable area */}
 
             {/* Choices — fixed at bottom */}
-            <div className="shrink-0 border-t border-game-border bg-game-bg/95 backdrop-blur-sm pt-3 pb-1">
+            <div className="shrink-0 border-t border-neural-cyan/15 glass-panel rounded-none border-x-0 pt-3 pb-1">
             <AnimatePresence>
               {options.length > 0 && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
@@ -1324,9 +1518,9 @@ export default function Game() {
                     const effects = showConsequences && effectText ? parseOptionEffects(effectText) : null
                     const letter = String.fromCharCode(65 + i)
                     return (
-                      <Button key={`${turn}-${i}`} variant="outline" disabled={choosing}
+                      <Button key={`${turn}-${i}`} variant="neural" disabled={choosing}
                         onClick={() => handleChoice(letter)}
-                        className="w-full flex flex-col items-center justify-center text-center h-auto py-2 px-3 hover:bg-game-primary/10 hover:border-game-primary/50 transition-all"
+                        className="w-full flex flex-col items-center justify-center text-center h-auto py-2 px-3 transition-all"
                       >
                         <div className="flex w-full flex-col gap-1.5 min-w-0 items-center">
                           <div className="flex gap-2 min-w-0 justify-center text-center w-full">

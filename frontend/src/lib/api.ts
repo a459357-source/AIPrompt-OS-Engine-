@@ -579,6 +579,12 @@ export async function saveEngineSettings(params: {
   return res.json()
 }
 
+export interface ContentWeights {
+  story: number
+  romance: number
+  adult: number
+}
+
 export interface GameGenSettings {
   story_length: number
   min: number
@@ -598,6 +604,12 @@ export interface GameGenSettings {
   narrative_pov: string
   style_preference: string
   repetition_check: string
+  adult_mode: boolean
+  expression_style: string
+  expression_style_options: string[]
+  expression_style_labels: Record<string, string>
+  content_weights: ContentWeights
+  preset_weights: Record<string, ContentWeights>
   api_limits?: {
     context_tokens: number
     max_output_tokens: number
@@ -607,6 +619,8 @@ export interface GameGenSettings {
 }
 
 const _FALLBACK_BOUNDS = storyTargetBounds(1000, 300)
+
+const DEFAULT_CONTENT_WEIGHTS: ContentWeights = { story: 50, romance: 30, adult: 20 }
 
 const GAME_GEN_FALLBACK: GameGenSettings = {
   story_length: 1000,
@@ -627,6 +641,12 @@ const GAME_GEN_FALLBACK: GameGenSettings = {
   narrative_pov: 'auto',
   style_preference: 'balanced',
   repetition_check: 'standard',
+  adult_mode: false,
+  expression_style: 'light_novel',
+  expression_style_options: ['literary', 'romantic', 'light_novel', 'direct'],
+  expression_style_labels: { literary: '文学风', romantic: '浪漫风', light_novel: '轻小说风', direct: '直白风' },
+  content_weights: { ...DEFAULT_CONTENT_WEIGHTS },
+  preset_weights: {},
 }
 
 function parseGameGenSettings(data: Partial<GameGenSettings>): GameGenSettings {
@@ -654,6 +674,12 @@ function parseGameGenSettings(data: Partial<GameGenSettings>): GameGenSettings {
     narrative_pov: data.narrative_pov ?? GAME_GEN_FALLBACK.narrative_pov,
     style_preference: data.style_preference ?? GAME_GEN_FALLBACK.style_preference,
     repetition_check: data.repetition_check ?? GAME_GEN_FALLBACK.repetition_check,
+    adult_mode: data.adult_mode ?? GAME_GEN_FALLBACK.adult_mode,
+    expression_style: data.expression_style ?? GAME_GEN_FALLBACK.expression_style,
+    expression_style_options: data.expression_style_options ?? GAME_GEN_FALLBACK.expression_style_options,
+    expression_style_labels: data.expression_style_labels ?? GAME_GEN_FALLBACK.expression_style_labels,
+    content_weights: data.content_weights ?? { ...DEFAULT_CONTENT_WEIGHTS },
+    preset_weights: data.preset_weights ?? GAME_GEN_FALLBACK.preset_weights,
     api_limits: data.api_limits,
   }
 }
@@ -673,6 +699,9 @@ export async function updateGameGenSettings(patch: {
   narrativePov?: string
   stylePreference?: string
   repetitionCheck?: string
+  adultMode?: boolean
+  expressionStyle?: string
+  contentWeights?: ContentWeights
 }): Promise<GameGenSettings> {
   const fd = new FormData()
   if (patch.storyLength != null) fd.append('story_length', String(patch.storyLength))
@@ -683,6 +712,9 @@ export async function updateGameGenSettings(patch: {
   if (patch.narrativePov != null) fd.append('narrative_pov', patch.narrativePov)
   if (patch.stylePreference != null) fd.append('style_preference', patch.stylePreference)
   if (patch.repetitionCheck != null) fd.append('repetition_check', patch.repetitionCheck)
+  if (patch.adultMode != null) fd.append('adult_mode', patch.adultMode ? 'true' : 'false')
+  if (patch.expressionStyle != null) fd.append('expression_style', patch.expressionStyle)
+  if (patch.contentWeights != null) fd.append('content_weights', JSON.stringify(patch.contentWeights))
 
   const endpoints = ['/api/game-settings', '/api/settings']
   let lastError = '保存失败'

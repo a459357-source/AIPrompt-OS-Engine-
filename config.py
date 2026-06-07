@@ -574,6 +574,32 @@ DEFAULT_REPETITION_CHECK = "standard"
 DEFAULT_AUTO_SAVE_INTERVAL = 60
 DEFAULT_EXPORT_FORMAT = "markdown"
 DEFAULT_AUTO_EXPORT = "off"
+DEFAULT_ADULT_MODE = False
+DEFAULT_EXPRESSION_STYLE = "light_novel"
+DEFAULT_CONTENT_WEIGHTS = {"story": 50, "romance": 30, "adult": 20}
+
+EXPRESSION_STYLE_OPTIONS = ["literary", "romantic", "light_novel", "direct"]
+EXPRESSION_STYLE_LABELS = {
+    "literary": "文学风",
+    "romantic": "浪漫风",
+    "light_novel": "轻小说风",
+    "direct": "直白风",
+}
+EXPRESSION_STYLE_INSTRUCTIONS = {
+    "literary": "使用典雅文学语言，注重意境与修辞。",
+    "romantic": "文风浪漫温柔，注重情感氛围营造。",
+    "light_novel": "使用轻小说风格，轻松明快，对话与叙述并重。",
+    "direct": "文风直白简洁，少修饰，直接推进情节。",
+}
+
+PRESET_WEIGHTS = {
+    "balanced": {"story": 50, "romance": 30, "adult": 20},
+    "story_focus": {"story": 70, "romance": 20, "adult": 10},
+    "romance_first": {"story": 30, "romance": 60, "adult": 10},
+    "dark_story": {"story": 50, "romance": 20, "adult": 30},
+    "exploration": {"story": 60, "romance": 30, "adult": 10},
+    "daily_life": {"story": 30, "romance": 50, "adult": 20},
+}
 
 NARRATIVE_POV_INSTRUCTIONS = {
     "first": "使用第一人称「我」叙事，贴近主角内心。",
@@ -737,11 +763,78 @@ def reload_auto_export() -> str:
     return AUTO_EXPORT
 
 
+# ── Content preference (adult mode / expression style / weights) ────
+
+def _load_adult_mode() -> bool:
+    return bool(_read_settings().get("adult_mode", DEFAULT_ADULT_MODE))
+
+
+def save_adult_mode(enabled: bool) -> None:
+    _update_settings(adult_mode=bool(enabled))
+
+
+def reload_adult_mode() -> bool:
+    global ADULT_MODE
+    ADULT_MODE = _load_adult_mode()
+    return ADULT_MODE
+
+
+def _load_expression_style() -> str:
+    val = _read_settings().get("expression_style", DEFAULT_EXPRESSION_STYLE)
+    return val if val in EXPRESSION_STYLE_INSTRUCTIONS else DEFAULT_EXPRESSION_STYLE
+
+
+def save_expression_style(style: str) -> None:
+    if style not in EXPRESSION_STYLE_INSTRUCTIONS:
+        style = DEFAULT_EXPRESSION_STYLE
+    _update_settings(expression_style=style)
+
+
+def reload_expression_style() -> str:
+    global EXPRESSION_STYLE
+    EXPRESSION_STYLE = _load_expression_style()
+    return EXPRESSION_STYLE
+
+
+def _validate_content_weights(weights: dict) -> dict:
+    """Ensure story + romance + adult = 100, clamp each to valid range."""
+    story = max(0, min(100, int(weights.get("story", 50))))
+    romance = max(0, min(100, int(weights.get("romance", 30))))
+    adult = max(0, min(100, int(weights.get("adult", 20))))
+    total = story + romance + adult
+    if total == 0:
+        return {"story": 50, "romance": 30, "adult": 20}
+    # Scale to 100
+    return {
+        "story": round(story * 100 / total),
+        "romance": round(romance * 100 / total),
+        "adult": 100 - round(story * 100 / total) - round(romance * 100 / total),
+    }
+
+
+def _load_content_weights() -> dict:
+    raw = _read_settings().get("content_weights", DEFAULT_CONTENT_WEIGHTS)
+    return _validate_content_weights(raw)
+
+
+def save_content_weights(weights: dict) -> None:
+    _update_settings(content_weights=_validate_content_weights(weights))
+
+
+def reload_content_weights() -> dict:
+    global CONTENT_WEIGHTS
+    CONTENT_WEIGHTS = _load_content_weights()
+    return CONTENT_WEIGHTS
+
+
 def reload_app_behavior() -> None:
     reload_option_count()
     reload_narrative_pov()
     reload_style_preference()
     reload_repetition_check()
+    reload_adult_mode()
+    reload_expression_style()
+    reload_content_weights()
     reload_auto_save_interval()
     reload_max_save_slots()
     reload_export_format()
@@ -769,13 +862,72 @@ def force_event_thresholds() -> dict[str, int]:
     }
 
 
+def content_preference_rules_text() -> str:
+    """根据 content_weights 生成频率化叙事节奏指令（替代百分比）。"""
+    w = CONTENT_WEIGHTS
+    story_w = w.get("story", 50)
+    romance_w = w.get("romance", 30)
+    adult_w = w.get("adult", 20)
+
+    # 将百分比转化为每 N 轮的出现频率描述
+    parts = []
+
+    # 剧情
+    if story_w >= 60:
+        parts.append("以剧情推进为主轴，世界观探索与主线目标为最高优先级。")
+    elif story_w >= 40:
+        parts.append("剧情推进为骨架，在此之上发展感情与人物关系。")
+    else:
+        parts.append("剧情服务于人物互动，允许以角色日常和关系发展为主要推进方式。")
+
+    # 感情
+    if romance_w >= 50:
+        parts.append("感情发展是重点，每轮应有明确的感情互动或内心独白反映角色情感变化。关系递进需自然铺垫，不可跳跃。")
+    elif romance_w >= 25:
+        parts.append("感情发展应有节制地推进，在有意义的互动中自然升温。")
+    else:
+        parts.append("感情发展不作为主线，仅在剧情间隙中点缀。")
+
+    # 成人题材
+    if ADULT_MODE and adult_w > 0:
+        if adult_w >= 50:
+            parts.append("成人题材高频出现，服务于角色亲密关系，自然融入剧情而不打断叙事节奏。")
+        elif adult_w >= 25:
+            parts.append("成人题材每 3-5 轮中自然融入 1 次，作为角色关系的深化手段，不突兀。")
+        elif adult_w >= 10:
+            parts.append("成人题材作为点缀，每 5-8 轮中自然出现 1 次，服务于角色关系发展。")
+        else:
+            parts.append("成人题材极少出现，仅在角色关系达到关键阶段时作为自然结果。")
+    elif ADULT_MODE and adult_w == 0:
+        parts.append("即使成人模式开启，当前权重下不主动引入成人题材。")
+    else:
+        # adult_mode 关闭 → 不出现成人相关内容边界
+        parts.append("禁止成人题材与露骨描写。感情表达限于牵手、拥抱等纯爱范畴。")
+
+    return "【内容节奏】\n" + "\n".join(f"- {p}" for p in parts)
+
+
 def ai_behavior_rules_text() -> str:
-    return (
+    # 成人模式开启时，expression_style 覆盖 STYLE_PREFERENCE
+    if ADULT_MODE:
+        style_instruction = EXPRESSION_STYLE_INSTRUCTIONS.get(
+            EXPRESSION_STYLE, EXPRESSION_STYLE_INSTRUCTIONS["light_novel"]
+        )
+        style_label = EXPRESSION_STYLE_LABELS.get(EXPRESSION_STYLE, "轻小说风")
+        style_line = f"【文风偏好 · {style_label}】{style_instruction}"
+    else:
+        style_line = f"【文风偏好】{STYLE_PREFERENCE_INSTRUCTIONS[STYLE_PREFERENCE]}"
+
+    base = (
         f"【叙事视角】{NARRATIVE_POV_INSTRUCTIONS[NARRATIVE_POV]}\n"
-        f"【文风偏好】{STYLE_PREFERENCE_INSTRUCTIONS[STYLE_PREFERENCE]}\n"
+        f"{style_line}\n"
         f"【选项数量】必须输出恰好 {OPTION_COUNT} 个 options。\n"
         f"【反重复】{REPETITION_PROMPT_INSTRUCTIONS[REPETITION_CHECK]}"
     )
+
+    # 追加内容偏好规则
+    content_rules = content_preference_rules_text()
+    return base + "\n" + content_rules
 
 
 # ── DeepSeek API ────────────────────────────────────────────────────

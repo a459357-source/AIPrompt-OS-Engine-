@@ -18,6 +18,7 @@ const buttonVariants = cva(
         success: 'bg-game-success/20 text-game-success border border-game-success/30 hover:bg-game-success/30',
         glow: 'bg-game-primary/15 text-game-primary border border-game-primary/30 hover:bg-game-primary/25 shadow-[0_0_12px_var(--color-game-primary)]/20',
         primary: 'bg-game-primary/20 text-game-primary border border-game-primary/40 hover:bg-game-primary/30',
+        neural: 'glass-panel text-neural-cyan border-neural-cyan/30 hover:border-neural-cyan/60 neural-scan-hover shadow-[0_0_16px_rgba(0,240,255,0.15)] font-neural-mono uppercase tracking-wide text-xs',
       },
       size: {
         default: 'h-9 px-4 py-2',

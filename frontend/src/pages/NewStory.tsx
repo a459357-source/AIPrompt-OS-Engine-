@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { Globe, Network, Users, GitBranch, Gem } from 'lucide-react'
 import { generateWorld, generateField, generateRules, createStory } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { useAutoSave } from '@/hooks/useAutoSave'
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
+import { useAppSettings } from '@/hooks/useAppSettings'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,8 +18,18 @@ import { Separator } from '@/components/ui/separator'
 import { TagInput } from '@/components/TagInput'
 import { AIButton } from '@/components/AIButton'
 import { StatusToast } from '@/components/StatusToast'
+import { WorldGraphCanvas } from '@/components/world/WorldGraphCanvas'
+import { InspectorPanel } from '@/components/layout/InspectorPanel'
+import { usePageShell } from '@/components/layout/usePageShell'
+import { SectionHeader } from '@/components/neural/SectionHeader'
+import { GlowDivider } from '@/components/neural/GlowDivider'
+import { parseNodeSelection } from '@/lib/worldGraphAdapter'
+import { t } from '@/lib/i18n'
 import type { Character, WorldGenResponse } from '@/lib/types'
 import { STORY_PRESETS, type StoryPreset } from '@/lib/storyPresets'
+
+const WORLD_BUILDER_FORM_ID = 'world-builder-form'
+type BuilderSection = 'core' | 'factions' | 'characters' | 'relations' | 'artifacts'
 
 const WORLD_GEN_CONFIRM_MSG =
   '一键生成会用 AI 结果覆盖当前表单中的全部设定（标题、世界观、角色、势力、物品、关系维度等），此操作不可撤销。\n\n确定继续？'
@@ -285,14 +297,21 @@ interface NewStorySavedState {
   customStats?: { key: string; label: string; max: number }[]
   keywords?: string
   activePreset?: string | null
+  nodePositions?: Record<string, { x: number; y: number }>
+  activeSection?: BuilderSection
 }
 
 // ── Main Page ──
 export default function NewStory() {
+  const { language } = useAppSettings()
+  const lang = language as 'zh' | 'en' | 'ja'
   const [aiStatus, setAiStatus] = useState('')
   const [aiStatusType, setAiStatusType] = useState<'info' | 'success' | 'error' | 'loading'>('info')
   const [generating, setGenerating] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({})
+  const [activeSection, setActiveSection] = useState<BuilderSection>('core')
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [nodePositions, setNodePositions] = useState<Record<string, { x: number; y: number }>>({})
   const [characterRelations, setCharacterRelations] = useState<Record<string, {
     relationshipType: string; affection: number; trust: number; respect: number;
     dependence: number; hostility: number; attraction: number; tags: string[];
@@ -340,7 +359,9 @@ export default function NewStory() {
     customStats,
     keywords,
     activePreset,
-  }), [watchAll, factions, artifacts, characterRelations, customStats, keywords, activePreset])
+    nodePositions,
+    activeSection,
+  }), [watchAll, factions, artifacts, characterRelations, customStats, keywords, activePreset, nodePositions, activeSection])
 
   const { restoredData, clearSaved } = useAutoSave('new-story-draft-v2', saveBundle)
   useEffect(() => {
@@ -356,6 +377,8 @@ export default function NewStory() {
       setCustomStats(saved.customStats || [])
       if (saved.keywords != null) setKeywords(saved.keywords)
       if (saved.activePreset != null) setActivePreset(saved.activePreset)
+      if (saved.nodePositions) setNodePositions(saved.nodePositions)
+      if (saved.activeSection) setActiveSection(saved.activeSection)
       return
     }
     if ('title' in saved || 'characters' in saved) {
@@ -633,84 +656,105 @@ export default function NewStory() {
   const titleLen = (watch('title') || '').length
   const worldLen = (watch('world') || '').length
 
-  return (
-    <div className="max-w-6xl mx-auto">
-      {/* AI Status Toast */}
-      <StatusToast message={aiStatus} type={aiStatusType} />
+  const graphInput = useMemo(() => ({
+    title: watchAll.title || '',
+    world: watchAll.world || '',
+    genre: watchAll.genre || [],
+    scene: watchAll.scene || '',
+    main_goal: watchAll.main_goal || '',
+    characters: (watchAll.characters || []).map((c) => ({
+      name: c.name,
+      isMain: c.isMain,
+      faction: c.faction,
+    })),
+    factions: factions.map((f) => ({
+      name: f.name,
+      type: f.type,
+      leader: f.leader,
+      influence: f.influence,
+    })),
+    artifacts: artifacts.map((a) => ({
+      name: a.name,
+      type: a.type,
+      ownerId: a.ownerId,
+    })),
+    characterRelations,
+    nodePositions,
+  }), [watchAll, factions, artifacts, characterRelations, nodePositions])
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" onKeyDown={(e) => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT' && (e.target as HTMLInputElement).type === 'number') e.preventDefault() }}>
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* ═══════════ Sidebar ═══════════ */}
-          <div className="lg:col-span-1 space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">🤖 一键生成</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Textarea
-                  id="kw-input"
-                  value={keywords}
-                  onChange={(e) => setKeywords(e.target.value)}
-                  placeholder="粘贴小说简介 / 世界观描述 / 关键词均可&#10;&#10;示例①：修仙 宗门 重生&#10;示例②：被退婚的废柴少年捡到神秘戒指…"
-                  className="h-28 resize-y text-xs"
-                />
+  const navItems = useMemo(() => [
+    { id: 'core', label: t('world.core', lang), icon: <Globe className="w-4 h-4" /> },
+    { id: 'factions', label: t('world.factions', lang), icon: <Network className="w-4 h-4" /> },
+    { id: 'characters', label: t('world.characters', lang), icon: <Users className="w-4 h-4" /> },
+    { id: 'relations', label: t('world.relations', lang), icon: <GitBranch className="w-4 h-4" /> },
+    { id: 'artifacts', label: t('world.artifacts', lang), icon: <Gem className="w-4 h-4" /> },
+  ], [lang])
+
+  useEffect(() => {
+    if (!selectedNodeId) return
+    const parsed = parseNodeSelection(selectedNodeId)
+    if (parsed.type === 'worldCore') setActiveSection('core')
+    else if (parsed.type === 'faction') setActiveSection('factions')
+    else if (parsed.type === 'character') setActiveSection('characters')
+    else if (parsed.type === 'artifact') setActiveSection('artifacts')
+  }, [selectedNodeId])
+
+  const inspector = (
+    <InspectorPanel
+      title={navItems.find((n) => n.id === activeSection)?.label}
+      footer={
+        <Button type="submit" form={WORLD_BUILDER_FORM_ID} variant="neural" size="lg" className="w-full">
+          {t('world.launch', lang)}
+        </Button>
+      }
+    >
+      <form
+        id={WORLD_BUILDER_FORM_ID}
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="space-y-4"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT' && (e.target as HTMLInputElement).type === 'number') {
+            e.preventDefault()
+          }
+        }}
+      >
+        <Card className="border-neural-cyan/10">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-neural-cyan">{t('world.aiGen', lang)}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Textarea
+              id="kw-input"
+              value={keywords}
+              onChange={(e) => setKeywords(e.target.value)}
+              placeholder="粘贴小说简介 / 世界观描述 / 关键词…"
+              className="h-24 resize-y text-xs"
+            />
+            <Button type="button" variant="neural" className="w-full" disabled={generating === 'world'} onClick={handleWorldGen}>
+              {generating === 'world' ? '生成中…' : '✨ 一键生成完整设定'}
+            </Button>
+            <GlowDivider label={t('world.presets', lang)} />
+            <div className="flex flex-wrap gap-1">
+              {STORY_PRESETS.map((preset) => (
                 <Button
+                  key={preset.id}
                   type="button"
-                  variant="success"
-                  className="w-full"
+                  variant={activePreset === preset.id ? 'default' : 'outline'}
+                  size="xs"
+                  onClick={() => handlePresetSelect(preset)}
                   disabled={generating === 'world'}
-                  onClick={handleWorldGen}
                 >
-                  {generating === 'world' ? (
-                    <>
-                      <span className="inline-block w-3 h-3 border-2 border-game-success/30 border-t-game-success rounded-full animate-spin" />
-                      生成中…
-                    </>
-                  ) : fieldErrors.world ? (
-                    '🔄 重试一键生成'
-                  ) : (
-                    '✨ 一键生成完整设定'
-                  )}
+                  {preset.label}
                 </Button>
-                {fieldErrors.world && (
-                  <p className="text-[11px] text-game-danger">{fieldErrors.world}</p>
-                )}
-                <p className="text-[11px] text-game-dim leading-relaxed">
-                  将覆盖当前表单全部设定，操作不可撤销。
-                </p>
-              </CardContent>
-            </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
+        <div className={activeSection === 'core' ? '' : 'hidden'}>
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">📦 预设模板</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1">
-                {STORY_PRESETS.map((preset) => (
-                  <Button
-                    key={preset.id}
-                    type="button"
-                    variant={activePreset === preset.id ? 'default' : 'ghost'}
-                    className="w-full justify-start text-xs h-8"
-                    onClick={() => handlePresetSelect(preset)}
-                    disabled={generating === 'world'}
-                  >
-                    {preset.label}
-                  </Button>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* ═══════════ Main Form ═══════════ */}
-          <div className="lg:col-span-3 space-y-4">
-            {/* Part 1: Story Basics */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-primary/20 text-game-primary text-xs flex items-center justify-center">1</span>
-                  故事基础信息
-                </CardTitle>
+                <CardTitle className="text-sm">{t('world.core', lang)}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Title */}
@@ -791,13 +835,13 @@ export default function NewStory() {
                 </div>
               </CardContent>
             </Card>
+        </div>
 
-            {/* Part 2: Factions */}
+        <div className={activeSection === 'factions' ? '' : 'hidden'}>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-warning/20 text-game-warning text-xs flex items-center justify-center">2</span>
-                  🏛️ 势力
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  {t('world.factions', lang)}
                 </CardTitle>
                 <div className="flex gap-1">
                   <Button
@@ -1041,13 +1085,13 @@ export default function NewStory() {
                 </div>
               </CardContent>
             </Card>
+        </div>
 
-            {/* Part 3: Characters */}
+        <div className={activeSection === 'characters' ? '' : 'hidden'}>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-primary/20 text-game-primary text-xs flex items-center justify-center">3</span>
-                  角色系统
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  {t('world.characters', lang)}
                 </CardTitle>
                 <Button
                   type="button"
@@ -1204,14 +1248,12 @@ export default function NewStory() {
                 </div>
               </CardContent>
             </Card>
+        </div>
 
-            {/* Part 4: Custom Rules — 关系系统已合并到此 */}
+        <div className={activeSection === 'relations' ? '' : 'hidden'}>
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-primary/20 text-game-primary text-xs flex items-center justify-center">4</span>
-                  专属规则 & 多维关系
-                </CardTitle>
+                <CardTitle className="text-sm">{t('world.relations', lang)}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="space-y-2 rounded-md border border-game-border/60 bg-game-bg/30 p-3">
@@ -1381,13 +1423,13 @@ export default function NewStory() {
                 </AIButton>
               </CardContent>
             </Card>
+        </div>
 
-            {/* Part 5: Artifacts */}
+        <div className={activeSection === 'artifacts' ? '' : 'hidden'}>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-accent/20 text-game-accent text-xs flex items-center justify-center">5</span>
-                  🗝️ 关键物品
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  {t('world.artifacts', lang)}
                 </CardTitle>
                 <div className="flex gap-1">
                   <Button
@@ -1571,24 +1613,57 @@ export default function NewStory() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Submit */}
-            <div className="space-y-2">
-              <p className="text-xs text-game-dim text-center">
-                提交后将覆盖当前对局进度，操作不可撤销。
-              </p>
-              <Button
-                type="submit"
-                variant="success"
-                size="lg"
-                className="w-full text-base"
-              >
-                🎬 开始新故事
-              </Button>
-            </div>
-          </div>
         </div>
       </form>
-    </div>
+    </InspectorPanel>
+  )
+
+  const shell = usePageShell({
+    navItems,
+    activeNavId: activeSection,
+    inspector,
+  })
+
+  useEffect(() => {
+    shell.setActiveNavId(activeSection)
+  }, [activeSection, shell.setActiveNavId])
+
+  useEffect(() => {
+    if (shell.activeNavId && shell.activeNavId !== activeSection) {
+      setActiveSection(shell.activeNavId as BuilderSection)
+      setSelectedNodeId(null)
+    }
+  }, [shell.activeNavId, activeSection])
+
+  return (
+    <>
+      <StatusToast message={aiStatus} type={aiStatusType} />
+      <div className="h-full w-full relative">
+        <WorldGraphCanvas
+          input={graphInput}
+          selectedNodeId={selectedNodeId}
+          onSelectNode={setSelectedNodeId}
+          onPositionsChange={setNodePositions}
+          onGraphUpdate={(update) => {
+            if (update.factions) setFactions(update.factions as typeof factions)
+            if (update.characters) {
+              const chars = getValues('characters')
+              update.characters.forEach((c, i) => {
+                if (chars[i]) chars[i] = { ...chars[i], ...c }
+              })
+              setValue('characters', chars)
+            }
+            if (update.characterRelations) setCharacterRelations(update.characterRelations as typeof characterRelations)
+          }}
+        />
+        <SectionHeader
+          icon={Globe}
+          title={watchAll.title || t('world.core', lang)}
+          subtitle={t('brand.subtitle', lang)}
+          status={generating ? 'active' : 'idle'}
+          className="absolute top-3 left-12 md:left-4 z-10 pointer-events-none max-w-md"
+        />
+      </div>
+    </>
   )
 }

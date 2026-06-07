@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import mermaid from 'mermaid'
 import { motion } from 'framer-motion'
+import { Activity, BarChart3, GitBranch, Network, Clock } from 'lucide-react'
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement, PointElement,
@@ -12,18 +13,20 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { StatusToast } from '@/components/StatusToast'
+import { WorldGraphCanvas } from '@/components/world/WorldGraphCanvas'
+import { SectionHeader } from '@/components/neural/SectionHeader'
+import { usePageShell } from '@/components/layout/usePageShell'
+import { InspectorPanel } from '@/components/layout/InspectorPanel'
 import { getDashboard, type DashboardData } from '@/lib/api'
 import { logger } from '@/lib/logger'
+import { useAppSettings } from '@/hooks/useAppSettings'
+import { t } from '@/lib/i18n'
 
-ChartJS.register(
-  CategoryScale, LinearScale, BarElement,
-  PointElement, LineElement, ArcElement,
-  Tooltip, Legend, Filler,
-)
+type DashSection = 'overview' | 'timeline' | 'network' | 'branch' | 'factions'
 
 const CHART_COLORS = [
-  '#58a6ff', '#3fb950', '#d29922', '#da3633',
-  '#bc8cff', '#79c0ff', '#f0883e', '#56d364',
+  '#00f0ff', '#7b5cff', '#ff2d95', '#ffb870',
+  '#8aef93', '#79c0ff', '#f0883e', '#56d364',
 ]
 
 const CHART_OPTIONS_DARK = {
@@ -35,21 +38,31 @@ const CHART_OPTIONS_DARK = {
   scales: {
     x: {
       ticks: { color: '#8b949e', font: { size: 10 } },
-      grid: { color: '#21262d' },
+      grid: { color: 'rgba(0,240,255,0.06)' },
     },
     y: {
       ticks: { color: '#8b949e', font: { size: 10 } },
-      grid: { color: '#21262d' },
+      grid: { color: 'rgba(0,240,255,0.06)' },
     },
   },
 }
 
+ChartJS.register(
+  CategoryScale, LinearScale, BarElement,
+  PointElement, LineElement, ArcElement,
+  Tooltip, Legend, Filler,
+)
+
 mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' })
 
 export default function Dashboard() {
+  const { language } = useAppSettings()
+  const lang = language as 'zh' | 'en' | 'ja'
   const [data, setData] = useState<DashboardData | null>(null)
+  const [activeSection, setActiveSection] = useState<DashSection>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [mermaidError, setMermaidError] = useState('')
   const graphRef = useRef<HTMLDivElement>(null)
 
   const loadDashboard = useCallback(async () => {
@@ -72,15 +85,72 @@ export default function Dashboard() {
   useEffect(() => {
     const src = data?.story_graph?.mermaid
     const el = graphRef.current
-    if (!src || !el || Object.keys(data?.story_graph?.nodes ?? {}).length === 0) return
+    if (!src || !el || Object.keys(data?.story_graph?.nodes ?? {}).length === 0) {
+      setMermaidError('')
+      return
+    }
     el.innerHTML = ''
+    setMermaidError('')
     const id = `mermaid-graph-${Date.now()}`
     mermaid.render(id, src).then(({ svg }) => {
       if (graphRef.current) graphRef.current.innerHTML = svg
     }).catch((e) => {
-      logger.warn('Dashboard', 'Mermaid render failed', { error: String(e) })
+      const msg = e instanceof Error ? e.message : String(e)
+      setMermaidError(msg || '分支图渲染失败')
+      logger.warn('Dashboard', 'Mermaid render failed', { error: msg })
     })
   }, [data?.story_graph?.mermaid, data?.story_graph?.nodes])
+
+  const navItems = useMemo(() => [
+    { id: 'overview', label: t('dashboard.overview', lang), icon: <Activity className="w-4 h-4" /> },
+    { id: 'timeline', label: t('dashboard.timeline', lang), icon: <Clock className="w-4 h-4" /> },
+    { id: 'network', label: t('dashboard.network', lang), icon: <Network className="w-4 h-4" /> },
+    { id: 'branch', label: t('dashboard.branch', lang), icon: <GitBranch className="w-4 h-4" /> },
+    { id: 'factions', label: t('dashboard.factions', lang), icon: <BarChart3 className="w-4 h-4" /> },
+  ], [lang])
+
+  const graphInput = useMemo(() => ({
+    title: data?.scene || 'World State',
+    world: data?.analytics?.world_state_v2?.location || '',
+    genre: [] as string[],
+    scene: data?.scene || '',
+    main_goal: '',
+    characters: (data?.characters || []).map((c, i) => ({
+      name: c.name,
+      isMain: i === 0,
+      faction: '',
+    })),
+    factions: (data?.analytics?.world_state_v2?.factions || []).map((f) => ({
+      name: f.name,
+      type: 'organization',
+      leader: '',
+      influence: Math.abs(f.reputation_pct) + 50,
+    })),
+    artifacts: [] as { name: string; type: string; ownerId: string }[],
+    characterRelations: {} as Record<string, unknown>,
+  }), [data])
+
+  const shell = usePageShell({
+    navItems,
+    activeNavId: activeSection,
+    hideShellPanels: !data,
+    inspector: data ? (
+      <InspectorPanel title={navItems.find((n) => n.id === activeSection)?.label || ''}>
+        <p className="text-sm text-game-muted">第 {data.turn} 轮 · {data.status}</p>
+        <p className="text-xs text-game-dim mt-2">📍 {data.scene}</p>
+      </InspectorPanel>
+    ) : null,
+  })
+
+  useEffect(() => {
+    shell.setActiveNavId(activeSection)
+  }, [activeSection, shell.setActiveNavId])
+
+  useEffect(() => {
+    if (shell.activeNavId && shell.activeNavId !== activeSection) {
+      setActiveSection(shell.activeNavId as DashSection)
+    }
+  }, [shell.activeNavId, activeSection])
 
   if (loading) {
     return (
@@ -97,15 +167,15 @@ export default function Dashboard() {
       >
         <div className="text-5xl">📊</div>
         <div className="space-y-2">
-          <h2 className="text-lg font-bold text-game-accent">还没有数据</h2>
+          <h2 className="text-lg font-bold text-game-accent">{t('dashboard.empty', lang)}</h2>
           <p className="text-game-muted text-sm max-w-md">
             {error || '开始一个新故事后，这里会展示你的故事进度、角色关系变化、字数统计等数据可视化。'}
           </p>
         </div>
         <div className="flex gap-3">
           <Button variant="outline" onClick={loadDashboard}>🔄 重试</Button>
-          <Button variant="glow" onClick={() => window.location.href = '/new'}>
-            ✨ 创建第一个故事
+          <Button variant="neural" onClick={() => window.location.href = '/new'}>
+            启动世界构建
           </Button>
         </div>
       </motion.div>
@@ -246,16 +316,24 @@ export default function Dashboard() {
   const hasCharts = trustChart || apiChart || choiceChart || wordChart || freqChart || factionChart
   const showAnalytics = hasCharts || statusTimeline.length > 0
 
+  if (activeSection === 'network' && data) {
+    return (
+      <div className="h-full w-full">
+        <StatusToast message="" type="info" />
+        <WorldGraphCanvas input={graphInput} selectedNodeId={null} onSelectNode={() => {}} readOnly />
+      </div>
+    )
+  }
+
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-game-accent font-bold text-xl">📊 仪表盘</h1>
-          <p className="text-game-muted text-sm mt-1">
-            第 {data.turn} 轮 · {data.status} · 📍 {data.scene}
-          </p>
-        </div>
+    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-6">
+      <SectionHeader
+        icon={Activity}
+        title={t('dashboard.title', lang)}
+        subtitle={`第 ${data.turn} 轮 · ${data.status} · ${data.scene}`}
+        status="active"
+      />
+      <div className="flex justify-end">
         <Button variant="outline" size="sm" onClick={loadDashboard}>🔄 刷新</Button>
       </div>
 
@@ -397,6 +475,11 @@ export default function Dashboard() {
             <p className="text-game-dim text-sm text-center py-6">暂无分支节点，进行游戏后将自动生成</p>
           ) : (
             <div className="overflow-x-auto rounded-md border border-game-border/60 bg-game-bg/40 p-4">
+              {mermaidError ? (
+                <p className="text-game-dim text-sm text-center py-6">
+                  分支图暂时无法渲染（{mermaidError}）。节点数据仍可在上方「关系网络」查看。
+                </p>
+              ) : null}
               <div ref={graphRef} className="min-w-[320px] flex justify-center" />
             </div>
           )}

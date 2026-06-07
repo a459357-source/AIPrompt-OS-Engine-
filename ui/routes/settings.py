@@ -29,6 +29,15 @@ from config import (
     reload_style_preference,
     save_repetition_check,
     reload_repetition_check,
+    save_adult_mode,
+    reload_adult_mode,
+    save_expression_style,
+    reload_expression_style,
+    save_content_weights,
+    reload_content_weights,
+    EXPRESSION_STYLE_OPTIONS,
+    EXPRESSION_STYLE_LABELS,
+    PRESET_WEIGHTS,
     save_auto_save_interval,
     reload_auto_save_interval,
     save_max_save_slots,
@@ -164,6 +173,12 @@ def game_settings_payload() -> dict:
         "narrative_pov": config.NARRATIVE_POV,
         "style_preference": config.STYLE_PREFERENCE,
         "repetition_check": config.REPETITION_CHECK,
+        "adult_mode": config.ADULT_MODE,
+        "expression_style": config.EXPRESSION_STYLE,
+        "expression_style_options": EXPRESSION_STYLE_OPTIONS,
+        "expression_style_labels": EXPRESSION_STYLE_LABELS,
+        "content_weights": config.CONTENT_WEIGHTS,
+        "preset_weights": PRESET_WEIGHTS,
         "api_limits": config.api_limits(),
     }
 
@@ -178,6 +193,9 @@ def apply_game_gen_settings(
     narrative_pov: str | None = None,
     style_preference: str | None = None,
     repetition_check: str | None = None,
+    adult_mode: bool | None = None,
+    expression_style: str | None = None,
+    content_weights: dict | None = None,
 ) -> dict:
     """Update generation quick settings (Game page)."""
     before = _gen_settings_snapshot()
@@ -208,7 +226,14 @@ def apply_game_gen_settings(
         save_style_preference(style_preference)
     if repetition_check is not None:
         save_repetition_check(repetition_check)
-    if any(x is not None for x in (option_count, narrative_pov, style_preference, repetition_check)):
+    if adult_mode is not None:
+        save_adult_mode(adult_mode)
+    if expression_style is not None:
+        save_expression_style(expression_style)
+    if content_weights is not None:
+        save_content_weights(content_weights)
+    if any(x is not None for x in (option_count, narrative_pov, style_preference, repetition_check,
+                                    adult_mode, expression_style, content_weights)):
         reload_app_behavior()
     ensure_story_length_context_sync(force_compress=story_length is not None)
     after = _gen_settings_snapshot()

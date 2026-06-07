@@ -6,13 +6,23 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StatusToast } from '@/components/StatusToast'
 import { CharacterCard } from '@/components/CharacterCard'
+import { InspectorPanel } from '@/components/layout/InspectorPanel'
+import { usePageShell } from '@/components/layout/usePageShell'
+import { SectionHeader } from '@/components/neural/SectionHeader'
+import { GlassPanel } from '@/components/neural/GlassPanel'
+import { Users } from 'lucide-react'
 import { getNpcs, generateNpc, type NpcData } from '@/lib/api'
 import { logger } from '@/lib/logger'
+import { useAppSettings } from '@/hooks/useAppSettings'
+import { t } from '@/lib/i18n'
 
 type FilterType = 'all' | 'main' | 'npc'
 
 export default function NPCs() {
+  const { language } = useAppSettings()
+  const lang = language as 'zh' | 'en' | 'ja'
   const [characters, setCharacters] = useState<NpcData[]>([])
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [stats, setStats] = useState({ total: 0, main: 0, npc: 0, avg_trust: 0 })
   const [filter, setFilter] = useState<FilterType>('all')
   const [search, setSearch] = useState('')
@@ -66,32 +76,64 @@ export default function NPCs() {
     return true
   })
 
+  const selected = selectedIndex != null ? filtered[selectedIndex] : null
+
+  const navItems = [
+    { id: 'all', label: '全部' },
+    { id: 'main', label: '主角' },
+    { id: 'npc', label: 'NPC' },
+  ]
+
+  usePageShell({
+    navItems,
+    activeNavId: filter,
+    inspector: selected ? (
+      <InspectorPanel title={selected.name}>
+        <CharacterCard
+          character={{
+            name: selected.name,
+            isMain: selected.isMain,
+            role_tags: selected.role_tags,
+            personality_tags: selected.personality_tags,
+            appearance: selected.appearance,
+            relationship: selected.relationship,
+            goal: selected.goal,
+            secret: selected.secret,
+            background: selected.background,
+            special_ability: selected.special_ability,
+          }}
+          index={0}
+          isMain={selected.isMain}
+          trustPct={selected.trust_pct}
+          className="border-none shadow-none bg-transparent"
+        />
+      </InspectorPanel>
+    ) : (
+      <InspectorPanel title={t('world.characters', lang)}>
+        <p className="text-sm text-game-muted">选择人物卡片查看详情</p>
+      </InspectorPanel>
+    ),
+  })
+
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-4">
       <StatusToast
         message={loading ? '加载角色数据…' : error ? `❌ ${error}` : ''}
         type={loading ? 'loading' : error ? 'error' : 'info'}
       />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-game-accent font-bold text-xl">👥 角色管理</h1>
-          <p className="text-game-muted text-sm mt-1">
-            共 {stats.total} 位角色 · {stats.main} 主角 · {stats.npc} NPC · 平均好感 {stats.avg_trust}%
-          </p>
-          <p className="text-game-dim text-xs mt-1">
-            角色由对局与记忆系统自动维护，暂不支持编辑或删除。
-          </p>
-        </div>
-        <Button variant="glow" size="sm" onClick={handleGenerate} disabled={generating}>
-          {generating ? (
-            <><span className="inline-block w-3 h-3 border-2 border-game-primary/30 border-t-game-primary rounded-full animate-spin" /> 生成中…</>
-          ) : (
-            '✨ AI生成角色'
-          )}
+      <SectionHeader
+        icon={Users}
+        title={t('world.characters', lang)}
+        subtitle={`共 ${stats.total} 位 · 平均好感 ${stats.avg_trust}%`}
+        status={loading ? 'active' : 'idle'}
+      />
+      <GlassPanel className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <p className="text-xs text-game-dim">角色由对局与记忆系统自动维护</p>
+        <Button variant="neural" size="sm" onClick={handleGenerate} disabled={generating}>
+          {generating ? '生成中…' : '✨ AI 生成角色'}
         </Button>
-      </div>
+      </GlassPanel>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -128,14 +170,22 @@ export default function NPCs() {
         >
           <p className="text-game-muted text-lg">还没有角色</p>
           <p className="text-game-dim text-sm">点击上方「✨ AI生成角色」创建第一个角色，或前往「新故事」创建完整故事</p>
-          <Button variant="outline" onClick={() => window.location.href = '/new'}>
-            前往新故事
+          <Button variant="neural" onClick={() => window.location.href = '/new'}>
+            前往世界构建
           </Button>
         </motion.div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           <AnimatePresence>
             {filtered.map((c, i) => (
+              <div
+                key={c.name + i}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedIndex(i)}
+                onKeyDown={(e) => { if (e.key === 'Enter') setSelectedIndex(i) }}
+                className={`cursor-pointer transition-transform ${selectedIndex === i ? 'ring-2 ring-neural-cyan rounded-lg scale-[1.02]' : 'hover:scale-[1.01]'}`}
+              >
               <CharacterCard
                 key={c.name + i}
                 character={{
@@ -154,6 +204,7 @@ export default function NPCs() {
                 isMain={c.isMain}
                 trustPct={c.trust_pct}
               />
+              </div>
             ))}
           </AnimatePresence>
         </div>

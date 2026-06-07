@@ -75,6 +75,9 @@ def save(slot: str) -> dict | None:
             "story_graph": graph,
             "candidate_npcs": _load_candidate_pool(),
             "chapter": chapter,
+            "content_weights": config.CONTENT_WEIGHTS,
+            "adult_mode": config.ADULT_MODE,
+            "expression_style": config.EXPRESSION_STYLE,
         }
 
         slot_path = _slot_path(slot)

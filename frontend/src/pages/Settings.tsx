@@ -34,6 +34,9 @@ import {
 } from '@/lib/settings'
 import { t } from '@/lib/i18n'
 import { useAppSettings } from '@/hooks/useAppSettings'
+import { usePageShell } from '@/components/layout/usePageShell'
+import { SectionHeader } from '@/components/neural/SectionHeader'
+import { Settings as SettingsIcon } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -407,20 +410,35 @@ export default function Settings() {
     setApiClearing(false)
   }, [])
 
+  usePageShell({
+    navItems: [
+      { id: 'reading', label: t('settings.reading', lang) },
+      { id: 'data', label: t('settings.data', lang) },
+      { id: 'ui', label: t('settings.ui', lang) },
+      { id: 'api', label: t('settings.api', lang) },
+    ],
+    activeNavId: 'reading',
+    hideShellPanels: false,
+  })
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-game-accent font-bold text-xl">⚙️ {t('settings.title', lang)}</h1>
+    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-6 max-w-3xl">
+      <SectionHeader
+        icon={SettingsIcon}
+        title={t('settings.title', lang)}
+        subtitle="Neural Interface · 系统配置"
+        status={saved ? 'active' : 'idle'}
+      />
+      <div className="flex justify-end">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: saved ? 1 : 0 }}
-          className="flex items-center gap-2"
         >
           <Badge variant="success" size="sm">✅ 已保存</Badge>
         </motion.div>
       </div>
 
-      <Accordion type="multiple" defaultValue={['reading', 'data', 'ui']} className="space-y-3">
+      <Accordion type="multiple" defaultValue={['reading', 'data', 'ui', 'api']} className="space-y-3">
         {/* ── Reading ── */}
         <AccordionItem value="reading" asChild>
           <Card>

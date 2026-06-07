@@ -490,9 +490,27 @@ async def api_set_game_settings(
     narrative_pov: str | None = Form(default=None),
     style_preference: str | None = Form(default=None),
     repetition_check: str | None = Form(default=None),
+    adult_mode: str | None = Form(default=None),
+    expression_style: str | None = Form(default=None),
+    content_weights: str | None = Form(default=None),
 ):
     """Update generation quick settings from the Game page."""
     from ui.routes.settings import apply_game_gen_settings
+    import json as _json
+
+    # Parse adult_mode from form string
+    _adult_mode = None
+    if adult_mode is not None:
+        _adult_mode = adult_mode.lower() in ("true", "1", "on")
+
+    # Parse content_weights from JSON string
+    _content_weights = None
+    if content_weights is not None:
+        try:
+            _content_weights = _json.loads(content_weights)
+        except Exception:
+            pass
+
     payload = apply_game_gen_settings(
         story_length=story_length,
         temperature=temperature,
@@ -502,6 +520,9 @@ async def api_set_game_settings(
         narrative_pov=narrative_pov,
         style_preference=style_preference,
         repetition_check=repetition_check,
+        adult_mode=_adult_mode,
+        expression_style=expression_style,
+        content_weights=_content_weights,
     )
     return JSONResponse({"ok": True, **payload})
 
