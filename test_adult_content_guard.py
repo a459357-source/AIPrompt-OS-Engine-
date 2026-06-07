@@ -11,6 +11,7 @@ def test_adult_system_override_extreme():
     assert config.use_adult_extreme_template()
     override = config.adult_system_override_text()
     assert "禁止男男" in override
+    assert "男性角色↔女性角色" in override
     assert "女↔女" in override or "女性角色↔女性角色" in override
     text = config.adult_extreme_content_rules_text()
     assert "每轮性内容铁律" in text
