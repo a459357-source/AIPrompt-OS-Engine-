@@ -427,6 +427,10 @@ def _update_graph(response: dict, state: dict, choice: str | None) -> None:
 def _update_memory(response: dict, state: dict, choice: str | None = None) -> None:
     """Update character memory based on the new story content.
 
+    Delegates to focused helpers in memory_updater.py — each helper
+    saves memory incrementally so a mid-function exception only loses
+    the failed step's changes, not everything from the current turn.
+
     Args:
         response: Current turn's AI response.
         state:    Current session state.
@@ -434,204 +438,33 @@ def _update_memory(response: dict, state: dict, choice: str | None = None) -> No
                   used to apply trust deltas from the chosen option only.
     """
     try:
+        from engine.memory_updater import (
+            init_world_state, auto_register_npcs,
+            apply_trust_deltas, update_factions,
+        )
         memory = load_memory()
         story = response.get("story", "")
         turn = state.get("turn", 0)
 
-        # ── Initialize factions from world pack (first time) ──────
-        init_factions(memory)
-        init_faction_attitudes(memory)
-        init_events(memory)
-        # Seed default events from faction goals (first time only)
-        if not memory.get("world_events"):
-            seed_default_events(memory, world_pack)
-
-        # ── Check event triggers ───────────────────────────────
-        triggered = check_event_triggers(memory, turn)
-        for evt in triggered:
-            logger.info("Event triggered: %s (turn %d)", evt.get("title"), turn)
-
-        # Load world_pack for tier assignment
+        # Load world_pack (used by multiple helpers)
         world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
 
-        # ── Auto-register new NPCs from session state ────────────
-        state_chars = state.get("characters", {})
-        mem_chars = memory.setdefault("characters", {})
-        for key, sc in state_chars.items():
-            name = sc.get("name", key)
-            if name not in mem_chars:
-                # New NPC discovered — auto-register with relationship-based trust
-                init_trust = get_initial_trust(name, world_pack)
-                # Find faction from world_pack
-                char_faction = ""
-                for wc in world_pack.get("world", {}).get("characters", []):
-                    if wc.get("name") == name:
-                        char_faction = wc.get("faction", "")
-                        break
-                mem_chars[name] = {
-                    "trust": init_trust,
-                    "flags": [],
-                    "relationship": sc.get("relation", ""),
-                    "role": sc.get("role", ""),
-                    "faction": char_faction,
-                }
-                # Record first appearance in metric_history
-                mem_chars[name].setdefault("metric_history", {}).setdefault(
-                    "trust", []
-                ).append([turn, init_trust])
-                logger.info("Memory: auto-registered '%s' (turn %d, trust=%.2f)", name, turn, init_trust)
+        # 1. One-time world state initialization (factions, events)
+        init_world_state(memory, world_pack, turn)
+        # Reload after save
+        memory = load_memory()
 
-        # ── Character tier management ─────────────────────────
-        # Assign tiers to newly registered NPCs (and migration for existing unclassified chars)
-        for name in list(mem_chars.keys()):
-            if not mem_chars[name].get("tier"):
-                # Check world_pack for is_main flag
-                is_main = False
-                world_chars = world_pack.get("world", {}).get("characters", [])
-                for wc in world_chars:
-                    if wc.get("name") == name and wc.get("is_main"):
-                        is_main = True
-                        break
-                assign_character_tier(memory, name, world_pack, is_main=is_main)
+        # 2. Auto-register NPCs + tier assignment + migration
+        auto_register_npcs(memory, state, world_pack, turn, story)
+        memory = load_memory()
 
-        # ── One-time trust migration for old data ─────────────
-        # Characters registered before the initial-trust system had
-        # default trust=0.5 or trust=0.0 (from old keyword heuristic).
-        # Migrate them to relationship-based initial trust once.
-        if not memory.get("_trust_migrated"):
-            for name in list(mem_chars.keys()):
-                old_trust = mem_chars[name].get("trust", 0.5)
-                # Only migrate if trust is at old defaults (0.5 or 0.0)
-                if old_trust in (0.5, 0.0):
-                    new_trust = get_initial_trust(name, world_pack)
-                    if abs(new_trust - old_trust) > 0.01:
-                        mem_chars[name]["trust"] = new_trust
-                        logger.info("Memory: migrated '%s' trust %.2f → %.2f",
-                                    name, old_trust, new_trust)
-            memory["_trust_migrated"] = True
+        # 3. Apply trust deltas (option-based + keyword heuristic)
+        apply_trust_deltas(memory, story, choice, turn, _prev_options)
+        memory = load_memory()
 
-        # ── Detect new characters from story text (fallback) ──
-        # If the AI introduced a character in the narrative but forgot to
-        # register it in state.characters, catch it from the story text.
-        known = set(mem_chars.keys())
-        story_newcomers = detect_new_characters_from_story(story, known)
-        for name in story_newcomers:
-            init_trust = get_initial_trust(name, world_pack)
-            # Story-detected chars get slightly lower trust than state-registered
-            init_trust = round(init_trust * 0.8, 2)
-            mem_chars[name] = {
-                "trust": init_trust,
-                "flags": [],
-                "relationship": "",
-                "role": "story-detected",
-                "faction": "",
-            }
-            mem_chars[name].setdefault("metric_history", {}).setdefault(
-                "trust", []
-            ).append([turn, init_trust])
-            assign_character_tier(memory, name, world_pack)
-            logger.info("Memory: story-detected '%s' (turn %d, trust=%.2f)", name, turn, init_trust)
+        # 4. Update faction dynamics (reputation + attitudes + drift)
+        update_factions(memory, story, turn)
 
-        # Track last_appearance_turn for characters appearing in this turn's story
-        for name in list(mem_chars.keys()):
-            if name in story:
-                mem_chars[name]["last_appearance_turn"] = turn
-
-        # Degrade inactive characters
-        degrade_messages = degrade_inactive_characters(memory, turn)
-        for msg in degrade_messages:
-            logger.info(msg)
-
-        # ── Option trust deltas from PREVIOUS turn's chosen option ──
-        # Only apply deltas from the option the player actually picked last turn.
-        # Choices are letters A(0)/B(1)/C(2)/D(3) mapping to _prev_options indices.
-        if choice and _prev_options:
-            choice_map = {"A": 0, "B": 1, "C": 2, "D": 3}
-            idx = choice_map.get(choice.upper(), -1)
-            if 0 <= idx < len(_prev_options):
-                chosen_opt = _prev_options[idx]
-                option_deltas = parse_option_trust_deltas([chosen_opt])
-                for char_name, delta in option_deltas:
-                    # Match against known characters (fuzzy)
-                    matched = False
-                    for mem_name in list(mem_chars.keys()):
-                        if char_name in mem_name or mem_name in char_name:
-                            update_trust(memory, mem_name, delta, turn)
-                            matched = True
-                            logger.info(
-                                "Memory: choice %s trust delta %s %+.2f (matched '%s')",
-                                choice, mem_name, delta, char_name,
-                            )
-                    if not matched:
-                        update_trust(memory, char_name, delta, turn)
-                        logger.info(
-                            "Memory: choice %s trust delta %s %+.2f (new char)",
-                            choice, char_name, delta,
-                        )
-            else:
-                logger.debug("Memory: choice '%s' out of range for _prev_options (len=%d)",
-                             choice, len(_prev_options))
-
-        # Heuristic trust deltas from story keywords (fallback)
-        deltas = guess_trust_delta_from_story(story)
-        for char_name, delta, flag in deltas:
-            # Apply to all known characters
-            for name in list(mem_chars.keys()):
-                if name in story:
-                    update_trust(memory, name, delta, turn)
-            if flag:
-                for name in list(mem_chars.keys()):
-                    if name in story:
-                        set_flag(memory, name, flag)
-                        break
-                else:
-                    set_flag(memory, None, flag)  # world flag
-
-        # ── Faction reputation from story ───────────────────────
-        mem_factions = memory.get("factions", {})
-        for fname in list(mem_factions.keys()):
-            if fname in story:
-                # Simple heuristic: faction mentioned → minor rep change
-                # Positive tone keywords
-                pos = any(kw in story for kw in ["合作", "支援", "友好", "结盟", "信任"])
-                neg = any(kw in story for kw in ["敌对", "攻击", "背叛", "威胁", "警告"])
-                if pos and not neg:
-                    update_faction_reputation(memory, fname, 0.05, turn)
-                elif neg and not pos:
-                    update_faction_reputation(memory, fname, -0.05, turn)
-
-        # ── Inter-faction attitude from story ───────────────────
-        # When two factions are mentioned in the same sentence,
-        # adjust their mutual attitudes based on sentiment.
-        mem_factions = memory.get("factions", {})
-        fnames = list(mem_factions.keys())
-        if len(fnames) >= 2:
-            import re
-            sentences = re.split(r'[。！？\n]', story)
-            for sent in sentences:
-                mentioned = [f for f in fnames if f in sent]
-                for i, fa in enumerate(mentioned):
-                    for fb in mentioned[i + 1:]:
-                        # Sentiment in this sentence
-                        pos = any(kw in sent for kw in [
-                            "合作", "结盟", "支援", "友好", "信任", "联手",
-                            "和解", "协议", "共同", "协助",
-                        ])
-                        neg = any(kw in sent for kw in [
-                            "敌对", "攻击", "背叛", "威胁", "警告", "打压",
-                            "冲突", "对抗", "撕毁", "决裂", "宣战",
-                        ])
-                        if pos and not neg:
-                            update_faction_attitude(memory, fa, fb, 0.03, turn)
-                            update_faction_attitude(memory, fb, fa, 0.02, turn)
-                        elif neg and not pos:
-                            update_faction_attitude(memory, fa, fb, -0.05, turn)
-                            update_faction_attitude(memory, fb, fa, -0.04, turn)
-
-        # ── Passive faction drift ──────────────────────────────
-        passive_faction_drift(memory, turn)
-
-        save_memory(memory)
     except Exception as exc:
         logger.warning("Failed to update memory: %s", exc)
 

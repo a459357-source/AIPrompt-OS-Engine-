@@ -147,7 +147,7 @@ def build_prompt() -> tuple[str, str]:
     event_context = get_event_context(memory)
 
     # ── World state (faction autonomous actions) ──────────────
-    world_state_context = get_world_state_context(memory)
+    world_state_context = get_world_state_context(memory, session_state.get("turn", 0))
 
     # ── Last choice context ────────────────────────────────────
     last_choice = session_state.get("last_choice", "")

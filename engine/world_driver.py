@@ -94,12 +94,12 @@ def passive_faction_drift(memory: dict, turn: int) -> None:
                 update_faction_attitude(memory, a, b, round(delta, 3), turn)
 
 
-def get_world_state_context(memory: dict) -> str:
+def get_world_state_context(memory: dict, turn: int = 0) -> str:
     """
     Build a summary of the world's autonomous activity for the prompt.
     Tells the AI what factions are doing this turn.
     """
-    hooks = generate_plot_hooks(memory, 0)  # turn doesn't matter for context
+    hooks = generate_plot_hooks(memory, turn)
     if not hooks:
         return ""
 

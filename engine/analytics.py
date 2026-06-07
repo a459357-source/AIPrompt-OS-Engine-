@@ -64,6 +64,8 @@ def metrics_curves() -> dict[str, dict]:
     all_metrics: dict[str, dict] = {}  # metric_name → {char_name → [[turn, val], ...]}
 
     for name, data in chars.items():
+        if not isinstance(data, dict):
+            continue
         # 1. Check new-style metric_history
         mh = data.get("metric_history", {})
         for metric, history in mh.items():

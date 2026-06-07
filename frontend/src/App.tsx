@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import NewStory from './pages/NewStory'
 import Game from './pages/Game'
 import NPCs from './pages/NPCs'
@@ -80,8 +81,8 @@ function MobileDrawer() {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger className="md:hidden">
-        <Button variant="ghost" size="icon" className="text-game-text pointer-events-none">
+      <SheetTrigger className="md:hidden" asChild>
+        <Button variant="ghost" size="icon" className="text-game-text">
           <span className="text-xl">☰</span>
         </Button>
       </SheetTrigger>
@@ -146,14 +147,16 @@ function App() {
           transition={{ duration: 0.2 }}
           className="p-4 md:p-6"
         >
-          <Routes>
-            <Route path="/new" element={<NewStory />} />
-            <Route path="/game" element={<Game />} />
-            <Route path="/npcs" element={<NPCs />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/" element={<NewStory />} />
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/new" element={<NewStory />} />
+              <Route path="/game" element={<Game />} />
+              <Route path="/npcs" element={<NPCs />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/" element={<NewStory />} />
+            </Routes>
+          </ErrorBoundary>
         </motion.main>
       </AnimatePresence>
     </div>

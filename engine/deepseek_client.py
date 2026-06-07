@@ -164,14 +164,14 @@ def _log_usage(body: dict, result: dict) -> None:
 
 
 def _validate_response(data: dict) -> None:
-    """Ensure the response contains the required top-level keys."""
-    required = ["story", "state", "options"]
-    missing = [k for k in required if k not in data]
-    if missing:
+    """
+    Validate the AI response structure.  Delegates to state_manager's
+    validate_response (which performs the same checks plus additional
+    state-machine validation) and raises DeepSeekError on any failure.
+    """
+    from engine.state_manager import validate_response
+    warnings = validate_response(data)
+    if warnings:
         raise DeepSeekError(
-            f"Response missing required keys: {missing}. Got keys: {list(data.keys())}"
-        )
-    if not isinstance(data["options"], list) or len(data["options"]) != 4:
-        logger.warning(
-            "options should be a list of exactly 4 strings; got: %s", data.get("options")
+            f"AI response validation failed: {'; '.join(warnings)}"
         )

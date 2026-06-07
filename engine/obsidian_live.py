@@ -252,6 +252,8 @@ def _update_characters(vault: Path) -> None:
 
 def _update_graph_view(vault: Path) -> None:
     """Write a Mermaid flowchart of the story graph."""
+    from engine.dashboard import _sanitize_mermaid
+
     graph = load_graph()
     nodes = graph.get("nodes", {})
     edges = graph.get("edges", [])
@@ -270,14 +272,14 @@ def _update_graph_view(vault: Path) -> None:
 
     for nid, node in nodes.items():
         turn = node.get("turn", "?")
-        text = node.get("text", "")[:40].replace('"', "'")
+        text = _sanitize_mermaid(node.get("text", "")[:40])
         label = f"T{turn}: {text}"
         lines.append(f'  n{nid}["{label}"]')
 
     for edge in edges:
         frm = edge["from"]
         to = edge["to"]
-        choice = edge.get("choice", "").replace('"', "'")
+        choice = _sanitize_mermaid(edge.get("choice", ""))
         lines.append(f"  n{frm} -- {choice} --> n{to}")
 
     lines.append("```")
@@ -367,13 +369,21 @@ def _write_index(vault: Path) -> None:
 
 
 def _strip_frontmatter(text: str) -> str:
-    """Remove YAML frontmatter from markdown text."""
+    """Remove YAML frontmatter from markdown text.
+
+    Only toggles frontmatter mode on the FIRST two `---` delimiters.
+    Subsequent `---` lines in the body (e.g. horizontal rules) are
+    left in place, fixing the bug where story-body `---` would
+    re-enter frontmatter mode and discard content.
+    """
     lines = text.split("\n")
     result: list[str] = []
+    fm_count = 0
     in_fm = False
     for line in lines:
-        if line.strip() == "---":
+        if line.strip() == "---" and fm_count < 2:
             in_fm = not in_fm
+            fm_count += 1
             continue
         if not in_fm:
             result.append(line)

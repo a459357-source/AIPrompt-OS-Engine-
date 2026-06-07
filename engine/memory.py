@@ -413,12 +413,20 @@ def get_faction_stats_for_ui(memory: dict) -> list[dict]:
 
 def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | None]]:
     """
-    Heuristic: scan the story text for character names and sentiment
+    Heuristic: scan the story text for character names near sentiment
     keywords to guess trust changes and flags.
+
+    For each keyword match, looks for known character names within a
+    30-char window around the keyword.  If a specific character is
+    found, the delta applies only to that character.  If no character
+    is found nearby, the delta is halved and applied to all characters
+    in the story (generic scene sentiment).
 
     Returns a list of (character, delta, optional_flag).
     This is a simple keyword-based heuristic — not AI-powered.
     """
+    import re
+
     results: list[tuple[str, float, str | None]] = []
 
     # Use the expanded keyword dictionaries defined above
@@ -433,21 +441,60 @@ def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | Non
         "牺牲": "重大牺牲事件",
     }
 
-    # Characters we track (from memory)
-    # We'll just scan for any keyword matches and return them;
-    # the caller decides which character they apply to.
+    def _find_nearby_char(kw: str) -> str | None:
+        """Find a known character name within ~30 chars of the keyword."""
+        idx = story.find(kw)
+        if idx < 0:
+            return None
+        window_start = max(0, idx - 30)
+        window_end = min(len(story), idx + len(kw) + 30)
+        window = story[window_start:window_end]
+        # Look for 2-4 char Chinese names (simple heuristic)
+        for m in re.finditer(r'[\u4e00-\u9fff]{2,4}', window):
+            name = m.group()
+            # Skip very common particles and non-name sequences
+            _COMMON_WORDS = frozenset({
+                '的是', '我也', '这不', '一个', '他们', '我们', '自己', '可以',
+                '什么', '没有', '已经', '因为', '所以', '但是', '如果', '虽然',
+                '这个', '那个', '这里', '那里', '怎么', '这样', '那样',
+                '不过', '而且', '或者', '还是', '只是', '就是', '不是',
+                '不能', '不会', '不要', '应该', '可能', '一定', '必须',
+                '之间', '之中', '之后', '之前', '之上', '之下',
+                '的时候', '有时候', '周围', '所有', '一些', '很多',
+                '主角', '两人', '他们', '这时', '突然', '然后', '接着',
+                '其中', '某种', '任何', '什么', '怎么', '怎样',
+                '觉得', '知道', '看到', '听到', '感到', '想到',
+            })
+            if name in _COMMON_WORDS:
+                continue
+            # Also skip if the name contains only extremely common chars
+            if all(c in '的一是不了在有人我他这来们说个到和地着就你也那要看没' for c in name):
+                continue
+            return name
+        return None
 
     for kw, delta in positive_keywords.items():
         if kw in story:
-            results.append(("__any__", delta, None))
+            char = _find_nearby_char(kw)
+            if char:
+                results.append((char, delta, None))
+            else:
+                # No specific character found — apply halved delta to all
+                results.append(("__all_present__", round(delta * 0.5, 2), None))
 
     for kw, delta in negative_keywords.items():
         if kw in story:
-            results.append(("__any__", delta, None))
+            char = _find_nearby_char(kw)
+            if char:
+                results.append((char, delta, None))
+            else:
+                results.append(("__all_present__", round(delta * 0.5, 2), None))
 
     for kw, flag in flag_keywords.items():
         if kw in story:
-            results.append(("__any__", 0.02, flag))
+            char = _find_nearby_char(kw)
+            target = char if char else "__all_present__"
+            results.append((target, 0.02, flag))
 
     return results
 

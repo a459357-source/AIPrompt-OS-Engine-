@@ -5,6 +5,7 @@ Central config: paths, API settings, engine constants.
 Set DEEPSEEK_API_KEY in your environment before running.
 """
 
+import json
 import os
 from pathlib import Path
 
@@ -38,17 +39,47 @@ AUTOSAVE_SLOT = "autosave"
 APIKEY_PATH = DATA_DIR / "apikey.json"
 
 
+# ── Shared settings persistence ────────────────────────────────────
+# All user-configurable settings (API key, model, token limits, etc.)
+# are stored in a single JSON file (APIKEY_PATH).  Reading and writing
+# the full dict avoids the previous pattern of 15 near-identical
+# save_X() functions each calling __import__("json") separately.
+
+
+def _read_settings() -> dict:
+    """Load the full settings dict from apikey.json.  Returns {} on any error."""
+    if not APIKEY_PATH.exists():
+        return {}
+    try:
+        return json.loads(APIKEY_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _write_settings(data: dict) -> None:
+    """Persist the full settings dict to apikey.json atomically."""
+    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    APIKEY_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _update_settings(**kwargs) -> dict:
+    """Merge kwargs into the settings file and return the new full dict."""
+    data = _read_settings()
+    data.update(kwargs)
+    _write_settings(data)
+    return data
+
+
 def _load_api_key() -> str:
     """Load API key: file first, then env var, then empty."""
     # 1. Try the stored key file
-    if APIKEY_PATH.exists():
-        try:
-            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-            key = data.get("api_key", "").strip()
-            if key:
-                return key
-        except Exception:
-            pass
+    data = _read_settings()
+    key = data.get("api_key", "").strip()
+    if key:
+        return key
     # 2. Fall back to environment variable
     env_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
     if env_key:
@@ -58,11 +89,7 @@ def _load_api_key() -> str:
 
 def save_api_key(key: str) -> None:
     """Persist API key to disk."""
-    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    APIKEY_PATH.write_text(
-        __import__("json").dumps({"api_key": key.strip()}, indent=2),
-        encoding="utf-8",
-    )
+    _update_settings(api_key=key.strip())
 
 
 def clear_api_key() -> None:
@@ -72,13 +99,10 @@ def clear_api_key() -> None:
 
 
 def reload_api_key() -> str:
-    """Re-read the API key and update the module-level constant.
-    Call this after save_api_key() or clear_api_key() at runtime.
-    Returns the new key (empty string if not set).
-    """
-    import config
-    config.DEEPSEEK_API_KEY = _load_api_key()
-    return config.DEEPSEEK_API_KEY
+    """Re-read the API key and update the module-level constant."""
+    global DEEPSEEK_API_KEY
+    DEEPSEEK_API_KEY = _load_api_key()
+    return DEEPSEEK_API_KEY
 
 
 # ── Available models ────────────────────────────────────────────────
@@ -89,40 +113,25 @@ AVAILABLE_MODELS = {
 
 
 def _load_model() -> str:
-    """Load model preference from apikey.json, default deepseek-chat."""
+    """Load model preference from settings, default deepseek-chat."""
     default = "deepseek-chat"
-    if APIKEY_PATH.exists():
-        try:
-            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-            model = data.get("model", default)
-            if model in AVAILABLE_MODELS:
-                return model
-        except Exception:
-            pass
+    data = _read_settings()
+    model = data.get("model", default)
+    if model in AVAILABLE_MODELS:
+        return model
     return default
 
 
 def save_model(model: str) -> None:
-    """Persist model preference (merges with existing key data)."""
-    data = {}
-    if APIKEY_PATH.exists():
-        try:
-            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    data["model"] = model
-    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    APIKEY_PATH.write_text(
-        __import__("json").dumps(data, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    """Persist model preference."""
+    _update_settings(model=model)
 
 
 def reload_model() -> str:
     """Re-read model preference and update the module-level constant."""
-    import config
-    config.DEEPSEEK_MODEL = _load_model()
-    return config.DEEPSEEK_MODEL
+    global DEEPSEEK_MODEL
+    DEEPSEEK_MODEL = _load_model()
+    return DEEPSEEK_MODEL
 
 
 # ── Story length ────────────────────────────────────────────────────
@@ -130,38 +139,21 @@ DEFAULT_STORY_LENGTH = 1000
 
 
 def _load_story_length() -> int:
-    """Load story length preference from apikey.json, default 1500."""
-    if APIKEY_PATH.exists():
-        try:
-            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-            val = data.get("story_length", DEFAULT_STORY_LENGTH)
-            return max(300, min(3000, int(val)))
-        except Exception:
-            pass
-    return DEFAULT_STORY_LENGTH
+    """Load story length preference from settings."""
+    val = _read_settings().get("story_length", DEFAULT_STORY_LENGTH)
+    return max(300, min(3000, int(val)))
 
 
 def save_story_length(length: int) -> None:
     """Persist story length preference."""
-    data = {}
-    if APIKEY_PATH.exists():
-        try:
-            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    data["story_length"] = length
-    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    APIKEY_PATH.write_text(
-        __import__("json").dumps(data, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    _update_settings(story_length=length)
 
 
 def reload_story_length() -> int:
     """Re-read and update story length."""
-    import config
-    config.STORY_LENGTH = _load_story_length()
-    return config.STORY_LENGTH
+    global STORY_LENGTH
+    STORY_LENGTH = _load_story_length()
+    return STORY_LENGTH
 
 
 # ── Max tokens (AI response length) ─────────────────────────────────
@@ -169,38 +161,21 @@ DEFAULT_MAX_TOKENS = 4096
 
 
 def _load_max_tokens() -> int:
-    """Load max_tokens preference from apikey.json."""
-    if APIKEY_PATH.exists():
-        try:
-            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-            val = data.get("max_tokens", DEFAULT_MAX_TOKENS)
-            return max(512, min(16384, int(val)))
-        except Exception:
-            pass
-    return DEFAULT_MAX_TOKENS
+    """Load max_tokens preference from settings."""
+    val = _read_settings().get("max_tokens", DEFAULT_MAX_TOKENS)
+    return max(512, min(16384, int(val)))
 
 
 def save_max_tokens(tokens: int) -> None:
     """Persist max_tokens preference."""
-    data = {}
-    if APIKEY_PATH.exists():
-        try:
-            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    data["max_tokens"] = tokens
-    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    APIKEY_PATH.write_text(
-        __import__("json").dumps(data, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    _update_settings(max_tokens=tokens)
 
 
 def reload_max_tokens() -> int:
     """Re-read and update max_tokens."""
-    import config
-    config.MAX_TOKENS = _load_max_tokens()
-    return config.MAX_TOKENS
+    global MAX_TOKENS
+    MAX_TOKENS = _load_max_tokens()
+    return MAX_TOKENS
 
 
 # ── Temperature ─────────────────────────────────────────────────────
@@ -208,30 +183,18 @@ DEFAULT_TEMPERATURE = 0.8
 
 
 def _load_temperature() -> float:
-    if APIKEY_PATH.exists():
-        try:
-            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-            val = data.get("temperature", DEFAULT_TEMPERATURE)
-            return max(0.1, min(2.0, float(val)))
-        except Exception:
-            pass
-    return DEFAULT_TEMPERATURE
+    val = _read_settings().get("temperature", DEFAULT_TEMPERATURE)
+    return max(0.1, min(2.0, float(val)))
 
 
 def save_temperature(temp: float) -> None:
-    data = {}
-    if APIKEY_PATH.exists():
-        try: data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-        except Exception: pass
-    data["temperature"] = temp
-    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    APIKEY_PATH.write_text(__import__("json").dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    _update_settings(temperature=temp)
 
 
 def reload_temperature() -> float:
-    import config
-    config.TEMPERATURE = _load_temperature()
-    return config.TEMPERATURE
+    global TEMPERATURE
+    TEMPERATURE = _load_temperature()
+    return TEMPERATURE
 
 
 # ── Top-P ───────────────────────────────────────────────────────────
@@ -239,30 +202,18 @@ DEFAULT_TOP_P = 0.9
 
 
 def _load_top_p() -> float:
-    if APIKEY_PATH.exists():
-        try:
-            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-            val = data.get("top_p", DEFAULT_TOP_P)
-            return max(0.0, min(1.0, float(val)))
-        except Exception:
-            pass
-    return DEFAULT_TOP_P
+    val = _read_settings().get("top_p", DEFAULT_TOP_P)
+    return max(0.0, min(1.0, float(val)))
 
 
 def save_top_p(val: float) -> None:
-    data = {}
-    if APIKEY_PATH.exists():
-        try: data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-        except Exception: pass
-    data["top_p"] = val
-    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    APIKEY_PATH.write_text(__import__("json").dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    _update_settings(top_p=val)
 
 
 def reload_top_p() -> float:
-    import config
-    config.TOP_P = _load_top_p()
-    return config.TOP_P
+    global TOP_P
+    TOP_P = _load_top_p()
+    return TOP_P
 
 
 # ── Streaming ───────────────────────────────────────────────────────
@@ -270,29 +221,17 @@ DEFAULT_STREAM = False
 
 
 def _load_stream() -> bool:
-    if APIKEY_PATH.exists():
-        try:
-            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-            return bool(data.get("stream", DEFAULT_STREAM))
-        except Exception:
-            pass
-    return DEFAULT_STREAM
+    return bool(_read_settings().get("stream", DEFAULT_STREAM))
 
 
 def save_stream(val: bool) -> None:
-    data = {}
-    if APIKEY_PATH.exists():
-        try: data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-        except Exception: pass
-    data["stream"] = val
-    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    APIKEY_PATH.write_text(__import__("json").dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    _update_settings(stream=val)
 
 
 def reload_stream() -> bool:
-    import config
-    config.STREAM = _load_stream()
-    return config.STREAM
+    global STREAM
+    STREAM = _load_stream()
+    return STREAM
 
 
 # ── Context management ──────────────────────────────────────────────
@@ -307,37 +246,25 @@ def _load_context_settings() -> dict:
         "auto_compress": DEFAULT_AUTO_COMPRESS,
         "compress_threshold": DEFAULT_COMPRESS_THRESHOLD,
     }
-    if APIKEY_PATH.exists():
-        try:
-            data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-            return {
-                "max_context_messages": max(4, min(100, int(data.get("max_context_messages", defaults["max_context_messages"])))),
-                "auto_compress": bool(data.get("auto_compress", defaults["auto_compress"])),
-                "compress_threshold": max(500, min(32000, int(data.get("compress_threshold", defaults["compress_threshold"])))),
-            }
-        except Exception:
-            pass
-    return defaults
+    data = _read_settings()
+    return {
+        "max_context_messages": max(4, min(100, int(data.get("max_context_messages", defaults["max_context_messages"])))),
+        "auto_compress": bool(data.get("auto_compress", defaults["auto_compress"])),
+        "compress_threshold": max(500, min(32000, int(data.get("compress_threshold", defaults["compress_threshold"])))),
+    }
 
 
 def save_context_settings(max_msgs: int, auto_compress: bool, compress_threshold: int) -> None:
-    data = {}
-    if APIKEY_PATH.exists():
-        try: data = __import__("json").loads(APIKEY_PATH.read_text(encoding="utf-8"))
-        except Exception: pass
-    data["max_context_messages"] = max_msgs
-    data["auto_compress"] = auto_compress
-    data["compress_threshold"] = compress_threshold
-    APIKEY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    APIKEY_PATH.write_text(__import__("json").dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    _update_settings(max_context_messages=max_msgs, auto_compress=auto_compress,
+                     compress_threshold=compress_threshold)
 
 
 def reload_context_settings() -> dict:
-    import config
+    global MAX_CONTEXT_MESSAGES, AUTO_COMPRESS, COMPRESS_THRESHOLD
     s = _load_context_settings()
-    config.MAX_CONTEXT_MESSAGES = s["max_context_messages"]
-    config.AUTO_COMPRESS = s["auto_compress"]
-    config.COMPRESS_THRESHOLD = s["compress_threshold"]
+    MAX_CONTEXT_MESSAGES = s["max_context_messages"]
+    AUTO_COMPRESS = s["auto_compress"]
+    COMPRESS_THRESHOLD = s["compress_threshold"]
     return s
 
 
@@ -363,18 +290,17 @@ COMPRESS_THRESHOLD = ctx["compress_threshold"]
 OBSIDIAN_PATH_FILE = DATA_DIR / "obsidian_path.json"
 
 def _load_obsidian_path() -> str:
-    if OBSIDIAN_PATH_FILE.exists():
-        try:
-            data = __import__("json").loads(OBSIDIAN_PATH_FILE.read_text(encoding="utf-8"))
-            return data.get("vault_path", "")
-        except Exception:
-            pass
-    return ""
+    if not OBSIDIAN_PATH_FILE.exists():
+        return ""
+    try:
+        return json.loads(OBSIDIAN_PATH_FILE.read_text(encoding="utf-8")).get("vault_path", "")
+    except Exception:
+        return ""
 
 def save_obsidian_path(path: str) -> None:
     OBSIDIAN_PATH_FILE.parent.mkdir(parents=True, exist_ok=True)
     OBSIDIAN_PATH_FILE.write_text(
-        __import__("json").dumps({"vault_path": path.strip()}, indent=2),
+        json.dumps({"vault_path": path.strip()}, indent=2),
         encoding="utf-8",
     )
 

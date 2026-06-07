@@ -51,7 +51,7 @@ def schedule_event(
     If trigger_turn is 0, the event triggers immediately (next turn).
     """
     if event_id is None:
-        ts = datetime.now().strftime("%Y%m%d%H%M%S")
+        ts = datetime.now().strftime("%Y%m%d%H%M%S%f")
         event_id = f"evt_{ts}"
 
     events = memory.setdefault("world_events", [])
@@ -181,13 +181,24 @@ def seed_default_events(memory: dict, world_pack: dict | None = None) -> list[st
     """
     Auto-generate default events from world_pack faction goals.
     Each faction's first goal becomes a scheduled event at turn ~5-20.
+
+    Uses a deterministic seed derived from the world title so that
+    event trigger turns are reproducible across runs — saves created
+    under the same world pack will see the same event schedule.
+
     Returns list of created event IDs.
     """
     import random
+    import hashlib
 
     created: list[str] = []
     if not world_pack:
         return created
+
+    # Deterministic seed from world title — same world = same events
+    world_title = world_pack.get("world", {}).get("title", "Galgame")
+    seed = int(hashlib.md5(world_title.encode()).hexdigest()[:8], 16) % (2**31)
+    rng = random.Random(seed)
 
     factions = world_pack.get("world", {}).get("factions", [])
     for f in factions:
@@ -196,7 +207,7 @@ def seed_default_events(memory: dict, world_pack: dict | None = None) -> list[st
             continue
         # Schedule the first goal as an event
         name = f.get("name", "?")
-        trigger = random.randint(3, 15)
+        trigger = rng.randint(3, 15)
         eid = schedule_event(
             memory,
             title=f"{name}：{goals[0]}",

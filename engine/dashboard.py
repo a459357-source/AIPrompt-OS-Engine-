@@ -12,6 +12,7 @@ No Obsidian dependency — writes to output/ directory by default.
 
 import json as _json
 import logging
+import re
 from pathlib import Path
 
 import config
@@ -20,6 +21,40 @@ from engine.router import load_graph
 from engine.analytics import compute_all
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_mermaid(text: str) -> str:
+    """Escape user-controlled text for safe Mermaid.js embedding.
+
+    Mermaid.js has a history of XSS CVEs — unescaped text in node labels
+    can inject JavaScript via event handlers, closing syntax, or HTML tags.
+    This function neutralises the known attack vectors.
+    """
+    if not isinstance(text, str):
+        return str(text)
+    # 1. Backslashes first (they would escape our subsequent escaping)
+    text = text.replace("\\", "\\\\")
+    # 2. Double quotes → single quotes (Mermaid uses " for attribute boundaries)
+    text = text.replace('"', "'")
+    # 3. Collapse newlines — they can terminate Mermaid lines prematurely
+    text = text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+    # 4. HTML tag brackets — prevent injection of <script>, <img onerror=…>, etc.
+    text = text.replace("<", "‹").replace(">", "›")
+    # 5. Mermaid arrow syntax — prevent label text from being parsed as graph edges
+    text = re.sub(r"-{2,}>", "→", text)
+    text = re.sub(r"<-{2,}", "←", text)
+    # 6. Mermaid link syntax `-- text -->` already handled by arrow substitution above
+    # 7. Truncate to reasonable length
+    if len(text) > 200:
+        text = text[:197] + "…"
+    return text
+
+
+def _sanitize_html(text: str) -> str:
+    """Minimal HTML escape for inline text in dashboard HTML."""
+    if not isinstance(text, str):
+        return str(text)
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 # CDN URLs & local filenames for offline bundling
 _JS_LIBS = {
@@ -156,9 +191,17 @@ def _build_mermaid(nodes: dict, edges: list, chars: dict) -> str:
     mm = ["graph TD"]
 
     # Story nodes
+    # Pre-compute character → node mapping (avoid O(n×m) nested loop)
+    char_to_nodes: dict[str, list[str]] = {}
+    for nid, node in nodes.items():
+        node_text = node.get("text", "")
+        for name in chars:
+            if name in node_text:
+                char_to_nodes.setdefault(name, []).append(nid)
+
     for nid, node in nodes.items():
         turn = node.get("turn", "?")
-        text = node.get("text", "")[:30].replace('"', "'")
+        text = _sanitize_mermaid(node.get("text", "")[:30])
         mm.append(f'  n{nid}["T{turn}: {text}"]')
 
     # Character nodes + connections
@@ -167,17 +210,16 @@ def _build_mermaid(nodes: dict, edges: list, chars: dict) -> str:
         cid = f"c{i}"
         char_ids[name] = cid
         trust_pct = round(data.get("trust", 0.5) * 100)
-        label = f"{name} ({trust_pct}%)".replace('"', "'")
+        label = _sanitize_mermaid(f"{name} ({trust_pct}%)")
         mm.append(f'  {cid}("{label}")')
-        for nid, node in nodes.items():
-            if name in node.get("text", ""):
-                mm.append(f"  {cid} -.-> n{nid}")
+        for nid in char_to_nodes.get(name, []):
+            mm.append(f"  {cid} -.-> n{nid}")
 
     # Story edges
     for edge in edges:
         frm = edge["from"]
         to = edge["to"]
-        choice = edge.get("choice", "").replace('"', "'")
+        choice = _sanitize_mermaid(edge.get("choice", ""))
         mm.append(f"  n{frm} -- {choice} --> n{to}")
 
     # Styles
@@ -248,15 +290,17 @@ def _build_node_rows(nodes: dict, chars: dict) -> str:
     rows = []
     for nid in sorted(nodes.keys(), key=lambda x: int(x) if x.isdigit() else 0):
         node = nodes[nid]
-        text = node.get("text", "")[:60]
+        text = _sanitize_html(node.get("text", "")[:60])
         for name in chars:
-            text = text.replace(
-                name,
-                f'<mark style="background:#1f6feb33;color:#58a6ff;border-radius:2px">{name}</mark>'
-            )
+            safe_name = _sanitize_html(name)
+            if safe_name in text:
+                text = text.replace(
+                    safe_name,
+                    f'<mark style="background:#1f6feb33;color:#58a6ff;border-radius:2px">{safe_name}</mark>'
+                )
         rows.append(
             f"<tr><td>{nid}</td><td>{node.get('turn','?')}</td>"
-            f"<td>{node.get('scene','?')}</td><td>{node.get('status','?')}</td>"
+            f"<td>{_sanitize_html(str(node.get('scene','?')))}</td><td>{_sanitize_html(str(node.get('status','?')))}</td>"
             f"<td>{text}</td></tr>"
         )
     return "\n".join(rows)
@@ -322,7 +366,7 @@ def _build_faction_graph(memory: dict) -> str:
         fid = f"f{i}"
         fid_map[name] = fid
         rep = int(data.get("reputation", 0.5) * 100)
-        label = f"{name}\\n声望 {rep}%".replace('"', "'")
+        label = _sanitize_mermaid(f"{name}\\n声望 {rep}%")
         # Styling: solid for high rep, dashed for low
         style = "fill:#161b22,stroke:#58a6ff,color:#c9d1d9"
         if rep >= 70:
