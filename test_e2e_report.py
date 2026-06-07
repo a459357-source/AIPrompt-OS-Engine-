@@ -180,6 +180,9 @@ for c in chars_config:
     trust = int(mem.get("trust",0.5)*100)
     tier = mem.get("tier","?")
     flags = ", ".join(mem.get("flags",[]))
+    trust_html = ""
+    if not c['isMain']:
+        trust_html = f'<div class="trust-bar"><div class="trust-fill" style="width:{trust}%"></div></div><div class="dim">信任度: {trust}% | 事件: {flags or "无"}</div>'
     char_cards += f"""
     <div class="card">
       <div class="card-title">{'⭐' if c['isMain'] else '👤'} {c['name']} <span class="badge">{tier}</span></div>
@@ -187,8 +190,7 @@ for c in chars_config:
       <div class="dim">性格: {', '.join(c['personality_tags'])}</div>
       <div class="dim">目标: {c['goal']}</div>
       <div class="dim">🔒秘密: {c['secret']}</div>
-      <div class="trust-bar"><div class="trust-fill" style="width:{trust}%"></div></div>
-      <div class="dim">信任度: {trust}% | 事件: {flags or '无'}</div>
+      {trust_html}
     </div>"""
 
 # Build faction cards
