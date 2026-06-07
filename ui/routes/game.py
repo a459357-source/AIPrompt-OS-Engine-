@@ -78,8 +78,27 @@ async def reset():
     if config.WORLD_INIT_PATH.exists():
         try:
             from engine.state_store import commit_bundle
+            from engine.objective_system import ensure_objectives, sync_main_objective_progress
+            from engine.plot_director import init_plot_state, save_plot_state
+
             init = io_utils.read_json(config.WORLD_INIT_PATH)
-            commit_bundle(init["state"], init["memory"], init["graph"], chapter="")
+            state = init["state"]
+            memory = init["memory"]
+            graph = init["graph"]
+            commit_bundle(state, memory, graph, chapter="")
+
+            plot_state = init.get("plot_state")
+            if isinstance(plot_state, dict) and plot_state.get("main_plot"):
+                save_plot_state(plot_state, persist=True)
+            else:
+                world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+                plot_state = init_plot_state(world_pack)
+
+            world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+            ensure_objectives(state, world_pack, plot_state)
+            sync_main_objective_progress(state, plot_state)
+            io_utils.write_yaml(config.SESSION_STATE_PATH, state)
+
             return RedirectResponse(url=config.frontend_url("/game"), status_code=303)
         except Exception:
             pass

@@ -86,6 +86,7 @@ def save(slot: str) -> dict | None:
             "plot_state": plot_state,
             "chapter": chapter,
             "content_weights": config.CONTENT_WEIGHTS,
+            "experience_mode": config.get_experience_mode(),
             "adult_mode": config.ADULT_MODE,
             "expression_style": config.EXPRESSION_STYLE,
         }
@@ -153,7 +154,9 @@ def load(slot: str) -> dict | None:
             from engine.plot_director import ensure_plot_state
             world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
             ensure_plot_state(world_pack)
-        if "adult_mode" in snapshot:
+        if "experience_mode" in snapshot:
+            config.save_experience_mode(str(snapshot["experience_mode"]))
+        elif "adult_mode" in snapshot:
             config.save_adult_mode(bool(snapshot["adult_mode"]))
         if snapshot.get("content_weights"):
             config.save_content_weights(snapshot["content_weights"])

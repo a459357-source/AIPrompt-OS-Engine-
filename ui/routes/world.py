@@ -592,7 +592,7 @@ async def create_new_story(
     commit_bundle(initial_state, initial_memory, initial_graph, chapter="")
 
     from engine.plot_director import init_plot_state
-    init_plot_state(world_pack)
+    plot_state = init_plot_state(world_pack)
 
     from engine.candidate_npcs import reset_pool
     reset_pool(persist=True)
@@ -602,6 +602,7 @@ async def create_new_story(
         "state": initial_state,
         "graph": initial_graph,
         "memory": initial_memory,
+        "plot_state": plot_state,
     })
 
     # Redirect to main page

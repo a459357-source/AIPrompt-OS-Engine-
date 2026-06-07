@@ -666,6 +666,10 @@ DEFAULT_AUTO_SAVE_INTERVAL = 60
 DEFAULT_EXPORT_FORMAT = "markdown"
 DEFAULT_AUTO_EXPORT = "off"
 DEFAULT_ADULT_MODE = False
+EXPERIENCE_MODE_STORY = "story"
+EXPERIENCE_MODE_ADULT = "adult"
+EXPERIENCE_MODE_OPTIONS = [EXPERIENCE_MODE_STORY, EXPERIENCE_MODE_ADULT]
+DEFAULT_EXPERIENCE_MODE = EXPERIENCE_MODE_STORY
 DEFAULT_EXPRESSION_STYLE = "light_novel"
 DEFAULT_ADULT_PROFILE = "balanced"
 DEFAULT_ADULT_THEME = "deep_purple"
@@ -914,6 +918,7 @@ def clear_adult_unlock_key() -> None:
     data = _read_settings()
     data.pop("adult_unlock_key", None)
     data["adult_mode"] = False
+    data["experience_mode"] = EXPERIENCE_MODE_STORY
     _write_settings(data)
 
 
@@ -921,21 +926,66 @@ def reload_adult_unlock_key() -> str:
     return _load_adult_unlock_key()
 
 
+def normalize_experience_mode(mode: str | None) -> str:
+    """Return a valid experience_mode value (ADR-001: story | adult)."""
+    if mode in EXPERIENCE_MODE_OPTIONS:
+        return mode
+    return DEFAULT_EXPERIENCE_MODE
+
+
+def experience_mode_to_adult_mode(mode: str | None) -> bool:
+    return normalize_experience_mode(mode) == EXPERIENCE_MODE_ADULT
+
+
+def adult_mode_to_experience_mode(adult: bool) -> str:
+    return EXPERIENCE_MODE_ADULT if adult else EXPERIENCE_MODE_STORY
+
+
+def _load_experience_mode() -> str:
+    """Load experience_mode; fallback to legacy adult_mode when absent."""
+    data = _read_settings()
+    if "experience_mode" in data:
+        mode = normalize_experience_mode(data.get("experience_mode"))
+    else:
+        mode = adult_mode_to_experience_mode(bool(data.get("adult_mode", DEFAULT_ADULT_MODE)))
+    if mode == EXPERIENCE_MODE_ADULT and not is_adult_unlocked():
+        return EXPERIENCE_MODE_STORY
+    return mode
+
+
 def _load_adult_mode() -> bool:
-    if not is_adult_unlocked():
-        return False
-    return bool(_read_settings().get("adult_mode", DEFAULT_ADULT_MODE))
+    return experience_mode_to_adult_mode(_load_experience_mode())
+
+
+def save_experience_mode(mode: str) -> None:
+    """Persist ADR experience_mode and keep adult_mode in sync (dual-write)."""
+    mode = normalize_experience_mode(mode)
+    if mode == EXPERIENCE_MODE_ADULT and not is_adult_unlocked():
+        raise ValueError("请先输入有效的成人模式解锁密钥")
+    _update_settings(experience_mode=mode, adult_mode=experience_mode_to_adult_mode(mode))
 
 
 def save_adult_mode(enabled: bool) -> None:
     if enabled and not is_adult_unlocked():
         raise ValueError("请先输入有效的成人模式解锁密钥")
-    _update_settings(adult_mode=bool(enabled))
+    mode = adult_mode_to_experience_mode(bool(enabled))
+    _update_settings(adult_mode=bool(enabled), experience_mode=mode)
+
+
+def get_experience_mode() -> str:
+    """Current experience mode (story | adult)."""
+    return EXPERIENCE_MODE
+
+
+def reload_experience_mode() -> str:
+    global EXPERIENCE_MODE, ADULT_MODE
+    EXPERIENCE_MODE = _load_experience_mode()
+    ADULT_MODE = experience_mode_to_adult_mode(EXPERIENCE_MODE)
+    return EXPERIENCE_MODE
 
 
 def reload_adult_mode() -> bool:
-    global ADULT_MODE
-    ADULT_MODE = _load_adult_mode()
+    reload_experience_mode()
     return ADULT_MODE
 
 
@@ -1059,7 +1109,7 @@ def reload_app_behavior() -> None:
     reload_narrative_pov()
     reload_style_preference()
     reload_repetition_check()
-    reload_adult_mode()
+    reload_experience_mode()
     reload_adult_profile()
     reload_adult_theme()
     reload_visual_theme()
