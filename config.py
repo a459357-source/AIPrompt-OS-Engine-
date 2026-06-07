@@ -19,10 +19,24 @@ else:
     ROOT = Path(__file__).resolve().parent
     BUNDLE_ROOT = ROOT
 
+
+def bundled_asset(name: str) -> Path:
+    """Read-only shipped assets (engine.yaml, prompt_template.yaml).
+
+    PyInstaller --onedir places --add-data files under _MEIPASS/_internal,
+    not next to the exe. Runtime YAML (world_pack, session) stays under ROOT.
+    """
+    if getattr(sys, "frozen", False):
+        candidate = BUNDLE_ROOT / name
+        if candidate.exists():
+            return candidate
+    return ROOT / name
+
+
 WORLD_PACK_PATH      = ROOT / "world_pack.yaml"
 SESSION_STATE_PATH   = ROOT / "session_state.yaml"
-ENGINE_CONFIG_PATH   = ROOT / "engine.yaml"
-PROMPT_TEMPLATE_PATH = ROOT / "prompt_template.yaml"
+ENGINE_CONFIG_PATH   = bundled_asset("engine.yaml")
+PROMPT_TEMPLATE_PATH = bundled_asset("prompt_template.yaml")
 
 OUTPUT_DIR           = ROOT / "output"
 CHAPTER_PATH         = OUTPUT_DIR / "chapter.md"
