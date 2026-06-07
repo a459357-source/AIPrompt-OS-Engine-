@@ -17,6 +17,10 @@ PromptOS 发布包使用说明
   cd prompt-os-engine
   python build_release.py
 
+  打包脚本会默认：重置 data/ 与进度文件、清空 output/ 与日志、
+  删除测试脚本与报告，并在 zip 前剥离 dist/PromptOS/data/。
+  详见仓库 .cursor/rules/release-build.mdc
+
 【日志】
 - 运行日志: PromptOS\data\app.log
 - 错误日志: PromptOS\data\error.log

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Clean personal data, build frontend, package PromptOS exe."""
+"""Clean personal data, build frontend, package PromptOS exe.
+
+Default: always run scripts/reset_user_data.py first (see .cursor/rules/release-build.mdc).
+Never ship api keys, saves, logs, or test artifacts in release zip.
+"""
 from __future__ import annotations
 
 import shutil

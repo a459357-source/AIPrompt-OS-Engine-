@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Reset runtime data to factory defaults (no API keys, no save progress)."""
+"""Reset runtime data to factory defaults (no API keys, no save progress).
+
+Used by build_release.py before packaging. See .cursor/rules/release-build.mdc
+for the full list of paths that must never ship in release zip.
+"""
 from __future__ import annotations
 
 import shutil
@@ -14,6 +18,7 @@ import config
 
 DEFAULTS = ROOT / "packaging" / "defaults"
 
+# Reset from factory templates (no API keys, empty progress)
 COPY_MAP = {
     "apikey.json": config.APIKEY_PATH,
     "memory.json": config.MEMORY_PATH,
@@ -21,6 +26,16 @@ COPY_MAP = {
     "session_state.yaml": config.SESSION_STATE_PATH,
     "world_pack.yaml": config.WORLD_PACK_PATH,
 }
+
+# Remove entirely — usage logs, caches, personal paths
+REMOVE_PATHS = (
+    config.WORLD_INIT_PATH,
+    config.API_USAGE_PATH,
+    config.OBSIDIAN_PATH_FILE,
+)
+
+# Log files including rotation backups (app.log.1, etc.)
+LOG_GLOBS = ("app.log*", "error.log*")
 
 
 def reset_user_data() -> None:
@@ -36,24 +51,22 @@ def reset_user_data() -> None:
 
     for slot in config.SAVES_DIR.glob("*.json"):
         slot.unlink()
-        print(f"  removed {slot.name}")
+        print(f"  removed saves/{slot.name}")
 
-    for path in (config.WORLD_INIT_PATH, config.API_USAGE_PATH,
-                 config.LOG_PATH, config.ERROR_LOG_PATH,
-                 config.DATA_DIR / "obsidian_path.json"):
+    for path in REMOVE_PATHS:
         if path.exists():
             path.unlink()
             print(f"  removed {path.name}")
 
-    for path in (config.CHAPTER_PATH, config.TURN_LOG_PATH, config.DASHBOARD_HTML_PATH):
-        if path.exists():
+    for pattern in LOG_GLOBS:
+        for path in config.DATA_DIR.glob(pattern):
             path.unlink()
-            print(f"  removed output/{path.name}")
+            print(f"  removed {path.name}")
 
-    out_reports = config.OUTPUT_DIR / "browser_report"
-    if out_reports.is_dir():
-        shutil.rmtree(out_reports, ignore_errors=True)
-        print("  removed output/browser_report/")
+    if config.OUTPUT_DIR.is_dir():
+        shutil.rmtree(config.OUTPUT_DIR, ignore_errors=True)
+        print("  cleared output/")
+    config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 if __name__ == "__main__":
