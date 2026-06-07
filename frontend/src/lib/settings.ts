@@ -128,12 +128,7 @@ export function applySettings(s: AppSettings) {
   root.setProperty('--story-paragraph-spacing', PARAGRAPH_SPACING[s.paragraphSpacing] || '1.5em')
 
   // Background theme
-  const bgMap: Record<string, { bg: string; surface: string; card: string; text: string }> = {
-    dark: { bg: '#0d1117', surface: '#1a1f2b', card: '#1e2433', text: '#e2e5ea' },
-    sepia: { bg: '#2a2218', surface: '#332b1f', card: '#3d3326', text: '#d4c5a9' },
-    gray: { bg: '#1a1a1a', surface: '#222222', card: '#2a2a2a', text: '#cccccc' },
-  }
-  const theme = bgMap[s.bgTheme]
+  const theme = BG_MAP[s.bgTheme]
   if (theme) {
     root.setProperty('--color-game-bg', theme.bg)
     root.setProperty('--color-game-surface', theme.surface)
@@ -162,6 +157,27 @@ export const BG_THEME_LABELS: Record<string, string> = {
   dark: '深黑',
   sepia: '暖棕护眼',
   gray: '暗灰',
+}
+
+const BG_MAP: Record<string, { bg: string; surface: string; card: string; text: string }> = {
+  dark: { bg: '#0d1117', surface: '#1a1f2b', card: '#1e2433', text: '#e2e5ea' },
+  sepia: { bg: '#2a2218', surface: '#332b1f', card: '#3d3326', text: '#d4c5a9' },
+  gray: { bg: '#1a1a1a', surface: '#222222', card: '#2a2a2a', text: '#cccccc' },
+}
+
+/** 仅应用背景主题 CSS 变量（不碰字号/行高/字体等），供成人模式覆盖使用 */
+export function applyBgTheme(theme: string) {
+  const t = BG_MAP[theme]
+  if (!t) return
+  const root = document.documentElement.style
+  root.setProperty('--color-game-bg', t.bg)
+  root.setProperty('--color-game-surface', t.surface)
+  root.setProperty('--color-game-card', t.card)
+  root.setProperty('--color-game-text', t.text)
+}
+
+export function getBgThemeCSS(theme: string) {
+  return BG_MAP[theme] ?? BG_MAP.dark
 }
 
 export const PARAGRAPH_SPACING: Record<string, string> = {

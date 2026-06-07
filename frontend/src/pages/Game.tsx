@@ -16,6 +16,7 @@ import { getGameState, startGameOnce, nextTurn, getHistory, getGameGenSettings, 
 import { logger } from '@/lib/logger'
 import { parseOptionEffects, deltaArrow, type RelationHint } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
+import { applyBgTheme, BG_THEME_LABELS } from '@/lib/settings'
 import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS, MAX_WIDTH_OPTIONS } from '@/lib/settings'
 import { t } from '@/lib/i18n'
 
@@ -322,6 +323,10 @@ export default function Game() {
   const [expressionStyleLabels, setExpressionStyleLabels] = useState<Record<string, string>>({})
   const [contentWeights, setContentWeights] = useState<ContentWeights>({ story: 50, romance: 30, adult: 20 })
   const [presetWeights, setPresetWeights] = useState<Record<string, ContentWeights>>({})
+  const [adultBgTheme, setAdultBgTheme] = useState(() => {
+    const saved = localStorage.getItem('adultBgTheme')
+    return saved || getSettings().bgTheme
+  })
   const [genSettingsOpen, setGenSettingsOpen] = useState(
     () => getSettings().sidebarDefault === 'expanded',
   )
@@ -521,6 +526,15 @@ export default function Game() {
       .then(applyGenSettings)
       .catch((e) => logger.warn('Game', 'Load gen settings failed', { error: String(e) }))
   }, [applyGenSettings])
+
+  // 成人模式主题覆盖：开启时用 adultBgTheme 覆盖设置页的 bgTheme
+  useEffect(() => {
+    if (adultMode) {
+      applyBgTheme(adultBgTheme)
+    } else {
+      applyBgTheme(appSettings.bgTheme)
+    }
+  }, [adultMode, adultBgTheme, appSettings.bgTheme])
 
   const markGenSettingsSaved = useCallback(() => {
     setGenSettingsSaveError('')
@@ -1313,6 +1327,25 @@ export default function Game() {
 
                   {adultMode && (
                     <>
+                      <QuickGenRow label="主题切换" hint="覆盖设置页的背景色调">
+                        {(['dark', 'sepia', 'gray'] as const).map((t) => (
+                          <Button
+                            key={t}
+                            type="button"
+                            size="xs"
+                            variant={adultBgTheme === t ? 'primary' : 'ghost'}
+                            disabled={choosing}
+                            onClick={() => {
+                              setAdultBgTheme(t)
+                              localStorage.setItem('adultBgTheme', t)
+                              applyBgTheme(t)
+                            }}
+                          >
+                            {BG_THEME_LABELS[t] || t}
+                          </Button>
+                        ))}
+                      </QuickGenRow>
+
                       <QuickGenRow label="表达风格" hint="成人模式下覆盖文风偏好；可选预设或自行输入">
                         <div className="flex flex-wrap items-center gap-2">
                           {expressionStyleOptions.map((opt) => (
