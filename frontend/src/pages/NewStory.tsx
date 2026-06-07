@@ -623,13 +623,13 @@ export default function NewStory() {
     logger.info('NewStory', 'runWorldGen: starting')
     try {
       const kw = (kwOverride ?? keywords).trim() || '奇幻冒险'
-      const data = await generateWorld(kw)
+      const data = await generateWorld(kw, adultMode)
       const warnings = applyWorldGenResult(data)
 
       if (data.characters?.length && !data.stats?.length) {
         try {
           const allChars = getValues('characters') || []
-          const rules = await generateRules({
+          const rules = await generateRules({ adultMode,
             title: getValues('title'),
             world: getValues('world'),
             genre: getValues('genre').join('/'),
@@ -650,7 +650,10 @@ export default function NewStory() {
       if (warnings.length) {
         showStatus(`⚠️ ${warnings.join('；')}。可在设置中提高 Token 后重试`, 'error')
       } else {
-        showStatus('✅ 生成完成，可继续修改', 'success')
+        showStatus(
+          adultMode ? '✅ 成人向设定生成完成，可继续修改' : '✅ 生成完成，可继续修改',
+          'success',
+        )
       }
       setFieldErrors((prev) => ({ ...prev, world: warnings.some((w) => w.includes('截断')) ? warnings[0] : null }))
     } catch (e) {
@@ -660,7 +663,7 @@ export default function NewStory() {
       setFieldErrors((prev) => ({ ...prev, world: msg }))
     }
     setGenerating(null)
-  }, [keywords, applyWorldGenResult, getValues, setValue])
+  }, [keywords, applyWorldGenResult, getValues, setValue, adultMode])
 
   const handleWorldGen = useCallback(() => {
     if (!window.confirm(WORLD_GEN_CONFIRM_MSG)) return
@@ -684,7 +687,7 @@ export default function NewStory() {
     showStatus(`正在生成${fieldLabels[field] || field}…`, 'loading')
     setFieldErrors((prev) => ({ ...prev, [field]: null }))
     try {
-      const data = await generateField({
+      const data = await generateField({ adultMode,
         field,
         title: getValues('title'),
         world: getValues('world'),
@@ -711,7 +714,7 @@ export default function NewStory() {
     showStatus('正在生成角色…', 'loading')
     setFieldErrors((prev) => ({ ...prev, [`char-${idx}`]: null }))
     try {
-      const data = await generateField({
+      const data = await generateField({ adultMode,
         field: 'character',
         title: getValues('title'),
         world: getValues('world'),
@@ -767,7 +770,7 @@ export default function NewStory() {
         npc?.goal ? `NPC目标：${npc.goal}` : '',
         npc?.secret ? `NPC秘密：${npc.secret}` : '',
       ].filter(Boolean).join('\n')
-      const data = await generateField({
+      const data = await generateField({ adultMode,
         field: 'character_relation',
         title: getValues('title'),
         world: getValues('world'),
@@ -1077,7 +1080,7 @@ export default function NewStory() {
                       const newFacs: typeof current = []
                       for (let i = 0; i < 3; i++) {
                         try {
-                          const data = await generateField({
+                          const data = await generateField({ adultMode,
                             field: 'faction',
                             title: getValues('title'),
                             world: getValues('world'),
@@ -1147,7 +1150,7 @@ export default function NewStory() {
                                 onClick={async () => {
                                   setGenerating(`faction-${idx}`)
                                   try {
-                                    const data = await generateField({
+                                    const data = await generateField({ adultMode,
                                       field: 'faction',
                                       title: getValues('title'),
                                       world: getValues('world'),
@@ -1721,7 +1724,7 @@ export default function NewStory() {
                     showStatus('正在根据当前内容推理专属规则…', 'loading')
                     try {
                       const allChars = getValues('characters') || []
-                      const data = await generateRules({
+                      const data = await generateRules({ adultMode,
                         title: getValues('title'),
                         world: getValues('world') + '\n势力：' + JSON.stringify(factions || []) + '\n物品：' + JSON.stringify(artifacts || []),
                         genre: getValues('genre').join('/'),
@@ -1766,7 +1769,7 @@ export default function NewStory() {
                       const newArts: typeof current = []
                       for (let i = 0; i < 3; i++) {
                         try {
-                          const data = await generateField({
+                          const data = await generateField({ adultMode,
                             field: 'artifact',
                             title: getValues('title'),
                             world: getValues('world'),
@@ -1821,7 +1824,7 @@ export default function NewStory() {
                                 onClick={async () => {
                                   setGenerating(`artifact-${idx}`)
                                   try {
-                                    const data = await generateField({
+                                    const data = await generateField({ adultMode,
                                       field: 'artifact',
                                       title: getValues('title'),
                                       world: getValues('world'),

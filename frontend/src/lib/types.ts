@@ -34,6 +34,7 @@ export interface WorldGenResponse {
   factions?: FactionGenItem[]
   artifacts?: ArtifactGenItem[]
   characterRelations?: Record<string, CharacterRelation>
+  adult_mode_applied?: boolean
 }
 
 export interface FactionGenItem {
@@ -87,6 +88,7 @@ export interface FieldGenRequest {
   context?: string
   char_role?: string
   char_name?: string
+  adultMode?: boolean
 }
 
 export interface FieldGenResponse {

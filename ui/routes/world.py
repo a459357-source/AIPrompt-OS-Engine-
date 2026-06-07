@@ -538,8 +538,29 @@ async def create_new_story(
 
 # ── AI World Generator ─────────────────────────────────────────────
 
+def _parse_form_bool(val: str | None) -> bool | None:
+    if val is None:
+        return None
+    s = str(val).strip().lower()
+    if not s:
+        return None
+    if s in ("true", "1", "on", "yes"):
+        return True
+    if s in ("false", "0", "off", "no"):
+        return False
+    return None
+
+
+def _world_gen_effective_mode(form_adult: str = "") -> bool:
+    config.reload_app_behavior()
+    parsed = _parse_form_bool(form_adult)
+    if parsed is not None:
+        return parsed
+    return bool(config.ADULT_MODE)
+
+
 @router.post("/generate-world")
-async def generate_world(keywords: str = Form("")):
+async def generate_world(keywords: str = Form(""), adult_mode: str = Form("")):
     """Generate a world setting from keywords using DeepSeek."""
     from fastapi.responses import JSONResponse
     from engine.deepseek_client import call_deepseek, DeepSeekError
@@ -548,10 +569,11 @@ async def generate_world(keywords: str = Form("")):
     if not kw:
         return JSONResponse({"error": "请输入关键词"}, status_code=400)
 
-    system = config.world_gen_system_prompt()
+    adult = _world_gen_effective_mode(adult_mode)
+    system = config.world_gen_system_prompt(adult_mode=adult)
     user = f"""输入内容：{kw}
 
-请根据以上内容，生成一个完整的 Galgame 世界观设定。输出必须是合法的 JSON：
+{config.world_gen_task_intro(adult_mode=adult)}
 
 {{
   "title": "故事标题（8~20字）",
@@ -637,7 +659,11 @@ async def generate_world(keywords: str = Form("")):
 9. artifacts 生成2-3个有故事推动力的关键物品；ownerId 必须与已有角色名或势力名一致
 10. characterRelations 的 key 必须与 NPC 的 name 完全一致；tags 选 2-4 个；六维数值要体现角色设定与戏剧张力
 11. 所有文字用中文
-12. 只输出JSON，不要输出markdown代码块或其他文字{config.world_gen_adult_requirements_suffix()}"""
+12. 只输出JSON，不要输出markdown代码块或其他文字"""
+    adult_body = config.world_gen_adult_requirements_body(adult_mode=adult)
+    if adult_body:
+        user += f"\n{adult_body}"
+    user += config.world_gen_adult_requirements_suffix(adult_mode=adult)
 
     try:
         result = call_deepseek(system, user, temperature=0.9, max_tokens=config.world_gen_output_tokens(), skip_validation=True)
@@ -662,6 +688,7 @@ async def generate_world(keywords: str = Form("")):
             result["characterRelations"] = _normalize_character_relations(
                 result.get("characterRelations"), npc_names
             )
+        result["adult_mode_applied"] = adult
         return JSONResponse(result)
     except DeepSeekError as exc:
         import logging
@@ -678,35 +705,44 @@ async def generate_world(keywords: str = Form("")):
 @router.post("/generate-field")
 async def generate_field(field: str = Form(""), title: str = Form(""), world: str = Form(""),
                          genre: str = Form(""), char_name: str = Form(""), char_role: str = Form(""),
-                         context: str = Form("")):
+                         context: str = Form(""), adult_mode: str = Form("")):
     """Generate a single story field via AI (title, world, or character)."""
     from engine.deepseek_client import call_deepseek, DeepSeekError
     from fastapi.responses import JSONResponse as JR
 
-    system = config.world_gen_field_system_prompt()
-    adult_suffix = config.world_gen_adult_requirements_suffix()
+    adult = _world_gen_effective_mode(adult_mode)
+    system = config.world_gen_field_system_prompt(adult_mode=adult)
+    adult_suffix = config.world_gen_adult_requirements_suffix(adult_mode=adult)
 
     if field == "title":
         user = f"根据以下世界观，生成一个吸引人的故事标题（8~20字）：\n{world or context}\n\n标题："
     elif field == "world":
         ctx = f"标题：{title}，风格：{genre}" if title else context
-        user = f"为以下 Galgame 生成世界观背景描述（50-300字，沉浸式叙事风格）：\n{ctx}\n\n世界观："
+        kind = "成人向 Galgame" if adult else "Galgame"
+        user = f"为以下 {kind} 生成世界观背景描述（50-300字，沉浸式叙事风格）：\n{ctx}\n\n世界观："
     elif field == "main_goal":
         ctx = f"标题：{title}，世界观：{world[:200] if world else context[:200]}"
-        user = f"为以下 Galgame 生成一个清晰的故事主线目标（一句话）：\n{ctx}\n\n主线目标："
+        hint = "（须与情感/亲密关系推进相关）" if adult else ""
+        user = f"为以下 Galgame 生成一个清晰的故事主线目标（一句话）{hint}：\n{ctx}\n\n主线目标："
     elif field == "scene":
         ctx = f"标题：{title}，世界观：{world[:200] if world else context[:200]}"
         user = f"为以下 Galgame 生成一个具体的开局场景名称：\n{ctx}\n\n场景："
     elif field == "genre":
         ctx = f"标题：{title}，世界观：{world[:200] if world else context[:200]}"
-        user = f"为以下 Galgame 推荐3-5个风格标签（校园、恋爱、后宫、日常、轻小说、科幻、奇幻、修仙、末日、悬疑、推理、克苏鲁、冒险、战争、搞笑、黑暗、治愈、百合、女性向）：\n{ctx}\n\n输出JSON数组：[\"标签1\", \"标签2\"]"
+        extra = "；成人模式下须含「恋爱/后宫/成人向」至少一项" if adult else ""
+        user = f"为以下 Galgame 推荐3-5个风格标签（校园、恋爱、后宫、日常、轻小说、科幻、奇幻、修仙、末日、悬疑、推理、克苏鲁、冒险、战争、搞笑、黑暗、治愈、百合、女性向、成人向{extra}）：\n{ctx}\n\n输出JSON数组：[\"标签1\", \"标签2\"]"
     elif field == "character":
         faction_ctx = context[:500] if context else "（暂无势力，faction 留空字符串）"
+        adult_char_hint = (
+            "女角色须有具体外貌吸引力；goal/secret 含情感或暧昧张力；禁止男男设定。"
+            if adult else ""
+        )
         user = f"""为以下故事生成一个完整的角色，用 JSON 格式输出：
 故事标题：{title}
 世界观：{world[:300] if world else context[:300]}
 已有势力：{faction_ctx}
 角色定位：{char_role or '重要NPC'}
+{adult_char_hint}
 
 输出格式：{{"name":"角色名","isMain":false,"faction":"主要明面势力（可选，与 factionMemberships 一致）","factionMemberships":[{{"faction":"势力名","visibility":"public|hidden"}}],"role_tags":["身份"],"personality_tags":["性格1","性格2","性格3"],"appearance":"外貌特征（10~30字）","relationship":["与主角关系"],"goal":"角色目标","secret":"隐藏秘密"}}
 
@@ -871,6 +907,8 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
                 except Exception:
                     pass
             return JR({"rel_stages": ["陌生", "熟悉", "朋友", "信赖", "暧昧", "恋人"], "rel_affection": 0})
+        if isinstance(result, dict):
+            result["adult_mode_applied"] = adult
         return JR(result)
     except DeepSeekError as exc:
         return JR({"error": f"AI 生成失败: {exc}"}, status_code=500)
@@ -889,12 +927,19 @@ async def generate_rules(
     char1_role: str = Form(""),
     char2_name: str = Form(""),
     char2_role: str = Form(""),
+    adult_mode: str = Form(""),
 ):
     """Generate story-specific custom tracking rules."""
     from fastapi.responses import JSONResponse
     from engine.deepseek_client import call_deepseek, DeepSeekError
 
-    system = config.world_gen_system_prompt("Galgame 规则设计师")
+    adult = _world_gen_effective_mode(adult_mode)
+    system = config.world_gen_system_prompt("Galgame 规则设计师", adult_mode=adult)
+    stat_hint = (
+        "成人向故事优先：吸引力、信任、亲密、欲望张力 等维度，勿用纯战斗/政务维度。"
+        if adult else
+        "根据故事的世界观、势力结构、关键物品来定制。"
+    )
     user = f"""故事标题：{title}
 类型：{genre}
 世界观：{world}
@@ -902,11 +947,12 @@ async def generate_rules(
 角色2：{char2_name}（{char2_role}）
 
 请为这个故事设计 2-3 个专属的角色追踪维度（替代通用的"好感度"）。
-根据故事的世界观、势力结构、关键物品来定制。
+{stat_hint}
 例如：
 - 宫廷故事 → 忠诚度、权势、民心
 - 修仙故事 → 修为、道心、羁绊
 - 商战故事 → 信任度、影响力、筹码
+- 成人向恋爱 → 吸引力、信任、亲密
 
 同时设计 5-7 个**双向**关系阶段标签（必须有正反两面）：
 崩坏←敌视←对立←冷漠←疏远←陌生→认识→信赖→盟友→羁绊
@@ -925,10 +971,13 @@ async def generate_rules(
 2. 每个 stat 有 max 值（建议 100）
 3. stages 5-7 个，从疏远到亲密递进
 4. 维度要贴合故事背景，有创意
-5. 只输出 JSON{config.world_gen_adult_requirements_suffix()}"""
+5. 只输出 JSON"""
+    user += config.world_gen_adult_requirements_suffix(adult_mode=adult)
 
     try:
         result = call_deepseek(system, user, temperature=0.9, max_tokens=config.MAX_TOKENS, skip_validation=True)
+        if isinstance(result, dict):
+            result["adult_mode_applied"] = adult
         return JSONResponse(result)
     except DeepSeekError as exc:
         return JSONResponse({"error": f"AI 生成失败: {exc}"}, status_code=500)

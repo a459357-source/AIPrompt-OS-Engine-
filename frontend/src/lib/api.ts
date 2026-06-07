@@ -77,12 +77,14 @@ async function post<T>(url: string, body: Record<string, string>): Promise<T> {
   return data as T
 }
 
-export async function generateWorld(keywords: string): Promise<WorldGenResponse> {
-  return post<WorldGenResponse>('/generate-world', { keywords })
+export async function generateWorld(keywords: string, adultMode?: boolean): Promise<WorldGenResponse> {
+  const body: Record<string, string> = { keywords }
+  if (adultMode != null) body.adult_mode = adultMode ? 'true' : 'false'
+  return post<WorldGenResponse>('/generate-world', body)
 }
 
 export async function generateField(req: FieldGenRequest): Promise<FieldGenResponse> {
-  return post<FieldGenResponse>('/generate-field', {
+  const body: Record<string, string> = {
     field: req.field,
     title: req.title || '',
     world: req.world || '',
@@ -90,7 +92,9 @@ export async function generateField(req: FieldGenRequest): Promise<FieldGenRespo
     context: req.context || '',
     char_role: req.char_role || '',
     char_name: req.char_name || '',
-  })
+  }
+  if (req.adultMode != null) body.adult_mode = req.adultMode ? 'true' : 'false'
+  return post<FieldGenResponse>('/generate-field', body)
 }
 
 export async function generateRules(data: {
@@ -101,8 +105,9 @@ export async function generateRules(data: {
   char1_role: string
   char2_name: string
   char2_role: string
+  adultMode?: boolean
 }): Promise<CustomRules> {
-  return post<CustomRules>('/generate-rules', {
+  const body: Record<string, string> = {
     title: data.title,
     world: data.world,
     genre: data.genre,
@@ -110,7 +115,9 @@ export async function generateRules(data: {
     char1_role: data.char1_role,
     char2_name: data.char2_name,
     char2_role: data.char2_role,
-  })
+  }
+  if (data.adultMode != null) body.adult_mode = data.adultMode ? 'true' : 'false'
+  return post<CustomRules>('/generate-rules', body)
 }
 
 export async function createStory(formData: FormData): Promise<void> {
