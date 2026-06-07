@@ -27,6 +27,17 @@
     0 0 24px rgba(0, 240, 255, 0.04);
 }
 
+/** Dropdowns / inspectors over busy canvases — higher opacity for readability */
+.glass-panel-opaque {
+  background: rgba(12, 18, 32, 0.94);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
 .glass-panel-glow {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),

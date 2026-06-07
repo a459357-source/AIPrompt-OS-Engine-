@@ -3,8 +3,8 @@
 [data-ui-theme='desire'] {
   --color-game-bg: #080808;
   --color-game-surface: #121212;
-  --color-game-card: rgba(255, 255, 255, 0.04);
-  --color-game-border: rgba(255, 255, 255, 0.08);
+  --color-game-card: rgba(16, 12, 18, 0.88);
+  --color-game-border: rgba(255, 255, 255, 0.12);
   --color-game-primary: #ff004d;
   --color-game-secondary: #a855f7;
   --color-game-accent: #ff4d6d;
@@ -20,7 +20,7 @@
   --radius-card: 1.5rem;
 
   --color-neural-void: #080808;
-  --color-neural-glass: rgba(255, 255, 255, 0.04);
+  --color-neural-glass: rgba(16, 12, 18, 0.88);
   --color-neural-cyan: #ff004d;
   --color-neural-magenta: #ff4d6d;
   --color-neural-violet: #a855f7;
@@ -76,16 +76,24 @@
 }
 
 [data-ui-theme='desire'] .glass-panel {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-game-card);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: var(--glass-shadow);
   border-radius: 24px;
 }
 
+[data-ui-theme='desire'] .glass-panel-opaque {
+  background: rgba(14, 10, 16, 0.97);
+  border-color: rgba(255, 77, 109, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 16px 48px rgba(0, 0, 0, 0.65);
+}
+
 [data-ui-theme='desire'] .theme-card {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-game-card);
   border-radius: 24px;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);

@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 
 interface GlassPanelProps extends React.HTMLAttributes<HTMLDivElement> {
   glow?: boolean
+  opaque?: boolean
   padding?: 'none' | 'sm' | 'md' | 'lg'
 }
 
@@ -16,6 +17,7 @@ const paddingMap = {
 export function GlassPanel({
   className,
   glow = false,
+  opaque = false,
   padding = 'md',
   children,
   ...props
@@ -23,7 +25,8 @@ export function GlassPanel({
   return (
     <div
       className={cn(
-        'glass-panel rounded-lg',
+        opaque ? 'glass-panel-opaque' : 'glass-panel',
+        'rounded-lg',
         glow && 'glass-panel-glow',
         paddingMap[padding],
         className,

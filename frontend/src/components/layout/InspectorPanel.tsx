@@ -24,7 +24,7 @@ export function InspectorPanel({
   collapseLabel = '收起',
 }: InspectorPanelProps) {
   return (
-    <GlassPanel padding="none" className={cn('flex flex-col h-full overflow-hidden', className)}>
+    <GlassPanel opaque padding="none" className={cn('flex flex-col h-full overflow-hidden', className)}>
       {title && (
         <div className="px-4 py-3 border-b border-neural-cyan/10 shrink-0 flex items-center justify-between gap-2">
           <h3 className="font-neural-display text-sm text-neural-cyan tracking-wide min-w-0 truncate">{title}</h3>

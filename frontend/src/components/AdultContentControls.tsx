@@ -113,8 +113,8 @@ export function AdultContentControls() {
       )}
 
       {open && adultMode && (
-        <div className="absolute top-full right-0 mt-1.5 z-[60] w-[min(92vw,22rem)] max-h-[min(70vh,32rem)] overflow-y-auto rounded-lg border border-neural-cyan/20 glass-panel shadow-xl p-3 space-y-3">
-          <div className="private-mode-banner rounded-lg border px-3 py-2 space-y-1">
+        <div className="absolute top-full right-0 mt-1.5 z-[60] w-[min(92vw,22rem)] max-h-[min(70vh,32rem)] overflow-y-auto rounded-lg glass-panel-opaque shadow-2xl p-3 space-y-3">
+          <div className="private-mode-banner rounded-lg border px-3 py-2 space-y-1 bg-game-surface/90">
             <p className="text-xs font-semibold text-game-accent">🌙 私人故事模式</p>
             <p className="text-[10px] text-game-muted">人物关系 · 情感发展 · 亲密互动</p>
           </div>
@@ -134,10 +134,10 @@ export function AdultContentControls() {
                   type="button"
                   onClick={() => savePreferences({ adultProfile: profileId }, true)}
                   className={cn(
-                    'text-left rounded-lg border px-2.5 py-2 transition-colors',
+                    'text-left rounded-lg border px-2.5 py-2 transition-colors bg-game-surface/80',
                     activeAdultProfile === profileId
-                      ? 'border-game-accent bg-game-accent/10'
-                      : 'border-game-border/50 hover:border-game-accent/40',
+                      ? 'border-game-accent bg-game-accent/15'
+                      : 'border-game-border/60 hover:border-game-accent/40',
                   )}
                 >
                   <span className="text-xs font-medium text-game-text">

@@ -138,11 +138,7 @@
 }
 
 [data-ui-theme='desire'] .private-mode-banner {
-  border-color: color-mix(in srgb, var(--color-game-accent) 35%, transparent);
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--color-game-primary) 8%, transparent),
-    color-mix(in srgb, var(--color-neural-violet) 6%, transparent)
-  );
+  border-color: color-mix(in srgb, var(--color-game-accent) 45%, transparent);
+  background: rgba(24, 14, 22, 0.92);
   box-shadow: 0 0 32px var(--color-neural-glow);
 }
