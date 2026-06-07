@@ -640,6 +640,9 @@ export interface GameGenSettings {
   adult_theme: string
   adult_theme_options: string[]
   adult_theme_labels: Record<string, string>
+  visual_theme: string
+  visual_theme_options: string[]
+  visual_theme_labels: Record<string, string>
   expression_style: string
   expression_style_options: string[]
   expression_style_labels: Record<string, string>
@@ -658,6 +661,7 @@ const _FALLBACK_BOUNDS = storyTargetBounds(1000, 300)
 const DEFAULT_CONTENT_WEIGHTS: ContentWeights = { story: 40, romance: 30, adult: 30 }
 
 export type AdultProfileId = 'story_first' | 'balanced' | 'adult_first'
+export type VisualThemeId = 'adult' | 'desire'
 export type AdultThemeId = 'deep_purple' | 'dark_crimson' | 'midnight_bar' | 'luxury_suite'
 
 const GAME_GEN_FALLBACK: GameGenSettings = {
@@ -695,6 +699,12 @@ const GAME_GEN_FALLBACK: GameGenSettings = {
     dark_crimson: '暗红暧昧',
     midnight_bar: '深夜酒馆',
     luxury_suite: '豪华套房',
+  },
+  visual_theme: 'desire',
+  visual_theme_options: ['adult', 'desire'],
+  visual_theme_labels: {
+    adult: 'Adult Theme',
+    desire: 'Desire+ Theme',
   },
   expression_style: 'light_novel',
   expression_style_options: ['literary', 'romantic', 'light_novel', 'direct'],
@@ -736,6 +746,9 @@ function parseGameGenSettings(data: Partial<GameGenSettings>): GameGenSettings {
     adult_theme: data.adult_theme ?? GAME_GEN_FALLBACK.adult_theme,
     adult_theme_options: data.adult_theme_options ?? GAME_GEN_FALLBACK.adult_theme_options,
     adult_theme_labels: data.adult_theme_labels ?? GAME_GEN_FALLBACK.adult_theme_labels,
+    visual_theme: data.visual_theme ?? GAME_GEN_FALLBACK.visual_theme,
+    visual_theme_options: data.visual_theme_options ?? GAME_GEN_FALLBACK.visual_theme_options,
+    visual_theme_labels: data.visual_theme_labels ?? GAME_GEN_FALLBACK.visual_theme_labels,
     expression_style: data.expression_style ?? GAME_GEN_FALLBACK.expression_style,
     expression_style_options: data.expression_style_options ?? GAME_GEN_FALLBACK.expression_style_options,
     expression_style_labels: data.expression_style_labels ?? GAME_GEN_FALLBACK.expression_style_labels,
@@ -763,6 +776,7 @@ export async function updateGameGenSettings(patch: {
   adultMode?: boolean
   adultProfile?: string
   adultTheme?: string
+  visualTheme?: string
   expressionStyle?: string
   contentWeights?: ContentWeights
 }): Promise<GameGenSettings> {
@@ -778,6 +792,7 @@ export async function updateGameGenSettings(patch: {
   if (patch.adultMode != null) fd.append('adult_mode', patch.adultMode ? 'true' : 'false')
   if (patch.adultProfile != null) fd.append('adult_profile', patch.adultProfile)
   if (patch.adultTheme != null) fd.append('adult_theme', patch.adultTheme)
+  if (patch.visualTheme != null) fd.append('visual_theme', patch.visualTheme)
   if (patch.expressionStyle != null) fd.append('expression_style', patch.expressionStyle)
   if (patch.contentWeights != null) fd.append('content_weights', JSON.stringify(patch.contentWeights))
 

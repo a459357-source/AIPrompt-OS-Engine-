@@ -1,6 +1,6 @@
-/* ── Desire+ Theme (adult_mode) — adult section + shared adult overrides ── */
+/* ── Desire+ Theme (data-ui-theme='desire') — adult_mode visual skin ── */
 
-[data-ui-theme='adult'] {
+[data-ui-theme='desire'] {
   --color-game-bg: #080808;
   --color-game-surface: #121212;
   --color-game-card: rgba(255, 255, 255, 0.04);
@@ -38,7 +38,7 @@
   --card-hover-shadow: 0 0 48px rgba(255, 77, 109, 0.22);
 }
 
-[data-ui-theme='adult'] body {
+[data-ui-theme='desire'] body {
   background-size: 200% 200%;
   animation: desire-gradient-flow 24s ease-in-out infinite;
 }
@@ -48,7 +48,7 @@
   50% { background-position: 100% 50%; }
 }
 
-[data-ui-theme='adult'] .neural-grid-bg {
+[data-ui-theme='desire'] .neural-grid-bg {
   background-image: none;
 }
 
@@ -75,7 +75,7 @@
   50% { transform: scale(1.08) translate(8px, -6px); opacity: 0.42; }
 }
 
-[data-ui-theme='adult'] .glass-panel {
+[data-ui-theme='desire'] .glass-panel {
   background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -84,7 +84,7 @@
   border-radius: 24px;
 }
 
-[data-ui-theme='adult'] .theme-card {
+[data-ui-theme='desire'] .theme-card {
   background: rgba(255, 255, 255, 0.04);
   border-radius: 24px;
   backdrop-filter: blur(20px);
@@ -92,21 +92,21 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-[data-ui-theme='adult'] .theme-card:hover {
+[data-ui-theme='desire'] .theme-card:hover {
   box-shadow: var(--card-hover-shadow);
   border-color: rgba(255, 77, 109, 0.22);
 }
 
-[data-ui-theme='adult'] .adult-relation-inspector {
+[data-ui-theme='desire'] .adult-relation-inspector {
   backdrop-filter: blur(24px);
 }
 
-[data-ui-theme='adult'] button.inline-flex:not(.rounded-none) {
+[data-ui-theme='desire'] button.inline-flex:not(.rounded-none) {
   border-radius: 999px;
   transition: all 800ms ease;
 }
 
-[data-ui-theme='adult'] button.inline-flex:hover:not(:disabled):not(.rounded-none) {
+[data-ui-theme='desire'] button.inline-flex:hover:not(:disabled):not(.rounded-none) {
   transform: scale(1.03);
   box-shadow: 0 0 28px rgba(255, 0, 77, 0.35);
 }
@@ -129,12 +129,12 @@
   max-width: 860px !important;
 }
 
-html[data-ui-theme='adult'] .game-reading-mode .private-orb {
+html[data-ui-theme='desire'] .game-reading-mode .private-orb {
   opacity: 0.5;
   filter: blur(100px);
 }
 
-[data-ui-theme='adult'] .neural-pulse-dot {
+[data-ui-theme='desire'] .neural-pulse-dot {
   animation: pulse-desire 4s ease-in-out infinite;
   background: var(--color-game-primary) !important;
   box-shadow: 0 0 12px rgba(255, 0, 77, 0.45);
@@ -145,25 +145,25 @@ html[data-ui-theme='adult'] .game-reading-mode .private-orb {
   50% { opacity: 0.65; transform: scale(0.9); }
 }
 
-[data-ui-theme='adult'] .neural-text-glow {
+[data-ui-theme='desire'] .neural-text-glow {
   text-shadow: 0 0 20px rgba(255, 0, 77, 0.35);
   font-family: 'Segoe UI', 'Noto Sans SC', sans-serif;
   letter-spacing: 0.06em;
 }
 
-[data-ui-theme='adult'] .glass-panel-glow {
+[data-ui-theme='desire'] .glass-panel-glow {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 0 48px rgba(255, 0, 77, 0.12);
 }
 
-[data-ui-theme='adult'] .font-neural-display,
-[data-ui-theme='adult'] .font-neural-mono {
+[data-ui-theme='desire'] .font-neural-display,
+[data-ui-theme='desire'] .font-neural-mono {
   font-family: 'Segoe UI', 'Noto Sans SC', sans-serif;
   text-transform: none;
   letter-spacing: 0.04em;
 }
 
-[data-ui-theme='adult'] .neural-scan-hover:hover {
+[data-ui-theme='desire'] .neural-scan-hover:hover {
   background: linear-gradient(90deg, transparent, rgba(255, 0, 77, 0.08), transparent);
 }

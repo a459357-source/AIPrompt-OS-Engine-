@@ -521,6 +521,7 @@ async def api_set_game_settings(
     adult_mode: str | None = Form(default=None),
     adult_profile: str | None = Form(default=None),
     adult_theme: str | None = Form(default=None),
+    visual_theme: str | None = Form(default=None),
     expression_style: str | None = Form(default=None),
     content_weights: str | None = Form(default=None),
 ):
@@ -553,6 +554,7 @@ async def api_set_game_settings(
         adult_mode=_adult_mode,
         adult_profile=adult_profile,
         adult_theme=adult_theme,
+        visual_theme=visual_theme,
         expression_style=expression_style,
         content_weights=_content_weights,
     )

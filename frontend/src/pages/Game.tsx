@@ -17,7 +17,7 @@ import { logger } from '@/lib/logger'
 import { parseOptionEffects, deltaArrow, type RelationHint } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
 import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS, MAX_WIDTH_OPTIONS } from '@/lib/settings'
-import { dispatchAdultModeChange, dispatchAdultThemeChange, getAdultRelationLevel, applyAdultThemePack, type AdultThemeId } from '@/lib/theme'
+import { dispatchAdultModeChange, dispatchAdultThemeChange, dispatchVisualThemeChange, getAdultRelationLevel, applyUiTheme, applyAdultThemePack, type AdultThemeId, type VisualThemeId } from '@/lib/theme'
 import { t, tTheme } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
@@ -419,8 +419,11 @@ export default function Game() {
   const [adultProfileLabels, setAdultProfileLabels] = useState<Record<string, string>>({})
   const [adultProfileDescriptions, setAdultProfileDescriptions] = useState<Record<string, string>>({})
   const [adultTheme, setAdultTheme] = useState<AdultThemeId>('deep_purple')
+  const [visualTheme, setVisualTheme] = useState<VisualThemeId>('desire')
   const [adultThemeOptions, setAdultThemeOptions] = useState<string[]>([])
   const [adultThemeLabels, setAdultThemeLabels] = useState<Record<string, string>>({})
+  const [visualThemeOptions, setVisualThemeOptions] = useState<string[]>([])
+  const [visualThemeLabels, setVisualThemeLabels] = useState<Record<string, string>>({})
   const [adultAdvancedOpen, setAdultAdvancedOpen] = useState(false)
   const [expressionStyle, setExpressionStyle] = useState('light_novel')
   const [expressionStyleOptions, setExpressionStyleOptions] = useState<string[]>(['literary', 'romantic', 'light_novel', 'direct'])
@@ -493,6 +496,7 @@ export default function Game() {
     adultMode?: boolean
     adultProfile?: string
     adultTheme?: string
+    visualTheme?: string
     expressionStyle?: string
     contentWeights?: ContentWeights
   }>({})
@@ -644,12 +648,17 @@ export default function Game() {
     setAdultProfileLabels(data.adult_profile_labels)
     setAdultProfileDescriptions(data.adult_profile_descriptions)
     const themeId = (data.adult_theme || 'deep_purple') as AdultThemeId
+    const visualId = (data.visual_theme || 'desire') as VisualThemeId
     setAdultTheme(themeId)
+    setVisualTheme(visualId)
     setAdultThemeOptions(data.adult_theme_options)
     setAdultThemeLabels(data.adult_theme_labels)
+    setVisualThemeOptions(data.visual_theme_options)
+    setVisualThemeLabels(data.visual_theme_labels)
     if (data.adult_mode) {
-      applyAdultThemePack(themeId)
+      applyUiTheme(visualId, themeId)
       dispatchAdultThemeChange(themeId)
+      dispatchVisualThemeChange(visualId)
     }
     setExpressionStyle(data.expression_style)
     setExpressionStyleOptions(data.expression_style_options)
@@ -687,6 +696,7 @@ export default function Game() {
     adultMode?: boolean
     adultProfile?: string
     adultTheme?: string
+    visualTheme?: string
     expressionStyle?: string
     contentWeights?: ContentWeights
   }) => {
@@ -721,7 +731,8 @@ export default function Game() {
     if (next.adultMode != null) {
       setAdultMode(next.adultMode)
       dispatchAdultModeChange(next.adultMode)
-      if (next.adultMode) applyAdultThemePack(adultTheme)
+      if (next.adultMode) applyUiTheme(visualTheme as VisualThemeId, adultTheme)
+      else applyUiTheme('normal')
     }
     if (next.adultProfile != null) {
       setAdultProfile(next.adultProfile)
@@ -736,11 +747,18 @@ export default function Game() {
       setAdultTheme(themeId)
       applyAdultThemePack(themeId)
       dispatchAdultThemeChange(themeId)
+      if (adultMode) applyUiTheme(visualTheme as VisualThemeId, themeId)
+    }
+    if (next.visualTheme != null) {
+      const visualId = next.visualTheme as VisualThemeId
+      setVisualTheme(visualId)
+      dispatchVisualThemeChange(visualId)
+      if (adultMode) applyUiTheme(visualId, adultTheme)
     }
     if (next.expressionStyle != null) setExpressionStyle(next.expressionStyle)
     if (next.contentWeights != null) setContentWeights({ ...next.contentWeights })
     return next
-  }, [storyLengthMin, storyLengthMax, contextTokens, maxOutputTokens, adultTheme, presetWeights])
+  }, [storyLengthMin, storyLengthMax, contextTokens, maxOutputTokens, adultTheme, visualTheme, presetWeights])
 
   const flushGenSettings = useCallback(async () => {
     const pending = pendingGenPatchRef.current
@@ -782,6 +800,7 @@ export default function Game() {
     adultMode?: boolean
     adultProfile?: string
     adultTheme?: string
+    visualTheme?: string
     expressionStyle?: string
     contentWeights?: ContentWeights
   }, immediate = false) => {
@@ -1519,20 +1538,37 @@ export default function Game() {
                         </div>
                       </QuickGenRow>
 
-                      <QuickGenRow label="视觉主题" hint="切换背景、阴影、动画与阅读区氛围">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {adultThemeOptions.map((themeId) => (
-                            <Button
-                              key={themeId}
-                              type="button"
-                              size="xs"
-                              variant={adultTheme === themeId ? 'primary' : 'ghost'}
-                              disabled={choosing}
-                              onClick={() => queueGenSettingsSave({ adultTheme: themeId }, true)}
-                            >
-                              {adultThemeLabels[themeId] || themeId}
-                            </Button>
-                          ))}
+                      <QuickGenRow label="视觉主题" hint="Adult / Desire+ 为界面风格；配色方案可叠加切换">
+                        <div className="flex flex-col gap-2 w-full">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {visualThemeOptions.map((themeId) => (
+                              <Button
+                                key={themeId}
+                                type="button"
+                                size="xs"
+                                variant={visualTheme === themeId ? 'primary' : 'ghost'}
+                                disabled={choosing}
+                                onClick={() => queueGenSettingsSave({ visualTheme: themeId }, true)}
+                              >
+                                {visualThemeLabels[themeId] || themeId}
+                              </Button>
+                            ))}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] text-game-dim shrink-0 w-full">配色方案</span>
+                            {adultThemeOptions.map((themeId) => (
+                              <Button
+                                key={themeId}
+                                type="button"
+                                size="xs"
+                                variant={adultTheme === themeId ? 'primary' : 'ghost'}
+                                disabled={choosing}
+                                onClick={() => queueGenSettingsSave({ adultTheme: themeId }, true)}
+                              >
+                                {adultThemeLabels[themeId] || themeId}
+                              </Button>
+                            ))}
+                          </div>
                         </div>
                       </QuickGenRow>
 

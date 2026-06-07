@@ -1,8 +1,10 @@
-/* ── Adult theme packs (data-adult-theme on html[data-ui-theme='adult']) ── */
+/* ── Color packs (data-adult-theme on html[data-ui-theme='adult'|'desire']) ── */
 
 /* Default / deep purple — private, immersive, VN */
 [data-ui-theme='adult'][data-adult-theme='deep_purple'],
-[data-ui-theme='adult']:not([data-adult-theme]) {
+[data-ui-theme='desire'][data-adult-theme='deep_purple'],
+[data-ui-theme='adult']:not([data-adult-theme]),
+[data-ui-theme='desire']:not([data-adult-theme]) {
   --color-game-bg: #080808;
   --color-game-primary: #ff004d;
   --color-game-secondary: #a855f7;
@@ -27,7 +29,8 @@
 }
 
 /* Dark crimson — temptation, dangerous relations */
-[data-ui-theme='adult'][data-adult-theme='dark_crimson'] {
+[data-ui-theme='adult'][data-adult-theme='dark_crimson'],
+[data-ui-theme='desire'][data-adult-theme='dark_crimson'] {
   --color-game-bg: #0a0506;
   --color-game-primary: #dc2626;
   --color-game-secondary: #991b1b;
@@ -52,7 +55,8 @@
 }
 
 /* Midnight bar — tipsy, jazz, mature */
-[data-ui-theme='adult'][data-adult-theme='midnight_bar'] {
+[data-ui-theme='adult'][data-adult-theme='midnight_bar'],
+[data-ui-theme='desire'][data-adult-theme='midnight_bar'] {
   --color-game-bg: #0c0a09;
   --color-game-primary: #d97706;
   --color-game-secondary: #92400e;
@@ -77,7 +81,8 @@
 }
 
 /* Luxury suite — premium, black-gold, night view */
-[data-ui-theme='adult'][data-adult-theme='luxury_suite'] {
+[data-ui-theme='adult'][data-adult-theme='luxury_suite'],
+[data-ui-theme='desire'][data-adult-theme='luxury_suite'] {
   --color-game-bg: #030712;
   --color-game-primary: #ca8a04;
   --color-game-secondary: #a16207;
@@ -101,47 +106,59 @@
   --adult-gradient-speed: 28s;
 }
 
-[data-ui-theme='adult'] .private-orb-1 {
+[data-ui-theme='adult'] .private-orb-1,
+[data-ui-theme='desire'] .private-orb-1 {
   background: radial-gradient(circle, var(--adult-orb-1, rgba(255, 0, 77, 0.45)), transparent 70%);
 }
 
-[data-ui-theme='adult'] .private-orb-2 {
+[data-ui-theme='adult'] .private-orb-2,
+[data-ui-theme='desire'] .private-orb-2 {
   background: radial-gradient(circle, var(--adult-orb-2, rgba(255, 77, 109, 0.4)), transparent 70%);
 }
 
-[data-ui-theme='adult'] .private-orb-3 {
+[data-ui-theme='adult'] .private-orb-3,
+[data-ui-theme='desire'] .private-orb-3 {
   background: radial-gradient(circle, var(--adult-orb-3, rgba(168, 85, 247, 0.32)), transparent 70%);
 }
 
-[data-ui-theme='adult'] body {
+[data-ui-theme='adult'] body,
+[data-ui-theme='desire'] body {
   animation-duration: var(--adult-gradient-speed, 24s);
 }
 
 [data-ui-theme='adult'] .font-neural-display,
 [data-ui-theme='adult'] .font-neural-mono,
-[data-ui-theme='adult'] .neural-text-glow {
+[data-ui-theme='adult'] .neural-text-glow,
+[data-ui-theme='desire'] .font-neural-display,
+[data-ui-theme='desire'] .font-neural-mono,
+[data-ui-theme='desire'] .neural-text-glow {
   font-family: var(--adult-font-display, 'Segoe UI', 'Noto Sans SC', sans-serif);
 }
 
-[data-ui-theme='adult'] button.inline-flex:hover:not(:disabled):not(.rounded-none) {
+[data-ui-theme='adult'] button.inline-flex:hover:not(:disabled):not(.rounded-none),
+[data-ui-theme='desire'] button.inline-flex:hover:not(:disabled):not(.rounded-none) {
   box-shadow: 0 0 28px var(--color-neural-glow);
 }
 
-[data-ui-theme='adult'] .adult-relation-bar-fill {
+[data-ui-theme='adult'] .adult-relation-bar-fill,
+[data-ui-theme='desire'] .adult-relation-bar-fill {
   box-shadow: 0 0 12px var(--color-neural-glow);
 }
 
-[data-ui-theme='adult'] .glass-panel-glow {
+[data-ui-theme='adult'] .glass-panel-glow,
+[data-ui-theme='desire'] .glass-panel-glow {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 0 48px var(--color-neural-glow);
 }
 
-[data-ui-theme='adult'] .neural-pulse-dot {
+[data-ui-theme='adult'] .neural-pulse-dot,
+[data-ui-theme='desire'] .neural-pulse-dot {
   box-shadow: 0 0 12px var(--color-neural-glow);
 }
 
-[data-ui-theme='adult'] .private-mode-banner {
+[data-ui-theme='adult'] .private-mode-banner,
+[data-ui-theme='desire'] .private-mode-banner {
   border-color: color-mix(in srgb, var(--color-game-accent) 35%, transparent);
   background: linear-gradient(
     135deg,

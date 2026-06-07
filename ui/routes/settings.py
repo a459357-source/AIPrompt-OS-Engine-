@@ -35,6 +35,8 @@ from config import (
     reload_adult_profile,
     save_adult_theme,
     reload_adult_theme,
+    save_visual_theme,
+    reload_visual_theme,
     save_expression_style,
     reload_expression_style,
     save_content_weights,
@@ -47,6 +49,8 @@ from config import (
     ADULT_PROFILE_DESCRIPTIONS,
     ADULT_THEME_OPTIONS,
     ADULT_THEME_LABELS,
+    VISUAL_THEME_OPTIONS,
+    VISUAL_THEME_LABELS,
     save_auto_save_interval,
     reload_auto_save_interval,
     save_max_save_slots,
@@ -190,6 +194,9 @@ def game_settings_payload() -> dict:
         "adult_theme": config.ADULT_THEME,
         "adult_theme_options": ADULT_THEME_OPTIONS,
         "adult_theme_labels": ADULT_THEME_LABELS,
+        "visual_theme": config.VISUAL_THEME,
+        "visual_theme_options": VISUAL_THEME_OPTIONS,
+        "visual_theme_labels": VISUAL_THEME_LABELS,
         "expression_style": config.EXPRESSION_STYLE,
         "expression_style_options": EXPRESSION_STYLE_OPTIONS,
         "expression_style_labels": EXPRESSION_STYLE_LABELS,
@@ -212,6 +219,7 @@ def apply_game_gen_settings(
     adult_mode: bool | None = None,
     adult_profile: str | None = None,
     adult_theme: str | None = None,
+    visual_theme: str | None = None,
     expression_style: str | None = None,
     content_weights: dict | None = None,
 ) -> dict:
@@ -250,12 +258,14 @@ def apply_game_gen_settings(
         save_adult_profile(adult_profile)
     if adult_theme is not None:
         save_adult_theme(adult_theme)
+    if visual_theme is not None:
+        save_visual_theme(visual_theme)
     if expression_style is not None:
         save_expression_style(expression_style)
     if content_weights is not None:
         save_content_weights(content_weights)
     if any(x is not None for x in (option_count, narrative_pov, style_preference, repetition_check,
-                                    adult_mode, adult_profile, adult_theme, expression_style, content_weights)):
+                                    adult_mode, adult_profile, adult_theme, visual_theme, expression_style, content_weights)):
         reload_app_behavior()
     ensure_story_length_context_sync(force_compress=story_length is not None)
     after = _gen_settings_snapshot()

@@ -29,7 +29,7 @@ export function ParticleBackground() {
     let animId = 0
     let particles: Particle[] = []
 
-    const isAdult = document.documentElement.getAttribute('data-ui-theme') === 'adult'
+    const isAdult = ['adult', 'desire'].includes(document.documentElement.getAttribute('data-ui-theme') ?? '')
     const speedMul = isAdult ? 0.12 : 0.3
     const maxLinkDist = isAdult ? 80 : 120
     const particleColor = isAdult

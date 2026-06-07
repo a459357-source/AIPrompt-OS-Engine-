@@ -578,6 +578,13 @@ DEFAULT_ADULT_MODE = False
 DEFAULT_EXPRESSION_STYLE = "light_novel"
 DEFAULT_ADULT_PROFILE = "balanced"
 DEFAULT_ADULT_THEME = "deep_purple"
+DEFAULT_VISUAL_THEME = "desire"
+
+VISUAL_THEME_OPTIONS = ["adult", "desire"]
+VISUAL_THEME_LABELS = {
+    "adult": "Adult Theme",
+    "desire": "Desire+ Theme",
+}
 
 ADULT_PROFILE_OPTIONS = ["story_first", "balanced", "adult_first"]
 ADULT_PROFILE_LABELS = {
@@ -896,6 +903,23 @@ def reload_adult_theme() -> str:
     return ADULT_THEME
 
 
+def _load_visual_theme() -> str:
+    val = _read_settings().get("visual_theme", DEFAULT_VISUAL_THEME)
+    return val if val in VISUAL_THEME_OPTIONS else DEFAULT_VISUAL_THEME
+
+
+def save_visual_theme(theme: str) -> None:
+    if theme not in VISUAL_THEME_OPTIONS:
+        theme = DEFAULT_VISUAL_THEME
+    _update_settings(visual_theme=theme)
+
+
+def reload_visual_theme() -> str:
+    global VISUAL_THEME
+    VISUAL_THEME = _load_visual_theme()
+    return VISUAL_THEME
+
+
 def reload_app_behavior() -> None:
     reload_option_count()
     reload_narrative_pov()
@@ -904,6 +928,7 @@ def reload_app_behavior() -> None:
     reload_adult_mode()
     reload_adult_profile()
     reload_adult_theme()
+    reload_visual_theme()
     reload_expression_style()
     reload_content_weights()
     reload_auto_save_interval()

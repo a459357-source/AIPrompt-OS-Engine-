@@ -1,6 +1,8 @@
-/** UI theme — Normal (World Builder) vs Desire+ (adult_mode) */
+/** UI theme — Normal (World Builder) vs Adult Theme vs Desire+ */
 
-export type UiTheme = 'normal' | 'adult'
+export type UiTheme = 'normal' | 'adult' | 'desire'
+
+export type VisualThemeId = 'adult' | 'desire'
 
 export type AdultThemeId = 'deep_purple' | 'dark_crimson' | 'midnight_bar' | 'luxury_suite'
 
@@ -8,6 +10,13 @@ export const UI_THEME_ATTR = 'data-ui-theme'
 export const ADULT_THEME_ATTR = 'data-adult-theme'
 
 export const ADULT_THEME_NAME = 'Desire+'
+
+export const VISUAL_THEME_OPTIONS: VisualThemeId[] = ['adult', 'desire']
+
+export const VISUAL_THEME_LABELS: Record<VisualThemeId, string> = {
+  adult: 'Adult Theme',
+  desire: 'Desire+ Theme',
+}
 
 export const ADULT_THEME_OPTIONS: AdultThemeId[] = [
   'deep_purple',
@@ -65,6 +74,10 @@ export function getAdultRelationLevel(affection: number): RelationLevel {
   )
 }
 
+export function isPrivateUiTheme(theme: string | null | undefined): boolean {
+  return theme === 'adult' || theme === 'desire'
+}
+
 export function applyAdultThemePack(themeId: AdultThemeId | null) {
   const root = document.documentElement
   if (themeId) {
@@ -76,7 +89,7 @@ export function applyAdultThemePack(themeId: AdultThemeId | null) {
 
 export function applyUiTheme(theme: UiTheme, adultThemePack?: AdultThemeId | null) {
   document.documentElement.setAttribute(UI_THEME_ATTR, theme)
-  if (theme === 'adult') {
+  if (isPrivateUiTheme(theme)) {
     applyAdultThemePack(adultThemePack ?? 'deep_purple')
     document.documentElement.style.setProperty('--story-max-width', '800px')
   } else {
@@ -95,6 +108,7 @@ export function applyUiTheme(theme: UiTheme, adultThemePack?: AdultThemeId | nul
 
 export const ADULT_MODE_EVENT = 'adult-mode-changed'
 export const ADULT_THEME_EVENT = 'adult-theme-changed'
+export const VISUAL_THEME_EVENT = 'visual-theme-changed'
 
 export function dispatchAdultModeChange(adultMode: boolean) {
   window.dispatchEvent(new CustomEvent(ADULT_MODE_EVENT, { detail: { adultMode } }))
@@ -102,4 +116,8 @@ export function dispatchAdultModeChange(adultMode: boolean) {
 
 export function dispatchAdultThemeChange(adultTheme: AdultThemeId) {
   window.dispatchEvent(new CustomEvent(ADULT_THEME_EVENT, { detail: { adultTheme } }))
+}
+
+export function dispatchVisualThemeChange(visualTheme: VisualThemeId) {
+  window.dispatchEvent(new CustomEvent(VISUAL_THEME_EVENT, { detail: { visualTheme } }))
 }
