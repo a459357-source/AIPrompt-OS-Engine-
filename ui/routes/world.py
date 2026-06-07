@@ -13,6 +13,39 @@ router = APIRouter(tags=["world"])
 _REL_TYPES = frozenset({"friend", "lover", "family", "teacher", "rival", "ally", "enemy"})
 _REL_METRICS = ("affection", "trust", "respect", "dependence", "hostility", "attraction")
 
+_PERSONALITY_BRAIN_KEYS = frozenset({"desire", "fear", "taboo", "secret", "values"})
+
+
+def _is_brain_personality(raw) -> bool:
+    return isinstance(raw, dict) and any(k in raw for k in _PERSONALITY_BRAIN_KEYS)
+
+
+def _normalize_character_personality(ch: dict) -> dict:
+    """Ensure character has normalized personality brain (from AI or form)."""
+    from engine.character_brain import normalize_personality, seed_personality_from_world
+
+    ch = ch if isinstance(ch, dict) else {}
+    if _is_brain_personality(ch.get("personality")):
+        ch["personality"] = normalize_personality(ch["personality"])
+    else:
+        ch["personality"] = seed_personality_from_world(ch)
+    return ch
+
+
+def _apply_character_personality_from_ai(result: dict) -> None:
+    """Normalize AI character JSON: brain personality vs legacy personality tags."""
+    from engine.character_brain import normalize_personality, seed_personality_from_world
+
+    raw_p = result.get("personality")
+    if _is_brain_personality(raw_p):
+        result["personality"] = normalize_personality(raw_p)
+    elif "personality_tags" not in result and "personality" in result:
+        p = result.pop("personality")
+        result["personality_tags"] = [p] if isinstance(p, str) else (p if isinstance(p, list) else [])
+        result["personality"] = seed_personality_from_world(result)
+    else:
+        result["personality"] = seed_personality_from_world(result)
+
 
 def _clamp_rel_metric(value, default: int = 50) -> int:
     try:
@@ -385,9 +418,7 @@ async def create_new_story(
             "background": ch.get("background", ""),
             "special_ability": ch.get("special_ability", ""),
         }
-        from engine.character_brain import seed_personality_from_world
-
-        char_data["personality"] = seed_personality_from_world(char_data)
+        _normalize_character_personality(char_data)
         if isinstance(char_data["role_tags"], str): char_data["role_tags"] = [char_data["role_tags"]]
         if isinstance(char_data["personality_tags"], str): char_data["personality_tags"] = [char_data["personality_tags"]]
         if isinstance(char_data["relationship"], str): char_data["relationship"] = [char_data["relationship"]]
@@ -622,6 +653,13 @@ async def generate_world(keywords: str = Form(""), adult_mode: str = Form("")):
       "relationship": ["与主角关系"],
       "goal": "角色目标",
       "secret": "隐藏秘密",
+      "personality": {{
+        "desire": "核心欲望（可与 goal 呼应）",
+        "fear": "最深恐惧",
+        "taboo": "行为禁忌（触犯时即使高好感也会拒绝）",
+        "secret": "隐藏秘密（可与 secret 字段一致）",
+        "values": ["价值观1", "价值观2"]
+      }},
       "background": "背景经历（主角）",
       "special_ability": "特殊能力（主角）"
     }}
@@ -661,7 +699,7 @@ async def generate_world(keywords: str = Form(""), adult_mode: str = Form("")):
 1. 先设计 factions（至少2个互相对立的势力），再为 characters 分配隶属；优先用 factionMemberships（可多个，visibility 为 public 或 hidden）；至少有一个 public 隶属；faction 字段可填主要明面势力名
 2. factions[].leader 应填写该势力首领的角色姓名；首领通常 public 隶属本势力，也可有 hidden 双重身份
 3. characters 必须包含 1 名主角（isMain:true）和至少 1 名 NPC（isMain:false）
-4. 角色要有个性，包含外貌、性格标签、目标、隐藏秘密
+4. 角色要有个性，包含外貌、性格标签、目标、隐藏秘密，以及 personality 人格核心（desire/fear/taboo/secret/values）
 5. 主角和至少1个NPC之间要有潜在的戏剧冲突或情感张力
 6. 初始场景要具体、有画面感；world 不超过 300 字
 7. stats 根据故事类型设计2-3个专属追踪维度
@@ -683,6 +721,12 @@ async def generate_world(keywords: str = Form(""), adult_mode: str = Form("")):
             result["characters"] = _link_character_factions(
                 result.get("characters"), result.get("factions")
             )
+        if result.get("characters"):
+            result["characters"] = [
+                _normalize_character_personality(dict(c))
+                for c in (result.get("characters") or [])
+                if isinstance(c, dict)
+            ]
         if result.get("artifacts"):
             result["artifacts"] = _link_artifact_owners(
                 result.get("artifacts"),
@@ -754,9 +798,9 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
 角色定位：{char_role or '重要NPC'}
 {adult_char_hint}
 
-输出格式：{{"name":"角色名","isMain":false,"faction":"主要明面势力（可选，与 factionMemberships 一致）","factionMemberships":[{{"faction":"势力名","visibility":"public|hidden"}}],"role_tags":["身份"],"personality_tags":["性格1","性格2","性格3"],"appearance":"外貌特征（10~30字）","relationship":["与主角关系"],"goal":"角色目标","secret":"隐藏秘密"}}
+输出格式：{{"name":"角色名","isMain":false,"faction":"主要明面势力（可选，与 factionMemberships 一致）","factionMemberships":[{{"faction":"势力名","visibility":"public|hidden"}}],"role_tags":["身份"],"personality_tags":["性格1","性格2","性格3"],"appearance":"外貌特征（10~30字）","relationship":["与主角关系"],"goal":"角色目标","secret":"隐藏秘密","personality":{{"desire":"核心欲望","fear":"最深恐惧","taboo":"行为禁忌","secret":"隐藏秘密","values":["价值观1","价值观2"]}}}}
 
-要求：角色要有个性、有目标、有秘密；若已有势力列表，用 factionMemberships 指定隶属（可多个，hidden 表示暗中）；只输出JSON。"""
+要求：角色要有个性、有目标、有秘密；personality 须完整且 taboo 要明确（行为红线）；若已有势力列表，用 factionMemberships 指定隶属（可多个，hidden 表示暗中）；只输出JSON。"""
     elif field == "rel_system":
         ctx = f"标题：{title}，世界观：{world[:200] if world else context[:200]}"
         user = f"为以下 Galgame 推荐关系阶段系统（必须是双向的！包含正面和负面阶段，共6-10个）：\n{ctx}\n\n关系应有正反两面，例如：崩坏←敌视←对立←冷漠←疏远←陌生→认识→信赖→盟友→羁绊\n\n输出JSON：{{\"rel_stages\":[\"负面阶段\",...,\"陌生\",...,\"正面阶段\"],\"rel_affection\":0}}"
@@ -792,9 +836,7 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
                 # Normalize: AI might return singular strings instead of lists
                 if "role_tags" not in result and "role" in result:
                     result["role_tags"] = [result.pop("role")] if isinstance(result.get("role"), str) else result.pop("role")
-                if "personality_tags" not in result and "personality" in result:
-                    p = result.pop("personality")
-                    result["personality_tags"] = [p] if isinstance(p, str) else p
+                _apply_character_personality_from_ai(result)
                 if "relationship" in result and isinstance(result["relationship"], str):
                     result["relationship"] = [result["relationship"]]
                 # Ensure list fields are lists

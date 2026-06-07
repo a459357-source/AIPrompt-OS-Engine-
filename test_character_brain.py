@@ -23,6 +23,25 @@ def test_seed_personality_from_world_maps_fields():
     assert p["values"] == ["冷静", "高傲"]
 
 
+def test_seed_personality_preserves_explicit_brain():
+    ch = {
+        "goal": "获得自由",
+        "secret": "表层秘密",
+        "personality_tags": ["冷静"],
+        "personality": {
+            "desire": "掌控命运",
+            "fear": "失去继承权",
+            "taboo": "被命令",
+            "secret": "私藏禁书",
+            "values": ["荣誉"],
+        },
+    }
+    p = seed_personality_from_world(ch)
+    assert p["desire"] == "掌控命运"
+    assert p["taboo"] == "被命令"
+    assert p["secret"] == "私藏禁书"
+
+
 def test_hybrid_filter_core_always_recent_background_only():
     session = {
         "turn": 20,

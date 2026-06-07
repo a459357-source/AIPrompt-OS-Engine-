@@ -33,7 +33,8 @@ import {
 } from '@/lib/factionMembership'
 import { t, tTheme } from '@/lib/i18n'
 import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
-import type { Character, WorldGenResponse } from '@/lib/types'
+import type { Character, WorldGenResponse, PersonalityBrain } from '@/lib/types'
+import { EMPTY_PERSONALITY_BRAIN } from '@/lib/types'
 import { STORY_PRESETS, type StoryPreset } from '@/lib/storyPresets'
 
 const WORLD_BUILDER_FORM_ID = 'world-builder-form'
@@ -50,6 +51,18 @@ const factionMembershipSchema = z.object({
   visibility: z.enum(['public', 'hidden']),
 })
 
+const PERSONALITY_BRAIN_VALUE_PRESETS = [
+  '荣誉', '自由', '血统', '忠诚', '利益', '正义', '家族', '权力', '爱情', '生存',
+]
+
+const personalityBrainSchema = z.object({
+  desire: z.string(),
+  fear: z.string(),
+  taboo: z.string(),
+  secret: z.string(),
+  values: z.array(z.string()),
+})
+
 // ── Schema ──
 const characterSchema = z.object({
   name: z.string().min(1, '必填'),
@@ -62,9 +75,70 @@ const characterSchema = z.object({
   relationship: z.array(z.string()),
   goal: z.string(),
   secret: z.string(),
+  personality: personalityBrainSchema,
   background: z.string(),
   special_ability: z.string(),
 })
+
+function emptyCharacter(isMain: boolean): FormValues['characters'][number] {
+  return {
+    name: '',
+    isMain,
+    role_tags: [],
+    personality_tags: [],
+    appearance: '',
+    relationship: [],
+    goal: '',
+    secret: '',
+    personality: { ...EMPTY_PERSONALITY_BRAIN },
+    background: '',
+    special_ability: '',
+  }
+}
+
+function normalizeFormPersonality(
+  c: Partial<Character & { personality?: PersonalityBrain }>,
+): PersonalityBrain {
+  const p = c.personality
+  if (p && (p.desire || p.fear || p.taboo || p.secret || (p.values?.length ?? 0) > 0)) {
+    return {
+      desire: p.desire || c.goal || '',
+      fear: p.fear || '',
+      taboo: p.taboo || '',
+      secret: p.secret || c.secret || '',
+      values: p.values?.length ? p.values : [...(c.personality_tags || [])],
+    }
+  }
+  return {
+    desire: c.goal || '',
+    fear: '',
+    taboo: '',
+    secret: c.secret || '',
+    values: [...(c.personality_tags || [])],
+  }
+}
+
+function applyGeneratedPersonality(
+  target: FormValues['characters'][number],
+  data: Partial<Character & { personality?: PersonalityBrain }>,
+): void {
+  const p = data.personality
+  if (p && typeof p === 'object') {
+    target.personality = {
+      desire: p.desire || data.goal || target.personality.desire || '',
+      fear: p.fear || '',
+      taboo: p.taboo || '',
+      secret: p.secret || data.secret || target.personality.secret || '',
+      values: p.values?.length ? p.values : target.personality.values,
+    }
+  } else if (data.goal || data.secret) {
+    target.personality = normalizeFormPersonality({
+      ...target,
+      goal: data.goal || target.goal,
+      secret: data.secret || target.secret,
+    })
+  }
+}
 
 const formSchema = z.object({
   title: z.string().min(1, '请输入标题').max(20, '最多20字'),
@@ -429,18 +503,7 @@ export default function NewStory() {
       genre: [],
       scene: '',
       main_goal: '',
-      characters: [
-        {
-          name: '', isMain: true, role_tags: [], personality_tags: [],
-          appearance: '', relationship: [], goal: '', secret: '',
-          background: '', special_ability: '',
-        },
-        {
-          name: '', isMain: false, role_tags: [], personality_tags: [],
-          appearance: '', relationship: [], goal: '', secret: '',
-          background: '', special_ability: '',
-        },
-      ],
+      characters: [emptyCharacter(true), emptyCharacter(false)],
       rel_stages: DEFAULT_STAGES,
       rel_affection: 0,
     },
@@ -467,7 +530,16 @@ export default function NewStory() {
     if (!restoredData) return
     const saved = restoredData as NewStorySavedState & Partial<FormValues>
     if (saved.form && typeof saved.form === 'object') {
-      Object.entries(saved.form).forEach(([key, val]) => {
+      const form = saved.form as FormValues
+      if (form.characters?.length) {
+        form.characters = form.characters.map((c) => ({
+          ...c,
+          personality: c.personality
+            ? { ...EMPTY_PERSONALITY_BRAIN, ...c.personality }
+            : normalizeFormPersonality(c),
+        }))
+      }
+      Object.entries(form).forEach(([key, val]) => {
         setValue(key as keyof FormValues, val as never)
       })
       setFactions(saved.factions || [])
@@ -500,11 +572,7 @@ export default function NewStory() {
     setValue('main_goal', seed.main_goal)
     setFactions(mapGeneratedFactions(seed.factions as unknown as Array<Record<string, unknown>>))
     const base = getValues('characters')
-    const emptyChar = (): FormValues['characters'][number] => ({
-      name: '', isMain: false, role_tags: [], personality_tags: [],
-      appearance: '', relationship: [], goal: '', secret: '',
-      background: '', special_ability: '',
-    })
+    const emptyChar = (): FormValues['characters'][number] => emptyCharacter(false)
     const merged = (seed.characters || []).map((c, i) => ({
       ...(base[i] || emptyChar()),
       ...c,
@@ -584,6 +652,7 @@ export default function NewStory() {
         relationship: Array.isArray(c.relationship) ? c.relationship : [],
         goal: c.goal || '',
         secret: c.secret || '',
+        personality: normalizeFormPersonality(c as Character & { personality?: PersonalityBrain }),
         background: c.background || '',
         special_ability: c.special_ability || '',
       }, facs),
@@ -742,6 +811,7 @@ export default function NewStory() {
       if (data.relationship) chars[idx].relationship = Array.isArray(data.relationship) ? data.relationship : [data.relationship]
       if (data.goal) chars[idx].goal = data.goal
       if (data.secret) chars[idx].secret = data.secret
+      applyGeneratedPersonality(chars[idx], data as Character & { personality?: PersonalityBrain })
       setValue('characters', chars)
       showStatus('✅ 角色生成完成', 'success')
     } catch (e) {
@@ -770,6 +840,8 @@ export default function NewStory() {
         npc?.relationship?.length ? `关系描述：${npc.relationship.join('、')}` : '',
         npc?.goal ? `NPC目标：${npc.goal}` : '',
         npc?.secret ? `NPC秘密：${npc.secret}` : '',
+        npc?.personality?.taboo ? `NPC禁忌：${npc.personality.taboo}` : '',
+        npc?.personality?.desire ? `NPC欲望：${npc.personality.desire}` : '',
       ].filter(Boolean).join('\n')
       const data = await generateField({ adultMode,
         field: 'character_relation',
@@ -1365,11 +1437,7 @@ export default function NewStory() {
                   type="button"
                   variant="outline"
                   size="xs"
-                  onClick={() => append({
-                    name: '', isMain: false, role_tags: [], personality_tags: [],
-                    appearance: '', relationship: [], goal: '', secret: '',
-                    background: '', special_ability: '',
-                  })}
+                  onClick={() => append(emptyCharacter(false))}
                 >
                   ➕ 新增 NPC
                 </Button>
@@ -1517,6 +1585,45 @@ export default function NewStory() {
                                   placeholder="用于制造剧情爆点…"
                                   className="border-game-secret/40 bg-game-secret/10 text-game-accent placeholder:text-game-dim"
                                 />
+                              </div>
+
+                              <div className="space-y-2 rounded-md border border-game-border/50 bg-game-bg/20 p-3">
+                                <Label className="text-[11px] text-game-text">🧠 人格核心</Label>
+                                <div>
+                                  <Label className="text-[10px] text-game-muted">欲望</Label>
+                                  <Input
+                                    {...register(`characters.${idx}.personality.desire`)}
+                                    placeholder="角色最想要什么…"
+                                    className="text-xs h-8 mt-0.5"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-[10px] text-game-muted">恐惧</Label>
+                                  <Input
+                                    {...register(`characters.${idx}.personality.fear`)}
+                                    placeholder="角色最害怕什么…"
+                                    className="text-xs h-8 mt-0.5"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-[10px] text-game-accent">禁忌</Label>
+                                  <Input
+                                    {...register(`characters.${idx}.personality.taboo`)}
+                                    placeholder="触犯时即使高好感也会拒绝…"
+                                    className="text-xs h-8 mt-0.5 border-game-secret/40"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-[10px] text-game-muted">价值观</Label>
+                                  <TagInput
+                                    value={c?.personality?.values || []}
+                                    onChange={(values) => setValue(`characters.${idx}.personality.values`, values)}
+                                    presets={PERSONALITY_BRAIN_VALUE_PRESETS}
+                                    placeholder="荣誉、自由…"
+                                    color="primary"
+                                    compact
+                                  />
+                                </div>
                               </div>
 
                               {/* Priority 4: Personality */}

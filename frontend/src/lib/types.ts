@@ -13,6 +13,7 @@ export interface Character {
   secret: string
   background: string
   special_ability: string
+  personality?: PersonalityBrain
   notes?: string
   trust_pct?: number   // 实际信任度 0-100，来自 memory.json（NPC 页面展示用）
 }
@@ -121,6 +122,7 @@ export interface FieldGenResponse {
   relationship?: string[]
   goal?: string
   secret?: string
+  personality?: PersonalityBrain
   isMain?: boolean
   faction?: string
   factionMemberships?: Array<{ faction: string; visibility: 'public' | 'hidden' }>
