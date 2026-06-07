@@ -88,6 +88,17 @@ def lore_env(tmp_path, monkeypatch):
     return {"world_pack_path": wp, "session_path": ss, "memory_path": mem}
 
 
+def test_normalize_rel_entry_only_explicit_fields():
+    from engine.supplement_lore import _normalize_rel_entry
+
+    assert _normalize_rel_entry({"affection": 40}) == {"affection": 40}
+    assert _normalize_rel_entry({"relationshipType": "rival", "tags": ["竞争"]}) == {
+        "relationshipType": "rival",
+        "tags": ["竞争"],
+    }
+    assert _normalize_rel_entry({}) == {}
+
+
 def test_apply_supplement_story_prompt_and_relation(lore_env):
     analysis = {
         "story_prompt": "禁止出现现代武器。",

@@ -100,17 +100,21 @@ def _remap_relation_keys(raw: dict, npc_names: list[str]) -> dict:
 
 
 def _normalize_rel_entry(rel: dict) -> dict:
-    rel_type = rel.get("relationshipType", "friend")
-    if rel_type not in _REL_TYPES:
-        rel_type = "friend"
+    out: dict[str, Any] = {}
+    rel_type = rel.get("relationshipType")
+    if isinstance(rel_type, str) and rel_type in _REL_TYPES:
+        out["relationshipType"] = rel_type
+    for metric in _REL_METRICS:
+        raw = rel.get(metric)
+        if isinstance(raw, (int, float)):
+            out[metric] = _clamp_rel_metric(raw, 50)
     tags = rel.get("tags") or []
     if not isinstance(tags, list):
         tags = [tags] if tags else []
-    return {
-        "relationshipType": rel_type,
-        **{m: _clamp_rel_metric(rel.get(m), 50) for m in _REL_METRICS},
-        "tags": [str(t).strip() for t in tags if t and str(t).strip()][:6],
-    }
+    tags = [str(t).strip() for t in tags if t and str(t).strip()][:6]
+    if tags:
+        out["tags"] = tags
+    return out
 
 
 def _normalize_stats(raw: Any) -> list[dict]:
@@ -239,95 +243,50 @@ def _build_analysis_context(world_pack: dict, session_state: dict) -> str:
 
 def _analysis_prompt(context: str, user_text: str) -> tuple[str, str]:
     system = (
-        "你是 Galgame 设定分析师。玩家会在游戏进行中补充设定。"
-        "输出字段须与「一键生成完整设定」同一套数据结构（见下方 JSON）。"
+        "你是 Galgame 设定提取器，不是创作者。"
+        "任务：把玩家补充文本里**明确写出**的信息映射到 JSON 字段。"
+        "禁止推断、联想、补全、扩写玩家未写的内容。"
         "只输出合法 JSON，不要 markdown。"
     )
-    user = f"""{context}
+    user = f"""以下「已有设定上下文」仅用于匹配已有角色/势力/物品名称，**不得**从中抽取或补充玩家未写的内容。
 
-【玩家补充设定】
+{context}
+
+【玩家补充设定 — 唯一信息来源】
 {user_text.strip()}
 
-请分析并输出 JSON（与新建故事「一键生成」字段对齐，另加 story_prompt）：
+请分析并输出 JSON（字段结构与「一键生成」对齐，另加 story_prompt）：
 {{
-  "story_prompt": "叙事规则/风格禁忌/剧情约束等，仅写入本故事 prompt，不放实体设定。无则空字符串",
-  "title": "故事标题（8~20字，仅变更时填写，否则省略或空字符串）",
-  "world": "世界观背景（50~300字，仅变更时填写）",
-  "genre": ["类型标签"],
-  "scene": "场景/地点名称（仅变更或新增地点时填写）",
-  "scene_desc": "场景描述（可选，配合 scene）",
-  "main_goal": "主线目标（仅变更时填写）",
-  "rel_stages": ["关系阶段标签，6~10个，双向从疏远到亲密，仅变更时填写"],
-  "rel_affection": 0,
-  "stats": [
-    {{"action": "add|update", "key": "english_key", "label": "中文维度名", "max": 100}}
-  ],
-  "characters": [
-    {{
-      "action": "add|update",
-      "name": "角色名",
-      "is_main": false,
-      "faction": "主要明面势力",
-      "factionMemberships": [{{"faction": "势力名", "visibility": "public|hidden"}}],
-      "role_tags": ["身份"],
-      "personality_tags": ["性格"],
-      "appearance": "外貌",
-      "relationship": ["与主角关系"],
-      "goal": "目标",
-      "secret": "秘密",
-      "background": "背景",
-      "special_ability": "能力"
-    }}
-  ],
-  "factions": [
-    {{
-      "action": "add|update",
-      "name": "势力名",
-      "type": "government|corporation|family|organization|guild|school|religion|kingdom|other",
-      "description": "描述",
-      "goals": ["目标"],
-      "resources": ["资源"],
-      "controlledTerritories": ["区域"],
-      "subordinateOrganizations": ["下属"],
-      "keyAssets": ["资产"],
-      "power": {{"military": 0, "economic": 0, "political": 0, "technology": 0}},
-      "influence": 50,
-      "relation_to_player": "neutral",
-      "leader": "首领角色名"
-    }}
-  ],
-  "artifacts": [
-    {{
-      "action": "add|update",
-      "name": "物品名",
-      "type": "personal|faction|world",
-      "description": "描述",
-      "ownerType": "character|faction|none",
-      "ownerId": "持有者名",
-      "importance": 50,
-      "abilities": ["能力"],
-      "tags": ["标签"]
-    }}
-  ],
-  "characterRelations": {{
-    "NPC姓名": {{
-      "relationshipType": "friend|lover|family|teacher|rival|ally|enemy",
-      "affection": 0, "trust": 0, "respect": 0,
-      "dependence": 0, "hostility": 0, "attraction": 0,
-      "tags": ["标签"]
-    }}
-  }},
-  "summary": "用中文简要说明本次更新了哪些内容"
+  "story_prompt": "玩家文本中的叙事规则/风格禁忌/剧情约束（轻度整理，不增删含义）。无则 \"\"",
+  "title": "",
+  "world": "",
+  "genre": [],
+  "scene": "",
+  "scene_desc": "",
+  "main_goal": "",
+  "rel_stages": [],
+  "stats": [],
+  "characters": [],
+  "factions": [],
+  "artifacts": [],
+  "characterRelations": {{}},
+  "summary": "仅概括玩家文本中实际提取到了什么"
 }}
 
-规则：
-1. 仅根据玩家补充提取/推断，不要编造无关内容
-2. 写作规则/禁忌/叙事约束 → story_prompt；结构化设定 → 对应字段
-3. update 只填变更字段；add 需填完整基础信息
-4. 不修改主角 is_main；新增角色默认 NPC
-5. characterRelations 的 key 须与 NPC 姓名一致（含本次 add 的角色）
-6. ownerId / leader / faction 须与已有或本次新增的角色/势力名一致
-7. 未涉及的字段：字符串用 ""，数组用 []，数字可省略"""
+各字段仅在玩家文本**明确提到**时才填写，结构示例（不要照抄示例值）：
+- characters[].action: add|update；update 只含玩家提到的字段；add 时 name 必填，其余字段仅填玩家写到的属性
+- factions / artifacts 同上
+- characterRelations：只含玩家明确提到的 NPC；六维数值只输出玩家写到的维度，未写不要输出
+- rel_affection：仅当玩家明确给出初始/当前好感数值时才输出该字段，否则整个字段省略
+
+【硬性规则 — 违反即为错误】
+1. **唯一信源**：只从「玩家补充设定」段落提取，禁止编造、推断、补全
+2. 玩家没写的字段：字符串用 ""，数组用 []，对象用 {{}}；数字字段整个省略，禁止填 0 占位
+3. 不要把已有上下文里的设定写进输出，除非玩家文本明确引用或修改它们
+4. 禁止为 add 角色自动补外貌、性格、目标、秘密、关系数值等未提及内容
+5. 不修改主角 is_main；新增角色默认 is_main=false
+6. ownerId / leader / faction 须是玩家文本或已有设定中可对应的名称
+7. 无法映射到结构化字段的叙述性内容 → 只放入 story_prompt（不增删含义）"""
     return system, user
 
 
@@ -352,7 +311,11 @@ def _normalize_analysis(raw: dict, npc_names: list[str]) -> dict:
         "scene_desc": str(raw.get("scene_desc") or "").strip(),
         "main_goal": str(raw.get("main_goal") or "").strip(),
         "rel_stages": rel_stages,
-        "rel_affection": raw.get("rel_affection"),
+        "rel_affection": (
+            raw.get("rel_affection")
+            if "rel_affection" in raw and isinstance(raw.get("rel_affection"), (int, float))
+            else None
+        ),
         "stats": _normalize_stats(raw.get("stats")),
         "characters": [],
         "factions": [],
@@ -401,7 +364,9 @@ def _normalize_analysis(raw: dict, npc_names: list[str]) -> dict:
         remapped = _remap_relation_keys(rel_raw, npc_names)
         for npc, rel in remapped.items():
             if isinstance(rel, dict):
-                out["characterRelations"][npc] = _normalize_rel_entry(rel)
+                normalized = _normalize_rel_entry(rel)
+                if normalized:
+                    out["characterRelations"][npc] = normalized
 
     return out
 
@@ -452,7 +417,7 @@ def _apply_rel_system(analysis: dict, world_pack: dict) -> list[str]:
         changes.append("更新关系阶段")
 
     aff = analysis.get("rel_affection")
-    if isinstance(aff, (int, float)):
+    if aff is not None and isinstance(aff, (int, float)):
         rel_sys["affection"] = max(0, min(100, int(aff)))
         changes.append("更新初始好感")
 
@@ -707,7 +672,7 @@ def analyze_supplement(user_text: str) -> dict:
     system, user = _analysis_prompt(context, text)
     raw = call_deepseek(
         system, user,
-        temperature=0.7,
+        temperature=0.3,
         max_tokens=min(config.MAX_TOKENS, 4096),
         skip_validation=True,
     )
