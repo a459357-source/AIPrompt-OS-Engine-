@@ -409,8 +409,11 @@ async def api_dashboard():
     analytics = compute_all()
 
     from engine.dashboard import _build_mermaid
+    from engine.plot_director import dashboard_payload, ensure_plot_state
 
     mermaid_src = _build_mermaid(nodes, edges, mem_chars)
+    plot_state = ensure_plot_state(world_pack)
+    plot_director = dashboard_payload(plot_state, state, world_pack)
 
     return JSONResponse({
         "turn": turn,
@@ -432,6 +435,7 @@ async def api_dashboard():
             "mermaid": mermaid_src,
             "current_node": graph.get("current_node"),
         },
+        "plot_director": plot_director,
     })
 
 

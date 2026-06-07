@@ -23,6 +23,10 @@
         └─ 没有 → 修订号（默认 build_release.py）
 ```
 
+## 当前版本
+
+- **3.1.0** — V3.1 Plot Director：主线进度与伏笔追踪、`DIRECTOR_ADVICE` 弱约束注入、Dashboard「剧情导演」面板。
+
 ## 术语说明
 
 | 术语 | 对应段 | 示例 |

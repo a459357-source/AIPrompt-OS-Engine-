@@ -412,6 +412,7 @@ def step(
         schedule_dashboard_write()
     profiler.mark("memory_start")
     _safe_call(_maybe_chapter_summary, "chapter summary update", new_state, runtime.memory)
+    _safe_call(_maybe_plot_director, "plot director analysis", new_state, runtime.memory)
     profiler.mark("memory_done")
     _safe_call(obsidian_live.on_turn, "Obsidian live export",
                response, new_state, choice)
@@ -749,6 +750,22 @@ def _maybe_chapter_summary(state: dict, memory: dict) -> None:
     from engine.memory_layers import maybe_update_chapter_summary
 
     maybe_update_chapter_summary(state, memory)
+
+
+def _maybe_plot_director(state: dict, memory: dict) -> None:
+    from engine.plot_director import (
+        ensure_plot_state,
+        maybe_analyze_plot,
+        save_plot_state,
+    )
+
+    turn = int(state.get("turn", 0) or 0)
+    if turn <= 0 or turn % config.PLOT_DIRECTOR_ANALYSIS_INTERVAL != 0:
+        return
+    world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+    plot_state = ensure_plot_state(world_pack)
+    updated = maybe_analyze_plot(plot_state, state, memory, world_pack)
+    save_plot_state(updated)
 
 
 def _update_graph(

@@ -5,7 +5,7 @@ Central config: paths, API settings, engine constants.
 Set DEEPSEEK_API_KEY in your environment before running.
 """
 
-APP_VERSION = "2.0.1"
+APP_VERSION = "3.1.0"
 
 import json
 import os
@@ -146,6 +146,7 @@ WORLD_SUMMARY_PATH   = DATA_DIR / "world_summary.json"
 CHAPTER_SUMMARIES_PATH = DATA_DIR / "chapter_summaries.json"
 TURN_PROFILE_PATH    = DATA_DIR / "turn_profile.jsonl"
 RUNTIME_MEMORY_PATH  = DATA_DIR / "runtime_memory.json"
+PLOT_STATE_PATH      = DATA_DIR / "plot_state.json"
 LOG_PATH             = DATA_DIR / "app.log"
 ERROR_LOG_PATH       = DATA_DIR / "error.log"
 
@@ -166,6 +167,13 @@ MAX_CONTEXT_ITEMS = 20
 MAX_WORLD_FACTION_ITEMS = 5
 CONTEXT_ROUTER_RECENT_TURNS = 5
 CONTEXT_ROUTER_ABSENT_TURNS = 15
+
+# ── V3.1 Plot Director ────────────────────────────────────────────
+PLOT_DIRECTOR_ENABLED = True
+PLOT_DIRECTOR_ANALYSIS_INTERVAL = 5
+PLOT_DIRECTOR_STALL_THRESHOLD = 10
+PLOT_DIRECTOR_MAX_OPEN_HOOKS = 8
+PLOT_DIRECTOR_OLD_HOOK_TURNS = 15
 
 STORY_LENGTH_MIN_RATIO_SHORT = 0.80   # target 0–1000
 STORY_LENGTH_MIN_RATIO_MEDIUM = 0.85  # 1000–3000

@@ -178,3 +178,54 @@ def test_prompt_router_filters_unrelated_factions():
         assert est < 12000, f"prompt too large: ~{est} tokens"
         assert user.count("海外商会") <= user.count("皇室")
         assert user.count("江湖门派") <= user.count("长公主")
+
+
+def test_prompt_includes_director_advice_placeholder():
+    session = {
+        "turn": 15,
+        "scene": "场景",
+        "status": "BUILD",
+        "chapter": 1,
+        "characters": {},
+        "history": [{"turn": 14, "options": ["a", "b", "c", "d"]}],
+    }
+    world = {"world": {"title": "T", "main_goal": "拯救王国", "characters": []}}
+    plot_state = {
+        "main_plot": {"name": "拯救王国", "progress": 5, "stage": 1},
+        "unresolved_hooks": [],
+        "resolved_hooks": [],
+        "last_progress_turn": 0,
+        "last_analysis_turn": 0,
+    }
+
+    with patch("engine.builder.io_utils.read_yaml") as ry, \
+         patch("engine.builder.load_memory", return_value={}), \
+         patch("engine.builder.ensure_plot_state", return_value=plot_state), \
+         patch("engine.builder.build_director_advice", return_value="【剧情导演建议】测试"), \
+         patch("engine.builder.build_hot_context", return_value="HOT"), \
+         patch("engine.builder.build_long_term_memory", return_value=""), \
+         patch("engine.builder.build_recent_summaries", return_value=""), \
+         patch("engine.builder.load_world_summary_text", return_value="世界"), \
+         patch("engine.memory_layers.load_chapter_summaries", return_value=[]):
+        template = {
+            "system": "sys {{FORCE_EVENT_NOTICE}} {{STORY_LENGTH}} {{STORY_LENGTH_MIN}} {{STORY_LENGTH_MAX}} {{AI_BEHAVIOR_RULES}} {{OPTION_COUNT}} {{CUSTOM_RULES}} {{MAIN_GOAL}}",
+            "user": "{{WORLD}}\n{{HOT_CONTEXT}}\n{{DIRECTOR_ADVICE}}\n{{LAST_CHOICE}}",
+        }
+
+        def _yaml(path, use_cache=True):
+            p = str(path).replace("\\", "/")
+            if "session_state" in p:
+                return session
+            if "world_pack" in p:
+                return world
+            if p.endswith("engine.yaml"):
+                return {"rules": []}
+            if "prompt_template" in p:
+                return template
+            return template
+        ry.side_effect = _yaml
+
+        _, user = build_prompt(current_choice="A")
+        assert "{{DIRECTOR_ADVICE}}" not in user
+        assert "剧情导演建议" in user
+        assert "测试" in user

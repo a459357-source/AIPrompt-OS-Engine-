@@ -125,6 +125,8 @@ def test_dashboard_endpoint():
     data = resp.json()
     assert "turn" in data
     assert "analytics" in data  # should include analytics now
+    assert "plot_director" in data
+    assert "main_plot" in data["plot_director"]
     print("✅ 仪表盘端点: PASS")
 
 

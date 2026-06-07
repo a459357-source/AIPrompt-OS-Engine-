@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import mermaid from 'mermaid'
 import { motion } from 'framer-motion'
-import { Activity, BarChart3, GitBranch, Network, Clock } from 'lucide-react'
+import { Activity, BarChart3, GitBranch, Network, Clock, Clapperboard } from 'lucide-react'
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement, PointElement,
@@ -24,7 +24,7 @@ import { useAppSettings } from '@/hooks/useAppSettings'
 import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
 import { t, tTheme } from '@/lib/i18n'
 
-type DashSection = 'overview' | 'timeline' | 'network' | 'branch' | 'factions'
+type DashSection = 'overview' | 'timeline' | 'network' | 'branch' | 'factions' | 'director'
 
 const CHART_COLORS = [
   '#00f0ff', '#7b5cff', '#ff2d95', '#ffb870',
@@ -110,6 +110,7 @@ export default function Dashboard() {
     activeSection === 'network' ? Network :
     activeSection === 'branch' ? GitBranch :
     activeSection === 'factions' ? BarChart3 :
+    activeSection === 'director' ? Clapperboard :
     Activity
 
   const navItems = useMemo(() => [
@@ -118,6 +119,7 @@ export default function Dashboard() {
     { id: 'network', label: t('dashboard.network', lang), icon: <Network className="w-4 h-4" /> },
     { id: 'branch', label: t('dashboard.branch', lang), icon: <GitBranch className="w-4 h-4" /> },
     { id: 'factions', label: t('dashboard.factions', lang), icon: <BarChart3 className="w-4 h-4" /> },
+    { id: 'director', label: t('dashboard.director', lang), icon: <Clapperboard className="w-4 h-4" /> },
   ], [lang])
 
   const graphInput = useMemo(() => {
@@ -196,6 +198,11 @@ export default function Dashboard() {
           <p className="text-xs text-game-muted mt-3">
             {data.analytics.world_state_v2.relationship_network.nodes.length} 角色 ·{' '}
             {data.analytics.world_state_v2.relationship_network.edges.length} 关系边
+          </p>
+        )}
+        {activeSection === 'director' && data.plot_director && (
+          <p className="text-xs text-game-muted mt-3">
+            {data.plot_director.main_plot.progress}% · {data.plot_director.unresolved_hooks.length} 伏笔
           </p>
         )}
       </InspectorPanel>
@@ -629,6 +636,93 @@ export default function Dashboard() {
                 <div className="h-56 max-w-sm mx-auto"><Doughnut data={choiceChart} options={{ responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#8b949e', font: { size: 11 } } } } }} /></div>
               </CardContent>
             </Card>
+          )}
+        </>
+      )}
+
+      {activeSection === 'director' && (
+        <>
+          {data.plot_director ? (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">🎬 {t('dashboard.director.progress', lang)}</CardTitle>
+                  <CardDescription>{data.plot_director.main_goal || data.plot_director.main_plot.name}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-xs text-game-muted mb-1">
+                      <span>{data.plot_director.main_plot.name}</span>
+                      <span>{data.plot_director.main_plot.progress}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-game-border/40 overflow-hidden">
+                      <div
+                        className="h-full bg-cyan-500/80 transition-all"
+                        style={{ width: `${Math.min(100, Math.max(0, data.plot_director.main_plot.progress))}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div className="border border-game-border/40 rounded-lg p-3">
+                      <p className="text-xs text-game-dim">{t('dashboard.director.stage', lang)}</p>
+                      <p className="font-bold mt-1">{data.plot_director.main_plot.stage}</p>
+                    </div>
+                    <div className="border border-game-border/40 rounded-lg p-3">
+                      <p className="text-xs text-game-dim">{t('dashboard.director.lastProgress', lang)}</p>
+                      <p className="font-bold mt-1">T{data.plot_director.last_progress_turn}</p>
+                    </div>
+                    <div className="border border-game-border/40 rounded-lg p-3">
+                      <p className="text-xs text-game-dim">{t('dashboard.director.stall', lang)}</p>
+                      <p className="font-bold mt-1">{data.plot_director.stall_turns}</p>
+                    </div>
+                    <div className="border border-game-border/40 rounded-lg p-3">
+                      <p className="text-xs text-game-dim">{t('dashboard.director.hooks', lang)}</p>
+                      <p className="font-bold mt-1">{data.plot_director.unresolved_hooks.length}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">📌 {t('dashboard.director.hooks', lang)}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {data.plot_director.unresolved_hooks.length > 0 ? (
+                    <div className="space-y-2">
+                      {data.plot_director.unresolved_hooks.map((h) => (
+                        <div key={h.id || h.title} className="flex justify-between gap-2 text-sm border border-game-border/40 rounded-lg p-3">
+                          <span className="font-medium">{h.title}</span>
+                          <Badge variant="outline" size="sm">
+                            T{h.created_turn ?? '?'} · {h.kind || 'foreshadow'}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-game-dim text-center py-4">暂无开放伏笔</p>
+                  )}
+                </CardContent>
+              </Card>
+              {data.plot_director.resolved_hooks.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">✅ {t('dashboard.director.resolved', lang)}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-1">
+                      {data.plot_director.resolved_hooks.map((h) => (
+                        <p key={h.id || h.title} className="text-xs text-game-muted">
+                          {h.title}
+                          {h.resolved_turn != null ? ` · T${h.resolved_turn}` : ''}
+                        </p>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card><CardContent className="py-8 text-center text-game-dim text-sm">暂无剧情导演数据，开局后会自动初始化</CardContent></Card>
           )}
         </>
       )}

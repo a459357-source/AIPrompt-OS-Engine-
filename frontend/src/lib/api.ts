@@ -322,6 +322,25 @@ export interface WorldStateV2 {
   }
 }
 
+export interface PlotDirectorHook {
+  id?: string
+  title: string
+  kind?: string
+  created_turn?: number
+  status?: string
+  resolved_turn?: number
+}
+
+export interface PlotDirectorData {
+  main_goal: string
+  main_plot: { name: string; progress: number; stage: number }
+  unresolved_hooks: PlotDirectorHook[]
+  resolved_hooks: PlotDirectorHook[]
+  last_progress_turn: number
+  last_analysis_turn: number
+  stall_turns: number
+}
+
 export interface DashboardData {
   turn: number
   status: string
@@ -353,6 +372,7 @@ export interface DashboardData {
     mermaid: string
     current_node?: string
   }
+  plot_director?: PlotDirectorData
   error?: string
 }
 

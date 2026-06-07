@@ -17,6 +17,7 @@ from engine.memory_layers import (
     build_recent_summaries,
     load_world_summary_text,
 )
+from engine.plot_director import build_director_advice, ensure_plot_state
 from engine.prompt_compact import (
     compact_engine_rules,
     compact_world_for_prompt,
@@ -226,6 +227,11 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
     if not world_text:
         world_text = compact_world_for_prompt(world_pack)
 
+    director_advice = ""
+    if config.PLOT_DIRECTOR_ENABLED:
+        plot_state = ensure_plot_state(world_pack)
+        director_advice = build_director_advice(plot_state, session_state)
+
     # ── Interpolate user prompt ────────────────────────────────
     user_raw = template.get("user", "")
     user_prompt = (
@@ -234,6 +240,7 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
         .replace("{{LONG_TERM_MEMORY}}", long_term)
         .replace("{{RECENT_SUMMARIES}}", recent_summaries)
         .replace("{{HOT_CONTEXT}}", hot_context)
+        .replace("{{DIRECTOR_ADVICE}}", director_advice)
         .replace("{{INTIMACY_ESCALATION_HINT}}", config.intimacy_escalation_hint(session_state))
         .replace("{{ENGINE_RULES}}", compact_engine_rules(engine_config))
         .replace("{{FORCE_EVENT_PROMPT}}", force_prompt)

@@ -34,6 +34,14 @@ def _load_candidate_pool() -> dict:
     except Exception:
         return {}
 
+
+def _load_plot_state() -> dict:
+    from engine.plot_director import load_plot_state
+    try:
+        return load_plot_state()
+    except Exception:
+        return {}
+
 # Maximum chapter content to include in a save (avoid giant save files)
 _MAX_CHAPTER_BYTES = MAX_CHAPTER_BYTES_IN_SAVE
 
@@ -54,6 +62,7 @@ def save(slot: str) -> dict | None:
         state = io_utils.read_yaml(config.SESSION_STATE_PATH)
         memory = io_utils.read_json(config.MEMORY_PATH)
         graph = io_utils.read_json(config.STORY_GRAPH_PATH)
+        plot_state = _load_plot_state()
 
         chapter = ""
         if config.CHAPTER_PATH.exists():
@@ -74,6 +83,7 @@ def save(slot: str) -> dict | None:
             "memory": memory,
             "story_graph": graph,
             "candidate_npcs": _load_candidate_pool(),
+            "plot_state": plot_state,
             "chapter": chapter,
             "content_weights": config.CONTENT_WEIGHTS,
             "adult_mode": config.ADULT_MODE,
@@ -137,6 +147,12 @@ def load(slot: str) -> dict | None:
             config.CANDIDATE_NPCS_PATH,
             snapshot.get("candidate_npcs", {}),
         )
+        if snapshot.get("plot_state"):
+            io_utils.write_json(config.PLOT_STATE_PATH, snapshot["plot_state"])
+        else:
+            from engine.plot_director import ensure_plot_state
+            world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+            ensure_plot_state(world_pack)
         if "adult_mode" in snapshot:
             config.save_adult_mode(bool(snapshot["adult_mode"]))
         if snapshot.get("content_weights"):
