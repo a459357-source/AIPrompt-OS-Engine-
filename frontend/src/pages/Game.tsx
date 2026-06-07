@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,19 @@ import { StatusToast } from '@/components/StatusToast'
 import { getGameState, startGame, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, type HistoryTurn, type GameGenSettings } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { parseRelationHints } from '@/lib/relationHints'
+
+/** Keep in sync with config.STORY_LENGTH_TOKEN_RATIO */
+const STORY_LENGTH_TOKEN_RATIO = 1.8
+
+function estimateMaxTokens(length: number, min: number, max: number, outputCap: number) {
+  const clamped = Math.max(min, Math.min(max, length))
+  return Math.max(1, Math.min(outputCap, Math.floor(clamped * STORY_LENGTH_TOKEN_RATIO)))
+}
+
+function parseDraftLength(draft: string, fallback: number) {
+  const parsed = parseInt(draft, 10)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
 
 
 interface CharInfo {
@@ -236,11 +249,12 @@ export default function Game() {
     temperature?: number
     topP?: number
     compressThreshold?: number
-  }) => {
+  }, immediate = false) => {
     if (patch.storyLength != null) {
       const clamped = Math.max(storyLengthMin, Math.min(storyLengthMax, patch.storyLength))
-      setStoryLength(clamped)
       patch.storyLength = clamped
+      setStoryLength(clamped)
+      setMaxTokens(estimateMaxTokens(clamped, storyLengthMin, storyLengthMax, maxOutputTokens))
     }
     if (patch.temperature != null) setTemperature(patch.temperature)
     if (patch.topP != null) setTopP(patch.topP)
@@ -251,10 +265,11 @@ export default function Game() {
     }
 
     pendingGenPatchRef.current = { ...pendingGenPatchRef.current, ...patch }
-    if (genSettingsTimerRef.current) clearTimeout(genSettingsTimerRef.current)
-    genSettingsTimerRef.current = setTimeout(async () => {
+
+    const flush = async () => {
       const pending = pendingGenPatchRef.current
       pendingGenPatchRef.current = {}
+      if (!Object.keys(pending).length) return
       try {
         const saved = await updateGameGenSettings(pending)
         applyGenSettings(saved)
@@ -263,8 +278,20 @@ export default function Game() {
       } catch (e) {
         logger.error('Game', 'Save gen settings failed', { error: String(e) })
       }
-    }, 600)
-  }, [storyLengthMin, storyLengthMax, contextTokens, applyGenSettings])
+    }
+
+    if (genSettingsTimerRef.current) clearTimeout(genSettingsTimerRef.current)
+    if (immediate) {
+      void flush()
+      return
+    }
+    genSettingsTimerRef.current = setTimeout(() => { void flush() }, 600)
+  }, [storyLengthMin, storyLengthMax, contextTokens, maxOutputTokens, applyGenSettings])
+
+  const previewMaxTokens = useMemo(() => {
+    const length = parseDraftLength(storyLengthDraft, storyLength)
+    return estimateMaxTokens(length, storyLengthMin, storyLengthMax, maxOutputTokens)
+  }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, maxOutputTokens])
 
   const commitStoryLengthDraft = useCallback(() => {
     const parsed = parseInt(storyLengthDraft, 10)
@@ -274,8 +301,11 @@ export default function Game() {
     }
     const clamped = Math.max(storyLengthMin, Math.min(storyLengthMax, parsed))
     setStoryLengthDraft(String(clamped))
-    if (clamped !== storyLength) queueGenSettingsSave({ storyLength: clamped })
-  }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, queueGenSettingsSave])
+    const expectedTokens = estimateMaxTokens(clamped, storyLengthMin, storyLengthMax, maxOutputTokens)
+    if (clamped !== storyLength || expectedTokens !== maxTokens) {
+      queueGenSettingsSave({ storyLength: clamped }, true)
+    }
+  }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, maxOutputTokens, maxTokens, queueGenSettingsSave])
 
   const commitCompressThresholdDraft = useCallback(() => {
     const parsed = parseInt(compressThresholdDraft, 10)
@@ -285,7 +315,7 @@ export default function Game() {
     }
     const clamped = Math.max(500, Math.min(contextTokens, parsed))
     setCompressThresholdDraft(String(clamped))
-    if (clamped !== compressThreshold) queueGenSettingsSave({ compressThreshold: clamped })
+    if (clamped !== compressThreshold) queueGenSettingsSave({ compressThreshold: clamped }, true)
   }, [compressThresholdDraft, compressThreshold, contextTokens, queueGenSettingsSave])
 
   const handleNumericFieldKeyDown = useCallback((e: React.KeyboardEvent, commit: () => void) => {
@@ -538,7 +568,7 @@ export default function Game() {
                       disabled={choosing}
                       onClick={() => {
                         setStoryLengthDraft(String(storyLengthRecommended))
-                        queueGenSettingsSave({ storyLength: storyLengthRecommended })
+                        queueGenSettingsSave({ storyLength: storyLengthRecommended }, true)
                       }}
                       className="text-xs text-game-accent hover:underline disabled:opacity-50"
                     >
@@ -550,7 +580,7 @@ export default function Game() {
                     label="最大 Token"
                     hint={`AI 单次回复上限，随字数自动匹配；官方最大 ${maxOutputTokens.toLocaleString()}`}
                   >
-                    <Badge variant="outline" size="sm" className="tabular-nums">{maxTokens.toLocaleString()}</Badge>
+                    <Badge variant="outline" size="sm" className="tabular-nums">{previewMaxTokens.toLocaleString()}</Badge>
                   </QuickGenRow>
                   <QuickGenRow
                     label="上下文"
