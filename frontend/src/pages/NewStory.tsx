@@ -662,11 +662,11 @@ export default function NewStory() {
                               <span className="text-[10px] text-game-dim shrink-0">标签</span>
                               <input
                                 type="text"
-                                value={(r.tags || []).join('、')}
-                                onChange={(e) => update('tags', e.target.value.split(/[、,，]/).map(s => s.trim()).filter(Boolean))}
-                                onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
+                                defaultValue={(r.tags || []).join('、')}
+                                onBlur={(e) => update('tags', e.target.value.split(/[、,，]/).map(s => s.trim()).filter(Boolean))}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur() } }}
                                 placeholder="青梅竹马、救命恩人…"
-                                className="flex-1 text-[10px] h-6 bg-game-bg border border-game-border rounded px-2 text-game-text"
+                                className="flex-1 text-[11px] h-6 bg-game-bg border border-game-border rounded px-2 text-game-text"
                               />
                             </div>
                           </div>
