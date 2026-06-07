@@ -6,6 +6,7 @@ import { initSettings, saveSettings } from '@/lib/settings'
 import { getAppSettings } from '@/lib/api'
 
 initSettings()
+document.documentElement.setAttribute('data-ui-theme', 'normal')
 getAppSettings().then((data) => {
   if (!data) return
   saveSettings({

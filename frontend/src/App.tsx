@@ -4,6 +4,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useAppSettings } from '@/hooks/useAppSettings'
 import { NeuralShellProvider } from '@/components/layout/NeuralShellContext'
 import { NeuralShell } from '@/components/layout/NeuralShell'
+import { AdultThemeProvider } from '@/contexts/AdultThemeContext'
 import { ApiKeyPrompt } from '@/components/ApiKeyPrompt'
 import NewStory from './pages/NewStory'
 import Game from './pages/Game'
@@ -48,14 +49,16 @@ function AppRoutes() {
 
 function App() {
   return (
-    <NeuralShellProvider>
-      <div className="h-screen overflow-hidden bg-neural-void text-game-text">
-        <ApiKeyPrompt />
-        <NeuralShell>
-          <AppRoutes />
-        </NeuralShell>
-      </div>
-    </NeuralShellProvider>
+    <AdultThemeProvider>
+      <NeuralShellProvider>
+        <div className="h-screen overflow-hidden bg-neural-void text-game-text">
+          <ApiKeyPrompt />
+          <NeuralShell>
+            <AppRoutes />
+          </NeuralShell>
+        </div>
+      </NeuralShellProvider>
+    </AdultThemeProvider>
   )
 }
 

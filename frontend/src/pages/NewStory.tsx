@@ -24,7 +24,8 @@ import { usePageShell } from '@/components/layout/usePageShell'
 import { SectionHeader } from '@/components/neural/SectionHeader'
 import { GlowDivider } from '@/components/neural/GlowDivider'
 import { parseNodeSelection } from '@/lib/worldGraphAdapter'
-import { t } from '@/lib/i18n'
+import { t, tTheme } from '@/lib/i18n'
+import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
 import type { Character, WorldGenResponse } from '@/lib/types'
 import { STORY_PRESETS, type StoryPreset } from '@/lib/storyPresets'
 
@@ -304,6 +305,7 @@ interface NewStorySavedState {
 // ── Main Page ──
 export default function NewStory() {
   const { language } = useAppSettings()
+  const adultMode = useAdultThemeOptional()?.adultMode ?? false
   const lang = language as 'zh' | 'en' | 'ja'
   const [aiStatus, setAiStatus] = useState('')
   const [aiStatusType, setAiStatusType] = useState<'info' | 'success' | 'error' | 'loading'>('info')
@@ -682,13 +684,22 @@ export default function NewStory() {
     nodePositions,
   }), [watchAll, factions, artifacts, characterRelations, nodePositions])
 
-  const navItems = useMemo(() => [
-    { id: 'core', label: t('world.core', lang), icon: <Globe className="w-4 h-4" /> },
-    { id: 'factions', label: t('world.factions', lang), icon: <Network className="w-4 h-4" /> },
-    { id: 'characters', label: t('world.characters', lang), icon: <Users className="w-4 h-4" /> },
-    { id: 'relations', label: t('world.relations', lang), icon: <GitBranch className="w-4 h-4" /> },
-    { id: 'artifacts', label: t('world.artifacts', lang), icon: <Gem className="w-4 h-4" /> },
-  ], [lang])
+  const navItems = useMemo(() => {
+    if (adultMode) {
+      return [
+        { id: 'core', label: tTheme('world.core', lang, true), icon: <Globe className="w-4 h-4" /> },
+        { id: 'relations', label: tTheme('world.relations', lang, true), icon: <GitBranch className="w-4 h-4" /> },
+        { id: 'factions', label: tTheme('world.factions', lang, true), icon: <Network className="w-4 h-4" /> },
+      ]
+    }
+    return [
+      { id: 'core', label: t('world.nav.core', lang), icon: <Globe className="w-4 h-4" /> },
+      { id: 'factions', label: t('world.nav.factions', lang), icon: <Network className="w-4 h-4" /> },
+      { id: 'characters', label: t('world.nav.characters', lang), icon: <Users className="w-4 h-4" /> },
+      { id: 'relations', label: t('world.relations', lang), icon: <GitBranch className="w-4 h-4" /> },
+      { id: 'artifacts', label: t('world.artifacts', lang), icon: <Gem className="w-4 h-4" /> },
+    ]
+  }, [lang, adultMode])
 
   useEffect(() => {
     if (!selectedNodeId) return

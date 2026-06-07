@@ -6,51 +6,55 @@ import {
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { ParticleBackground } from '@/components/neural/ParticleBackground'
+import { DesireAtmosphere } from '@/components/neural/DesireAtmosphere'
 import { WorldNavTree } from './WorldNavTree'
 import { useNeuralShell } from './NeuralShellContext'
 import { useAppSettings } from '@/hooks/useAppSettings'
-import { t } from '@/lib/i18n'
+import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
+import { t, tTheme } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
 const ROUTE_NAV = [
-  { to: '/new', icon: Globe, labelKey: 'nav.worldBuilder' },
-  { to: '/game', icon: Gamepad2, labelKey: 'nav.game' },
-  { to: '/npcs', icon: Users, labelKey: 'nav.characters' },
-  { to: '/dashboard', icon: Activity, labelKey: 'nav.worldState' },
-  { to: '/settings', icon: Settings, labelKey: 'nav.settings' },
+  { to: '/new', icon: Globe, labelKey: 'nav.worldBuilder', themeKey: true },
+  { to: '/game', icon: Gamepad2, labelKey: 'nav.game', themeKey: true },
+  { to: '/npcs', icon: Users, labelKey: 'nav.characters', themeKey: true },
+  { to: '/dashboard', icon: Activity, labelKey: 'nav.worldState', themeKey: true },
+  { to: '/settings', icon: Settings, labelKey: 'nav.settings', themeKey: false },
 ]
 
 function NeuralTopBar() {
   const location = useLocation()
   const { language } = useAppSettings()
+  const adultMode = useAdultThemeOptional()?.adultMode ?? false
+  const lang = language as 'zh' | 'en' | 'ja'
 
   return (
-    <header className="shrink-0 h-12 flex items-center justify-between px-4 border-b border-neural-cyan/10 glass-panel rounded-none border-x-0 border-t-0 z-40">
+    <header className="shrink-0 h-12 flex items-center justify-between px-4 border-b border-neural-cyan/10 glass-panel rounded-none border-x-0 border-t-0 z-40 transition-colors duration-[800ms]">
       <Link to="/" className="flex items-center gap-2 group">
-        <span className="w-2 h-2 rounded-full bg-neural-cyan neural-pulse-dot" />
-        <span className="font-neural-display text-sm font-bold text-neural-cyan neural-text-glow tracking-wider">
-          {t('brand.title', language as 'zh' | 'en' | 'ja')}
+        <span className="w-2 h-2 rounded-full bg-neural-cyan neural-pulse-dot transition-colors duration-[800ms]" />
+        <span className="font-neural-display text-sm font-bold text-neural-cyan neural-text-glow tracking-wider transition-colors duration-[800ms]">
+          {tTheme('brand.title', lang, adultMode)}
         </span>
-        <span className="hidden sm:inline text-[10px] font-neural-mono text-game-dim group-hover:text-neural-violet transition-colors">
-          {t('brand.subtitle', language as 'zh' | 'en' | 'ja')}
+        <span className="hidden sm:inline text-[10px] font-neural-mono text-game-dim group-hover:text-neural-violet transition-colors duration-[800ms]">
+          {tTheme('brand.subtitle', lang, adultMode)}
         </span>
       </Link>
       <nav className="hidden lg:flex items-center gap-1">
-        {ROUTE_NAV.map(({ to, icon: Icon, labelKey }) => {
+        {ROUTE_NAV.map(({ to, icon: Icon, labelKey, themeKey }) => {
           const active = location.pathname === to || (to === '/new' && location.pathname === '/')
           return (
             <Link
               key={to}
               to={to}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-[800ms]',
                 active
                   ? 'bg-neural-cyan/10 text-neural-cyan border border-neural-cyan/30'
                   : 'text-game-muted hover:text-game-text hover:bg-neural-glass/50',
               )}
             >
               <Icon className="w-3.5 h-3.5" />
-              {t(labelKey, language as 'zh' | 'en' | 'ja')}
+              {themeKey ? tTheme(labelKey, lang, adultMode) : tTheme(labelKey, lang, false)}
             </Link>
           )
         })}
@@ -62,24 +66,26 @@ function NeuralTopBar() {
 function NeuralDock() {
   const location = useLocation()
   const { language } = useAppSettings()
+  const adultMode = useAdultThemeOptional()?.adultMode ?? false
+  const lang = language as 'zh' | 'en' | 'ja'
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-panel border-x-0 border-b-0 rounded-none safe-area-bottom">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-panel border-x-0 border-b-0 rounded-none safe-area-bottom transition-colors duration-[800ms]">
       <div className="flex items-center justify-around px-1 py-2">
-        {ROUTE_NAV.map(({ to, icon: Icon, labelKey }) => {
+        {ROUTE_NAV.map(({ to, icon: Icon, labelKey, themeKey }) => {
           const active = location.pathname === to || (to === '/new' && location.pathname === '/')
           return (
             <Link
               key={to}
               to={to}
               className={cn(
-                'flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg min-w-0',
+                'flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg min-w-0 transition-colors duration-[800ms]',
                 active ? 'text-neural-cyan' : 'text-game-dim',
               )}
             >
               <Icon className="w-5 h-5" />
               <span className="text-[9px] leading-none truncate max-w-[56px]">
-                {t(labelKey, language as 'zh' | 'en' | 'ja')}
+                {themeKey ? tTheme(labelKey, lang, adultMode) : tTheme(labelKey, lang, false)}
               </span>
             </Link>
           )
@@ -113,6 +119,7 @@ export function NeuralShell({ children }: NeuralShellProps) {
   return (
     <div className="h-screen flex flex-col overflow-hidden relative">
       <ParticleBackground />
+      <DesireAtmosphere />
       <NeuralTopBar />
       <div className="flex-1 flex min-h-0 relative z-10 pb-14 lg:pb-0">
         {/* Desktop left panel */}

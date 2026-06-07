@@ -8,6 +8,13 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { StatusToast } from '@/components/StatusToast'
 import { InspectorPanel } from '@/components/layout/InspectorPanel'
 import { usePageShell } from '@/components/layout/usePageShell'
@@ -16,9 +23,10 @@ import { getGameState, startGameOnce, nextTurn, getHistory, getGameGenSettings, 
 import { logger } from '@/lib/logger'
 import { parseOptionEffects, deltaArrow, type RelationHint } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
-import { applyBgTheme, BG_THEME_LABELS } from '@/lib/settings'
 import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS, MAX_WIDTH_OPTIONS } from '@/lib/settings'
-import { t } from '@/lib/i18n'
+import { dispatchAdultModeChange, getAdultRelationLevel } from '@/lib/theme'
+import { t, tTheme } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
 
 /** Keep in sync with config.py */
 const STORY_CHAR_TO_TOKEN = 1.35
@@ -198,13 +206,29 @@ function OptionEffectsInline({
   )
 }
 
-function AffectionBar({ value }: { value: number; name?: string }) {
-  // 防御 NaN / undefined / 负数（避免 '█'.repeat(NaN) 崩溃）
+function AffectionBar({ value, adultMode = false }: { value: number; name?: string; adultMode?: boolean }) {
   const safe = Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 50
-  // 双向条：左5格=敌意(红)，右5格=好感(绿)，50%为中性
-  const hostility = Math.max(0, Math.min(5, Math.round((50 - safe) / 10)))  // 0~5 红色
-  const affection = Math.max(0, Math.min(5, Math.round((safe - 50) / 10)))  // 0~5 绿色
-  const neutral = 10 - hostility - affection  // 中间灰色
+
+  if (adultMode) {
+    const level = getAdultRelationLevel(safe)
+    return (
+      <div className="space-y-1 adult-relation-panel">
+        <div className="adult-relation-bar">
+          <div
+            className="adult-relation-bar-fill"
+            style={{ width: `${safe}%`, backgroundColor: level.color }}
+          />
+        </div>
+        <span className="adult-relation-label" style={{ color: level.color }}>
+          {level.label}
+        </span>
+      </div>
+    )
+  }
+
+  const hostility = Math.max(0, Math.min(5, Math.round((50 - safe) / 10)))
+  const affection = Math.max(0, Math.min(5, Math.round((safe - 50) / 10)))
+  const neutral = 10 - hostility - affection
   const label = safe <= 35 ? '敌视' : safe <= 45 ? '疏远' : safe >= 65 ? '信赖' : safe >= 55 ? '友好' : '中立'
   return (
     <span className="text-xs tracking-[2px] select-none leading-none">
@@ -323,10 +347,7 @@ export default function Game() {
   const [expressionStyleLabels, setExpressionStyleLabels] = useState<Record<string, string>>({})
   const [contentWeights, setContentWeights] = useState<ContentWeights>({ story: 50, romance: 30, adult: 20 })
   const [presetWeights, setPresetWeights] = useState<Record<string, ContentWeights>>({})
-  const [adultBgTheme, setAdultBgTheme] = useState(() => {
-    const saved = localStorage.getItem('adultBgTheme')
-    return saved || getSettings().bgTheme
-  })
+  const [readingMode, setReadingMode] = useState(false)
   const [genSettingsOpen, setGenSettingsOpen] = useState(
     () => getSettings().sidebarDefault === 'expanded',
   )
@@ -514,6 +535,7 @@ export default function Game() {
     setStylePreference(data.style_preference)
     setRepetitionCheck(data.repetition_check)
     setAdultMode(data.adult_mode)
+    dispatchAdultModeChange(data.adult_mode)
     setExpressionStyle(data.expression_style)
     setExpressionStyleOptions(data.expression_style_options)
     setExpressionStyleLabels(data.expression_style_labels)
@@ -527,14 +549,13 @@ export default function Game() {
       .catch((e) => logger.warn('Game', 'Load gen settings failed', { error: String(e) }))
   }, [applyGenSettings])
 
-  // 成人模式主题覆盖：开启时用 adultBgTheme 覆盖设置页的 bgTheme
   useEffect(() => {
-    if (adultMode) {
-      applyBgTheme(adultBgTheme)
-    } else {
-      applyBgTheme(appSettings.bgTheme)
-    }
-  }, [adultMode, adultBgTheme, appSettings.bgTheme])
+    dispatchAdultModeChange(adultMode)
+  }, [adultMode])
+
+  useEffect(() => {
+    if (!adultMode && readingMode) setReadingMode(false)
+  }, [adultMode, readingMode])
 
   const markGenSettingsSaved = useCallback(() => {
     setGenSettingsSaveError('')
@@ -584,7 +605,10 @@ export default function Game() {
     if (next.narrativePov != null) setNarrativePov(next.narrativePov)
     if (next.stylePreference != null) setStylePreference(next.stylePreference)
     if (next.repetitionCheck != null) setRepetitionCheck(next.repetitionCheck)
-    if (next.adultMode != null) setAdultMode(next.adultMode)
+    if (next.adultMode != null) {
+      setAdultMode(next.adultMode)
+      dispatchAdultModeChange(next.adultMode)
+    }
     if (next.expressionStyle != null) setExpressionStyle(next.expressionStyle)
     if (next.contentWeights != null) setContentWeights({ ...next.contentWeights })
     return next
@@ -901,7 +925,7 @@ export default function Game() {
           {c.relation && <p className="text-xs text-game-muted">{c.relation}</p>}
           {/* 主角对自己没有好感度，只显示 NPC 对主角的好感 */}
           {c.tier !== '主角' && (
-            <AffectionBar value={c.affection ?? 50} />
+            <AffectionBar value={c.affection ?? 50} adultMode={adultMode} />
           )}
           <Separator />
         </div>
@@ -921,7 +945,7 @@ export default function Game() {
           </div>
           {f.role && <p className="text-xs text-game-muted">{f.role}</p>}
           <div className="flex items-center gap-2">
-            <AffectionBar value={(f.reputation ?? 0.5) * 100} />
+            <AffectionBar value={(f.reputation ?? 0.5) * 100} adultMode={adultMode} />
             <span className="text-xs text-game-dim tabular-nums">{Math.round((f.reputation ?? 0.5) * 100)}%</span>
           </div>
           {/* Inter-faction attitudes (top 3) — safe guarded against missing data */}
@@ -940,7 +964,7 @@ export default function Game() {
   )
 
   usePageShell({
-    leftPanel: hasGame ? (
+    leftPanel: hasGame && !readingMode ? (
       <div className="p-3 space-y-1 overflow-y-auto h-full">
         <h3 className="text-[10px] font-neural-mono text-neural-cyan uppercase tracking-widest mb-3">
           {t('game.timeline', lang)}
@@ -962,14 +986,17 @@ export default function Game() {
         })}
       </div>
     ) : null,
-    inspector: hasGame && showCharPanel ? (
-      <InspectorPanel title={t('game.status', lang)}>
+    inspector: hasGame && showCharPanel && !readingMode ? (
+      <InspectorPanel
+        title={adultMode ? tTheme('nav.characters', lang, true) : t('game.status', lang)}
+        className={adultMode ? 'adult-relation-inspector' : undefined}
+      >
         <StatusList />
       </InspectorPanel>
     ) : null,
-    showLeftPanel: !!hasGame,
-    showRightPanel: !!(hasGame && showCharPanel),
-    hideShellPanels: !hasGame,
+    showLeftPanel: !!(hasGame && !readingMode),
+    showRightPanel: !!(hasGame && showCharPanel && !readingMode),
+    hideShellPanels: !hasGame || readingMode,
   })
 
   return (
@@ -1014,11 +1041,11 @@ export default function Game() {
 
       {/* Game */}
       {hasGame && (
-        <div className="flex gap-0 h-full">
+        <div className={cn('flex gap-0 h-full', readingMode && 'game-reading-mode')}>
           {/* Main content */}
           <div className="flex-1 min-w-0 flex flex-col">
             {/* Top status bar */}
-            <div className="flex items-center justify-between gap-3 flex-wrap shrink-0">
+            <div className={cn('flex items-center justify-between gap-3 flex-wrap shrink-0', readingMode && 'game-chrome-hidden')}>
               <div className="flex items-center gap-2 text-sm">
                 <Badge variant="primary">📖 第 {turn} 轮</Badge>
                 <Badge
@@ -1102,7 +1129,7 @@ export default function Game() {
 
             {/* Story — scrollable */}
             <div ref={storyScrollRef} className="flex-1 overflow-y-auto min-h-0 space-y-3">
-            {genSettingsOpen && (
+            {genSettingsOpen && !readingMode && (
               <div className="border border-game-border/70 rounded-lg bg-game-bg/40 px-4 py-3 shrink-0">
                 <p className="text-[11px] text-game-dim mb-2 rounded-md border border-game-border/50 bg-game-bg/40 px-2.5 py-1.5">
                   模型与压缩开关在 <strong className="text-game-muted">设置 → API</strong> 中配置
@@ -1314,36 +1341,51 @@ export default function Game() {
                     <Label className="text-xs text-game-accent font-semibold">🎭 内容偏好</Label>
                   </div>
 
-                  <QuickGenRow label="成人模式" hint="开启后启用内容强度调节与表达风格选择">
+                  <QuickGenRow label="成人模式" hint="开启后切换私人故事视觉主题，并启用内容强度调节">
                     <Switch
                       checked={adultMode}
                       disabled={choosing}
                       onCheckedChange={(v) => queueGenSettingsSave({ adultMode: v }, true)}
                     />
                     <Badge variant={adultMode ? 'default' : 'outline'} size="sm">
-                      {adultMode ? '开启' : '关闭'}
+                      {adultMode ? `❤️ ${tTheme('game.privateMode', lang, false)}` : `🌙 ${tTheme('game.normalMode', lang, false)}`}
                     </Badge>
                   </QuickGenRow>
 
                   {adultMode && (
                     <>
                       <QuickGenRow label="主题切换" hint="覆盖设置页的背景色调">
-                        {(['dark', 'sepia', 'gray'] as const).map((t) => (
-                          <Button
-                            key={t}
-                            type="button"
-                            size="xs"
-                            variant={adultBgTheme === t ? 'primary' : 'ghost'}
-                            disabled={choosing}
-                            onClick={() => {
-                              setAdultBgTheme(t)
-                              localStorage.setItem('adultBgTheme', t)
-                              applyBgTheme(t)
-                            }}
-                          >
-                            {BG_THEME_LABELS[t] || t}
-                          </Button>
-                        ))}
+                        <Select
+                          value={adultBgTheme}
+                          disabled={choosing}
+                          onValueChange={(v) => {
+                            setAdultBgTheme(v)
+                            localStorage.setItem('adultBgTheme', v)
+                            applyBgTheme(v)
+                          }}
+                        >
+                          <SelectTrigger className="w-36 h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(['dark', 'sepia', 'gray', 'crimson', 'violet'] as const).map((t) => (
+                              <SelectItem key={t} value={t} className="text-xs">
+                                {BG_THEME_LABELS[t] || t}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </QuickGenRow>
+
+                      <QuickGenRow label={tTheme('game.readingMode', lang, false)} hint="隐藏侧栏与快捷设置，聚焦正文阅读">
+                        <Switch
+                          checked={readingMode}
+                          disabled={choosing}
+                          onCheckedChange={setReadingMode}
+                        />
+                        <Badge variant={readingMode ? 'default' : 'outline'} size="sm">
+                          {readingMode ? '沉浸中' : '关闭'}
+                        </Badge>
                       </QuickGenRow>
 
                       <QuickGenRow label="表达风格" hint="成人模式下覆盖文风偏好；可选预设或自行输入">
@@ -1433,10 +1475,10 @@ export default function Game() {
                   )}
               </div>
             )}
-            <Card className="border-neural-cyan/15 glass-panel-glow w-full">
+            <Card className={cn('border-neural-cyan/15 glass-panel-glow w-full', adultMode && 'theme-card-enter')}>
               <CardContent
-                className="pt-4 pb-6 px-4 md:px-8 w-full mx-auto"
-                style={{ maxWidth: 'var(--story-max-width)' }}
+                className={cn('pt-4 pb-6 px-4 md:px-8 w-full mx-auto game-story-focus', readingMode && 'px-6 md:px-12')}
+                style={{ maxWidth: adultMode ? '760px' : 'var(--story-max-width)' }}
               >
                 {appSettings.animations ? (
                   <motion.div key={turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -1472,8 +1514,21 @@ export default function Game() {
             )}
             </div>{/* end scrollable area */}
 
+            {adultMode && readingMode && (
+              <div className="flex justify-center py-2 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-game-muted hover:text-game-highlight text-xs"
+                  onClick={() => setReadingMode(false)}
+                >
+                  退出阅读模式
+                </Button>
+              </div>
+            )}
+
             {/* Choices — fixed at bottom */}
-            <div className="shrink-0 border-t border-neural-cyan/15 glass-panel rounded-none border-x-0 pt-3 pb-1">
+            <div className={cn('shrink-0 border-t border-neural-cyan/15 glass-panel rounded-none border-x-0 pt-3 pb-1', readingMode && 'game-chrome-hidden')}>
             <AnimatePresence>
               {options.length > 0 && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">

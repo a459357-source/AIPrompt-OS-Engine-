@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
 
 interface Particle {
   x: number
@@ -7,10 +8,12 @@ interface Particle {
   vy: number
   size: number
   alpha: number
+  hue: number
 }
 
 export function ParticleBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const adultMode = useAdultThemeOptional()?.adultMode ?? false
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -26,17 +29,29 @@ export function ParticleBackground() {
     let animId = 0
     let particles: Particle[] = []
 
+    const isAdult = document.documentElement.getAttribute('data-ui-theme') === 'adult'
+    const speedMul = isAdult ? 0.12 : 0.3
+    const maxLinkDist = isAdult ? 80 : 120
+    const particleColor = isAdult
+      ? (a: number, h: number) => `hsla(${h}, 75%, 68%, ${a})`
+      : (a: number) => `rgba(79, 140, 255, ${a})`
+    const lineColor = isAdult
+      ? (a: number) => `rgba(255, 77, 109, ${a})`
+      : (a: number) => `rgba(124, 92, 255, ${a})`
+
     const resize = () => {
       canvas.width = window.innerWidth
       canvas.height = window.innerHeight
-      const count = Math.min(60, Math.floor((canvas.width * canvas.height) / 25000))
+      const density = isAdult ? 40000 : 25000
+      const count = Math.min(isAdult ? 35 : 60, Math.floor((canvas.width * canvas.height) / density))
       particles = Array.from({ length: count }, () => ({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
-        size: Math.random() * 1.5 + 0.5,
-        alpha: Math.random() * 0.4 + 0.1,
+        vx: (Math.random() - 0.5) * speedMul,
+        vy: (Math.random() - 0.5) * speedMul,
+        size: Math.random() * (isAdult ? 2.2 : 1.5) + 0.5,
+        alpha: Math.random() * (isAdult ? 0.2 : 0.4) + 0.04,
+        hue: isAdult ? 330 + Math.random() * 30 : 210,
       }))
     }
 
@@ -53,24 +68,36 @@ export function ParticleBackground() {
 
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(0, 240, 255, ${p.alpha})`
+        ctx.fillStyle = isAdult ? particleColor(p.alpha, p.hue) : particleColor(p.alpha, 0)
         ctx.fill()
+
+        if (isAdult) {
+          const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 8)
+          grd.addColorStop(0, `rgba(255, 0, 77, ${p.alpha * 0.12})`)
+          grd.addColorStop(1, 'transparent')
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, p.size * 8, 0, Math.PI * 2)
+          ctx.fillStyle = grd
+          ctx.fill()
+        }
       }
 
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const a = particles[i]
-          const b = particles[j]
-          const dx = a.x - b.x
-          const dy = a.y - b.y
-          const dist = Math.sqrt(dx * dx + dy * dy)
-          if (dist < 120) {
-            ctx.beginPath()
-            ctx.moveTo(a.x, a.y)
-            ctx.lineTo(b.x, b.y)
-            ctx.strokeStyle = `rgba(123, 92, 255, ${0.08 * (1 - dist / 120)})`
-            ctx.lineWidth = 0.5
-            ctx.stroke()
+      if (!isAdult) {
+        for (let i = 0; i < particles.length; i++) {
+          for (let j = i + 1; j < particles.length; j++) {
+            const a = particles[i]
+            const b = particles[j]
+            const dx = a.x - b.x
+            const dy = a.y - b.y
+            const dist = Math.sqrt(dx * dx + dy * dy)
+            if (dist < maxLinkDist) {
+              ctx.beginPath()
+              ctx.moveTo(a.x, a.y)
+              ctx.lineTo(b.x, b.y)
+              ctx.strokeStyle = lineColor(0.08 * (1 - dist / maxLinkDist))
+              ctx.lineWidth = 0.5
+              ctx.stroke()
+            }
           }
         }
       }
@@ -85,12 +112,12 @@ export function ParticleBackground() {
       cancelAnimationFrame(animId)
       window.removeEventListener('resize', resize)
     }
-  }, [])
+  }, [adultMode])
 
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 pointer-events-none z-0 opacity-60"
+      className="fixed inset-0 pointer-events-none z-0 opacity-60 transition-opacity duration-[800ms]"
       aria-hidden
     />
   )

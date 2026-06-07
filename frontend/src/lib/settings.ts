@@ -157,12 +157,16 @@ export const BG_THEME_LABELS: Record<string, string> = {
   dark: '深黑',
   sepia: '暖棕护眼',
   gray: '暗灰',
+  crimson: '暗红暧昧',
+  violet: '深紫迷离',
 }
 
 const BG_MAP: Record<string, { bg: string; surface: string; card: string; text: string }> = {
-  dark: { bg: '#0d1117', surface: '#1a1f2b', card: '#1e2433', text: '#e2e5ea' },
+  dark:  { bg: '#0d1117', surface: '#1a1f2b', card: '#1e2433', text: '#e2e5ea' },
   sepia: { bg: '#2a2218', surface: '#332b1f', card: '#3d3326', text: '#d4c5a9' },
-  gray: { bg: '#1a1a1a', surface: '#222222', card: '#2a2a2a', text: '#cccccc' },
+  gray:  { bg: '#1a1a1a', surface: '#222222', card: '#2a2a2a', text: '#cccccc' },
+  crimson: { bg: '#1a0f13', surface: '#2a1820', card: '#352028', text: '#e8d0d8' },
+  violet:  { bg: '#13101a', surface: '#1f1828', card: '#2a2035', text: '#d8d0e8' },
 }
 
 /** 仅应用背景主题 CSS 变量（不碰字号/行高/字体等），供成人模式覆盖使用 */

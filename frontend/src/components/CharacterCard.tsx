@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import type { Character } from '@/lib/types'
+import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
+import { getAdultRelationLevel } from '@/lib/theme'
 
 interface CharacterCardProps {
   character: Character & { id?: string }
@@ -15,7 +17,7 @@ interface CharacterCardProps {
 
 export function CharacterCard({ character, index, isMain, onRemove, className, trustPct }: CharacterCardProps) {
   const c = character
-  // 使用传入的 trustPct 或 character 自带的 trust_pct（默认 50）
+  const adultMode = useAdultThemeOptional()?.adultMode ?? false
   const affinity = trustPct ?? c.trust_pct ?? 50
 
   return (
@@ -108,10 +110,26 @@ export function CharacterCard({ character, index, isMain, onRemove, className, t
 
           <Separator className="my-1" />
 
-          {/* Affinity — bidirectional bar: 左红(敌意) 右绿(好感)，50%中性 */}
           {!isMain && (() => {
+            if (adultMode) {
+              const level = getAdultRelationLevel(affinity)
+              return (
+                <div className="adult-relation-panel">
+                  <span className="text-[10px] text-game-muted">关系</span>
+                  <div className="adult-relation-bar mt-1">
+                    <div
+                      className="adult-relation-bar-fill"
+                      style={{ width: `${affinity}%`, backgroundColor: level.color }}
+                    />
+                  </div>
+                  <span className="adult-relation-label mt-1 block" style={{ color: level.color }}>
+                    {level.label}
+                  </span>
+                </div>
+              )
+            }
             const isHostile = affinity < 50
-            const barWidth = Math.abs(affinity - 50) * 2  // 0~100
+            const barWidth = Math.abs(affinity - 50) * 2
             const barColor = isHostile ? '#da3633' : '#3fb950'
             const label = affinity <= 35 ? '敌视' : affinity <= 45 ? '疏远' : affinity >= 65 ? '信赖' : affinity >= 55 ? '友好' : '中立'
             const labelColor = affinity <= 35 ? 'text-game-danger' : affinity <= 45 ? 'text-game-warning' : affinity >= 65 ? 'text-game-success' : 'text-game-muted'
@@ -120,11 +138,9 @@ export function CharacterCard({ character, index, isMain, onRemove, className, t
                 <span className="text-[10px] text-game-muted">关系</span>
                 <div className="flex items-center gap-2 mt-0.5">
                   <div className="flex-1 h-2 bg-game-border rounded-full overflow-hidden relative">
-                    {/* center line at 50% */}
                     <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 0 }}>
                       <div className="h-full w-px bg-game-border/50" />
                     </div>
-                    {/* filled bar — grows from center */}
                     <div
                       className="h-full rounded-full transition-all absolute top-0"
                       style={{
