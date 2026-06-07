@@ -1,0 +1,152 @@
+/* ── Adult theme packs (data-adult-theme on html[data-ui-theme='adult']) ── */
+
+/* Default / deep purple — private, immersive, VN */
+[data-ui-theme='adult'][data-adult-theme='deep_purple'],
+[data-ui-theme='adult']:not([data-adult-theme]) {
+  --color-game-bg: #080808;
+  --color-game-primary: #ff004d;
+  --color-game-secondary: #a855f7;
+  --color-game-accent: #ff4d6d;
+  --color-game-highlight: #ffd1dc;
+  --color-neural-cyan: #ff004d;
+  --color-neural-magenta: #ff4d6d;
+  --color-neural-violet: #a855f7;
+  --color-neural-glow: rgba(255, 0, 77, 0.14);
+  --theme-body-gradient:
+    radial-gradient(ellipse 80% 60% at 50% 120%, rgba(255, 0, 77, 0.14), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 15% 20%, rgba(255, 77, 109, 0.1), transparent 50%),
+    radial-gradient(ellipse 45% 40% at 85% 75%, rgba(168, 85, 247, 0.08), transparent 45%),
+    var(--color-game-bg);
+  --glass-shadow: 0 0 40px rgba(255, 0, 77, 0.08);
+  --card-hover-shadow: 0 0 48px rgba(255, 77, 109, 0.22);
+  --adult-orb-1: rgba(255, 0, 77, 0.45);
+  --adult-orb-2: rgba(255, 77, 109, 0.4);
+  --adult-orb-3: rgba(168, 85, 247, 0.32);
+  --adult-font-display: 'Segoe UI', 'Noto Serif SC', serif;
+  --adult-gradient-speed: 24s;
+}
+
+/* Dark crimson — temptation, dangerous relations */
+[data-ui-theme='adult'][data-adult-theme='dark_crimson'] {
+  --color-game-bg: #0a0506;
+  --color-game-primary: #dc2626;
+  --color-game-secondary: #991b1b;
+  --color-game-accent: #f87171;
+  --color-game-highlight: #fecaca;
+  --color-neural-cyan: #ef4444;
+  --color-neural-magenta: #f87171;
+  --color-neural-violet: #7f1d1d;
+  --color-neural-glow: rgba(220, 38, 38, 0.18);
+  --theme-body-gradient:
+    radial-gradient(ellipse 70% 55% at 50% 100%, rgba(220, 38, 38, 0.2), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 10% 15%, rgba(127, 29, 29, 0.25), transparent 45%),
+    radial-gradient(ellipse 40% 35% at 90% 30%, rgba(248, 113, 113, 0.08), transparent 40%),
+    var(--color-game-bg);
+  --glass-shadow: 0 0 36px rgba(220, 38, 38, 0.12);
+  --card-hover-shadow: 0 0 52px rgba(239, 68, 68, 0.28);
+  --adult-orb-1: rgba(220, 38, 38, 0.5);
+  --adult-orb-2: rgba(248, 113, 113, 0.35);
+  --adult-orb-3: rgba(127, 29, 29, 0.4);
+  --adult-font-display: 'Segoe UI', 'Noto Sans SC', sans-serif;
+  --adult-gradient-speed: 18s;
+}
+
+/* Midnight bar — tipsy, jazz, mature */
+[data-ui-theme='adult'][data-adult-theme='midnight_bar'] {
+  --color-game-bg: #0c0a09;
+  --color-game-primary: #d97706;
+  --color-game-secondary: #92400e;
+  --color-game-accent: #fbbf24;
+  --color-game-highlight: #fde68a;
+  --color-neural-cyan: #f59e0b;
+  --color-neural-magenta: #d97706;
+  --color-neural-violet: #78350f;
+  --color-neural-glow: rgba(217, 119, 6, 0.16);
+  --theme-body-gradient:
+    radial-gradient(ellipse 65% 50% at 50% 110%, rgba(217, 119, 6, 0.15), transparent 55%),
+    radial-gradient(ellipse 45% 40% at 20% 25%, rgba(120, 53, 15, 0.2), transparent 50%),
+    radial-gradient(ellipse 35% 30% at 80% 70%, rgba(251, 191, 36, 0.06), transparent 45%),
+    linear-gradient(180deg, #0c0a09 0%, #1c1917 100%);
+  --glass-shadow: 0 0 32px rgba(217, 119, 6, 0.1);
+  --card-hover-shadow: 0 0 44px rgba(245, 158, 11, 0.22);
+  --adult-orb-1: rgba(217, 119, 6, 0.42);
+  --adult-orb-2: rgba(251, 191, 36, 0.28);
+  --adult-orb-3: rgba(120, 53, 15, 0.35);
+  --adult-font-display: Georgia, 'Noto Serif SC', serif;
+  --adult-gradient-speed: 32s;
+}
+
+/* Luxury suite — premium, black-gold, night view */
+[data-ui-theme='adult'][data-adult-theme='luxury_suite'] {
+  --color-game-bg: #030712;
+  --color-game-primary: #ca8a04;
+  --color-game-secondary: #a16207;
+  --color-game-accent: #eab308;
+  --color-game-highlight: #fef08a;
+  --color-neural-cyan: #eab308;
+  --color-neural-magenta: #ca8a04;
+  --color-neural-violet: #422006;
+  --color-neural-glow: rgba(234, 179, 8, 0.14);
+  --theme-body-gradient:
+    radial-gradient(ellipse 75% 55% at 50% 0%, rgba(234, 179, 8, 0.08), transparent 50%),
+    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(202, 138, 4, 0.12), transparent 55%),
+    radial-gradient(ellipse 40% 35% at 85% 50%, rgba(66, 32, 6, 0.3), transparent 45%),
+    var(--color-game-bg);
+  --glass-shadow: 0 0 48px rgba(234, 179, 8, 0.08);
+  --card-hover-shadow: 0 0 56px rgba(234, 179, 8, 0.2);
+  --adult-orb-1: rgba(234, 179, 8, 0.35);
+  --adult-orb-2: rgba(202, 138, 4, 0.3);
+  --adult-orb-3: rgba(66, 32, 6, 0.45);
+  --adult-font-display: 'Segoe UI', 'Noto Sans SC', sans-serif;
+  --adult-gradient-speed: 28s;
+}
+
+[data-ui-theme='adult'] .private-orb-1 {
+  background: radial-gradient(circle, var(--adult-orb-1, rgba(255, 0, 77, 0.45)), transparent 70%);
+}
+
+[data-ui-theme='adult'] .private-orb-2 {
+  background: radial-gradient(circle, var(--adult-orb-2, rgba(255, 77, 109, 0.4)), transparent 70%);
+}
+
+[data-ui-theme='adult'] .private-orb-3 {
+  background: radial-gradient(circle, var(--adult-orb-3, rgba(168, 85, 247, 0.32)), transparent 70%);
+}
+
+[data-ui-theme='adult'] body {
+  animation-duration: var(--adult-gradient-speed, 24s);
+}
+
+[data-ui-theme='adult'] .font-neural-display,
+[data-ui-theme='adult'] .font-neural-mono,
+[data-ui-theme='adult'] .neural-text-glow {
+  font-family: var(--adult-font-display, 'Segoe UI', 'Noto Sans SC', sans-serif);
+}
+
+[data-ui-theme='adult'] button.inline-flex:hover:not(:disabled):not(.rounded-none) {
+  box-shadow: 0 0 28px var(--color-neural-glow);
+}
+
+[data-ui-theme='adult'] .adult-relation-bar-fill {
+  box-shadow: 0 0 12px var(--color-neural-glow);
+}
+
+[data-ui-theme='adult'] .glass-panel-glow {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 48px var(--color-neural-glow);
+}
+
+[data-ui-theme='adult'] .neural-pulse-dot {
+  box-shadow: 0 0 12px var(--color-neural-glow);
+}
+
+[data-ui-theme='adult'] .private-mode-banner {
+  border-color: color-mix(in srgb, var(--color-game-accent) 35%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-game-primary) 8%, transparent),
+    color-mix(in srgb, var(--color-neural-violet) 6%, transparent)
+  );
+  box-shadow: 0 0 32px var(--color-neural-glow);
+}

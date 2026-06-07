@@ -2,9 +2,26 @@
 
 export type UiTheme = 'normal' | 'adult'
 
+export type AdultThemeId = 'deep_purple' | 'dark_crimson' | 'midnight_bar' | 'luxury_suite'
+
 export const UI_THEME_ATTR = 'data-ui-theme'
+export const ADULT_THEME_ATTR = 'data-adult-theme'
 
 export const ADULT_THEME_NAME = 'Desire+'
+
+export const ADULT_THEME_OPTIONS: AdultThemeId[] = [
+  'deep_purple',
+  'dark_crimson',
+  'midnight_bar',
+  'luxury_suite',
+]
+
+export const ADULT_THEME_LABELS: Record<AdultThemeId, string> = {
+  deep_purple: '深紫迷离',
+  dark_crimson: '暗红暧昧',
+  midnight_bar: '深夜酒馆',
+  luxury_suite: '豪华套房',
+}
 
 export interface RelationLevel {
   key: string
@@ -48,11 +65,22 @@ export function getAdultRelationLevel(affection: number): RelationLevel {
   )
 }
 
-export function applyUiTheme(theme: UiTheme) {
+export function applyAdultThemePack(themeId: AdultThemeId | null) {
+  const root = document.documentElement
+  if (themeId) {
+    root.setAttribute(ADULT_THEME_ATTR, themeId)
+  } else {
+    root.removeAttribute(ADULT_THEME_ATTR)
+  }
+}
+
+export function applyUiTheme(theme: UiTheme, adultThemePack?: AdultThemeId | null) {
   document.documentElement.setAttribute(UI_THEME_ATTR, theme)
   if (theme === 'adult') {
+    applyAdultThemePack(adultThemePack ?? 'deep_purple')
     document.documentElement.style.setProperty('--story-max-width', '800px')
   } else {
+    applyAdultThemePack(null)
     const saved = localStorage.getItem('app-settings')
     let maxWidth = 960
     try {

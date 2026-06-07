@@ -633,6 +633,13 @@ export interface GameGenSettings {
   style_preference: string
   repetition_check: string
   adult_mode: boolean
+  adult_profile: string
+  adult_profile_options: string[]
+  adult_profile_labels: Record<string, string>
+  adult_profile_descriptions: Record<string, string>
+  adult_theme: string
+  adult_theme_options: string[]
+  adult_theme_labels: Record<string, string>
   expression_style: string
   expression_style_options: string[]
   expression_style_labels: Record<string, string>
@@ -648,7 +655,10 @@ export interface GameGenSettings {
 
 const _FALLBACK_BOUNDS = storyTargetBounds(1000, 300)
 
-const DEFAULT_CONTENT_WEIGHTS: ContentWeights = { story: 50, romance: 30, adult: 20 }
+const DEFAULT_CONTENT_WEIGHTS: ContentWeights = { story: 40, romance: 30, adult: 30 }
+
+export type AdultProfileId = 'story_first' | 'balanced' | 'adult_first'
+export type AdultThemeId = 'deep_purple' | 'dark_crimson' | 'midnight_bar' | 'luxury_suite'
 
 const GAME_GEN_FALLBACK: GameGenSettings = {
   story_length: 1000,
@@ -670,6 +680,22 @@ const GAME_GEN_FALLBACK: GameGenSettings = {
   style_preference: 'balanced',
   repetition_check: 'standard',
   adult_mode: false,
+  adult_profile: 'balanced',
+  adult_profile_options: ['story_first', 'balanced', 'adult_first'],
+  adult_profile_labels: { story_first: '剧情优先', balanced: '平衡模式', adult_first: '成人优先' },
+  adult_profile_descriptions: {
+    story_first: '以剧情推进为主，亲密内容作为关系发展的结果',
+    balanced: '剧情与感情并重',
+    adult_first: '剧情主要围绕人物关系与亲密互动展开',
+  },
+  adult_theme: 'deep_purple',
+  adult_theme_options: ['deep_purple', 'dark_crimson', 'midnight_bar', 'luxury_suite'],
+  adult_theme_labels: {
+    deep_purple: '深紫迷离',
+    dark_crimson: '暗红暧昧',
+    midnight_bar: '深夜酒馆',
+    luxury_suite: '豪华套房',
+  },
   expression_style: 'light_novel',
   expression_style_options: ['literary', 'romantic', 'light_novel', 'direct'],
   expression_style_labels: { literary: '文学风', romantic: '浪漫风', light_novel: '轻小说风', direct: '直白风' },
@@ -703,6 +729,13 @@ function parseGameGenSettings(data: Partial<GameGenSettings>): GameGenSettings {
     style_preference: data.style_preference ?? GAME_GEN_FALLBACK.style_preference,
     repetition_check: data.repetition_check ?? GAME_GEN_FALLBACK.repetition_check,
     adult_mode: data.adult_mode ?? GAME_GEN_FALLBACK.adult_mode,
+    adult_profile: data.adult_profile ?? GAME_GEN_FALLBACK.adult_profile,
+    adult_profile_options: data.adult_profile_options ?? GAME_GEN_FALLBACK.adult_profile_options,
+    adult_profile_labels: data.adult_profile_labels ?? GAME_GEN_FALLBACK.adult_profile_labels,
+    adult_profile_descriptions: data.adult_profile_descriptions ?? GAME_GEN_FALLBACK.adult_profile_descriptions,
+    adult_theme: data.adult_theme ?? GAME_GEN_FALLBACK.adult_theme,
+    adult_theme_options: data.adult_theme_options ?? GAME_GEN_FALLBACK.adult_theme_options,
+    adult_theme_labels: data.adult_theme_labels ?? GAME_GEN_FALLBACK.adult_theme_labels,
     expression_style: data.expression_style ?? GAME_GEN_FALLBACK.expression_style,
     expression_style_options: data.expression_style_options ?? GAME_GEN_FALLBACK.expression_style_options,
     expression_style_labels: data.expression_style_labels ?? GAME_GEN_FALLBACK.expression_style_labels,
@@ -728,6 +761,8 @@ export async function updateGameGenSettings(patch: {
   stylePreference?: string
   repetitionCheck?: string
   adultMode?: boolean
+  adultProfile?: string
+  adultTheme?: string
   expressionStyle?: string
   contentWeights?: ContentWeights
 }): Promise<GameGenSettings> {
@@ -741,6 +776,8 @@ export async function updateGameGenSettings(patch: {
   if (patch.stylePreference != null) fd.append('style_preference', patch.stylePreference)
   if (patch.repetitionCheck != null) fd.append('repetition_check', patch.repetitionCheck)
   if (patch.adultMode != null) fd.append('adult_mode', patch.adultMode ? 'true' : 'false')
+  if (patch.adultProfile != null) fd.append('adult_profile', patch.adultProfile)
+  if (patch.adultTheme != null) fd.append('adult_theme', patch.adultTheme)
   if (patch.expressionStyle != null) fd.append('expression_style', patch.expressionStyle)
   if (patch.contentWeights != null) fd.append('content_weights', JSON.stringify(patch.contentWeights))
 

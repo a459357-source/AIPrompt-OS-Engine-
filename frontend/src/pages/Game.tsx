@@ -17,7 +17,8 @@ import { logger } from '@/lib/logger'
 import { parseOptionEffects, deltaArrow, type RelationHint } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
 import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS, MAX_WIDTH_OPTIONS } from '@/lib/settings'
-import { dispatchAdultModeChange, getAdultRelationLevel } from '@/lib/theme'
+import { dispatchAdultModeChange, getAdultRelationLevel, applyAdultThemePack, type AdultThemeId } from '@/lib/theme'
+import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
 import { t, tTheme } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
@@ -45,6 +46,17 @@ function parseDraftLength(draft: string, fallback: number) {
 
 function countStoryChars(text: string) {
   return text.replace(/\s/g, '').length
+}
+
+function weightsMatchPreset(a: ContentWeights, b: ContentWeights) {
+  return a.story === b.story && a.romance === b.romance && a.adult === b.adult
+}
+
+function detectActiveProfile(weights: ContentWeights, presets: Record<string, ContentWeights>) {
+  for (const [key, preset] of Object.entries(presets)) {
+    if (weightsMatchPreset(weights, preset)) return key
+  }
+  return null
 }
 
 import { storyTargetBounds, storyLengthRangeLabel } from '@/lib/storyLength'
@@ -335,10 +347,19 @@ export default function Game() {
   const [stylePreference, setStylePreference] = useState('balanced')
   const [repetitionCheck, setRepetitionCheck] = useState('standard')
   const [adultMode, setAdultMode] = useState(false)
+  const [adultProfile, setAdultProfile] = useState('balanced')
+  const [adultProfileOptions, setAdultProfileOptions] = useState<string[]>(['story_first', 'balanced', 'adult_first'])
+  const [adultProfileLabels, setAdultProfileLabels] = useState<Record<string, string>>({})
+  const [adultProfileDescriptions, setAdultProfileDescriptions] = useState<Record<string, string>>({})
+  const [adultTheme, setAdultTheme] = useState<AdultThemeId>('deep_purple')
+  const [adultThemeOptions, setAdultThemeOptions] = useState<string[]>([])
+  const [adultThemeLabels, setAdultThemeLabels] = useState<Record<string, string>>({})
+  const [adultAdvancedOpen, setAdultAdvancedOpen] = useState(false)
+  const adultThemeCtx = useAdultThemeOptional()
   const [expressionStyle, setExpressionStyle] = useState('light_novel')
   const [expressionStyleOptions, setExpressionStyleOptions] = useState<string[]>(['literary', 'romantic', 'light_novel', 'direct'])
   const [expressionStyleLabels, setExpressionStyleLabels] = useState<Record<string, string>>({})
-  const [contentWeights, setContentWeights] = useState<ContentWeights>({ story: 50, romance: 30, adult: 20 })
+  const [contentWeights, setContentWeights] = useState<ContentWeights>({ story: 40, romance: 30, adult: 30 })
   const [presetWeights, setPresetWeights] = useState<Record<string, ContentWeights>>({})
   const [readingMode, setReadingMode] = useState(false)
   const [genSettingsOpen, setGenSettingsOpen] = useState(
@@ -404,6 +425,8 @@ export default function Game() {
     stylePreference?: string
     repetitionCheck?: string
     adultMode?: boolean
+    adultProfile?: string
+    adultTheme?: string
     expressionStyle?: string
     contentWeights?: ContentWeights
   }>({})
@@ -529,12 +552,24 @@ export default function Game() {
     setRepetitionCheck(data.repetition_check)
     setAdultMode(data.adult_mode)
     dispatchAdultModeChange(data.adult_mode)
+    setAdultProfile(data.adult_profile)
+    setAdultProfileOptions(data.adult_profile_options)
+    setAdultProfileLabels(data.adult_profile_labels)
+    setAdultProfileDescriptions(data.adult_profile_descriptions)
+    const themeId = (data.adult_theme || 'deep_purple') as AdultThemeId
+    setAdultTheme(themeId)
+    setAdultThemeOptions(data.adult_theme_options)
+    setAdultThemeLabels(data.adult_theme_labels)
+    if (data.adult_mode) {
+      applyAdultThemePack(themeId)
+      adultThemeCtx?.setAdultTheme(themeId)
+    }
     setExpressionStyle(data.expression_style)
     setExpressionStyleOptions(data.expression_style_options)
     setExpressionStyleLabels(data.expression_style_labels)
     setContentWeights(data.content_weights)
     setPresetWeights(data.preset_weights)
-  }, [])
+  }, [adultThemeCtx])
 
   useEffect(() => {
     getGameGenSettings()
@@ -567,6 +602,8 @@ export default function Game() {
     stylePreference?: string
     repetitionCheck?: string
     adultMode?: boolean
+    adultProfile?: string
+    adultTheme?: string
     expressionStyle?: string
     contentWeights?: ContentWeights
   }) => {
@@ -601,11 +638,26 @@ export default function Game() {
     if (next.adultMode != null) {
       setAdultMode(next.adultMode)
       dispatchAdultModeChange(next.adultMode)
+      if (next.adultMode) applyAdultThemePack(adultTheme)
+    }
+    if (next.adultProfile != null) {
+      setAdultProfile(next.adultProfile)
+      const preset = presetWeights[next.adultProfile]
+      if (preset) {
+        setContentWeights({ ...preset })
+        next.contentWeights = { ...preset }
+      }
+    }
+    if (next.adultTheme != null) {
+      const themeId = next.adultTheme as AdultThemeId
+      setAdultTheme(themeId)
+      applyAdultThemePack(themeId)
+      adultThemeCtx?.setAdultTheme(themeId)
     }
     if (next.expressionStyle != null) setExpressionStyle(next.expressionStyle)
     if (next.contentWeights != null) setContentWeights({ ...next.contentWeights })
     return next
-  }, [storyLengthMin, storyLengthMax, contextTokens, maxOutputTokens])
+  }, [storyLengthMin, storyLengthMax, contextTokens, maxOutputTokens, adultTheme, presetWeights, adultThemeCtx])
 
   const flushGenSettings = useCallback(async () => {
     const pending = pendingGenPatchRef.current
@@ -645,6 +697,8 @@ export default function Game() {
     stylePreference?: string
     repetitionCheck?: string
     adultMode?: boolean
+    adultProfile?: string
+    adultTheme?: string
     expressionStyle?: string
     contentWeights?: ContentWeights
   }, immediate = false) => {
@@ -675,6 +729,11 @@ export default function Game() {
     const length = parseDraftLength(storyLengthDraft, storyLength)
     return estimateCompressThreshold(length, storyLengthMin, storyLengthMax, contextTokens)
   }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, contextTokens])
+
+  const activeAdultProfile = useMemo(
+    () => detectActiveProfile(contentWeights, presetWeights),
+    [contentWeights, presetWeights],
+  )
 
   const commitStoryLengthDraft = useCallback(() => {
     const parsed = parseInt(storyLengthDraft, 10)
@@ -1334,19 +1393,41 @@ export default function Game() {
                     <Label className="text-xs text-game-accent font-semibold">🎭 内容偏好</Label>
                   </div>
 
-                  <QuickGenRow label="Desire+ 主题" hint="开启后切换成人视觉小说界面，并启用内容强度调节">
-                    <Switch
-                      checked={adultMode}
-                      disabled={choosing}
-                      onCheckedChange={(v) => queueGenSettingsSave({ adultMode: v }, true)}
-                    />
-                    <Badge variant={adultMode ? 'default' : 'outline'} size="sm">
-                      {adultMode ? `❤️ ${tTheme('game.privateMode', lang, false)}` : `🌙 ${tTheme('game.normalMode', lang, false)}`}
-                    </Badge>
+                  <QuickGenRow label="❤️ 成人模式" hint="开启后进入私人故事模式，界面与内容倾向同步切换">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant={!adultMode ? 'primary' : 'ghost'}
+                        disabled={choosing}
+                        onClick={() => queueGenSettingsSave({ adultMode: false }, true)}
+                      >
+                        关闭
+                      </Button>
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant={adultMode ? 'primary' : 'ghost'}
+                        disabled={choosing}
+                        onClick={() => queueGenSettingsSave({ adultMode: true }, true)}
+                      >
+                        开启
+                      </Button>
+                    </div>
                   </QuickGenRow>
 
                   {adultMode && (
                     <>
+                      <div className="col-span-full private-mode-banner rounded-xl border px-4 py-3 my-1 space-y-2">
+                        <p className="text-sm font-semibold text-game-accent">🌙 私人故事模式已启用</p>
+                        <p className="text-xs text-game-muted">故事将更关注：</p>
+                        <ul className="text-xs text-game-text space-y-0.5">
+                          <li>✓ 人物关系</li>
+                          <li>✓ 情感发展</li>
+                          <li>✓ 亲密互动</li>
+                        </ul>
+                      </div>
+
                       <QuickGenRow label={tTheme('game.readingMode', lang, false)} hint="隐藏侧栏与快捷设置，聚焦正文阅读">
                         <Switch
                           checked={readingMode}
@@ -1358,7 +1439,40 @@ export default function Game() {
                         </Badge>
                       </QuickGenRow>
 
-                      <QuickGenRow label="表达风格" hint="成人模式下覆盖文风偏好；可选预设或自行输入">
+                      <div className="col-span-full py-2 space-y-2 border-b border-game-border/40">
+                        <Label className="text-xs text-game-muted">内容倾向</Label>
+                        <div className="flex flex-col gap-2">
+                          {adultProfileOptions.map((profileId) => (
+                            <button
+                              key={profileId}
+                              type="button"
+                              disabled={choosing}
+                              onClick={() => queueGenSettingsSave({ adultProfile: profileId }, true)}
+                              className={cn(
+                                'text-left rounded-lg border px-3 py-2 transition-colors',
+                                activeAdultProfile === profileId
+                                  ? 'border-game-accent bg-game-accent/10'
+                                  : 'border-game-border/50 hover:border-game-accent/40',
+                              )}
+                            >
+                              <span className="text-xs font-medium text-game-text flex items-center gap-2">
+                                <span className={cn(
+                                  'inline-block w-3 h-3 rounded-full border',
+                                  activeAdultProfile === profileId ? 'border-game-accent bg-game-accent' : 'border-game-muted',
+                                )} />
+                                {adultProfileLabels[profileId] || profileId}
+                              </span>
+                              {adultProfileDescriptions[profileId] && (
+                                <p className="text-[11px] text-game-muted mt-1 ml-5">
+                                  {adultProfileDescriptions[profileId]}
+                                </p>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <QuickGenRow label="表达风格" hint="与上方「文风」独立叠加，例如快节奏 + 浪漫表达">
                         <div className="flex flex-wrap items-center gap-2">
                           {expressionStyleOptions.map((opt) => (
                             <Button
@@ -1375,72 +1489,76 @@ export default function Game() {
                         </div>
                       </QuickGenRow>
 
-                      <QuickGenRow label="内容权重" hint="剧情 / 感情 / 成人，总和自动保持 100">
-                        <div className="flex flex-col gap-2 w-full">
-                          <WeightSlider
-                            label="剧情"
-                            value={contentWeights.story}
-                            disabled={choosing}
-                            onChange={(v) => {
-                              const remaining = 100 - v
-                              const ratio = contentWeights.romance + contentWeights.adult || 1
-                              const newRomance = Math.round(remaining * contentWeights.romance / ratio)
-                              const newAdult = remaining - newRomance
-                              queueGenSettingsSave({ contentWeights: { story: v, romance: newRomance, adult: newAdult } })
-                            }}
-                          />
-                          <WeightSlider
-                            label="感情"
-                            value={contentWeights.romance}
-                            disabled={choosing}
-                            onChange={(v) => {
-                              const remaining = 100 - v
-                              const ratio = contentWeights.story + contentWeights.adult || 1
-                              const newStory = Math.round(remaining * contentWeights.story / ratio)
-                              const newAdult = remaining - newStory
-                              queueGenSettingsSave({ contentWeights: { story: newStory, romance: v, adult: newAdult } })
-                            }}
-                          />
-                          <WeightSlider
-                            label="成人"
-                            value={contentWeights.adult}
-                            disabled={choosing}
-                            onChange={(v) => {
-                              const remaining = 100 - v
-                              const ratio = contentWeights.story + contentWeights.romance || 1
-                              const newStory = Math.round(remaining * contentWeights.story / ratio)
-                              const newRomance = remaining - newStory
-                              queueGenSettingsSave({ contentWeights: { story: newStory, romance: newRomance, adult: v } })
-                            }}
-                          />
+                      <QuickGenRow label="视觉主题" hint="切换背景、阴影、动画与阅读区氛围">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {adultThemeOptions.map((themeId) => (
+                            <Button
+                              key={themeId}
+                              type="button"
+                              size="xs"
+                              variant={adultTheme === themeId ? 'primary' : 'ghost'}
+                              disabled={choosing}
+                              onClick={() => queueGenSettingsSave({ adultTheme: themeId }, true)}
+                            >
+                              {adultThemeLabels[themeId] || themeId}
+                            </Button>
+                          ))}
                         </div>
                       </QuickGenRow>
 
-                      {/* 预设模式 */}
-                      {Object.keys(presetWeights).length > 0 && (
-                        <QuickGenRow label="预设模式" hint="一键切换内容权重组合">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {Object.entries(presetWeights).map(([key, w]) => (
-                              <Button
-                                key={key}
-                                type="button"
-                                size="xs"
-                                variant={
-                                  contentWeights.story === w.story &&
-                                  contentWeights.romance === w.romance &&
-                                  contentWeights.adult === w.adult
-                                    ? 'primary'
-                                    : 'ghost'
-                                }
-                                disabled={choosing}
-                                onClick={() => queueGenSettingsSave({ contentWeights: { ...w } }, true)}
-                              >
-                                {key.replace(/_/g, ' ')}
-                              </Button>
-                            ))}
+                      <div className="col-span-full py-1 border-b border-game-border/40">
+                        <button
+                          type="button"
+                          className="flex items-center gap-1.5 text-xs text-game-muted hover:text-game-accent transition-colors py-1"
+                          onClick={() => setAdultAdvancedOpen((v) => !v)}
+                        >
+                          <span>{adultAdvancedOpen ? '▼' : '▶'}</span>
+                          <span>高级设置</span>
+                          {!activeAdultProfile && (
+                            <Badge variant="outline" size="sm" className="ml-1 text-[10px]">自定义权重</Badge>
+                          )}
+                        </button>
+                        {adultAdvancedOpen && (
+                          <div className="mt-2 mb-2 space-y-2 pl-1">
+                            <WeightSlider
+                              label="剧情"
+                              value={contentWeights.story}
+                              disabled={choosing}
+                              onChange={(v) => {
+                                const remaining = 100 - v
+                                const ratio = contentWeights.romance + contentWeights.adult || 1
+                                const newRomance = Math.round(remaining * contentWeights.romance / ratio)
+                                const newAdult = remaining - newRomance
+                                queueGenSettingsSave({ contentWeights: { story: v, romance: newRomance, adult: newAdult } })
+                              }}
+                            />
+                            <WeightSlider
+                              label="感情"
+                              value={contentWeights.romance}
+                              disabled={choosing}
+                              onChange={(v) => {
+                                const remaining = 100 - v
+                                const ratio = contentWeights.story + contentWeights.adult || 1
+                                const newStory = Math.round(remaining * contentWeights.story / ratio)
+                                const newAdult = remaining - newStory
+                                queueGenSettingsSave({ contentWeights: { story: newStory, romance: v, adult: newAdult } })
+                              }}
+                            />
+                            <WeightSlider
+                              label="成人"
+                              value={contentWeights.adult}
+                              disabled={choosing}
+                              onChange={(v) => {
+                                const remaining = 100 - v
+                                const ratio = contentWeights.story + contentWeights.romance || 1
+                                const newStory = Math.round(remaining * contentWeights.story / ratio)
+                                const newRomance = remaining - newStory
+                                queueGenSettingsSave({ contentWeights: { story: newStory, romance: newRomance, adult: v } })
+                              }}
+                            />
                           </div>
-                        </QuickGenRow>
-                      )}
+                        )}
+                      </div>
                     </>
                   )}
               </div>

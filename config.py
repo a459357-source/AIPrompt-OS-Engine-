@@ -576,7 +576,35 @@ DEFAULT_EXPORT_FORMAT = "markdown"
 DEFAULT_AUTO_EXPORT = "off"
 DEFAULT_ADULT_MODE = False
 DEFAULT_EXPRESSION_STYLE = "light_novel"
-DEFAULT_CONTENT_WEIGHTS = {"story": 50, "romance": 30, "adult": 20}
+DEFAULT_ADULT_PROFILE = "balanced"
+DEFAULT_ADULT_THEME = "deep_purple"
+
+ADULT_PROFILE_OPTIONS = ["story_first", "balanced", "adult_first"]
+ADULT_PROFILE_LABELS = {
+    "story_first": "剧情优先",
+    "balanced": "平衡模式",
+    "adult_first": "成人优先",
+}
+ADULT_PROFILE_DESCRIPTIONS = {
+    "story_first": "以剧情推进为主，亲密内容作为关系发展的结果",
+    "balanced": "剧情与感情并重",
+    "adult_first": "剧情主要围绕人物关系与亲密互动展开",
+}
+
+PRESET_WEIGHTS = {
+    "story_first": {"story": 60, "romance": 25, "adult": 15},
+    "balanced": {"story": 40, "romance": 30, "adult": 30},
+    "adult_first": {"story": 20, "romance": 20, "adult": 60},
+}
+DEFAULT_CONTENT_WEIGHTS = dict(PRESET_WEIGHTS[DEFAULT_ADULT_PROFILE])
+
+ADULT_THEME_OPTIONS = ["deep_purple", "dark_crimson", "midnight_bar", "luxury_suite"]
+ADULT_THEME_LABELS = {
+    "deep_purple": "深紫迷离",
+    "dark_crimson": "暗红暧昧",
+    "midnight_bar": "深夜酒馆",
+    "luxury_suite": "豪华套房",
+}
 
 EXPRESSION_STYLE_OPTIONS = ["literary", "romantic", "light_novel", "direct"]
 EXPRESSION_STYLE_LABELS = {
@@ -590,15 +618,6 @@ EXPRESSION_STYLE_INSTRUCTIONS = {
     "romantic": "文风浪漫温柔，注重情感氛围营造。",
     "light_novel": "使用轻小说风格，轻松明快，对话与叙述并重。",
     "direct": "文风直白简洁，少修饰，直接推进情节。",
-}
-
-PRESET_WEIGHTS = {
-    "balanced": {"story": 50, "romance": 30, "adult": 20},
-    "story_focus": {"story": 70, "romance": 20, "adult": 10},
-    "romance_first": {"story": 30, "romance": 60, "adult": 10},
-    "dark_story": {"story": 50, "romance": 20, "adult": 30},
-    "exploration": {"story": 60, "romance": 30, "adult": 10},
-    "daily_life": {"story": 30, "romance": 50, "adult": 20},
 }
 
 NARRATIVE_POV_INSTRUCTIONS = {
@@ -827,12 +846,64 @@ def reload_content_weights() -> dict:
     return CONTENT_WEIGHTS
 
 
+def _weights_match_preset(weights: dict, preset: dict) -> bool:
+    return all(int(weights.get(k, -1)) == int(preset.get(k, -2)) for k in ("story", "romance", "adult"))
+
+
+def detect_adult_profile(weights: dict | None = None) -> str | None:
+    w = weights if weights is not None else CONTENT_WEIGHTS
+    for key in ADULT_PROFILE_OPTIONS:
+        if _weights_match_preset(w, PRESET_WEIGHTS[key]):
+            return key
+    return None
+
+
+def _load_adult_profile() -> str:
+    val = _read_settings().get("adult_profile", DEFAULT_ADULT_PROFILE)
+    if val not in ADULT_PROFILE_OPTIONS:
+        detected = detect_adult_profile(_load_content_weights())
+        return detected or DEFAULT_ADULT_PROFILE
+    return val
+
+
+def save_adult_profile(profile: str) -> None:
+    if profile not in ADULT_PROFILE_OPTIONS:
+        profile = DEFAULT_ADULT_PROFILE
+    weights = dict(PRESET_WEIGHTS[profile])
+    _update_settings(adult_profile=profile, content_weights=weights)
+
+
+def reload_adult_profile() -> str:
+    global ADULT_PROFILE
+    ADULT_PROFILE = _load_adult_profile()
+    return ADULT_PROFILE
+
+
+def _load_adult_theme() -> str:
+    val = _read_settings().get("adult_theme", DEFAULT_ADULT_THEME)
+    return val if val in ADULT_THEME_OPTIONS else DEFAULT_ADULT_THEME
+
+
+def save_adult_theme(theme: str) -> None:
+    if theme not in ADULT_THEME_OPTIONS:
+        theme = DEFAULT_ADULT_THEME
+    _update_settings(adult_theme=theme)
+
+
+def reload_adult_theme() -> str:
+    global ADULT_THEME
+    ADULT_THEME = _load_adult_theme()
+    return ADULT_THEME
+
+
 def reload_app_behavior() -> None:
     reload_option_count()
     reload_narrative_pov()
     reload_style_preference()
     reload_repetition_check()
     reload_adult_mode()
+    reload_adult_profile()
+    reload_adult_theme()
     reload_expression_style()
     reload_content_weights()
     reload_auto_save_interval()
@@ -863,89 +934,65 @@ def force_event_thresholds() -> dict[str, int]:
 
 
 def content_preference_rules_text() -> str:
-    """根据 content_weights 生成频率化叙事节奏指令（替代百分比）。"""
+    """根据 content_weights 生成倾向化内容偏好指令。"""
     w = CONTENT_WEIGHTS
-    story_w = w.get("story", 50)
+    story_w = w.get("story", 40)
     romance_w = w.get("romance", 30)
-    adult_w = w.get("adult", 20)
+    adult_w = w.get("adult", 30)
 
-    # 将百分比转化为每 N 轮的出现频率描述
-    parts = []
+    if not ADULT_MODE:
+        return (
+            "【内容偏好】\n"
+            "当前模式：标准模式\n\n"
+            "生成要求：\n"
+            "- 优先保证剧情逻辑连续性。\n"
+            "- 禁止成人题材与露骨描写。\n"
+            "- 感情表达限于牵手、拥抱等纯爱范畴。\n"
+            "- 所有选项必须是全年龄向。"
+        )
 
-    # 剧情
-    if story_w >= 60:
-        parts.append("以剧情推进为主轴，世界观探索与主线目标为最高优先级。")
-    elif story_w >= 40:
-        parts.append("剧情推进为骨架，在此之上发展感情与人物关系。")
-    else:
-        parts.append("剧情服务于人物互动，允许以角色日常和关系发展为主要推进方式。")
-
-    # 感情
-    if romance_w >= 50:
-        parts.append("感情发展是重点，每轮应有明确的感情互动或内心独白反映角色情感变化。关系递进需自然铺垫，不可跳跃。")
-    elif romance_w >= 25:
-        parts.append("感情发展应有节制地推进，在有意义的互动中自然升温。")
-    else:
-        parts.append("感情发展不作为主线，仅在剧情间隙中点缀。")
-
-    # 成人题材
-    if ADULT_MODE and adult_w > 0:
-        if adult_w >= 50:
-            parts.append("成人题材高频出现，服务于角色亲密关系，自然融入剧情而不打断叙事节奏。")
-        elif adult_w >= 25:
-            parts.append("成人题材每 3-5 轮中自然融入 1 次，作为角色关系的深化手段，不突兀。")
-        elif adult_w >= 10:
-            parts.append("成人题材作为点缀，每 5-8 轮中自然出现 1 次，服务于角色关系发展。")
-        else:
-            parts.append("成人题材极少出现，仅在角色关系达到关键阶段时作为自然结果。")
-    elif ADULT_MODE and adult_w == 0:
-        parts.append("即使成人模式开启，当前权重下不主动引入成人题材。")
-    else:
-        # adult_mode 关闭 → 不出现成人相关内容边界
-        parts.append("禁止成人题材与露骨描写。感情表达限于牵手、拥抱等纯爱范畴。")
-
-    # ── 选项生成约束 ──
-    if ADULT_MODE:
-        if adult_w >= 50:
-            parts.append("【选项】最多只保留 1 个正常剧情选项（如探索、战斗、调查），其余所有选项必须涉及亲密互动或成人情境，与当前角色关系阶段自然匹配。")
-        elif adult_w >= 25:
-            parts.append("【选项】每轮至少一半选项涉及暧昧或亲密互动，其余为正常剧情选项。两项数量大致均衡。")
-        elif adult_w > 0:
-            parts.append("【选项】成人相关选项作为点缀（约每 3-4 轮出现 1 次），多数选项仍以剧情和角色发展为主。")
-        else:
-            parts.append("【选项】所有选项应以剧情推进、角色成长、世界观探索为主，不提供成人倾向选项。")
-    else:
-        parts.append("【选项】所有选项必须是全年龄向。禁止出现暧昧邀约、亲密接触、成人暗示等选项。感情选项限于关心、鼓励、合作等友谊范畴。")
-
-    # 剧情/感情选项比例约束（仅在非最高成人档时生效，避免与上述规则冲突）
-    if adult_w < 50:
-        if story_w >= 60:
-            parts.append("【选项】过半数选项应围绕主线剧情推进、世界观探索、冲突解决。")
-        if romance_w >= 50:
-            parts.append("【选项】每轮至少 1 个选项涉及角色感情互动或关系发展。")
-
-    return "【内容节奏】\n" + "\n".join(f"- {p}" for p in parts)
+    lines = [
+        "【内容偏好】",
+        "",
+        "当前模式：成人模式",
+        "",
+        "内容倾向：",
+        f"剧情：{story_w}%",
+        f"感情：{romance_w}%",
+        f"成人：{adult_w}%",
+        "",
+        "生成要求：",
+        "- 优先保证剧情逻辑连续性。",
+        "- 所有关系发展必须符合人物性格与当前情境。",
+        "- 亲密互动应作为人物关系发展的自然结果。",
+        "- 根据内容倾向动态调整生成重点。",
+        "- 成人内容不得破坏剧情连贯性。",
+        "- 即使成人内容占比较高，也必须保持人物成长与主线推进。",
+    ]
+    return "\n".join(lines)
 
 
 def ai_behavior_rules_text() -> str:
-    # 成人模式开启时，expression_style 覆盖 STYLE_PREFERENCE
+    style_line = f"【文风偏好】{STYLE_PREFERENCE_INSTRUCTIONS[STYLE_PREFERENCE]}"
+    expression_line = ""
     if ADULT_MODE:
         style_instruction = EXPRESSION_STYLE_INSTRUCTIONS.get(
             EXPRESSION_STYLE, EXPRESSION_STYLE_INSTRUCTIONS["light_novel"]
         )
         style_label = EXPRESSION_STYLE_LABELS.get(EXPRESSION_STYLE, "轻小说风")
-        style_line = f"【文风偏好 · {style_label}】{style_instruction}"
-    else:
-        style_line = f"【文风偏好】{STYLE_PREFERENCE_INSTRUCTIONS[STYLE_PREFERENCE]}"
+        expression_line = f"【表达风格 · {style_label}】{style_instruction}"
 
-    base = (
-        f"【叙事视角】{NARRATIVE_POV_INSTRUCTIONS[NARRATIVE_POV]}\n"
-        f"{style_line}\n"
-        f"【选项数量】必须输出恰好 {OPTION_COUNT} 个 options。\n"
-        f"【反重复】{REPETITION_PROMPT_INSTRUCTIONS[REPETITION_CHECK]}"
-    )
-
-    # 追加内容偏好规则
+    base_parts = [
+        f"【叙事视角】{NARRATIVE_POV_INSTRUCTIONS[NARRATIVE_POV]}",
+        style_line,
+    ]
+    if expression_line:
+        base_parts.append(expression_line)
+    base_parts.extend([
+        f"【选项数量】必须输出恰好 {OPTION_COUNT} 个 options。",
+        f"【反重复】{REPETITION_PROMPT_INSTRUCTIONS[REPETITION_CHECK]}",
+    ])
+    base = "\n".join(base_parts)
     content_rules = content_preference_rules_text()
     return base + "\n" + content_rules
 

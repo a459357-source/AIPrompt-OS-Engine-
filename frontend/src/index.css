@@ -4,6 +4,7 @@
 @import './styles/neural-tokens.css';
 @import './styles/themes.css';
 @import './styles/desire-theme.css';
+@import './styles/adult-themes.css';
 
 @theme {
   --color-game-bg: #050810;
