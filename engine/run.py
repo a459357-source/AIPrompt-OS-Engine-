@@ -281,13 +281,28 @@ def run_loop(n: int) -> int:
 # ── Web mode ───────────────────────────────────────────────────────
 
 def _open_browser(host: str, port: int) -> None:
-    """Open the web UI in the default browser after a short delay."""
+    """Open the web UI in the default browser after the server is ready."""
     url = f"http://{'127.0.0.1' if host == '0.0.0.0' else host}:{port}"
     def _open():
         import time
-        time.sleep(1.0)  # wait for uvicorn to start listening
+        import socket
+        # Wait up to 10s for the server to start listening
+        for _ in range(20):
+            time.sleep(0.5)
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(0.5)
+                s.connect(('127.0.0.1', port))
+                s.close()
+                break  # server is ready
+            except (ConnectionRefusedError, OSError):
+                continue
         logger.info("Opening browser → %s", url)
-        webbrowser.open(url)
+        try:
+            webbrowser.open(url)
+        except Exception as exc:
+            logger.warning("Failed to open browser: %s", exc)
+            logger.info("Please open %s manually", url)
     threading.Thread(target=_open, daemon=True).start()
 
 
