@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
 import { StatusToast } from '@/components/StatusToast'
-import { getGameState, startGame, nextTurn, getHistory, getStoryLengthSettings, updateStoryLength, type HistoryTurn } from '@/lib/api'
+import { getGameState, startGame, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, type HistoryTurn, type GameGenSettings } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { parseRelationHints } from '@/lib/relationHints'
 
@@ -89,6 +90,22 @@ function AffectionBar({ value }: { value: number; name?: string }) {
   )
 }
 
+function GenFieldHint({ children }: { children: React.ReactNode }) {
+  return <span className="text-[11px] text-game-dim/90 leading-snug">{children}</span>
+}
+
+function QuickGenRow({ label, children, hint }: { label: string; children: React.ReactNode; hint: string }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-[5.5rem_1fr] gap-x-3 gap-y-1 items-center py-1.5 border-b border-game-border/40 last:border-0">
+      <Label className="text-xs text-game-muted whitespace-nowrap">{label}</Label>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+        {children}
+        <GenFieldHint>{hint}</GenFieldHint>
+      </div>
+    </div>
+  )
+}
+
 export default function Game() {
   const [story, setStory] = useState('')
   const [options, setOptions] = useState<string[]>([])
@@ -110,9 +127,22 @@ export default function Game() {
   const [storyLengthMin, setStoryLengthMin] = useState(300)
   const [storyLengthMax, setStoryLengthMax] = useState(213333)
   const [storyLengthRecommended, setStoryLengthRecommended] = useState(1000)
-  const [storyLengthSaved, setStoryLengthSaved] = useState(false)
+  const [maxTokens, setMaxTokens] = useState(1800)
+  const [maxOutputTokens, setMaxOutputTokens] = useState(384000)
+  const [contextTokens, setContextTokens] = useState(1000000)
+  const [temperature, setTemperature] = useState(0.8)
+  const [topP, setTopP] = useState(0.9)
+  const [compressThreshold, setCompressThreshold] = useState(4000)
+  const [genSettingsOpen, setGenSettingsOpen] = useState(true)
+  const [genSettingsSaved, setGenSettingsSaved] = useState(false)
   const storyScrollRef = useRef<HTMLDivElement>(null)
-  const storyLengthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const genSettingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingGenPatchRef = useRef<{
+    storyLength?: number
+    temperature?: number
+    topP?: number
+    compressThreshold?: number
+  }>({})
 
   const applyTurnData = useCallback((data: {
     story: string
@@ -178,35 +208,62 @@ export default function Game() {
 
   useEffect(() => { loadGame() }, [loadGame])
 
-  useEffect(() => {
-    getStoryLengthSettings()
-      .then((data) => {
-        setStoryLength(data.story_length)
-        setStoryLengthMin(data.min)
-        setStoryLengthMax(data.max)
-        setStoryLengthRecommended(data.recommended)
-      })
-      .catch((e) => logger.warn('Game', 'Load story length failed', { error: String(e) }))
+  const applyGenSettings = useCallback((data: GameGenSettings) => {
+    setStoryLength(data.story_length)
+    setStoryLengthMin(data.min)
+    setStoryLengthMax(data.max)
+    setStoryLengthRecommended(data.recommended)
+    setMaxTokens(data.max_tokens)
+    setMaxOutputTokens(data.max_output_tokens)
+    setContextTokens(data.context_tokens)
+    setTemperature(data.temperature)
+    setTopP(data.top_p)
+    setCompressThreshold(data.compress_threshold)
   }, [])
 
-  const queueStoryLengthSave = useCallback((value: number) => {
-    const clamped = Math.max(storyLengthMin, Math.min(storyLengthMax, value))
-    setStoryLength(clamped)
-    if (storyLengthTimerRef.current) clearTimeout(storyLengthTimerRef.current)
-    storyLengthTimerRef.current = setTimeout(async () => {
+  useEffect(() => {
+    getGameGenSettings()
+      .then(applyGenSettings)
+      .catch((e) => logger.warn('Game', 'Load gen settings failed', { error: String(e) }))
+  }, [applyGenSettings])
+
+  const queueGenSettingsSave = useCallback((patch: {
+    storyLength?: number
+    temperature?: number
+    topP?: number
+    compressThreshold?: number
+  }) => {
+    if (patch.storyLength != null) {
+      const clamped = Math.max(storyLengthMin, Math.min(storyLengthMax, patch.storyLength))
+      setStoryLength(clamped)
+      patch.storyLength = clamped
+    }
+    if (patch.temperature != null) setTemperature(patch.temperature)
+    if (patch.topP != null) setTopP(patch.topP)
+    if (patch.compressThreshold != null) {
+      const clamped = Math.max(500, Math.min(contextTokens, patch.compressThreshold))
+      setCompressThreshold(clamped)
+      patch.compressThreshold = clamped
+    }
+
+    pendingGenPatchRef.current = { ...pendingGenPatchRef.current, ...patch }
+    if (genSettingsTimerRef.current) clearTimeout(genSettingsTimerRef.current)
+    genSettingsTimerRef.current = setTimeout(async () => {
+      const pending = pendingGenPatchRef.current
+      pendingGenPatchRef.current = {}
       try {
-        const saved = await updateStoryLength(clamped)
-        setStoryLength(saved.story_length)
-        setStoryLengthSaved(true)
-        setTimeout(() => setStoryLengthSaved(false), 1500)
+        const saved = await updateGameGenSettings(pending)
+        applyGenSettings(saved)
+        setGenSettingsSaved(true)
+        setTimeout(() => setGenSettingsSaved(false), 1500)
       } catch (e) {
-        logger.error('Game', 'Save story length failed', { error: String(e) })
+        logger.error('Game', 'Save gen settings failed', { error: String(e) })
       }
     }, 600)
-  }, [storyLengthMin, storyLengthMax])
+  }, [storyLengthMin, storyLengthMax, contextTokens, applyGenSettings])
 
   useEffect(() => () => {
-    if (storyLengthTimerRef.current) clearTimeout(storyLengthTimerRef.current)
+    if (genSettingsTimerRef.current) clearTimeout(genSettingsTimerRef.current)
   }, [])
 
   const currentStoryChars = story.replace(/\s/g, '').length
@@ -413,51 +470,108 @@ export default function Game() {
             )}
 
             {/* Story — scrollable */}
-            <div ref={storyScrollRef} className="flex-1 overflow-y-auto min-h-0 space-y-4">
-            <div className="flex flex-wrap items-end justify-between gap-3 px-1">
-              <p className="text-sm font-medium text-game-muted">📖 正文</p>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="story-length" className="text-xs text-game-dim whitespace-nowrap">目标字数</Label>
-                  <Input
-                    id="story-length"
-                    type="number"
-                    min={storyLengthMin}
-                    max={storyLengthMax}
-                    step={100}
-                    value={storyLength}
-                    disabled={choosing}
-                    onChange={(e) => queueStoryLengthSave(parseInt(e.target.value, 10) || storyLengthRecommended)}
-                    className="w-24 h-8 text-sm"
-                  />
-                  <span className="text-xs text-game-dim whitespace-nowrap">
-                    上限 {storyLengthMax.toLocaleString()} ·{' '}
+            <div ref={storyScrollRef} className="flex-1 overflow-y-auto min-h-0 space-y-3">
+            <Card className="border-game-border/70 bg-game-bg/40">
+              <button
+                type="button"
+                className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-game-primary/5 transition-colors"
+                onClick={() => setGenSettingsOpen((v) => !v)}
+              >
+                <span className="text-sm font-medium text-game-muted">⚡ 生成快捷设置</span>
+                <span className="text-xs text-game-dim flex items-center gap-2">
+                  {genSettingsSaved && <span className="text-game-success">已保存</span>}
+                  <span>{genSettingsOpen ? '收起 ▲' : '展开 ▼'}</span>
+                </span>
+              </button>
+              {genSettingsOpen && (
+                <CardContent className="pt-0 pb-3 px-4">
+                  <QuickGenRow
+                    label="目标字数"
+                    hint="每轮正文目标长度，修改后下一轮生成生效"
+                  >
+                    <Input
+                      type="number"
+                      min={storyLengthMin}
+                      max={storyLengthMax}
+                      step={100}
+                      value={storyLength}
+                      disabled={choosing}
+                      onChange={(e) => queueGenSettingsSave({ storyLength: parseInt(e.target.value, 10) || storyLengthRecommended })}
+                      className="w-24 h-8 text-sm"
+                    />
                     <button
                       type="button"
                       disabled={choosing}
-                      onClick={() => queueStoryLengthSave(storyLengthRecommended)}
-                      className="text-game-accent hover:underline disabled:opacity-50"
+                      onClick={() => queueGenSettingsSave({ storyLength: storyLengthRecommended })}
+                      className="text-xs text-game-accent hover:underline disabled:opacity-50"
                     >
                       建议 {storyLengthRecommended.toLocaleString()}
                     </button>
-                  </span>
-                </div>
-                <Badge
-                  variant={currentStoryChars >= storyLength * 0.85 ? 'default' : 'outline'}
-                  size="sm"
-                  className="tabular-nums"
-                >
-                  当前 {currentStoryChars} 字
-                </Badge>
-                {storyLengthSaved && (
-                  <span className="text-xs text-game-success">已保存</span>
-                )}
-                <span className="text-xs text-game-dim hidden lg:inline">下一轮生成生效</span>
-                <span className="text-xs text-game-dim hidden md:inline">上限 {storyLengthMax.toLocaleString()} 字</span>
-              </div>
-            </div>
+                    <Badge variant="outline" size="sm" className="tabular-nums">当前 {currentStoryChars} 字</Badge>
+                  </QuickGenRow>
+                  <QuickGenRow
+                    label="最大 Token"
+                    hint={`AI 单次回复上限，随字数自动匹配；官方最大 ${maxOutputTokens.toLocaleString()}`}
+                  >
+                    <Badge variant="outline" size="sm" className="tabular-nums">{maxTokens.toLocaleString()}</Badge>
+                  </QuickGenRow>
+                  <QuickGenRow
+                    label="上下文"
+                    hint="模型一次能读入的提示+历史总量（官方 1M tokens）"
+                  >
+                    <Badge variant="outline" size="sm" className="tabular-nums">{contextTokens.toLocaleString()}</Badge>
+                  </QuickGenRow>
+                  <QuickGenRow
+                    label="温度"
+                    hint="越高越发散创意，越低越稳定；推荐 0.8–1.0，官方 ≤ 2.0"
+                  >
+                    <Slider
+                      value={[temperature]}
+                      min={0.1}
+                      max={2.0}
+                      step={0.1}
+                      disabled={choosing}
+                      onValueChange={([v]) => queueGenSettingsSave({ temperature: v })}
+                      className="w-32 sm:w-40"
+                    />
+                    <Badge variant="outline" size="sm">{temperature.toFixed(1)}</Badge>
+                  </QuickGenRow>
+                  <QuickGenRow
+                    label="Top P"
+                    hint="核采样范围，越小越保守；推荐 0.9，官方 ≤ 1.0"
+                  >
+                    <Slider
+                      value={[topP]}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      disabled={choosing}
+                      onValueChange={([v]) => queueGenSettingsSave({ topP: v })}
+                      className="w-32 sm:w-40"
+                    />
+                    <Badge variant="outline" size="sm">{topP.toFixed(2)}</Badge>
+                  </QuickGenRow>
+                  <QuickGenRow
+                    label="压缩阈值"
+                    hint={`对话 token 超过此值时触发压缩；范围 500–${contextTokens.toLocaleString()}`}
+                  >
+                    <Input
+                      type="number"
+                      min={500}
+                      max={contextTokens}
+                      step={500}
+                      value={compressThreshold}
+                      disabled={choosing}
+                      onChange={(e) => queueGenSettingsSave({ compressThreshold: parseInt(e.target.value, 10) || 4000 })}
+                      className="w-28 h-8 text-sm"
+                    />
+                  </QuickGenRow>
+                </CardContent>
+              )}
+            </Card>
             <Card>
-              <CardContent className="pt-6 md:px-8">
+              <CardContent className="pt-4 md:px-8">
+                <p className="text-sm font-medium text-game-muted mb-4">📖 正文</p>
                 <motion.div key={turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
                   {story.split('\n').filter(Boolean).map((paragraph, i) => (
                     <motion.p key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}

@@ -483,12 +483,12 @@ async def api_save_settings(
     model: str = Form("deepseek-chat"),
     story_length: int | None = Form(default=None),
     max_tokens: int | None = Form(default=None),
-    temperature: float = Form(0.8),
-    top_p: float = Form(0.9),
-    stream: int = Form(0),
-    max_context_messages: int = Form(20),
-    auto_compress: int = Form(1),
-    compress_threshold: int = Form(4000),
+    temperature: float | None = Form(default=None),
+    top_p: float | None = Form(default=None),
+    stream: int | None = Form(default=None),
+    max_context_messages: int | None = Form(default=None),
+    auto_compress: int | None = Form(default=None),
+    compress_threshold: int | None = Form(default=None),
 ):
     """Save engine settings from the React settings page."""
     from ui.routes.settings import apply_engine_settings
@@ -520,30 +520,42 @@ async def api_clear_settings_key():
     return JSONResponse(settings_payload())
 
 
+@router.get("/game-settings")
+async def api_get_game_settings():
+    """Generation quick settings for the Game page."""
+    from ui.routes.settings import game_settings_payload
+    return JSONResponse(game_settings_payload())
+
+
+@router.post("/game-settings")
+async def api_set_game_settings(
+    story_length: int | None = Form(default=None),
+    temperature: float | None = Form(default=None),
+    top_p: float | None = Form(default=None),
+    compress_threshold: int | None = Form(default=None),
+):
+    """Update generation quick settings from the Game page."""
+    from ui.routes.settings import apply_game_gen_settings
+    payload = apply_game_gen_settings(
+        story_length=story_length,
+        temperature=temperature,
+        top_p=top_p,
+        compress_threshold=compress_threshold,
+    )
+    return JSONResponse({"ok": True, **payload})
+
+
 @router.get("/story-length")
 async def api_get_story_length():
     """Current target length for generated story text (chars per turn)."""
-    payload = config.story_length_limits()
-    payload["story_length"] = config.STORY_LENGTH
-    payload["max_tokens"] = config.MAX_TOKENS
-    payload["matched_max_tokens"] = config.tokens_for_story_length(config.STORY_LENGTH)
-    payload["api_limits"] = config.api_limits()
-    return JSONResponse(payload)
+    from ui.routes.settings import game_settings_payload
+    return JSONResponse(game_settings_payload())
 
 
 @router.post("/story-length")
 async def api_set_story_length(story_length: int = Form(...)):
     """Update story length; applies from the next AI generation."""
-    from config import save_story_length, reload_story_length, reload_max_tokens, clamp_story_length
-    length = clamp_story_length(story_length)
-    save_story_length(length)
-    reload_story_length()
-    reload_max_tokens()
-    return JSONResponse({
-        "ok": True,
-        "story_length": config.STORY_LENGTH,
-        "max_tokens": config.MAX_TOKENS,
-        "matched_max_tokens": config.tokens_for_story_length(config.STORY_LENGTH),
-        "api_limits": config.api_limits(),
-    })
+    from ui.routes.settings import apply_game_gen_settings
+    payload = apply_game_gen_settings(story_length=story_length)
+    return JSONResponse({"ok": True, **payload})
 

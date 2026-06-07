@@ -264,24 +264,24 @@ export async function saveEngineSettings(params: {
   model: string
   storyLength?: number
   maxTokens?: number
-  temperature: number
-  topP: number
-  stream: boolean
-  maxContextMsgs: number
-  autoCompress: boolean
-  compressThreshold: number
+  temperature?: number
+  topP?: number
+  stream?: boolean
+  maxContextMsgs?: number
+  autoCompress?: boolean
+  compressThreshold?: number
 }): Promise<EngineSettings> {
   const fd = new FormData()
   if (params.apiKey) fd.append('api_key', params.apiKey)
   fd.append('model', params.model)
   if (params.storyLength != null) fd.append('story_length', String(params.storyLength))
   if (params.maxTokens != null) fd.append('max_tokens', String(params.maxTokens))
-  fd.append('temperature', String(params.temperature))
-  fd.append('top_p', String(params.topP))
-  fd.append('stream', params.stream ? '1' : '0')
-  fd.append('max_context_messages', String(params.maxContextMsgs))
-  fd.append('auto_compress', params.autoCompress ? '1' : '0')
-  fd.append('compress_threshold', String(params.compressThreshold))
+  if (params.temperature != null) fd.append('temperature', String(params.temperature))
+  if (params.topP != null) fd.append('top_p', String(params.topP))
+  if (params.stream != null) fd.append('stream', params.stream ? '1' : '0')
+  if (params.maxContextMsgs != null) fd.append('max_context_messages', String(params.maxContextMsgs))
+  if (params.autoCompress != null) fd.append('auto_compress', params.autoCompress ? '1' : '0')
+  if (params.compressThreshold != null) fd.append('compress_threshold', String(params.compressThreshold))
   const res = await fetch('/api/settings', { method: 'POST', body: fd })
   if (!res.ok) {
     const data = await res.json().catch(() => ({})) as { error?: string }
@@ -290,52 +290,86 @@ export async function saveEngineSettings(params: {
   return res.json()
 }
 
-export interface StoryLengthSettings {
+export interface GameGenSettings {
   story_length: number
   min: number
   max: number
   recommended: number
-  max_tokens?: number
-  matched_max_tokens?: number
-  max_output_tokens?: number
-  context_tokens?: number
+  max_tokens: number
+  matched_max_tokens: number
+  max_output_tokens: number
+  context_tokens: number
+  temperature: number
+  top_p: number
+  compress_threshold: number
+  api_limits?: {
+    context_tokens: number
+    max_output_tokens: number
+    max_temperature: number
+    max_top_p: number
+  }
 }
 
-export async function getStoryLengthSettings(): Promise<StoryLengthSettings> {
-  const res = await fetch('/api/story-length')
-  const fallback: StoryLengthSettings = {
-    story_length: 1000,
-    min: 300,
-    max: 213333,
-    recommended: 1000,
-    max_output_tokens: 384000,
-    context_tokens: 1000000,
-  }
-  if (!res.ok) return fallback
-  const data = await res.json() as Partial<StoryLengthSettings>
+export type StoryLengthSettings = GameGenSettings
+
+const GAME_GEN_FALLBACK: GameGenSettings = {
+  story_length: 1000,
+  min: 300,
+  max: 213333,
+  recommended: 1000,
+  max_tokens: 2048,
+  matched_max_tokens: 1800,
+  max_output_tokens: 384000,
+  context_tokens: 1000000,
+  temperature: 0.8,
+  top_p: 0.9,
+  compress_threshold: 4000,
+}
+
+function parseGameGenSettings(data: Partial<GameGenSettings>): GameGenSettings {
   return {
-    story_length: data.story_length ?? fallback.story_length,
-    min: data.min ?? fallback.min,
-    max: data.max ?? fallback.max,
-    recommended: data.recommended ?? fallback.recommended,
-    max_tokens: data.max_tokens,
-    matched_max_tokens: data.matched_max_tokens,
-    max_output_tokens: data.max_output_tokens,
-    context_tokens: data.context_tokens,
+    story_length: data.story_length ?? GAME_GEN_FALLBACK.story_length,
+    min: data.min ?? GAME_GEN_FALLBACK.min,
+    max: data.max ?? GAME_GEN_FALLBACK.max,
+    recommended: data.recommended ?? GAME_GEN_FALLBACK.recommended,
+    max_tokens: data.max_tokens ?? GAME_GEN_FALLBACK.max_tokens,
+    matched_max_tokens: data.matched_max_tokens ?? GAME_GEN_FALLBACK.matched_max_tokens,
+    max_output_tokens: data.max_output_tokens ?? GAME_GEN_FALLBACK.max_output_tokens,
+    context_tokens: data.context_tokens ?? GAME_GEN_FALLBACK.context_tokens,
+    temperature: data.temperature ?? GAME_GEN_FALLBACK.temperature,
+    top_p: data.top_p ?? GAME_GEN_FALLBACK.top_p,
+    compress_threshold: data.compress_threshold ?? GAME_GEN_FALLBACK.compress_threshold,
+    api_limits: data.api_limits,
   }
 }
 
-export async function updateStoryLength(length: number): Promise<StoryLengthSettings> {
+export async function getGameGenSettings(): Promise<GameGenSettings> {
+  const res = await fetch('/api/game-settings')
+  if (!res.ok) return GAME_GEN_FALLBACK
+  return parseGameGenSettings(await res.json() as Partial<GameGenSettings>)
+}
+
+export async function getStoryLengthSettings(): Promise<GameGenSettings> {
+  return getGameGenSettings()
+}
+
+export async function updateGameGenSettings(patch: {
+  storyLength?: number
+  temperature?: number
+  topP?: number
+  compressThreshold?: number
+}): Promise<GameGenSettings> {
   const fd = new FormData()
-  fd.append('story_length', String(length))
-  const res = await fetch('/api/story-length', { method: 'POST', body: fd })
-  const data = await res.json().catch(() => ({})) as Partial<StoryLengthSettings> & { error?: string }
+  if (patch.storyLength != null) fd.append('story_length', String(patch.storyLength))
+  if (patch.temperature != null) fd.append('temperature', String(patch.temperature))
+  if (patch.topP != null) fd.append('top_p', String(patch.topP))
+  if (patch.compressThreshold != null) fd.append('compress_threshold', String(patch.compressThreshold))
+  const res = await fetch('/api/game-settings', { method: 'POST', body: fd })
+  const data = await res.json().catch(() => ({})) as Partial<GameGenSettings> & { error?: string }
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
-  const settings = await getStoryLengthSettings()
-  return {
-    ...settings,
-    story_length: data.story_length ?? settings.story_length,
-    max_tokens: data.max_tokens ?? settings.max_tokens,
-    matched_max_tokens: data.matched_max_tokens ?? settings.matched_max_tokens,
-  }
+  return parseGameGenSettings(data)
+}
+
+export async function updateStoryLength(length: number): Promise<GameGenSettings> {
+  return updateGameGenSettings({ storyLength: length })
 }
