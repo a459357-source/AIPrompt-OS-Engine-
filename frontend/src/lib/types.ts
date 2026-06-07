@@ -97,6 +97,7 @@ export interface GameState {
   status: 'SETUP' | 'BUILD' | 'TENSION' | 'CLIMAX' | 'COOLDOWN'
   turn: number
   characters: Record<string, StateCharacter>
+  factions?: Record<string, unknown>[]
   history: unknown[]
   force_event_pending: boolean
   chapter: number

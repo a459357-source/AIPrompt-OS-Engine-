@@ -22,6 +22,7 @@ import type { Character } from '@/lib/types'
 const characterSchema = z.object({
   name: z.string().min(1, '必填'),
   isMain: z.boolean(),
+  faction: z.string().optional(),
   role_tags: z.array(z.string()),
   personality_tags: z.array(z.string()),
   appearance: z.string(),
@@ -85,6 +86,9 @@ export default function NewStory() {
     relationshipType: string; affection: number; trust: number; respect: number;
     dependence: number; hostility: number; attraction: number; tags: string[];
   }>>({})
+  const [artifacts, setArtifacts] = useState<{ name: string; type: string; description: string; ownerType: string; ownerId: string; importance: number; abilities: string[]; tags: string[] }[]>([])
+  const [factions, setFactions] = useState<{ name: string; type: string; description: string; goals: string[]; resources: string[]; controlledTerritories: string[]; subordinateOrganizations: string[]; keyAssets: string[]; power: { military: number; economic: number; political: number; technology: number }; influence: number; relation_to_player: string; leader: string }[]>([])
+  const [customStats, setCustomStats] = useState<{ key: string; label: string; max: number }[]>([])
   const kwRef = useRef<HTMLTextAreaElement>(null)
 
   const form = useForm<FormValues>({
@@ -109,9 +113,6 @@ export default function NewStory() {
       ],
       rel_stages: DEFAULT_STAGES,
       rel_affection: 0,
-      artifacts: [] as { name: string; type: 'personal'|'faction'|'world'; description: string; ownerType: 'character'|'faction'|'location'|'none'; ownerId: string; importance: number; abilities: string[]; tags: string[] }[],
-      factions: [] as { name: string; type: string; description: string; goals: string[]; resources: string[]; controlledTerritories: string[]; subordinateOrganizations: string[]; keyAssets: string[]; power: { military: number; economic: number; political: number; technology: number }; influence: number; relation_to_player: string; leader: string }[],
-      customStats: [] as { key: string; label: string; max: number }[],
     },
   })
 
@@ -164,9 +165,9 @@ export default function NewStory() {
       }
       if (data.rel_stages) setValue('rel_stages', data.rel_stages)
       if (data.rel_affection != null) setValue('rel_affection', data.rel_affection)
-      if (data.stats) setValue('customStats', data.stats)
+      if (data.stats) setCustomStats( data.stats)
       if (data.factions) {
-        const facs = (data.factions as Array<Record<string,unknown>>).map((f: Record<string,unknown>) => ({
+        const facs = (data.factions as unknown as Array<Record<string,unknown>>).map((f: Record<string,unknown>) => ({
           name: (f.name as string) || '',
           type: (f.type as string) || 'organization',
           description: (f.description as string) || '',
@@ -180,10 +181,10 @@ export default function NewStory() {
           relation_to_player: (f.relation_to_player as string) || 'neutral',
           leader: (f.leader as string) || '',
         }))
-        setValue('factions', facs)
+        setFactions( facs)
       }
       if (data.artifacts) {
-        const arts = (data.artifacts as Array<Record<string,unknown>>).map((a: Record<string,unknown>) => ({
+        const arts = (data.artifacts as unknown as Array<Record<string,unknown>>).map((a: Record<string,unknown>) => ({
           name: (a.name as string) || '',
           type: ((a.type as string) || 'personal') as 'personal'|'faction'|'world',
           description: (a.description as string) || '',
@@ -193,7 +194,7 @@ export default function NewStory() {
           abilities: (a.abilities as string[]) || [],
           tags: (a.tags as string[]) || [],
         }))
-        setValue('artifacts', arts)
+        setArtifacts( arts)
       }
       showStatus('✅ 生成完成，可继续修改', 'success')
       setFieldErrors((prev) => ({ ...prev, world: null }))
@@ -274,9 +275,9 @@ export default function NewStory() {
     fd.append('main_goal', data.main_goal)
     fd.append('chars_json', JSON.stringify(data.characters))
     fd.append('rel_system', JSON.stringify({ stages: data.rel_stages, affection: data.rel_affection }))
-    fd.append('custom_rules', JSON.stringify({ stats: data.customStats || [], stages: data.rel_stages, characterRelations: characterRelations }))
-    fd.append('artifacts_json', JSON.stringify(data.artifacts || []))
-    fd.append('factions_json', JSON.stringify(data.factions || []))
+    fd.append('custom_rules', JSON.stringify({ stats: customStats, stages: data.rel_stages, characterRelations: characterRelations }))
+    fd.append('artifacts_json', JSON.stringify(artifacts))
+    fd.append('factions_json', JSON.stringify(factions))
     showStatus('正在创建故事…', 'loading')
     try {
       await createStory(fd)
@@ -522,7 +523,7 @@ export default function NewStory() {
                                   className="w-full bg-game-bg border border-game-border rounded-md px-2 py-1.5 text-xs text-game-text mt-0.5"
                                 >
                                   <option value="">无</option>
-                                  {(getValues('factions') || []).map((f: { name: string }) => (
+                                  {(factions || []).map((f: { name: string }) => (
                                     <option key={f.name} value={f.name}>{f.name}</option>
                                   ))}
                                 </select>
@@ -602,7 +603,7 @@ export default function NewStory() {
                 {(() => {
                   const allChars = watch('characters') || []
                   const mainChar = allChars.find((c: { isMain?: boolean }) => c.isMain) || allChars[0]
-                  const npcs = allChars.filter((c: { isMain?: boolean }) => !c.isMain && c.name)
+                  const npcs = allChars.filter((c: { isMain?: boolean; name?: string }) => !c.isMain && c.name)
                   const DIMS = [
                     ['❤️好感', 'affection'], ['🤝信任', 'trust'], ['🙏尊重', 'respect'],
                     ['🔗依赖', 'dependence'], ['⚔️敌意', 'hostility'], ['💫吸引', 'attraction'],
@@ -640,7 +641,7 @@ export default function NewStory() {
                             </div>
                             <div className="grid grid-cols-3 gap-x-3 gap-y-1">
                               {DIMS.map(([label, key]) => {
-                                const val = (r as Record<string,number>)[key] ?? 50
+                                const val = (r as unknown as Record<string,number>)[key] ?? 50
                                 const barColor = key === 'hostility' ? '#da3633' : '#58a6ff'
                                 return (
                                   <div key={key} className="flex items-center gap-1">
@@ -676,7 +677,7 @@ export default function NewStory() {
 
                 {/* Current custom stats */}
                 {(() => {
-                  const stats = getValues('customStats') || []
+                  const stats = customStats || []
                   return stats.length > 0 ? (
                     <div>
                       <span className="text-[10px] text-game-muted">📊 追踪维度</span>
@@ -699,7 +700,7 @@ export default function NewStory() {
                       const allChars = getValues('characters') || []
                       const data = await generateRules({
                         title: getValues('title'),
-                        world: getValues('world') + '\n势力：' + JSON.stringify(getValues('factions') || []) + '\n物品：' + JSON.stringify(getValues('artifacts') || []),
+                        world: getValues('world') + '\n势力：' + JSON.stringify(factions || []) + '\n物品：' + JSON.stringify(artifacts || []),
                         genre: getValues('genre').join('/'),
                         char1_name: allChars[0]?.name || '主角',
                         char1_role: allChars[0]?.role_tags?.[0] || '',
@@ -707,7 +708,7 @@ export default function NewStory() {
                         char2_role: allChars[1]?.role_tags?.[0] || '',
                       })
                       if (data.stages?.length) setValue('rel_stages', data.stages)
-                      if (data.stats?.length) setValue('customStats', data.stats)
+                      if (data.stats?.length) setCustomStats( data.stats)
                       showStatus('✅ 专属规则生成完成', 'success')
                     } catch (e) {
                       const msg = (e as Error).message || String(e)
@@ -737,7 +738,7 @@ export default function NewStory() {
                     onClick={async () => {
                       setGenerating('artifacts-all')
                       showStatus('正在批量生成关键物品…', 'loading')
-                      const current = getValues('artifacts') || []
+                      const current = artifacts || []
                       const newArts: typeof current = []
                       for (let i = 0; i < 3; i++) {
                         try {
@@ -761,7 +762,7 @@ export default function NewStory() {
                           }
                         } catch { /* continue */ }
                       }
-                      setValue('artifacts', [...current, ...newArts])
+                      setArtifacts( [...current, ...newArts])
                       showStatus(`✅ 已生成 ${newArts.length} 个关键物品`, 'success')
                       setGenerating(null)
                     }}
@@ -773,8 +774,8 @@ export default function NewStory() {
                     variant="outline"
                     size="xs"
                     onClick={() => {
-                      const current = getValues('artifacts') || []
-                      setValue('artifacts', [...current, {
+                      const current = artifacts || []
+                      setArtifacts( [...current, {
                         name: '', type: 'personal' as const, description: '',
                         ownerType: 'none' as const, ownerId: '',
                         importance: 50, abilities: [], tags: [],
@@ -787,7 +788,7 @@ export default function NewStory() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                  {(getValues('artifacts') || []).map((art, idx) => (
+                  {(artifacts || []).map((art, idx) => (
                     <motion.div
                       key={idx}
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -812,7 +813,7 @@ export default function NewStory() {
                                       genre: getValues('genre').join('/'),
                                     })
                                     if ((data as { name?: string }).name) {
-                                      const current = getValues('artifacts') || []
+                                      const current = artifacts || []
                                       current[idx] = {
                                         name: (data as { name: string }).name,
                                         type: ((data as { type?: string }).type || 'personal') as 'personal' | 'faction' | 'world',
@@ -823,7 +824,7 @@ export default function NewStory() {
                                         abilities: (data as { abilities?: string[] }).abilities || [],
                                         tags: (data as { tags?: string[] }).tags || [],
                                       }
-                                      setValue('artifacts', [...current])
+                                      setArtifacts( [...current])
                                     }
                                     showStatus('✅ 物品生成完成', 'success')
                                   } catch (e) { showStatus(`❌ ${(e as Error).message}`, 'error') }
@@ -833,9 +834,9 @@ export default function NewStory() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const current = getValues('artifacts') || []
+                                  const current = artifacts || []
                                   current.splice(idx, 1)
-                                  setValue('artifacts', [...current])
+                                  setArtifacts( [...current])
                                 }}
                                 className="text-game-dim hover:text-game-danger transition-colors text-sm"
                               >✕</button>
@@ -844,9 +845,9 @@ export default function NewStory() {
                           <Input
                             value={art.name}
                             onChange={(e) => {
-                              const current = getValues('artifacts') || []
+                              const current = artifacts || []
                               current[idx] = { ...current[idx], name: e.target.value }
-                              setValue('artifacts', [...current])
+                              setArtifacts( [...current])
                             }}
                             placeholder="物品名称"
                             className="mt-1 font-bold text-sm h-8"
@@ -857,9 +858,9 @@ export default function NewStory() {
                             <select
                               value={art.type}
                               onChange={(e) => {
-                                const current = getValues('artifacts') || []
+                                const current = artifacts || []
                                 current[idx] = { ...current[idx], type: e.target.value as 'personal' | 'faction' | 'world' }
-                                setValue('artifacts', [...current])
+                                setArtifacts( [...current])
                               }}
                               className="bg-game-bg border border-game-border rounded-md px-2 py-1 text-xs text-game-text"
                             >
@@ -870,9 +871,9 @@ export default function NewStory() {
                             <Input
                               value={art.ownerId}
                               onChange={(e) => {
-                                const current = getValues('artifacts') || []
+                                const current = artifacts || []
                                 current[idx] = { ...current[idx], ownerId: e.target.value }
-                                setValue('artifacts', [...current])
+                                setArtifacts( [...current])
                               }}
                               placeholder="持有者（角色名/势力名）"
                               className="flex-1 text-xs h-7"
@@ -881,9 +882,9 @@ export default function NewStory() {
                               type="number"
                               value={art.importance}
                               onChange={(e) => {
-                                const current = getValues('artifacts') || []
+                                const current = artifacts || []
                                 current[idx] = { ...current[idx], importance: Math.max(1, Math.min(100, parseInt(e.target.value) || 50)) }
-                                setValue('artifacts', [...current])
+                                setArtifacts( [...current])
                               }}
                               className="w-16 text-xs h-7"
                               placeholder="重要度"
@@ -892,9 +893,9 @@ export default function NewStory() {
                           <Input
                             value={art.description}
                             onChange={(e) => {
-                              const current = getValues('artifacts') || []
+                              const current = artifacts || []
                               current[idx] = { ...current[idx], description: e.target.value }
-                              setValue('artifacts', [...current])
+                              setArtifacts( [...current])
                             }}
                             placeholder="物品描述（用途、背景…）"
                             className="text-xs h-7"
@@ -903,9 +904,9 @@ export default function NewStory() {
                             <TagInput
                               value={art.tags || []}
                               onChange={(tags) => {
-                                const current = getValues('artifacts') || []
+                                const current = artifacts || []
                                 current[idx] = { ...current[idx], tags }
-                                setValue('artifacts', [...current])
+                                setArtifacts( [...current])
                               }}
                               presets={['国宝','机密','武器','货币','信物','钥匙','证据','传家宝']}
                               placeholder="标签…"
@@ -916,7 +917,7 @@ export default function NewStory() {
                       </Card>
                     </motion.div>
                   ))}
-                  {(getValues('artifacts') || []).length === 0 && (
+                  {(artifacts || []).length === 0 && (
                     <p className="text-game-dim text-xs text-center py-4 col-span-2">
                       暂无关键物品 · 点击「✨ 模块生成」AI 批量生成，或「➕ 添加物品」手动填写
                     </p>
@@ -941,7 +942,7 @@ export default function NewStory() {
                     onClick={async () => {
                       setGenerating('factions-all')
                       showStatus('正在批量生成势力…', 'loading')
-                      const current = getValues('factions') || []
+                      const current = factions || []
                       const newFacs: typeof current = []
                       for (let i = 0; i < 3; i++) {
                         try {
@@ -969,7 +970,7 @@ export default function NewStory() {
                           }
                         } catch { /* continue */ }
                       }
-                      setValue('factions', [...current, ...newFacs])
+                      setFactions( [...current, ...newFacs])
                       showStatus(`✅ 已生成 ${newFacs.length} 个势力`, 'success')
                       setGenerating(null)
                     }}
@@ -981,8 +982,8 @@ export default function NewStory() {
                     variant="outline"
                     size="xs"
                     onClick={() => {
-                      const current = getValues('factions') || []
-                      setValue('factions', [...current, {
+                      const current = factions || []
+                      setFactions( [...current, {
                         name: '', type: 'organization', description: '',
                         goals: [], resources: [], controlledTerritories: [],
                         subordinateOrganizations: [], keyAssets: [],
@@ -997,7 +998,7 @@ export default function NewStory() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                  {(getValues('factions') || []).map((fac, idx) => (
+                  {(factions || []).map((fac, idx) => (
                     <motion.div
                       key={idx}
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -1022,7 +1023,7 @@ export default function NewStory() {
                                       genre: getValues('genre').join('/'),
                                     })
                                     if ((data as { name?: string }).name) {
-                                      const current = getValues('factions') || []
+                                      const current = factions || []
                                       current[idx] = {
                                         name: (data as { name: string }).name,
                                         type: ((data as { type?: string }).type || 'organization') as string,
@@ -1037,7 +1038,7 @@ export default function NewStory() {
                                         relation_to_player: ((data as { relation_to_player?: string }).relation_to_player || 'neutral') as string,
                                         leader: (data as { leader?: string }).leader || '',
                                       }
-                                      setValue('factions', [...current])
+                                      setFactions( [...current])
                                     }
                                     showStatus('✅ 势力生成完成', 'success')
                                   } catch (e) { showStatus(`❌ ${(e as Error).message}`, 'error') }
@@ -1047,9 +1048,9 @@ export default function NewStory() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const current = getValues('factions') || []
+                                  const current = factions || []
                                   current.splice(idx, 1)
-                                  setValue('factions', [...current])
+                                  setFactions( [...current])
                                 }}
                                 className="text-game-dim hover:text-game-danger transition-colors text-sm"
                               >✕</button>
@@ -1058,9 +1059,9 @@ export default function NewStory() {
                           <Input
                             value={fac.name}
                             onChange={(e) => {
-                              const current = getValues('factions') || []
+                              const current = factions || []
                               current[idx] = { ...current[idx], name: e.target.value }
-                              setValue('factions', [...current])
+                              setFactions( [...current])
                             }}
                             placeholder="势力名称"
                             className="mt-1 font-bold text-sm h-8"
@@ -1071,9 +1072,9 @@ export default function NewStory() {
                             <select
                               value={fac.type}
                               onChange={(e) => {
-                                const current = getValues('factions') || []
+                                const current = factions || []
                                 current[idx] = { ...current[idx], type: e.target.value }
-                                setValue('factions', [...current])
+                                setFactions( [...current])
                               }}
                               className="bg-game-bg border border-game-border rounded-md px-2 py-1 text-xs text-game-text"
                             >
@@ -1090,9 +1091,9 @@ export default function NewStory() {
                             <select
                               value={fac.relation_to_player}
                               onChange={(e) => {
-                                const current = getValues('factions') || []
+                                const current = factions || []
                                 current[idx] = { ...current[idx], relation_to_player: e.target.value }
-                                setValue('factions', [...current])
+                                setFactions( [...current])
                               }}
                               className="bg-game-bg border border-game-border rounded-md px-2 py-1 text-xs text-game-text"
                             >
@@ -1105,9 +1106,9 @@ export default function NewStory() {
                             <Input
                               value={fac.leader}
                               onChange={(e) => {
-                                const current = getValues('factions') || []
+                                const current = factions || []
                                 current[idx] = { ...current[idx], leader: e.target.value }
-                                setValue('factions', [...current])
+                                setFactions( [...current])
                               }}
                               placeholder="首领"
                               className="flex-1 text-xs h-7"
@@ -1116,9 +1117,9 @@ export default function NewStory() {
                               type="number"
                               value={fac.influence}
                               onChange={(e) => {
-                                const current = getValues('factions') || []
+                                const current = factions || []
                                 current[idx] = { ...current[idx], influence: Math.max(1, Math.min(100, parseInt(e.target.value) || 50)) }
-                                setValue('factions', [...current])
+                                setFactions( [...current])
                               }}
                               className="w-16 text-xs h-7"
                               placeholder="影响力"
@@ -1127,9 +1128,9 @@ export default function NewStory() {
                           <Input
                             value={fac.description}
                             onChange={(e) => {
-                              const current = getValues('factions') || []
+                              const current = factions || []
                               current[idx] = { ...current[idx], description: e.target.value }
-                              setValue('factions', [...current])
+                              setFactions( [...current])
                             }}
                             placeholder="势力描述…"
                             className="text-xs h-7"
@@ -1142,9 +1143,9 @@ export default function NewStory() {
                                   type="number"
                                   value={fac.power?.[k] ?? 0}
                                   onChange={(e) => {
-                                    const current = getValues('factions') || []
+                                    const current = factions || []
                                     current[idx] = { ...current[idx], power: { ...(current[idx].power || { military:0,economic:0,political:0,technology:0 }), [k]: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) } }
-                                    setValue('factions', [...current])
+                                    setFactions( [...current])
                                   }}
                                   className="flex-1 text-[10px] h-6 text-center"
                                 />
@@ -1154,9 +1155,9 @@ export default function NewStory() {
                           <TagInput
                             value={fac.goals || []}
                             onChange={(goals) => {
-                              const current = getValues('factions') || []
+                              const current = factions || []
                               current[idx] = { ...current[idx], goals }
-                              setValue('factions', [...current])
+                              setFactions( [...current])
                             }}
                             presets={[]}
                             placeholder="目标…"
@@ -1166,7 +1167,7 @@ export default function NewStory() {
                       </Card>
                     </motion.div>
                   ))}
-                  {(getValues('factions') || []).length === 0 && (
+                  {(factions || []).length === 0 && (
                     <p className="text-game-dim text-xs text-center py-4 col-span-2">
                       暂无势力 · 点击「✨ 模块生成」AI 批量生成，或「➕ 添加势力」手动填写
                     </p>

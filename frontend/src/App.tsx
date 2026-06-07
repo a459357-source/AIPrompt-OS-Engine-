@@ -81,7 +81,7 @@ function MobileDrawer() {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger className="md:hidden" asChild>
+      <SheetTrigger className="md:hidden">
         <Button variant="ghost" size="icon" className="text-game-text">
           <span className="text-xl">☰</span>
         </Button>
