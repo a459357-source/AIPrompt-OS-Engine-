@@ -17,6 +17,7 @@ import logging
 import re
 
 import config
+from engine.constants import ARTIFACT_TRANSFER_KEYWORDS
 from engine import io_utils
 from engine.memory import (
     load_memory, save_memory, update_trust, set_flag,
