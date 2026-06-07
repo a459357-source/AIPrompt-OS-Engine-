@@ -73,6 +73,8 @@ const ROLE_PRESETS = [
 
 const DEFAULT_STAGES = ['崩坏', '敌视', '对立', '冷漠', '疏远', '陌生', '认识', '信赖', '盟友', '羁绊']
 
+const DEFAULT_REL = { relationshipType:'friend', affection:50, trust:50, respect:50, dependence:50, hostility:30, attraction:50, tags:[] as string[] }
+
 // ── Main Page ──
 export default function NewStory() {
   const [aiStatus, setAiStatus] = useState('')
@@ -613,11 +615,11 @@ export default function NewStory() {
                   return (
                     <div className="space-y-3">
                       {npcs.map((c: { name: string }) => {
-                        const r = characterRelations[c.name] || { relationshipType:'friend', affection:50, trust:50, respect:50, dependence:50, hostility:30, attraction:50, tags:[] as string[] }
+                        const r = characterRelations[c.name] || DEFAULT_REL
                         const updateRel = (k: string, v: unknown) => {
                           setCharacterRelations(prev => ({
                             ...prev,
-                            [c.name]: { ...(prev[c.name] || r), [k]: v }
+                            [c.name]: { ...(prev[c.name] || DEFAULT_REL), [k]: v }
                           }))
                         }
                         return (
@@ -630,7 +632,7 @@ export default function NewStory() {
                               </div>
                               <select
                                 value={r.relationshipType}
-                                onChange={(e) => updateRel('relationshipType', e.target.value)}
+                                onChange={(e) => { updateRel('relationshipType', e.target.value) }}
                                 className="bg-game-bg border border-game-border rounded-md px-2 py-0.5 text-[10px] text-game-text"
                               >
                                 {REL_TYPES.map(t => <option key={t} value={t}>{REL_LABELS[t]}</option>)}
