@@ -88,6 +88,54 @@ def lore_env(tmp_path, monkeypatch):
     return {"world_pack_path": wp, "session_path": ss, "memory_path": mem}
 
 
+def test_merge_special_ability_append_and_remove():
+    from engine.supplement_lore import _merge_special_ability
+
+    existing = "能与星辰碎片产生共鸣，短暂强化自身。"
+    merged, changed = _merge_special_ability(existing, {"special_ability": "催眠术"})
+    assert changed is True
+    assert "星辰碎片" in merged
+    assert "催眠术" in merged
+
+    merged2, changed2 = _merge_special_ability(merged, {"special_ability": "催眠术"})
+    assert changed2 is False
+
+    merged3, changed3 = _merge_special_ability(
+        merged,
+        {"special_ability_remove": "催眠术"},
+    )
+    assert changed3 is True
+    assert "催眠术" not in merged3
+    assert "星辰碎片" in merged3
+
+    merged4, changed4 = _merge_special_ability(
+        existing,
+        {"special_ability_replace": True, "special_ability": "仅会催眠术"},
+    )
+    assert changed4 is True
+    assert merged4 == "仅会催眠术"
+
+
+def test_apply_supplement_append_special_ability(lore_env):
+    pack_before = io_utils.read_yaml(lore_env["world_pack_path"])
+    hero = next(c for c in pack_before["world"]["characters"] if c["name"] == "主角")
+    hero["special_ability"] = "原有能力"
+    io_utils.write_yaml(lore_env["world_pack_path"], pack_before)
+
+    apply_supplement({
+        "story_prompt": "",
+        "characters": [{"action": "update", "name": "主角", "special_ability": "催眠术"}],
+        "factions": [],
+        "artifacts": [],
+        "characterRelations": {},
+        "summary": "追加催眠术",
+    })
+    pack = io_utils.read_yaml(lore_env["world_pack_path"])
+    hero_after = next(c for c in pack["world"]["characters"] if c["name"] == "主角")
+    assert "原有能力" in hero_after["special_ability"]
+    assert "催眠术" in hero_after["special_ability"]
+
+
 def test_normalize_rel_entry_only_explicit_fields():
     from engine.supplement_lore import _normalize_rel_entry
 

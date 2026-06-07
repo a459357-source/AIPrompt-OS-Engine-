@@ -25,7 +25,7 @@ _REL_TYPES = frozenset({"friend", "lover", "family", "teacher", "rival", "ally",
 _REL_METRICS = ("affection", "trust", "respect", "dependence", "hostility", "attraction")
 _CHAR_PATCH_KEYS = (
     "role_tags", "personality_tags", "appearance", "relationship",
-    "goal", "secret", "background", "special_ability", "faction",
+    "goal", "secret", "background", "faction",
     "factionMemberships", "faction_memberships", "is_main",
 )
 _FACTION_PATCH_KEYS = (
@@ -60,6 +60,69 @@ def _find_by_name(items: list[dict], name: str) -> dict | None:
             if iname and (name in iname or iname in name):
                 return item
     return None
+
+
+def _split_abilities(text: str) -> list[str]:
+    raw = str(text or "").strip()
+    if not raw:
+        return []
+    parts: list[str] = []
+    for chunk in raw.replace("；", ";").replace("，", ",").split(";"):
+        for piece in chunk.split(","):
+            piece = piece.strip()
+            if piece:
+                parts.append(piece)
+    return parts
+
+
+def _join_abilities(parts: list[str]) -> str:
+    return "；".join(p for p in parts if p)
+
+
+def _ability_already_listed(parts: list[str], addition: str) -> bool:
+    addition = addition.strip()
+    if not addition:
+        return True
+    for part in parts:
+        if part == addition or addition in part or part in addition:
+            return True
+    return False
+
+
+def _merge_special_ability(existing: str, entry: dict) -> tuple[str, bool]:
+    """Append special_ability by default; replace/remove only when entry says so."""
+    current = str(existing or "").strip()
+    parts = _split_abilities(current)
+    changed = False
+
+    remove_raw = entry.get("special_ability_remove")
+    if remove_raw:
+        remove_list = remove_raw if isinstance(remove_raw, list) else [remove_raw]
+        for item in remove_list:
+            target = str(item or "").strip()
+            if not target:
+                continue
+            before = len(parts)
+            parts = [
+                p for p in parts
+                if p != target and target not in p and p not in target
+            ]
+            if len(parts) != before:
+                changed = True
+
+    if entry.get("special_ability_replace") is True:
+        replacement = str(entry.get("special_ability") or "").strip()
+        if replacement != current:
+            return replacement, True
+        return current, changed
+
+    addition = str(entry.get("special_ability") or "").strip()
+    if addition and not _ability_already_listed(parts, addition):
+        parts.append(addition)
+        changed = True
+
+    merged = _join_abilities(parts)
+    return merged, changed or merged != current
 
 
 def _merge_dict(base: dict, patch: dict, keys: tuple[str, ...]) -> dict:
@@ -275,6 +338,9 @@ def _analysis_prompt(context: str, user_text: str) -> tuple[str, str]:
 
 各字段仅在玩家文本**明确提到**时才填写，结构示例（不要照抄示例值）：
 - characters[].action: add|update；update 只含玩家提到的字段；add 时 name 必填，其余字段仅填玩家写到的属性
+- characters[].special_ability：update 时只写要**追加**的能力片段（系统合并到已有能力，不覆盖）
+- characters[].special_ability_remove：玩家明确要去掉某能力时填写（字符串或数组）
+- characters[].special_ability_replace：仅当玩家明确「改为仅有/替换为/去掉原来能力」时为 true，此时 special_ability 表示完整替换结果
 - factions / artifacts 同上
 - characterRelations：只含玩家明确提到的 NPC；六维数值只输出玩家写到的维度，未写不要输出
 - rel_affection：仅当玩家明确给出初始/当前好感数值时才输出该字段，否则整个字段省略
@@ -511,6 +577,13 @@ def _apply_characters(
 
         if action == "update" and existing:
             merged = _merge_dict(existing, entry, _CHAR_PATCH_KEYS)
+            if (
+                "special_ability" in entry
+                or "special_ability_remove" in entry
+                or entry.get("special_ability_replace") is True
+            ):
+                new_ability, _ = _merge_special_ability(existing.get("special_ability", ""), entry)
+                merged["special_ability"] = new_ability
             merged["name"] = name
             idx = wp_chars.index(existing)
             wp_chars[idx] = merged
