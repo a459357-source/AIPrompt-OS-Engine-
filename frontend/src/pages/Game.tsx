@@ -437,6 +437,7 @@ export default function Game() {
   const [genSettingsSaving, setGenSettingsSaving] = useState(false)
   const [genSettingsSaveError, setGenSettingsSaveError] = useState('')
   const storyScrollRef = useRef<HTMLDivElement>(null)
+  const storyEndRef = useRef<HTMLDivElement>(null)
   const genSettingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const genSettingsSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
@@ -959,12 +960,24 @@ export default function Game() {
         ? 'border-game-danger/40 text-game-danger'
         : 'border-amber-500/40 text-amber-400'
 
-  // 新回合完成后滚回顶部，方便从开头阅读（流式过程中不滚动，便于继续看上一轮正文）
+  // 新回合完成后滚回顶部，方便从开头阅读
   useEffect(() => {
     const el = storyScrollRef.current
     if (!el) return
     requestAnimationFrame(() => { el.scrollTop = 0 })
   }, [turn])
+
+  // 流式生成时跟随滚动到底部（构建提示词阶段仍保留上一轮正文，不滚动）
+  useEffect(() => {
+    const streaming = choosing || openingPending
+    if (!streaming) return
+    if (choosing && genProgress === 'building_prompt' && !streamGenerationStartedRef.current) return
+    const end = storyEndRef.current
+    if (!end) return
+    requestAnimationFrame(() => {
+      end.scrollIntoView({ block: 'end', behavior: 'auto' })
+    })
+  }, [story, choosing, openingPending, genProgress])
 
   const handleChoice = useCallback(async (choice: string, opts?: { auto?: boolean }) => {
     if (!opts?.auto) setAutoAdvancePaused(true)
@@ -1682,6 +1695,7 @@ export default function Game() {
                     ))}
                   </div>
                 )}
+                <div ref={storyEndRef} aria-hidden className="h-px shrink-0" />
               </CardContent>
             </Card>
 
