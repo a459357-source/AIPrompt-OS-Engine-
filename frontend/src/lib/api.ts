@@ -654,6 +654,10 @@ export interface GameGenSettings {
     max_temperature: number
     max_top_p: number
   }
+  /** 切换成人模式等场景下重生本轮选项 */
+  options?: string[]
+  options_regenerated?: boolean
+  options_regen_error?: string
 }
 
 const _FALLBACK_BOUNDS = storyTargetBounds(1000, 300)
@@ -755,6 +759,9 @@ function parseGameGenSettings(data: Partial<GameGenSettings>): GameGenSettings {
     content_weights: data.content_weights ?? { ...DEFAULT_CONTENT_WEIGHTS },
     preset_weights: data.preset_weights ?? GAME_GEN_FALLBACK.preset_weights,
     api_limits: data.api_limits,
+    options: Array.isArray(data.options) ? data.options : undefined,
+    options_regenerated: data.options_regenerated,
+    options_regen_error: data.options_regen_error,
   }
 }
 

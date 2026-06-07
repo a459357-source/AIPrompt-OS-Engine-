@@ -80,6 +80,16 @@ def _merge_adult_options(
     return merged[:count]
 
 
+def regenerate_options_for_story(
+    *,
+    story: str,
+    scene: str,
+    partners: list[str],
+    tier: str,
+) -> list[str] | None:
+    return _regenerate_options(story=story, scene=scene, partners=partners, tier=tier)
+
+
 def _regenerate_options(
     *,
     story: str,
@@ -155,7 +165,7 @@ def ensure_adult_turn_content(
             scene,
         )
 
-        regen = _regenerate_options(story=story, scene=scene, partners=partners, tier=tier)
+        regen = regenerate_options_for_story(story=story, scene=scene, partners=partners, tier=tier)
         if regen and config.intimate_option_count(regen) >= need:
             out["options"] = regen
             logger.info("成人 options 已通过补生成满足要求")

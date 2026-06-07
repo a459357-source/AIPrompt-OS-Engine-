@@ -252,8 +252,11 @@ def apply_game_gen_settings(
         save_style_preference(style_preference)
     if repetition_check is not None:
         save_repetition_check(repetition_check)
+    adult_mode_changed = False
     if adult_mode is not None:
+        prev_adult = config.ADULT_MODE
         save_adult_mode(adult_mode)
+        adult_mode_changed = prev_adult != bool(adult_mode)
     if adult_profile is not None:
         save_adult_profile(adult_profile)
     if adult_theme is not None:
@@ -270,7 +273,17 @@ def apply_game_gen_settings(
     ensure_story_length_context_sync(force_compress=story_length is not None)
     after = _gen_settings_snapshot()
     log_gen_settings_change(before, after, source="game-settings")
-    return game_settings_payload()
+    payload = game_settings_payload()
+    if adult_mode_changed:
+        from engine.regenerate_options import regenerate_current_turn_options
+
+        regen = regenerate_current_turn_options()
+        payload["options_regenerated"] = bool(regen.get("ok"))
+        if regen.get("ok") and regen.get("options"):
+            payload["options"] = regen["options"]
+        elif regen.get("error"):
+            payload["options_regen_error"] = regen["error"]
+    return payload
 
 
 def app_settings_payload() -> dict:

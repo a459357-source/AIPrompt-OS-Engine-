@@ -362,10 +362,12 @@ export default function Game() {
   const [genSettingsSaved, setGenSettingsSaved] = useState(false)
   const [genSettingsSaving, setGenSettingsSaving] = useState(false)
   const [genSettingsSaveError, setGenSettingsSaveError] = useState('')
+  const [optionsRegenerated, setOptionsRegenerated] = useState(false)
   const storyScrollRef = useRef<HTMLDivElement>(null)
   const storyEndRef = useRef<HTMLDivElement>(null)
   const genSettingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const genSettingsSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const optionsRegenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const mountedRef = useRef(true)
   const loadSeqRef = useRef(0)
@@ -708,14 +710,25 @@ export default function Game() {
     try {
       logger.info('Game', 'Saving gen settings', pending)
       const saved = await updateGameGenSettings(pending)
+      if (saved.options?.length) {
+        setOptions(saved.options)
+      }
       if (silent) {
         markGenSettingsSaved()
       } else {
         applyGenSettings(saved)
+        if (saved.options_regenerated) {
+          setOptionsRegenerated(true)
+          if (optionsRegenTimerRef.current) clearTimeout(optionsRegenTimerRef.current)
+          optionsRegenTimerRef.current = setTimeout(() => setOptionsRegenerated(false), 3000)
+        } else if (saved.options_regen_error && pending.adultMode != null) {
+          setGenSettingsSaveError(`选项未重生：${saved.options_regen_error}`)
+        }
         logger.info('Game', 'Gen settings saved', {
           story_length: saved.story_length,
           max_tokens: saved.max_tokens,
           compress_threshold: saved.compress_threshold,
+          options_regenerated: saved.options_regenerated,
         })
         markGenSettingsSaved()
       }
@@ -942,6 +955,7 @@ export default function Game() {
       mountedRef.current = false
       if (genSettingsTimerRef.current) clearTimeout(genSettingsTimerRef.current)
       if (genSettingsSavedTimerRef.current) clearTimeout(genSettingsSavedTimerRef.current)
+      if (optionsRegenTimerRef.current) clearTimeout(optionsRegenTimerRef.current)
     }
   }, [])
 
@@ -1300,7 +1314,9 @@ export default function Game() {
                 {(genSettingsSaved || genSettingsSaveError) && (
                   <div className="mb-2 text-xs">
                     {genSettingsSaved && (
-                      <span className="text-game-success">✅ 已保存，下一轮生成生效</span>
+                      <span className="text-game-success">
+                        ✅ 已保存{optionsRegenerated ? '，并已重生本轮选项' : '，下一轮生成生效'}
+                      </span>
                     )}
                     {genSettingsSaveError && (
                       <span className="text-game-danger">❌ 保存失败：{genSettingsSaveError}</span>
