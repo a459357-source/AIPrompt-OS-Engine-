@@ -1,1 +1,18 @@
-{}
+{
+  "story_length": 600,
+  "max_tokens": 1730,
+  "compress_threshold": 5800,
+  "max_context_messages": 5,
+  "auto_compress": true,
+  "stream": true,
+  "temperature": 0.8,
+  "top_p": 0.9,
+  "option_count": 4,
+  "narrative_pov": "auto",
+  "style_preference": "balanced",
+  "repetition_check": "standard",
+  "auto_save_interval": 60,
+  "export_format": "markdown",
+  "auto_export": "off",
+  "max_save_slots": 3
+}

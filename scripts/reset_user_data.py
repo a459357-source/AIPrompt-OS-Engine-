@@ -32,6 +32,11 @@ REMOVE_PATHS = (
     config.WORLD_INIT_PATH,
     config.API_USAGE_PATH,
     config.OBSIDIAN_PATH_FILE,
+    config.CHAPTER_SUMMARIES_PATH,
+    config.WORLD_SUMMARY_PATH,
+    config.RUNTIME_MEMORY_PATH,
+    config.TURN_PROFILE_PATH,
+    config.CANDIDATE_NPCS_PATH,
 )
 
 # Log files including rotation backups (app.log.1, etc.)
@@ -53,15 +58,26 @@ def reset_user_data() -> None:
         slot.unlink()
         print(f"  removed saves/{slot.name}")
 
+    staging = config.DATA_DIR / ".staging"
+    if staging.is_dir():
+        shutil.rmtree(staging, ignore_errors=True)
+        print("  removed data/.staging/")
+
     for path in REMOVE_PATHS:
         if path.exists():
-            path.unlink()
-            print(f"  removed {path.name}")
+            try:
+                path.unlink()
+                print(f"  removed {path.name}")
+            except OSError as exc:
+                print(f"  skip {path.name} ({exc})")
 
     for pattern in LOG_GLOBS:
         for path in config.DATA_DIR.glob(pattern):
-            path.unlink()
-            print(f"  removed {path.name}")
+            try:
+                path.unlink()
+                print(f"  removed {path.name}")
+            except OSError as exc:
+                print(f"  skip {path.name} ({exc})")
 
     if config.OUTPUT_DIR.is_dir():
         shutil.rmtree(config.OUTPUT_DIR, ignore_errors=True)
