@@ -391,7 +391,6 @@ export default function Game() {
   const [genStoryChars, setGenStoryChars] = useState(0)
   const [customInput, setCustomInput] = useState('')
   const [showCustomInput, setShowCustomInput] = useState(false)
-  const [charPanelOpen, setCharPanelOpen] = useState(false)
   const [showConsequences, setShowConsequences] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState<HistoryTurn[]>([])
@@ -1063,7 +1062,6 @@ export default function Game() {
   const hasGame = !loading && !error && story.length > 0
   const lang = appSettings.language as 'zh' | 'en' | 'ja'
   const showCharPanel = appSettings.charPanelPosition !== 'hidden'
-  const charPanelBottom = appSettings.charPanelPosition === 'bottom'
   const storyParagraphStyle = {
     fontSize: 'var(--story-font-size)',
     lineHeight: 'var(--story-line-height)',
@@ -1229,18 +1227,6 @@ export default function Game() {
                   }}
                 >
                   📜 回顾
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1.5 text-game-muted hover:text-game-text"
-                  onClick={() => setCharPanelOpen(!charPanelOpen)}
-                  style={{ display: showCharPanel ? undefined : 'none' }}
-                >
-                  📊 {t('game.status', lang)}
-                  {(characters.length > 0 || factions.length > 0) && (
-                    <Badge variant="accent" size="sm" className="ml-0.5">{characters.length + factions.length}</Badge>
-                  )}
                 </Button>
               </div>
             </div>
@@ -1682,15 +1668,6 @@ export default function Game() {
               </CardContent>
             </Card>
 
-            {charPanelBottom && charPanelOpen && showCharPanel && (
-              <div className="shrink-0 border-t border-game-border bg-game-card p-4 max-h-48 overflow-auto">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-bold text-game-accent">📊 {t('game.status', lang)}</h3>
-                  <button type="button" onClick={() => setCharPanelOpen(false)} className="text-game-muted hover:text-game-text">✕</button>
-                </div>
-                <GameStatusList characters={characters} factions={factions} adultMode={adultMode} />
-              </div>
-            )}
             </div>{/* end scrollable area */}
 
             {adultMode && readingMode && (
@@ -1904,16 +1881,6 @@ export default function Game() {
 
           </div>
 
-          {/* Character side panel — inline, pushes content */}
-          {!charPanelBottom && charPanelOpen && showCharPanel && (
-            <div className="w-64 shrink-0 border-l border-game-border bg-game-card p-4 overflow-auto max-h-[calc(100vh-64px)] sticky top-14">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-game-accent">📊 {t('game.status', lang)}</h3>
-                <button onClick={() => setCharPanelOpen(false)} className="text-game-muted hover:text-game-text">✕</button>
-              </div>
-              <GameStatusList characters={characters} factions={factions} adultMode={adultMode} />
-            </div>
-          )}
         </div>
       )}
 
