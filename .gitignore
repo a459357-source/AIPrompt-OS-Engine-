@@ -1,21 +1,18 @@
 __pycache__/
 *.pyc
 *.pyo
-data/saves/
-output/
-session_state.yaml
-!packaging/defaults/session_state.yaml
-data/apikey.json
-data/api_usage.jsonl
+.pytest_cache/
 
-# ── 游戏进度（个人数据，不提交）──
-data/story_graph.json
-data/memory.json
-data/world_init.json
-data/app.log
-data/error.log
+# ── 运行时 data/（个人进度、密钥、日志，永不提交）──
+data/*
+!data/.gitkeep
+
+# ── 运行时根目录 YAML ──
+session_state.yaml
 world_pack.yaml
-!packaging/defaults/world_pack.yaml
+
+# ── 输出与导出 ──
+output/
 
 # ── 打包产物 ──
 dist/
