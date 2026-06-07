@@ -1,0 +1,20 @@
+PromptOS 发布包使用说明
+====================
+
+【给别人用】
+1. 只发送 release\PromptOS-win64.zip（不要附带 data 文件夹）
+2. 对方解压后双击 PromptOS.exe
+3. 首次打开会弹出窗口，请填写各自的 DeepSeek API Key
+   （也可在「设置」页填写；Key 仅保存在本机 data\apikey.json）
+4. 通过「新故事」开始游戏
+
+【重要】
+- 发布包内不含任何 API Key
+- exe 不会读取打包者电脑上的 DEEPSEEK_API_KEY 环境变量
+- 若在本机测试 zip，请先删除系统环境变量 DEEPSEEK_API_KEY，否则会误用你的 Key
+
+【重新打包（确保无个人数据）】
+  cd prompt-os-engine
+  python build_release.py
+
+打包前请勿在 dist\PromptOS 目录运行过程序后再手动打 zip。

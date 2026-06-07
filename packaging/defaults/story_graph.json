@@ -1,0 +1,15 @@
+{
+  "nodes": {
+    "0": {
+      "turn": 0,
+      "text": "尚未开始故事",
+      "scene": "待创建",
+      "status": "SETUP",
+      "choices": {},
+      "parent": null,
+      "choice_taken": null
+    }
+  },
+  "current_node": "0",
+  "edges": []
+}

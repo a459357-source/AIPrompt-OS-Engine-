@@ -7,10 +7,16 @@ Set DEEPSEEK_API_KEY in your environment before running.
 
 import json
 import os
+import sys
 from pathlib import Path
 
 # ── Paths ──────────────────────────────────────────────────────────
-ROOT = Path(__file__).resolve().parent
+if getattr(sys, "frozen", False):
+    ROOT = Path(sys.executable).resolve().parent
+    BUNDLE_ROOT = Path(sys._MEIPASS)
+else:
+    ROOT = Path(__file__).resolve().parent
+    BUNDLE_ROOT = ROOT
 
 WORLD_PACK_PATH      = ROOT / "world_pack.yaml"
 SESSION_STATE_PATH   = ROOT / "session_state.yaml"
@@ -30,6 +36,54 @@ WORLD_INIT_PATH      = DATA_DIR / "world_init.json"
 API_USAGE_PATH       = DATA_DIR / "api_usage.jsonl"
 LOG_PATH             = DATA_DIR / "app.log"
 ERROR_LOG_PATH       = DATA_DIR / "error.log"
+
+FRONTEND_DIST        = BUNDLE_ROOT / "frontend" / "dist"
+if not (FRONTEND_DIST / "index.html").exists():
+    FRONTEND_DIST    = ROOT / "frontend" / "dist"
+
+
+def has_bundled_frontend() -> bool:
+    """True when production React build is available (exe or local dist)."""
+    return (FRONTEND_DIST / "index.html").exists()
+
+
+def ensure_runtime_files() -> None:
+    """Copy factory defaults next to exe on first run."""
+    defaults = BUNDLE_ROOT / "packaging" / "defaults"
+    if not defaults.is_dir():
+        defaults = ROOT / "packaging" / "defaults"
+    if not defaults.is_dir():
+        return
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    SAVES_DIR.mkdir(parents=True, exist_ok=True)
+    mapping = {
+        "apikey.json": APIKEY_PATH,
+        "memory.json": MEMORY_PATH,
+        "story_graph.json": STORY_GRAPH_PATH,
+        "session_state.yaml": SESSION_STATE_PATH,
+        "world_pack.yaml": WORLD_PACK_PATH,
+    }
+    for name, dest in mapping.items():
+        src = defaults / name
+        if src.exists() and not dest.exists():
+            dest.write_bytes(src.read_bytes())
+
+# ── Frontend (React Vite dev server) ───────────────────────────────
+# :8000 = API + 遗留路由；日常 UI 请打开 FRONTEND_DEV_URL（默认 :5173）
+FRONTEND_DEV_URL = os.environ.get("PROMPTOS_FRONTEND_URL", "http://127.0.0.1:5173").rstrip("/")
+
+
+def frontend_url(path: str = "/") -> str:
+    """Build absolute URL to the React SPA."""
+    if has_bundled_frontend():
+        base = os.environ.get("PROMPTOS_FRONTEND_URL", "http://127.0.0.1:8000").rstrip("/")
+    else:
+        base = FRONTEND_DEV_URL
+    if not path or path == "/":
+        return base
+    return f"{base}/{path.lstrip('/')}"
+
 
 # ── Save system ────────────────────────────────────────────────────
 MAX_SAVE_SLOTS = 3
@@ -73,14 +127,20 @@ def _update_settings(**kwargs) -> dict:
     return data
 
 
+def _read_stored_api_key() -> str:
+    """API key saved in data/apikey.json only (not env var)."""
+    return _read_settings().get("api_key", "").strip()
+
+
 def _load_api_key() -> str:
-    """Load API key: file first, then env var, then empty."""
-    # 1. Try the stored key file
+    """Load API key: file first, then env var (dev only), then empty."""
     data = _read_settings()
     key = data.get("api_key", "").strip()
     if key:
         return key
-    # 2. Fall back to environment variable
+    # Packaged exe must NOT inherit the builder's machine env var.
+    if getattr(sys, "frozen", False):
+        return ""
     env_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
     if env_key:
         return env_key

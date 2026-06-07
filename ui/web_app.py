@@ -29,6 +29,7 @@ import config
 
 # Initialize file logging for uvicorn workers
 config.setup_logging()
+config.ensure_runtime_files()
 
 app = FastAPI(
     title="Prompt OS Galgame Runtime",
@@ -39,7 +40,10 @@ app = FastAPI(
 # Allow CORS for React dev server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173", "http://127.0.0.1:5173",
+        "http://localhost:5174", "http://127.0.0.1:5174",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -63,6 +67,25 @@ app.include_router(game_router)
 app.include_router(world_router)
 app.include_router(npc_router)
 app.include_router(settings_router)
+
+
+# ── Production SPA (built frontend/dist) ───────────────────────────
+
+if config.has_bundled_frontend():
+    from fastapi.responses import FileResponse
+    from fastapi import HTTPException
+
+    _dist = config.FRONTEND_DIST
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Serve React build for client-side routes (GET only)."""
+        if full_path.startswith(("api/", "static/")):
+            raise HTTPException(404)
+        fp = _dist / full_path
+        if full_path and fp.is_file():
+            return FileResponse(fp)
+        return FileResponse(_dist / "index.html")
 
 
 # ── Standalone utility routes (kept at root level for frontend compat) ──

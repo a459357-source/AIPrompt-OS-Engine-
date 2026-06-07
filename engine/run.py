@@ -278,12 +278,14 @@ def run_loop(n: int) -> int:
 # ── Web mode ───────────────────────────────────────────────────────
 
 def _open_browser(host: str, port: int) -> None:
-    """Open the web UI in the default browser after the server is ready."""
-    url = f"http://{'127.0.0.1' if host == '0.0.0.0' else host}:{port}"
+    """Open the React UI in the default browser after the API server is ready."""
+    ui_url = config.frontend_url()
+    api_url = f"http://{'127.0.0.1' if host == '0.0.0.0' else host}:{port}"
+
     def _open():
         import time
         import socket
-        # Wait up to 10s for the server to start listening
+        # Wait up to 10s for the API server to start listening
         for _ in range(20):
             time.sleep(0.5)
             try:
@@ -294,12 +296,12 @@ def _open_browser(host: str, port: int) -> None:
                 break  # server is ready
             except (ConnectionRefusedError, OSError):
                 continue
-        logger.info("Opening browser → %s", url)
+        logger.info("Opening browser → %s (API: %s)", ui_url, api_url)
         try:
-            webbrowser.open(url)
+            webbrowser.open(ui_url)
         except Exception as exc:
             logger.warning("Failed to open browser: %s", exc)
-            logger.info("Please open %s manually", url)
+            logger.info("Please open %s manually (API: %s)", ui_url, api_url)
     threading.Thread(target=_open, daemon=True).start()
 
 
@@ -317,7 +319,8 @@ def run_web(host: str = "0.0.0.0", port: int = 8000, no_browser: bool = False) -
     if not no_browser:
         _open_browser(host, port)
 
-    logger.info("Starting Galgame Web UI → http://%s:%d", host, port)
+    logger.info("API backend → http://%s:%d", host, port)
+    logger.info("React UI → %s  (cd frontend && npm run dev)", config.frontend_url())
     uvicorn.run("ui.web_app:app", host=host, port=port, reload=False)
 
 
