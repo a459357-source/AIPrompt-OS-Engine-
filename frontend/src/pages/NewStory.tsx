@@ -653,18 +653,19 @@ export default function NewStory() {
                             <div className="grid grid-cols-3 gap-x-3 gap-y-1">
                               {DIMS.map(([label, key]) => {
                                 const val = (r as Record<string,number>)[key] ?? 50
-                                const color = key === 'hostility' ? 'game-danger' : 'game-accent'
+                                const barColor = key === 'hostility' ? '#da3633' : '#58a6ff'
                                 return (
-                                  <div key={key} className="flex items-center gap-1.5">
+                                  <div key={key} className="flex items-center gap-1">
                                     <span className="text-[10px] text-game-dim w-12 shrink-0">{label}</span>
                                     <input
-                                      type="range"
+                                      type="number"
                                       min={0} max={100} value={val}
-                                      onChange={(e) => update(key, parseInt(e.target.value))}
-                                      className="flex-1 h-4 cursor-pointer"
-                                      style={{ accentColor: key === 'hostility' ? '#da3633' : '#58a6ff' }}
+                                      onChange={(e) => update(key, Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                                      className="w-10 text-center text-[10px] h-5 bg-game-bg border border-game-border rounded text-game-text"
                                     />
-                                    <span className="text-[10px] text-game-muted w-6 text-right tabular-nums">{val}</span>
+                                    <div className="flex-1 h-2 bg-game-border rounded-full overflow-hidden">
+                                      <div className="h-full rounded-full transition-all" style={{width: `${val}%`, background: barColor}} />
+                                    </div>
                                   </div>
                                 )
                               })}
