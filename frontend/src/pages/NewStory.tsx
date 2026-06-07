@@ -526,21 +526,7 @@ export default function NewStory() {
                                 </select>
                               </div>
 
-                              {/* Priority 1: Relationship (NPC only) */}
-                              {!isMain && (
-                                <div>
-                                  <Label className="text-[11px]">💞 与主角关系</Label>
-                                  <TagInput
-                                    value={c?.relationship || []}
-                                    onChange={(tags) => setValue(`characters.${idx}.relationship`, tags)}
-                                    presets={RELATION_PRESETS}
-                                    placeholder="如：同伴、青梅竹马…"
-                                    color="accent"
-                                  />
-                                </div>
-                              )}
-
-                              {/* Priority 2: Goal */}
+                              {/* Goal (原关系字段已合并到Part3多维关系) */}
                               <div>
                                 <Label className="text-[11px]">🎯 当前目标</Label>
                                 <Input
@@ -671,13 +657,17 @@ export default function NewStory() {
                                 )
                               })}
                             </div>
-                            <TagInput
-                              value={r.tags || []}
-                              onChange={(tags) => update('tags', tags)}
-                              presets={['青梅竹马','救命恩人','秘密共享','竞争意识','单向暗恋','互相试探','过去纠葛','命运绑定']}
-                              placeholder="关系标签…"
-                              color="accent"
-                            />
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-game-dim shrink-0">标签</span>
+                              <input
+                                type="text"
+                                value={(r.tags || []).join('、')}
+                                onChange={(e) => update('tags', e.target.value.split(/[、,，]/).map(s => s.trim()).filter(Boolean))}
+                                onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
+                                placeholder="青梅竹马、救命恩人…"
+                                className="flex-1 text-[10px] h-6 bg-game-bg border border-game-border rounded px-2 text-game-text"
+                              />
+                            </div>
                           </div>
                         )
                       })}
