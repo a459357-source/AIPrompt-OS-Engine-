@@ -170,8 +170,8 @@ def build_prompt() -> tuple[str, str]:
         last_choice_text = "这是故事的开始，没有上一轮选择。"
 
     # ── Truncate history to avoid token-limit overflow ──────────
-    # DeepSeek context limit is 128K tokens (~400K chars Chinese).
-    # Each turn's full story can be 1-3K chars; 15+ turns → easily >100K.
+    # DeepSeek V4 context limit is 1M tokens.
+    # Each turn's full story can be 1-3K chars; many turns → large prompts.
     # We keep the last 10 turns for context and summarize older turns.
     MAX_HISTORY_TURNS = 10
     full_history = session_state.get("history", [])
@@ -305,11 +305,7 @@ def _warn_if_approaching_limit(
     faction_scope_context: str, artifact_context: str,
     event_context: str, world_state_context: str,
 ) -> None:
-    """Estimate total prompt tokens and warn if approaching 128K limit.
-
-    Now includes both system and user prompts in the estimation —
-    previously only counted the system side, underestimating by ~40%.
-    """
+    """Estimate total prompt tokens and warn if approaching context limit."""
     # Rough estimate: Chinese ≈ 0.5 tokens/char, English ≈ 0.25 tokens/char
     # Conservative: use 0.6 to be safe
     total_chars = (
@@ -320,11 +316,16 @@ def _warn_if_approaching_limit(
     )
     estimated_tokens = int(total_chars * 0.6)
 
-    if estimated_tokens > 100_000:
+    ctx_limit = config.DEEPSEEK_CONTEXT_TOKENS
+    warn_threshold = int(ctx_limit * 0.7)
+    danger_threshold = int(ctx_limit * 0.9)
+
+    if estimated_tokens > danger_threshold:
         logger.warning(
-            "⚠️ Prompt ~%d tokens — approaching 128K limit. "
+            "⚠️ Prompt ~%d tokens — approaching %dK context limit. "
             "Consider reducing STORY_LENGTH or resetting history.",
             estimated_tokens,
+            ctx_limit // 1000,
         )
-    elif estimated_tokens > 70_000:
+    elif estimated_tokens > warn_threshold:
         logger.info("Prompt ~%d tokens (within safe range)", estimated_tokens)

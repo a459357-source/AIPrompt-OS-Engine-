@@ -108,7 +108,7 @@ export default function Game() {
   const [history, setHistory] = useState<HistoryTurn[]>([])
   const [storyLength, setStoryLength] = useState(1000)
   const [storyLengthMin, setStoryLengthMin] = useState(300)
-  const [storyLengthMax, setStoryLengthMax] = useState(9102)
+  const [storyLengthMax, setStoryLengthMax] = useState(213333)
   const [storyLengthRecommended, setStoryLengthRecommended] = useState(1000)
   const [storyLengthSaved, setStoryLengthSaved] = useState(false)
   const storyScrollRef = useRef<HTMLDivElement>(null)
@@ -452,7 +452,8 @@ export default function Game() {
                 {storyLengthSaved && (
                   <span className="text-xs text-game-success">已保存</span>
                 )}
-                <span className="text-xs text-game-dim hidden md:inline">下一轮生成生效</span>
+                <span className="text-xs text-game-dim hidden lg:inline">下一轮生成生效</span>
+                <span className="text-xs text-game-dim hidden md:inline">上限 {storyLengthMax.toLocaleString()} 字</span>
               </div>
             </div>
             <Card>

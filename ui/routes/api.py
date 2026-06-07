@@ -527,6 +527,7 @@ async def api_get_story_length():
     payload["story_length"] = config.STORY_LENGTH
     payload["max_tokens"] = config.MAX_TOKENS
     payload["matched_max_tokens"] = config.tokens_for_story_length(config.STORY_LENGTH)
+    payload["api_limits"] = config.api_limits()
     return JSONResponse(payload)
 
 
@@ -543,5 +544,6 @@ async def api_set_story_length(story_length: int = Form(...)):
         "story_length": config.STORY_LENGTH,
         "max_tokens": config.MAX_TOKENS,
         "matched_max_tokens": config.tokens_for_story_length(config.STORY_LENGTH),
+        "api_limits": config.api_limits(),
     })
 

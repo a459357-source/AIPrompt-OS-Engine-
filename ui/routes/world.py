@@ -365,7 +365,7 @@ async def generate_world(keywords: str = Form("")):
 9. 只输出JSON，不要输出markdown代码块或其他文字"""
 
     try:
-        result = call_deepseek(system, user, temperature=0.9, max_tokens=config.MAX_TOKENS * 2, skip_validation=True)
+        result = call_deepseek(system, user, temperature=0.9, max_tokens=config.world_gen_output_tokens(), skip_validation=True)
         return JSONResponse(result)
     except DeepSeekError as exc:
         import logging

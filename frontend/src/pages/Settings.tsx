@@ -481,7 +481,9 @@ export default function Settings() {
                       随游戏页「目标字数」自动匹配（当前 {storyLength.toLocaleString()} 字）
                     </span>
                   </div>
-                  <p className="text-xs text-game-dim">请在游戏正文区调整目标字数；Token 上限会同步更新。世界观生成会用双倍值。</p>
+                  <p className="text-xs text-game-dim">
+                    随游戏页「目标字数」自动匹配；官方单次输出上限 384,000 tokens。世界观生成最多 2× 且不超过官方上限。
+                  </p>
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -546,13 +548,13 @@ export default function Settings() {
                     <Input
                       type="number"
                       min={500}
-                      max={32000}
+                      max={1000000}
                       step={500}
                       value={compressThreshold}
                       onChange={(e) => setCompressThreshold(parseInt(e.target.value) || 4000)}
                       className="w-28"
                     />
-                    <span className="text-xs text-game-dim">500–32000</span>
+                    <span className="text-xs text-game-dim">500–1,000,000（官方上下文 1M）</span>
                   </div>
                 </div>
                 <Button variant={apiSaved ? 'success' : 'success'} className="w-full" onClick={saveApiKey} disabled={apiSaving}>

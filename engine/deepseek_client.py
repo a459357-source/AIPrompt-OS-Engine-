@@ -133,7 +133,7 @@ def call_deepseek(
 
         # JSON parse failed — likely truncated, retry with more tokens
         if attempt < 2:
-            new_mt = min(mt * 2, 16384)
+            new_mt = min(mt * 2, config.DEEPSEEK_MAX_OUTPUT_TOKENS)
             if new_mt > mt:
                 logger.warning(
                     "JSON parse failed (attempt %d), retrying with max_tokens=%d (was %d). "

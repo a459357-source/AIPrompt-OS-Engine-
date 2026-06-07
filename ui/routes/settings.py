@@ -45,6 +45,7 @@ def settings_payload() -> dict:
         "story_length": config.STORY_LENGTH,
         "max_tokens": config.MAX_TOKENS,
         "matched_max_tokens": config.tokens_for_story_length(config.STORY_LENGTH),
+        "api_limits": config.api_limits(),
         "temperature": config.TEMPERATURE,
         "top_p": config.TOP_P,
         "stream": config.STREAM,
@@ -82,18 +83,18 @@ def apply_engine_settings(
         reload_story_length()
         reload_max_tokens()
     elif max_tokens is not None:
-        save_max_tokens(max(512, min(16384, max_tokens)))
+        save_max_tokens(config.cap_output_tokens(max_tokens))
         reload_max_tokens()
-    save_temperature(max(0.1, min(2.0, temperature)))
+    save_temperature(max(0.1, min(config.DEEPSEEK_MAX_TEMPERATURE, temperature)))
     reload_temperature()
-    save_top_p(max(0.0, min(1.0, top_p)))
+    save_top_p(max(0.0, min(config.DEEPSEEK_MAX_TOP_P, top_p)))
     reload_top_p()
     save_stream(bool(stream))
     reload_stream()
     save_context_settings(
         max(4, min(100, max_context_messages)),
         bool(auto_compress),
-        max(500, min(32000, compress_threshold)),
+        max(500, min(config.DEEPSEEK_CONTEXT_TOKENS, compress_threshold)),
     )
     reload_context_settings()
     return settings_payload()

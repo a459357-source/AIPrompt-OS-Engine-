@@ -239,6 +239,12 @@ export interface EngineSettings {
   story_length: number
   max_tokens: number
   matched_max_tokens?: number
+  api_limits?: {
+    context_tokens: number
+    max_output_tokens: number
+    max_temperature: number
+    max_top_p: number
+  }
   temperature: number
   top_p: number
   stream: boolean
@@ -291,6 +297,8 @@ export interface StoryLengthSettings {
   recommended: number
   max_tokens?: number
   matched_max_tokens?: number
+  max_output_tokens?: number
+  context_tokens?: number
 }
 
 export async function getStoryLengthSettings(): Promise<StoryLengthSettings> {
@@ -298,8 +306,10 @@ export async function getStoryLengthSettings(): Promise<StoryLengthSettings> {
   const fallback: StoryLengthSettings = {
     story_length: 1000,
     min: 300,
-    max: 9102,
+    max: 213333,
     recommended: 1000,
+    max_output_tokens: 384000,
+    context_tokens: 1000000,
   }
   if (!res.ok) return fallback
   const data = await res.json() as Partial<StoryLengthSettings>
@@ -310,6 +320,8 @@ export async function getStoryLengthSettings(): Promise<StoryLengthSettings> {
     recommended: data.recommended ?? fallback.recommended,
     max_tokens: data.max_tokens,
     matched_max_tokens: data.matched_max_tokens,
+    max_output_tokens: data.max_output_tokens,
+    context_tokens: data.context_tokens,
   }
 }
 

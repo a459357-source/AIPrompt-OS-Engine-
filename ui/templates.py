@@ -1493,7 +1493,7 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
             <select name="max_tokens" id="maxTokens" style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:0.9em;">
                 {{MAX_TOKENS_OPTIONS}}
             </select>
-            <div class="hint">控制 AI 回复长度上限（512–8192），越大回复越完整但越慢。世界观生成会用双倍值。</div>
+            <div class="hint">控制 AI 回复长度上限（官方最大 384K output），随游戏页目标字数自动匹配。世界观生成最多 2× 且不超过官方上限。</div>
             <label style="margin-top:14px;">🌡️ 温度</label>
             <input name="temperature" type="range" min="0.1" max="2.0" step="0.1"
                    value="{{TEMPERATURE}}" style="width:100%;accent-color:#d2a8ff;">
@@ -1517,9 +1517,9 @@ body{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d11
             </select>
             <div class="hint">超过阈值时自动压缩对话历史，减少 token 消耗</div>
             <label style="margin-top:14px;">📏 压缩阈值 (tokens)</label>
-            <input name="compress_threshold" type="number" min="500" max="32000" step="500"
+            <input name="compress_threshold" type="number" min="500" max="1000000" step="500"
                    value="{{COMPRESS_THRESHOLD}}" style="width:120px;">
-            <div class="hint">达到此 token 数时触发自动压缩（500–32000），默认 4000</div>
+            <div class="hint">达到此 token 数时触发自动压缩（500–1000000，官方上下文 1M），默认 4000</div>
             <div class="status {{STATUS_CLASS}}">{{STATUS_TEXT}}</div>
             <div class="btn-row">
                 <button class="btn btn-save" type="submit">💾 保存</button>

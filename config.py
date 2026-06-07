@@ -211,14 +211,37 @@ def reload_model() -> str:
     return DEEPSEEK_MODEL
 
 
+# ── DeepSeek API limits (official) ──────────────────────────────────
+# Source: https://api-docs.deepseek.com/quick_start/pricing
+DEEPSEEK_CONTEXT_TOKENS = 1_000_000      # 1M context window
+DEEPSEEK_MAX_OUTPUT_TOKENS = 384_000     # 384K max output per request
+DEEPSEEK_MIN_OUTPUT_TOKENS = 1
+DEEPSEEK_MAX_TEMPERATURE = 2.0
+DEEPSEEK_MAX_TOP_P = 1.0
+
+
+def cap_output_tokens(tokens: int) -> int:
+    """Clamp max_tokens to DeepSeek official output range."""
+    return max(DEEPSEEK_MIN_OUTPUT_TOKENS, min(DEEPSEEK_MAX_OUTPUT_TOKENS, int(tokens)))
+
+
+def api_limits() -> dict[str, int | float]:
+    """Official API limits exposed to the frontend."""
+    return {
+        "context_tokens": DEEPSEEK_CONTEXT_TOKENS,
+        "max_output_tokens": DEEPSEEK_MAX_OUTPUT_TOKENS,
+        "max_temperature": DEEPSEEK_MAX_TEMPERATURE,
+        "max_top_p": DEEPSEEK_MAX_TOP_P,
+    }
+
+
 # ── Story length ────────────────────────────────────────────────────
 MIN_STORY_LENGTH = 300
 DEFAULT_STORY_LENGTH = 1000
 RECOMMENDED_STORY_LENGTH = DEFAULT_STORY_LENGTH
-# 与 api 保存字数时的 max_tokens 估算一致：needed ≈ length × ratio，上限受 MAX_TOKENS 顶格约束
+# JSON 回复含 state/options，needed ≈ length × ratio，上限受官方 max output 约束
 STORY_LENGTH_TOKEN_RATIO = 1.8
-MAX_STORY_LENGTH = int(16384 / STORY_LENGTH_TOKEN_RATIO)  # 9102
-MAX_TOKEN_TIERS = (512, 1024, 2048, 4096, 8192, 16384)
+MAX_STORY_LENGTH = int(DEEPSEEK_MAX_OUTPUT_TOKENS / STORY_LENGTH_TOKEN_RATIO)  # 213333
 
 
 def clamp_story_length(length: int) -> int:
@@ -227,21 +250,20 @@ def clamp_story_length(length: int) -> int:
 
 
 def tokens_for_story_length(length: int) -> int:
-    """Map target story length to the smallest standard max_tokens tier that fits."""
+    """Map target story length to max_tokens (official output cap)."""
     needed = int(clamp_story_length(length) * STORY_LENGTH_TOKEN_RATIO)
-    needed = max(512, min(16384, needed))
-    for tier in MAX_TOKEN_TIERS:
-        if tier >= needed:
-            return tier
-    return 16384
+    return cap_output_tokens(needed)
 
 
 def story_length_limits() -> dict[str, int]:
-    return {
+    limits = {
         "min": MIN_STORY_LENGTH,
         "max": MAX_STORY_LENGTH,
         "recommended": RECOMMENDED_STORY_LENGTH,
+        "max_output_tokens": DEEPSEEK_MAX_OUTPUT_TOKENS,
+        "context_tokens": DEEPSEEK_CONTEXT_TOKENS,
     }
+    return limits
 
 
 def _load_story_length() -> int:
@@ -270,12 +292,12 @@ DEFAULT_MAX_TOKENS = 4096
 def _load_max_tokens() -> int:
     """Load max_tokens preference from settings."""
     val = _read_settings().get("max_tokens", DEFAULT_MAX_TOKENS)
-    return max(512, min(16384, int(val)))
+    return cap_output_tokens(val)
 
 
 def save_max_tokens(tokens: int) -> None:
     """Persist max_tokens preference."""
-    _update_settings(max_tokens=tokens)
+    _update_settings(max_tokens=cap_output_tokens(tokens))
 
 
 def reload_max_tokens() -> int:
@@ -285,13 +307,19 @@ def reload_max_tokens() -> int:
     return MAX_TOKENS
 
 
+def world_gen_output_tokens(base: int | None = None) -> int:
+    """World/field generation may request 2× turn budget, capped at official max."""
+    base_tokens = base if base is not None else MAX_TOKENS
+    return cap_output_tokens(base_tokens * 2)
+
+
 # ── Temperature ─────────────────────────────────────────────────────
 DEFAULT_TEMPERATURE = 0.8
 
 
 def _load_temperature() -> float:
     val = _read_settings().get("temperature", DEFAULT_TEMPERATURE)
-    return max(0.1, min(2.0, float(val)))
+    return max(0.1, min(DEEPSEEK_MAX_TEMPERATURE, float(val)))
 
 
 def save_temperature(temp: float) -> None:
@@ -310,7 +338,7 @@ DEFAULT_TOP_P = 0.9
 
 def _load_top_p() -> float:
     val = _read_settings().get("top_p", DEFAULT_TOP_P)
-    return max(0.0, min(1.0, float(val)))
+    return max(0.0, min(DEEPSEEK_MAX_TOP_P, float(val)))
 
 
 def save_top_p(val: float) -> None:
@@ -357,7 +385,10 @@ def _load_context_settings() -> dict:
     return {
         "max_context_messages": max(4, min(100, int(data.get("max_context_messages", defaults["max_context_messages"])))),
         "auto_compress": bool(data.get("auto_compress", defaults["auto_compress"])),
-        "compress_threshold": max(500, min(32000, int(data.get("compress_threshold", defaults["compress_threshold"])))),
+        "compress_threshold": max(
+            500,
+            min(DEEPSEEK_CONTEXT_TOKENS, int(data.get("compress_threshold", defaults["compress_threshold"]))),
+        ),
     }
 
 
