@@ -93,6 +93,14 @@ def _safe_call(fn: Callable, label: str, *args: Any, **kwargs: Any) -> bool:
 
 # ── Core step (stateless, for web/cli reuse) ───────────────────────
 
+_last_step_error: str = ""
+
+
+def get_last_step_error() -> str:
+    """Human-readable reason for the most recent step() failure."""
+    return _last_step_error
+
+
 def step(choice: str | None = None) -> dict | None:
     """
     Execute one turn: generate story + options, apply to state,
@@ -103,6 +111,8 @@ def step(choice: str | None = None) -> dict | None:
         choice: The player's choice from the previous turn (A/B/C/D),
                 or None for the first turn.
     """
+    global _last_step_error
+    _last_step_error = ""
     logger.info("═══ TURN START ═══")
 
     # Clear the IO cache so every turn starts with fresh disk state
@@ -112,6 +122,7 @@ def step(choice: str | None = None) -> dict | None:
     try:
         system_prompt, user_prompt = build_prompt()
     except Exception as exc:
+        _last_step_error = f"构建提示词失败: {exc}"
         logger.error("Failed to build prompt: %s", exc)
         return None
 
@@ -119,6 +130,7 @@ def step(choice: str | None = None) -> dict | None:
     try:
         response = call_deepseek(system_prompt, user_prompt)
     except DeepSeekError as exc:
+        _last_step_error = str(exc)
         logger.error("DeepSeek API error: %s", exc)
         return None
 
@@ -131,6 +143,7 @@ def step(choice: str | None = None) -> dict | None:
     try:
         new_state = apply_turn(response, choice)
     except Exception as exc:
+        _last_step_error = f"写入游戏状态失败: {exc}"
         logger.error("Failed to apply turn: %s", exc)
         return None
 

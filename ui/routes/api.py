@@ -119,11 +119,18 @@ async def api_game_state():
 async def api_start_game():
     """Generate the opening scene (POST — has side effects)."""
     from fastapi.responses import JSONResponse
-    from engine.run import step
+    from engine.run import step, get_last_step_error
+
+    if not config.DEEPSEEK_API_KEY:
+        return JSONResponse(
+            {"error": "未配置 DeepSeek API Key，请先在设置页填写"},
+            status_code=400,
+        )
 
     result = step(None)
     if result is None:
-        return JSONResponse({"error": "AI 生成失败，请检查 API Key 后刷新"}, status_code=500)
+        err = get_last_step_error() or "AI 生成失败，请重试"
+        return JSONResponse({"error": err}, status_code=500)
 
     try:
         state = io_utils.read_yaml(config.SESSION_STATE_PATH)

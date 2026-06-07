@@ -68,8 +68,13 @@ def build_prompt() -> tuple[str, str]:
         stats = custom.get("stats", [])
         stages = custom.get("stages", [])
         if stats:
-            stat_labels = "、".join(s["label"] for s in stats)
-            custom_rules_text += f"【专属追踪维度】本故事追踪以下维度：{stat_labels}。在故事中自然体现这些维度的变化。\n"
+            stat_labels = "、".join(
+                (s.get("label") or s.get("key") or "维度")
+                for s in stats
+                if isinstance(s, dict)
+            )
+            if stat_labels:
+                custom_rules_text += f"【专属追踪维度】本故事追踪以下维度：{stat_labels}。在故事中自然体现这些维度的变化。\n"
         if stages:
             stage_chain = " → ".join(stages)
             custom_rules_text += f"【关系阶段】角色关系阶段为：{stage_chain}。重要事件推进阶段变化。\n"

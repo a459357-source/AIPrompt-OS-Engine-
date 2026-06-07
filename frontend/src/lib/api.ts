@@ -84,8 +84,15 @@ export async function generateRules(data: {
   })
 }
 
-export async function createStory(formData: FormData): Promise<Response> {
-  return fetch('/new', { method: 'POST', body: formData })
+export async function createStory(formData: FormData): Promise<void> {
+  const res = await fetch('/new', { method: 'POST', body: formData, redirect: 'manual' })
+  if (res.type === 'opaqueredirect' || res.status === 303 || res.status === 302) {
+    return
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(text || `创建故事失败 (HTTP ${res.status})`)
+  }
 }
 
 export async function getGameState(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; not_started?: boolean; error?: string }> {

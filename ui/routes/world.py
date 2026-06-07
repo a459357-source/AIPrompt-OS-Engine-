@@ -51,6 +51,20 @@ async def create_new_story(
         except Exception:
             pass
 
+    # Normalize stats from AI / form (label may be missing)
+    raw_stats = custom.get("stats") if isinstance(custom, dict) else None
+    if isinstance(raw_stats, list):
+        normalized_stats = []
+        for s in raw_stats:
+            if not isinstance(s, dict):
+                continue
+            normalized_stats.append({
+                "key": s.get("key") or "stat",
+                "label": s.get("label") or s.get("key") or "维度",
+                "max": s.get("max", 100),
+            })
+        custom["stats"] = normalized_stats
+
     # Parse main goal
     main_goal_text = main_goal.strip() if main_goal else ""
 

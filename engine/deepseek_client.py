@@ -34,6 +34,8 @@ def call_deepseek(
     Call the DeepSeek Chat Completions API and return the parsed JSON body.
     Auto-retries with 2x max_tokens on JSON truncation (up to 2 retries).
     """
+    if not config.DEEPSEEK_API_KEY:
+        raise DeepSeekError("未配置 DeepSeek API Key，请在设置页或首次启动弹窗中填写")
 
     headers = {
         "Authorization": f"Bearer {config.DEEPSEEK_API_KEY}",

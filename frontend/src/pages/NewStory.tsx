@@ -165,7 +165,14 @@ export default function NewStory() {
       }
       if (data.rel_stages) setValue('rel_stages', data.rel_stages)
       if (data.rel_affection != null) setValue('rel_affection', data.rel_affection)
-      if (data.stats) setCustomStats( data.stats)
+      if (data.stats) {
+        const stats = (data.stats as Array<Record<string, unknown>>).map((s) => ({
+          key: String(s.key || 'stat'),
+          label: String(s.label || s.key || '维度'),
+          max: typeof s.max === 'number' ? s.max : 100,
+        }))
+        setCustomStats(stats)
+      }
       if (data.factions) {
         const facs = (data.factions as unknown as Array<Record<string,unknown>>).map((f: Record<string,unknown>) => ({
           name: (f.name as string) || '',

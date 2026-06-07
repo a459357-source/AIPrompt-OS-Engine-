@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,6 @@ import { getSettingsStatus, saveApiKey } from '@/lib/api'
 
 /** Block first use until DeepSeek API Key is saved locally. */
 export function ApiKeyPrompt() {
-  const location = useLocation()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [key, setKey] = useState('')
@@ -23,13 +22,9 @@ export function ApiKeyPrompt() {
   const [saving, setSaving] = useState(false)
 
   const checkStatus = useCallback(async () => {
-    if (location.pathname === '/settings') {
-      setOpen(false)
-      return
-    }
     const data = await getSettingsStatus()
     setOpen(!data.configured)
-  }, [location.pathname])
+  }, [])
 
   useEffect(() => {
     checkStatus()
