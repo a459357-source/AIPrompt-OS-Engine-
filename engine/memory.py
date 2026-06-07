@@ -44,21 +44,25 @@ def save_memory(memory: dict, *, persist: bool = True) -> None:
 
 
 def update_trust(memory: dict, character: str, delta: float, turn: int = 0,
-                 metric: str = "trust") -> None:
+                 metric: str = "trust", *, allow_create: bool = False) -> None:
     """
     Adjust a character's numeric metric by delta (clamped to 0.0–1.0).
-    Creates the character entry if it doesn't exist.
-    If turn > 0, appends to metric_history for analytics.
-
-    Args:
-        metric: Name of the metric to update (default "trust").
-                Different stories may track different metrics:
-                好感度, 恐惧值, 羁绊, 声望, etc.
+    Does not create new characters unless allow_create=True.
+    Skips incubating candidate NPCs (promoted but not yet active).
     """
     chars = memory.setdefault("characters", {})
-    entry = chars.setdefault(character, {"trust": 0.3, "flags": [], "relationship": ""})
+    if character not in chars:
+        if not allow_create:
+            logger.debug("Memory: skip %s for unknown character '%s'", metric, character)
+            return
+        entry = {"trust": 0.3, "flags": [], "relationship": ""}
+        chars[character] = entry
+    else:
+        entry = chars[character]
+        if entry.get("npc_stage") == "incubating":
+            logger.debug("Memory: skip %s for incubating '%s'", metric, character)
+            return
 
-    # Backward-compat: also set top-level field for the primary metric
     old = entry.get(metric, 0.5 if metric == "trust" else 0.0)
     new = round(max(0.0, min(1.0, old + delta)), 2)
     entry[metric] = new
@@ -77,19 +81,26 @@ def update_trust(memory: dict, character: str, delta: float, turn: int = 0,
 def set_flag(memory: dict, character: str | None, flag: str) -> None:
     """
     Add a flag to a character (or to world_flags if character is None).
-    Idempotent — won't duplicate.
+    Idempotent — won't duplicate. Does not auto-create characters.
     """
     if character is None:
         flags = memory.setdefault("world_flags", [])
         if flag not in flags:
             flags.append(flag)
             logger.info("Memory: world flag set → %s", flag)
-    else:
-        chars = memory.setdefault("characters", {})
-        entry = chars.setdefault(character, {"trust": 0.5, "flags": [], "relationship": ""})
-        if flag not in entry.setdefault("flags", []):
-            entry["flags"].append(flag)
-            logger.info("Memory: %s flag set → %s", character, flag)
+        return
+
+    chars = memory.get("characters", {})
+    if character not in chars:
+        logger.debug("Memory: skip flag for unknown '%s'", character)
+        return
+    entry = chars[character]
+    if entry.get("npc_stage") == "incubating":
+        logger.debug("Memory: skip flag for incubating '%s'", character)
+        return
+    if flag not in entry.setdefault("flags", []):
+        entry["flags"].append(flag)
+        logger.info("Memory: %s flag set → %s", character, flag)
 
 
 def update_relationship(memory: dict, character: str, relationship: str) -> None:
@@ -109,7 +120,18 @@ def get_context_for_prompt(memory: dict) -> str:
 
     if chars:
         lines.append("【角色关系记忆】")
+        try:
+            import config
+            from engine import io_utils
+            from engine.memory_names import filter_context_character_names
+            world = io_utils.read_yaml(config.WORLD_PACK_PATH)
+            allowed = filter_context_character_names(memory, world)
+        except Exception:
+            allowed = {n for n, d in chars.items() if d.get("npc_stage") != "incubating"}
+
         for name, data in chars.items():
+            if name not in allowed:
+                continue
             trust = data.get("trust", 0.5)
             rel = data.get("relationship", "")
             flags = data.get("flags", [])
@@ -623,6 +645,7 @@ def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | Non
     This is a simple keyword-based heuristic — not AI-powered.
     """
     import re
+    from engine.memory_names import build_roster_names, is_valid_character_name
 
     results: list[tuple[str, float, str | None]] = []
 
@@ -630,45 +653,53 @@ def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | Non
     negative_keywords = TRUST_KEYWORDS_NEGATIVE
     flag_keywords = FLAG_KEYWORDS
 
-    def _find_nearby_char(kw: str) -> str | None:
-        """Find a known character name within ~30 chars of the keyword."""
+    def _find_nearby_char(kw: str, roster: set[str]) -> str | None:
+        """Find a roster name within ~30 chars of the keyword."""
         idx = story.find(kw)
         if idx < 0:
             return None
         window_start = max(0, idx - 30)
         window_end = min(len(story), idx + len(kw) + 30)
         window = story[window_start:window_end]
-        # Look for 2-4 char Chinese names (simple heuristic)
-        for m in re.finditer(r'[\u4e00-\u9fff]{2,4}', window):
-            name = m.group()
-            if name in COMMON_WORDS:
-                continue
-            # Also skip if the name contains only extremely common chars
-            if all(c in '的一是不了在有人我他这来们说个到和地着就你也那要看没' for c in name):
-                continue
-            return name
-        return None
+        best: str | None = None
+        best_len = 0
+        for rn in roster:
+            if rn in window and len(rn) > best_len:
+                best = rn
+                best_len = len(rn)
+        return best
+
+    roster: set[str] = set()
+    try:
+        import config
+        from engine import io_utils
+        memory = io_utils.read_json(config.MEMORY_PATH)
+        world = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        session = io_utils.read_yaml(config.SESSION_STATE_PATH)
+        roster = build_roster_names(memory, world, session)
+        roster = {n for n in roster if is_valid_character_name(n) or n in memory.get("characters", {})}
+    except Exception:
+        roster = set()
 
     for kw, delta in positive_keywords.items():
         if kw in story:
-            char = _find_nearby_char(kw)
+            char = _find_nearby_char(kw, roster)
             if char:
                 results.append((char, delta, None))
-            else:
-                # No specific character found — apply halved delta to all
+            elif roster:
                 results.append(("__all_present__", round(delta * 0.5, 2), None))
 
     for kw, delta in negative_keywords.items():
         if kw in story:
-            char = _find_nearby_char(kw)
+            char = _find_nearby_char(kw, roster)
             if char:
                 results.append((char, delta, None))
-            else:
+            elif roster:
                 results.append(("__all_present__", round(delta * 0.5, 2), None))
 
     for kw, flag in flag_keywords.items():
         if kw in story:
-            char = _find_nearby_char(kw)
+            char = _find_nearby_char(kw, roster)
             target = char if char else "__all_present__"
             results.append((target, 0.02, flag))
 
@@ -760,10 +791,8 @@ def detect_new_characters_from_story(story: str,
             # Reject if all high-frequency particles
             if all(c in '的了是我也就不这人一个来去说看' for c in name):
                 continue
-            # Reject story fragments: names containing common verbs/particles
-            _FRAGMENT_CHARS = set('倒吸盯着露出启动紧急主控要巨大知道彻底关闭接近'
-                                 '把能也是远前个成半觉次再开室起过')
-            if any(c in _FRAGMENT_CHARS for c in name):
+            from engine.memory_names import assess_npc_name, NameVerdict
+            if assess_npc_name(name) == NameVerdict.REJECT:
                 continue
             candidates.append(name)
 
@@ -829,9 +858,14 @@ def parse_option_metric_deltas(options: list[str]) -> list[tuple[str, str, float
         for scan in (target, opt):
             for match in arrow_pattern.finditer(scan):
                 name = match.group(1)
-                results.append((name, "trust", _delta_from_sign(match.group(2), int(match.group(3)))))
+                from engine.memory_names import is_valid_character_name
+                if is_valid_character_name(name):
+                    results.append((name, "trust", _delta_from_sign(match.group(2), int(match.group(3)))))
             for match in metric_pattern.finditer(scan):
                 name = match.group(1)
+                from engine.memory_names import is_valid_character_name
+                if not is_valid_character_name(name):
+                    continue
                 raw_metric = match.group(2).lower()
                 sign = match.group(3) or '+'
                 value = int(match.group(4))

@@ -162,7 +162,7 @@ def test_game_settings_post():
     data = resp.json()
     assert data.get("ok") is True
     assert data.get("story_length") == 4000
-    assert data.get("max_tokens") == 8900
+    assert data.get("max_tokens") == 6320
 
     resp_slash = client.post("/api/game-settings/", data={"story_length": "3000"})
     assert resp_slash.status_code == 200

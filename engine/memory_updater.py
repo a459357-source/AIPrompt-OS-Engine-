@@ -29,9 +29,8 @@ from engine.memory import (
     assign_character_tier, degrade_inactive_characters,
     init_artifacts, transfer_artifact,
 )
-from engine.constants import (
-    ARTIFACT_TRANSFER_KEYWORDS,
-)
+from engine.memory_names import resolve_roster_name, is_memory_active_npc
+from engine.candidate_npcs import scan_story_sightings
 from engine.events import init_events, check_event_triggers, seed_default_events
 from engine.world_driver import passive_faction_drift
 from engine.constants import (
@@ -149,27 +148,13 @@ def auto_register_npcs(memory: dict, state: dict, world_pack: dict,
         memory["_trust_migrated"] = True
         save_memory(memory, persist=persist)
 
-    # (d) Detect new characters from story text (fallback)
-    known = set(mem_chars.keys())
-    story_newcomers = detect_new_characters_from_story(story, known)
-    for name in story_newcomers:
-        init_trust = get_initial_trust(name, world_pack)
-        init_trust = round(init_trust * 0.8, 2)  # story-detected = lower trust
-        mem_chars[name] = {
-            "trust": init_trust,
-            "flags": [],
-            "relationship": "",
-            "role": "story-detected",
-            "faction": "",
-        }
-        mem_chars[name].setdefault("metric_history", {}).setdefault(
-            "trust", []
-        ).append([turn, init_trust])
-        assign_character_tier(memory, name, world_pack)
-        logger.info(
-            "Memory updater: story-detected '%s' (turn %d, trust=%.2f)",
-            name, turn, init_trust,
-        )
+    # (d) Candidate NPC pool — sighting tracking & staged promotion
+    newcomers = detect_new_characters_from_story(story, set(mem_chars.keys()))
+    scan_story_sightings(
+        story, turn, memory, world_pack,
+        known_from_detection=newcomers,
+        persist=False,
+    )
 
     # (e) Track appearance + degrade inactive
     for name in list(mem_chars.keys()):
@@ -207,28 +192,24 @@ def _resolve_chosen_option(choice: str | None, prev_options: list[str]) -> list[
     return texts
 
 
-def _apply_metric_deltas(memory: dict, deltas: list[tuple[str, str, float]], turn: int, source: str) -> None:
-    mem_chars = memory.setdefault("characters", {})
+def _apply_metric_deltas(memory: dict, deltas: list[tuple[str, str, float]], turn: int, source: str,
+                         world_pack: dict | None = None, session: dict | None = None) -> None:
+    world_pack = world_pack or {}
     for char_name, metric, delta in deltas:
-        matched = False
-        for mem_name in list(mem_chars.keys()):
-            if char_name in mem_name or mem_name in char_name:
-                update_trust(memory, mem_name, delta, turn, metric=metric)
-                matched = True
-                logger.info(
-                    "Memory updater: %s %s %s %+.2f (matched '%s')",
-                    source, mem_name, metric, delta, char_name,
-                )
-        if not matched:
-            update_trust(memory, char_name, delta, turn, metric=metric)
-            logger.info(
-                "Memory updater: %s %s %s %+.2f (new char)",
-                source, char_name, metric, delta,
-            )
+        resolved = resolve_roster_name(char_name, memory, world_pack, session)
+        if not resolved or not is_memory_active_npc(resolved, memory):
+            logger.debug("Memory updater: skip delta for '%s' (not active roster)", char_name)
+            continue
+        update_trust(memory, resolved, delta, turn, metric=metric)
+        logger.info(
+            "Memory updater: %s %s %s %+.2f ('%s')",
+            source, resolved, metric, delta, char_name,
+        )
 
 
 def apply_trust_deltas(memory: dict, story: str, choice: str | None,
-                        turn: int, prev_options: list[str], *, persist: bool = True) -> None:
+                        turn: int, prev_options: list[str], *, persist: bool = True,
+                        world_pack: dict | None = None, session: dict | None = None) -> None:
     """
     Apply trust changes from two sources:
       a) Player's chosen option from the *previous* turn (explicit deltas)
@@ -241,17 +222,19 @@ def apply_trust_deltas(memory: dict, story: str, choice: str | None,
         for opt_text in _resolve_chosen_option(choice, prev_options):
             deltas = parse_option_metric_deltas([opt_text])
             if deltas:
-                _apply_metric_deltas(memory, deltas, turn, f"choice[{choice[:12]}]")
+                _apply_metric_deltas(memory, deltas, turn, f"choice[{choice[:12]}]",
+                                     world_pack=world_pack, session=session)
 
     # (b) Heuristic trust deltas from story keywords (covers custom narrative outcomes)
     deltas = guess_trust_delta_from_story(story)
     for char_name, delta, flag in deltas:
         if char_name == "__all_present__":
             for name in list(mem_chars.keys()):
-                if name in story:
+                if name in story and is_memory_active_npc(name, memory):
                     update_trust(memory, name, delta, turn)
         else:
-            update_trust(memory, char_name, delta, turn)
+            if is_memory_active_npc(char_name, memory):
+                update_trust(memory, char_name, delta, turn)
 
         if flag:
             if char_name != "__all_present__":

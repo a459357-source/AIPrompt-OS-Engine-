@@ -17,8 +17,18 @@ from datetime import datetime
 
 
 # ── Per-thread file cache ──────────────────────────────────────────
-# Each thread (web worker) gets its own cache so concurrent requests
-# never share stale data.  The cache is invalidated at the end of a turn.
+# Static YAML (world/engine/prompt) persists across turns (V2 runtime_cache).
+# Session/memory paths are invalidated each turn via clear_cache(session_only=True).
+
+import config as _config
+
+RUNTIME_STATIC_PATHS = frozenset({
+    str(_config.WORLD_PACK_PATH),
+    str(_config.ENGINE_CONFIG_PATH),
+    str(_config.PROMPT_TEMPLATE_PATH),
+    str(_config.WORLD_SUMMARY_PATH),
+    str(_config.CHAPTER_SUMMARIES_PATH),
+})
 
 _thread_local = threading.local()
 
@@ -32,9 +42,15 @@ def _get_cache() -> dict:
     return cache
 
 
-def clear_cache() -> None:
-    """Discard the current thread's file cache — call at the end of each turn."""
-    _thread_local.file_cache = {}
+def clear_cache(*, session_only: bool = False) -> None:
+    """Discard cache entries. session_only keeps static runtime YAML cached."""
+    if not session_only:
+        _thread_local.file_cache = {}
+        return
+    cache = _get_cache()
+    for key in list(cache.keys()):
+        if key not in RUNTIME_STATIC_PATHS:
+            cache.pop(key, None)
 
 
 def _cached_read(path: Path, reader) -> dict:

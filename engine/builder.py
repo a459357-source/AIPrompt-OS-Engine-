@@ -6,20 +6,21 @@ template, then interpolates everything into the final system + user
 messages sent to DeepSeek.
 """
 
-import json
 import logging
 
 import config
 from engine import io_utils
-from engine.memory import (
-    load_memory, get_context_for_prompt,
-    build_character_tier_context, get_faction_attitude_context,
-    get_faction_context_for_prompt,
-    get_artifact_context_for_prompt,
+from engine.memory import load_memory
+from engine.memory_layers import (
+    build_hot_context,
+    build_long_term_memory,
+    build_recent_summaries,
+    load_world_summary_text,
 )
-from engine.events import get_event_context
-from engine.world_driver import get_world_state_context
-from engine.context_compress import compress_history_for_prompt
+from engine.prompt_compact import (
+    compact_engine_rules,
+    compact_world_for_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -120,36 +121,41 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
     if not main_goal:
         main_goal = "推进剧情发展，探索角色关系"
 
-    # ── Characters context ─────────────────────────────────────
+    # ── Characters context (active + main only for token budget) ─
     characters_list = world_data.get("characters", [])
     characters_context = ""
+    session_chars = session_state.get("characters", {})
+    active_names: set[str] = set()
+    for _key, ch in session_chars.items():
+        if isinstance(ch, dict) and ch.get("name"):
+            active_names.add(str(ch["name"]))
     if characters_list:
-        lines = ["【角色信息】"]
+        lines = ["【角色信息 — 当前相关】"]
         for ch in characters_list:
             name = ch.get("name", "?")
-            is_main = "⭐主角" if ch.get("is_main") else "👤NPC"
+            is_main = ch.get("is_main", False)
+            if not is_main and active_names and name not in active_names:
+                # Include name-only for inactive NPCs when force event
+                if not force_triggered:
+                    continue
             role_tags = ch.get("role_tags", [])
             role_str = " / ".join(role_tags) if role_tags else ""
             personality_tags = ch.get("personality_tags", [])
             pers_str = "、".join(personality_tags) if personality_tags else ""
             appearance = ch.get("appearance", "")
-            relationship = ch.get("relationship", [])
-            rel_str = "、".join(relationship) if relationship else ""
             goal = ch.get("goal", "")
-            secret = ch.get("secret", "")
-            background = ch.get("background", "")
-            special_ability = ch.get("special_ability", "")
-            parts = [f"{name}（{is_main}）"]
-            if role_str: parts.append(f"身份：{role_str}")
-            if appearance: parts.append(f"外貌：{appearance}")
-            if pers_str: parts.append(f"性格：{pers_str}")
-            if rel_str: parts.append(f"关系：{rel_str}")
-            if goal: parts.append(f"目标：{goal}")
-            if secret: parts.append(f"🔒秘密：{secret}")
-            if background: parts.append(f"背景：{background}")
-            if special_ability: parts.append(f"能力：{special_ability}")
+            parts = [f"{name}（{'⭐主角' if is_main else '👤NPC'}）"]
+            if role_str:
+                parts.append(f"身份：{role_str}")
+            if appearance and (is_main or name in active_names):
+                parts.append(f"外貌：{_clip_field(appearance, 80)}")
+            if pers_str:
+                parts.append(f"性格：{pers_str}")
+            if goal and is_main:
+                parts.append(f"目标：{_clip_field(goal, 80)}")
             lines.append("  " + " | ".join(parts))
-        characters_context = "\n".join(lines)
+        if len(lines) > 1:
+            characters_context = "\n".join(lines)
 
     # ── Relationship system ────────────────────────────────────
     rel_system = world_data.get("relationship_system", {})
@@ -182,91 +188,78 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
         .replace("{{MAIN_GOAL}}", main_goal)
     )
 
-    # ── Memory context ─────────────────────────────────────────
+    # ── Memory layers (V2) ─────────────────────────────────────
     memory = load_memory()
-    memory_context = get_context_for_prompt(memory)
-
-    # ── Character tier context ────────────────────────────────
-    tier_context = build_character_tier_context(memory)
-
-    # ── Faction attitude context ──────────────────────────────
-    faction_attitude_context = get_faction_attitude_context(memory)
-
-    # ── Faction scope (control territories, orgs, assets, power) ─
-    faction_scope_context = get_faction_context_for_prompt(memory)
-
-    # ── Artifact context ────────────────────────────────────────
-    artifact_context = get_artifact_context_for_prompt(memory)
-
-    # ── World events context ──────────────────────────────────
-    event_context = get_event_context(memory)
-
-    # ── World state (faction autonomous actions) ──────────────
-    world_state_context = get_world_state_context(memory, session_state.get("turn", 0))
+    long_term = build_long_term_memory(memory, session_state)
+    recent_summaries = build_recent_summaries(count=2)
+    hot_context = build_hot_context(session_state, memory)
 
     # ── Player choice for THIS generation ───────────────────────
     last_choice_text = _player_choice_prompt(current_choice, session_state)
 
-    # ── History compression (auto_compress + compress_threshold) ─
-    config.reload_context_settings()
-    full_history = session_state.get("history", [])
-    recent_history, history_summary, compress_stats = compress_history_for_prompt(
-        full_history,
-        max_full_turns=config.MAX_CONTEXT_MESSAGES,
-        auto_compress=config.AUTO_COMPRESS,
-        compress_threshold=config.COMPRESS_THRESHOLD,
-    )
-    state_for_prompt = dict(session_state)
-    state_for_prompt["history"] = recent_history
-    if history_summary:
-        state_for_prompt["history_summary"] = history_summary
-    else:
-        state_for_prompt.pop("history_summary", None)
+    world_text = load_world_summary_text()
+    if not world_text:
+        world_text = compact_world_for_prompt(world_pack)
 
     # ── Interpolate user prompt ────────────────────────────────
     user_raw = template.get("user", "")
     user_prompt = (
         user_raw
-        .replace("{{WORLD}}", json.dumps(world_pack, ensure_ascii=False, indent=2))
-        .replace("{{STATE_JSON}}", json.dumps(state_for_prompt, ensure_ascii=False, indent=2))
-        .replace("{{ENGINE_RULES}}", json.dumps(engine_config, ensure_ascii=False, indent=2))
+        .replace("{{WORLD}}", world_text)
+        .replace("{{LONG_TERM_MEMORY}}", long_term)
+        .replace("{{RECENT_SUMMARIES}}", recent_summaries)
+        .replace("{{HOT_CONTEXT}}", hot_context)
+        .replace("{{ENGINE_RULES}}", compact_engine_rules(engine_config))
         .replace("{{FORCE_EVENT_PROMPT}}", force_prompt)
         .replace("{{LAST_CHOICE}}", last_choice_text)
         .replace("{{CHARACTERS_CONTEXT}}", characters_context)
         .replace("{{RELATIONSHIP_SYSTEM}}", relationship_context)
-        .replace("{{MEMORY_CONTEXT}}", memory_context)
-        .replace("{{TIER_CONTEXT}}", tier_context)
-        .replace("{{FACTION_CONTEXT}}", faction_attitude_context)
-        .replace("{{FACTION_SCOPE}}", faction_scope_context)
-        .replace("{{ARTIFACT_CONTEXT}}", artifact_context)
-        .replace("{{EVENT_CONTEXT}}", event_context)
-        .replace("{{WORLD_STATE}}", world_state_context)
         .replace("{{STORY_LENGTH}}", str(target_len))
         .replace("{{STORY_LENGTH_MIN}}", str(min_len))
         .replace("{{STORY_LENGTH_MAX}}", str(max_len))
         .replace("{{OPTION_COUNT}}", str(config.OPTION_COUNT))
     )
 
+    user_prompt = _apply_prompt_budget(user_prompt)
+
     # ── Estimate token usage and warn ───────────────────────────
-    _warn_if_approaching_limit(system_prompt, user_prompt,
-                                state_for_prompt, world_pack,
-                                memory_context, tier_context, faction_attitude_context,
-                                faction_scope_context, artifact_context,
-                                event_context, world_state_context)
+    _warn_if_approaching_limit(system_prompt, user_prompt)
 
     logger.info(
         "Prompt built — force_event=%s current_choice=%s story_length=%d max_tokens=%d "
-        "auto_compress=%s compress_threshold=%d history_tokens=%d→%d",
+        "hot_turns=%d long_term_chars=%d",
         force_triggered,
         current_choice or "none",
         target_len,
         config.MAX_TOKENS,
-        config.AUTO_COMPRESS,
-        config.COMPRESS_THRESHOLD,
-        compress_stats.get("original_tokens", 0),
-        compress_stats.get("final_tokens", 0),
+        config.HOT_CONTEXT_TURNS,
+        len(long_term),
     )
     return system_prompt, user_prompt
+
+
+def _clip_field(text: str, limit: int) -> str:
+    text = str(text or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1] + "…"
+
+
+def _apply_prompt_budget(user_prompt: str) -> str:
+    """Trim user prompt if estimated tokens exceed V2 budget."""
+    budget = config.PROMPT_TOKEN_BUDGET
+    est = int(len(user_prompt) * 0.6)
+    if est <= budget:
+        return user_prompt
+    ratio = budget / max(est, 1)
+    trimmed = user_prompt[: int(len(user_prompt) * ratio * 0.95)]
+    logger.warning(
+        "Prompt trimmed for budget: ~%d → ~%d tokens (cap=%d)",
+        est,
+        int(len(trimmed) * 0.6),
+        budget,
+    )
+    return trimmed + "\n…（上下文已按预算裁剪，请依据以上信息续写）"
 
 
 def _detect_force_event(state: dict) -> tuple[bool, str]:
@@ -340,34 +333,24 @@ def _min_level_index(levels: list[str]) -> int:
         return 0
 
 
-def _warn_if_approaching_limit(
-    system_prompt: str, user_prompt: str,
-    state: dict, world_pack: dict,
-    memory_context: str, tier_context: str, faction_context: str,
-    faction_scope_context: str, artifact_context: str,
-    event_context: str, world_state_context: str,
-) -> None:
+def _warn_if_approaching_limit(system_prompt: str, user_prompt: str) -> None:
     """Estimate total prompt tokens and warn if approaching context limit."""
-    # Rough estimate: Chinese ≈ 0.5 tokens/char, English ≈ 0.25 tokens/char
-    # Conservative: use 0.6 to be safe
-    total_chars = (
-        len(system_prompt) + len(user_prompt) +
-        len(memory_context) + len(tier_context) + len(faction_context) +
-        len(faction_scope_context) + len(artifact_context) +
-        len(event_context) + len(world_state_context)
-    )
+    total_chars = len(system_prompt) + len(user_prompt)
     estimated_tokens = int(total_chars * 0.6)
 
     ctx_limit = config.DEEPSEEK_CONTEXT_TOKENS
-    warn_threshold = int(ctx_limit * 0.7)
+    v2_budget = config.PROMPT_TOKEN_BUDGET
     danger_threshold = int(ctx_limit * 0.9)
 
+    if estimated_tokens > v2_budget:
+        logger.info(
+            "Prompt ~%d tokens (V2 target ≤%d)",
+            estimated_tokens,
+            v2_budget,
+        )
     if estimated_tokens > danger_threshold:
         logger.warning(
-            "⚠️ Prompt ~%d tokens — approaching %dK context limit. "
-            "Consider reducing STORY_LENGTH or resetting history.",
+            "⚠️ Prompt ~%d tokens — approaching %dK context limit.",
             estimated_tokens,
             ctx_limit // 1000,
         )
-    elif estimated_tokens > warn_threshold:
-        logger.info("Prompt ~%d tokens (within safe range)", estimated_tokens)

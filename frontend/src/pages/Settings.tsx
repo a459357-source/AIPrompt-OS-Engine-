@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -27,6 +27,7 @@ import {
   FONT_SIZE_OPTIONS,
   LINE_HEIGHT_OPTIONS,
   MAX_WIDTH_OPTIONS,
+  normalizeMaxWidth,
   FONT_FAMILY_LABELS,
   BG_THEME_LABELS,
   AUTO_ADVANCE_ROUND_OPTIONS,
@@ -90,12 +91,24 @@ function SelectRow({
   onChange: (v: string | number) => void
   labels?: Record<string, string>
 }) {
+  const optionValues = new Set(
+    options.map((opt) =>
+      String(typeof opt === 'object' && opt !== null && 'value' in opt ? opt.value : opt),
+    ),
+  )
+  const safeValue = optionValues.has(String(value))
+    ? String(value)
+    : (optionValues.size > 0 ? String(value) : undefined)
+
   return (
     <div className="flex items-center justify-between gap-4">
       <Label className="text-sm text-game-muted shrink-0">{label}</Label>
-      <Select value={String(value)} onValueChange={(v) => onChange(isNaN(Number(v)) ? v : Number(v))}>
+      <Select
+        value={safeValue && optionValues.has(safeValue) ? safeValue : undefined}
+        onValueChange={(v) => onChange(isNaN(Number(v)) ? v : Number(v))}
+      >
         <SelectTrigger className="w-[140px] h-8 text-xs">
-          <SelectValue />
+          <SelectValue placeholder="请选择" />
         </SelectTrigger>
         <SelectContent>
           {options.map((opt) => {
@@ -122,6 +135,7 @@ export default function Settings() {
   const [apiKey, setApiKey] = useState('')
   const [apiKeyMasked, setApiKeyMasked] = useState('')
   const [model, setModel] = useState('deepseek-chat')
+  const [streamEnabled, setStreamEnabled] = useState(true)
   const [maxContextMsgs, setMaxContextMsgs] = useState(20)
   const [autoCompress, setAutoCompress] = useState(true)
 
@@ -131,7 +145,7 @@ export default function Settings() {
     defaultValues,
   })
 
-  const { watch, setValue, formState: { isDirty } } = form
+  const { watch, setValue } = form
   const values = watch()
 
   // Persist on change
@@ -141,10 +155,21 @@ export default function Settings() {
     setTimeout(() => setSaved(false), 1500)
   }, [])
 
-  // Sync all changes
+  const setAndPersist = useCallback((key: keyof SettingsForm, value: unknown) => {
+    setValue(key, value as never, { shouldDirty: true })
+    persist(key as keyof AppSettings, value)
+  }, [setValue, persist])
+
+  const skipWatchRef = useRef(true)
+
+  // Sync all changes（不依赖 isDirty 闭包，避免首次改最大宽度等不保存）
   useEffect(() => {
     const sub = form.watch((data) => {
-      if (data && isDirty) {
+      if (skipWatchRef.current) {
+        skipWatchRef.current = false
+        return
+      }
+      if (data) {
         saveSettings(data as Partial<AppSettings>)
         setSaved(true)
         const t = setTimeout(() => setSaved(false), 1500)
@@ -152,7 +177,19 @@ export default function Settings() {
       }
     })
     return () => sub.unsubscribe()
-  }, [form, isDirty])
+  }, [form])
+
+  // 旧版 maxWidth（如 800）迁移到合法选项并写回
+  useEffect(() => {
+    const s = loadSettings()
+    const normalized = normalizeMaxWidth(s.maxWidth)
+    if (normalized !== s.maxWidth) {
+      saveSettings({ maxWidth: normalized })
+    }
+    if (values.maxWidth !== normalized) {
+      setValue('maxWidth', normalized)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // API settings — refetch when entering settings or tab refocus (sync max_tokens after game page edits)
   const location = useLocation()
@@ -161,6 +198,7 @@ export default function Settings() {
       .then((data) => {
         if (data.api_key_masked) setApiKeyMasked(data.api_key_masked)
         setModel(data.model)
+        setStreamEnabled(data.stream)
         setMaxContextMsgs(data.max_context_messages)
         setAutoCompress(data.auto_compress)
       })
@@ -332,6 +370,7 @@ export default function Settings() {
       const data = await saveEngineSettings({
         apiKey: apiKey || undefined,
         model,
+        stream: streamEnabled,
         maxContextMsgs,
         autoCompress,
       })
@@ -346,7 +385,7 @@ export default function Settings() {
       logger.error('Settings', 'Save API failed', { error: msg })
     }
     setApiSaving(false)
-  }, [apiKey, model, maxContextMsgs, autoCompress])
+  }, [apiKey, model, streamEnabled, maxContextMsgs, autoCompress])
 
   const clearStoredApiKey = useCallback(async () => {
     if (!confirm('确定要清除本机已保存的 API Key？清除后需重新填写才能调用 AI。')) return
@@ -392,12 +431,12 @@ export default function Settings() {
             </AccordionTrigger>
             <AccordionContent>
               <CardContent className="space-y-4 pt-2">
-                <SelectRow label="字体大小" value={values.fontSize} options={FONT_SIZE_OPTIONS} onChange={(v) => setValue('fontSize', v as number)} />
-                <SelectRow label="行高" value={values.lineHeight} options={LINE_HEIGHT_OPTIONS} onChange={(v) => setValue('lineHeight', v as number)} />
-                <SelectRow label="正文字体" value={values.fontFamily} options={['system', 'serif', 'sans', 'kai']} onChange={(v) => setValue('fontFamily', v as string)} labels={FONT_FAMILY_LABELS} />
-                <SelectRow label="最大宽度" value={values.maxWidth} options={MAX_WIDTH_OPTIONS} onChange={(v) => setValue('maxWidth', v as number)} />
-                <SelectRow label="背景色调" value={values.bgTheme} options={['dark', 'sepia', 'gray']} onChange={(v) => setValue('bgTheme', v as string)} labels={BG_THEME_LABELS} />
-                <SelectRow label="段落间距" value={values.paragraphSpacing} options={['compact', 'standard', 'relaxed']} onChange={(v) => setValue('paragraphSpacing', v as string)} labels={{ compact: '紧凑', standard: '标准', relaxed: '宽松' }} />
+                <SelectRow label="字体大小" value={values.fontSize} options={FONT_SIZE_OPTIONS} onChange={(v) => setAndPersist('fontSize', v as number)} />
+                <SelectRow label="行高" value={values.lineHeight} options={LINE_HEIGHT_OPTIONS} onChange={(v) => setAndPersist('lineHeight', v as number)} />
+                <SelectRow label="正文字体" value={values.fontFamily} options={['system', 'serif', 'sans', 'kai']} onChange={(v) => setAndPersist('fontFamily', v as string)} labels={FONT_FAMILY_LABELS} />
+                <SelectRow label="最大宽度" value={normalizeMaxWidth(values.maxWidth)} options={MAX_WIDTH_OPTIONS} onChange={(v) => setAndPersist('maxWidth', v as number)} />
+                <SelectRow label="背景色调" value={values.bgTheme} options={['dark', 'sepia', 'gray']} onChange={(v) => setAndPersist('bgTheme', v as string)} labels={BG_THEME_LABELS} />
+                <SelectRow label="段落间距" value={values.paragraphSpacing} options={['compact', 'standard', 'relaxed']} onChange={(v) => setAndPersist('paragraphSpacing', v as string)} labels={{ compact: '紧凑', standard: '标准', relaxed: '宽松' }} />
 
                 {/* Live preview */}
                 <Card className="bg-game-bg border-game-border">
@@ -686,12 +725,9 @@ export default function Settings() {
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <Label>📡 流式输出</Label>
-                    <p className="text-xs text-game-dim">逐字显示 AI 回复（SSE）</p>
+                    <p className="text-xs text-game-dim">逐字显示 AI 回复（SSE，默认开启）</p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant="outline" size="sm" className="text-[10px]">V2</Badge>
-                    <Switch checked={false} disabled aria-readonly />
-                  </div>
+                  <Switch checked={streamEnabled} onCheckedChange={setStreamEnabled} />
                 </div>
                 <Separator />
                 <p className="text-xs text-game-accent font-medium">💬 上下文管理</p>

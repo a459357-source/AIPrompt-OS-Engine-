@@ -6,6 +6,7 @@ import type {
   CustomRules,
 } from './types'
 import { logger } from './logger'
+import { storyTargetBounds } from './storyLength'
 
 const BASE = ''
 
@@ -248,6 +249,52 @@ export async function generateNpc(roleHint?: string): Promise<NpcData & { error?
 }
 
 // ── Dashboard ──
+export interface WorldStateV2 {
+  location: string
+  locations: { name: string; desc: string }[]
+  world_time: {
+    turn: number
+    chapter: number
+    era: string
+    label: string
+    scene_changes: number
+  }
+  factions: {
+    name: string
+    role: string
+    type: string
+    reputation_pct: number
+    relation_to_player: string
+    influence: number
+    leader: string
+    goals: string[]
+    flags: string[]
+    attitudes: { target: string; attitude: number; label: string }[]
+  }[]
+  faction_links: { from: string; to: string; attitude: number; label: string }[]
+  events: {
+    id: string
+    title: string
+    status: string
+    importance: number
+    trigger_turn: number
+    related_factions: string[]
+    related_characters: string[]
+  }[]
+  relationship_network: {
+    nodes: {
+      name: string
+      is_main: boolean
+      faction: string
+      relationship_type: string
+      trust_pct: number
+      tags: string[]
+      tier: string
+    }[]
+    edges: { from: string; to: string; kind: string; label: string }[]
+  }
+}
+
 export interface DashboardData {
   turn: number
   status: string
@@ -271,6 +318,7 @@ export interface DashboardData {
     branch_stats?: { total_nodes: number; leaf_count: number; max_depth: number; avg_branches: number }
     faction_curves?: Record<string, { labels: number[]; datasets: { name: string; data: number[] }[]; label: string }>
     summary?: { turns: number; status: string; characters: number; total_words: number; nodes: number; edges: number }
+    world_state_v2?: WorldStateV2
   }
   story_graph?: {
     nodes: Record<string, unknown>
@@ -303,24 +351,144 @@ export async function getDashboard(): Promise<DashboardData> {
   return res.json()
 }
 
-export async function nextTurn(choice: string): Promise<GameTurnResponse> {
-  const formData = new FormData()
-  formData.append('choice', choice)
-  const res = await apiFetch('/api/next', { method: 'POST', body: formData })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
-    return { story: '', state: {} as GameTurnResponse['state'], options: [], error: (data as { error?: string }).error || 'Failed to advance' }
-  }
+export type TurnStreamHandlers = {
+  onStoryDelta?: (delta: string) => void
+  onStoryReset?: () => void
+  onProgress?: (phase: string, data: Record<string, unknown>) => void
+}
+
+let activeTurnAbort: AbortController | null = null
+
+export function cancelGeneration(): Promise<void> {
+  activeTurnAbort?.abort()
+  return apiFetch(`${BASE}/api/cancel-generation`, { method: 'POST' })
+    .then(() => undefined)
+    .catch(() => undefined)
+}
+
+export async function getGenerationStatus(): Promise<{ active: boolean; story: string; cancelled?: boolean }> {
+  const res = await apiFetch(`${BASE}/api/generation-status`)
+  if (!res.ok) return { active: false, story: '' }
   return res.json()
 }
 
-export async function startGame(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; error?: string }> {
-  const res = await apiFetch('/api/start', { method: 'POST' })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
-    return { story: '', options: [], state: {}, error: (data as { error?: string }).error || 'Failed to start game' }
+function parseSseBlock(
+  block: string,
+  handlers: TurnStreamHandlers | undefined,
+  onDone: (payload: GameTurnResponse) => void,
+  onError: (message: string) => void,
+): void {
+  let event = 'message'
+  let dataLine = ''
+  for (const line of block.split('\n')) {
+    if (line.startsWith('event:')) event = line.slice(6).trim()
+    else if (line.startsWith('data:')) dataLine = line.slice(5).trim()
   }
-  return res.json()
+  if (!dataLine) return
+  const data = JSON.parse(dataLine) as Record<string, unknown>
+  if (event === 'story') {
+    handlers?.onStoryDelta?.(String(data.delta ?? ''))
+  } else if (event === 'story_reset') {
+    handlers?.onStoryReset?.()
+  } else if (event === 'progress') {
+    const { phase, ...rest } = data
+    handlers?.onProgress?.(String(phase ?? ''), rest)
+  } else if (event === 'error') {
+    onError(String(data.error ?? 'AI 生成失败，请重试'))
+  } else if (event === 'done') {
+    onDone(data as unknown as GameTurnResponse)
+  }
+}
+
+async function consumeTurnStream(
+  res: Response,
+  handlers?: TurnStreamHandlers,
+): Promise<GameTurnResponse> {
+  const reader = res.body?.getReader()
+  if (!reader) throw new Error('浏览器不支持流式响应')
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let final: GameTurnResponse | null = null
+  let streamError = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    let sep = buffer.indexOf('\n\n')
+    while (sep >= 0) {
+      const block = buffer.slice(0, sep)
+      buffer = buffer.slice(sep + 2)
+      parseSseBlock(
+        block,
+        handlers,
+        (payload) => { final = payload },
+        (msg) => { streamError = msg },
+      )
+      sep = buffer.indexOf('\n\n')
+    }
+  }
+
+  if (streamError) {
+    return { story: '', state: {} as GameTurnResponse['state'], options: [], error: streamError }
+  }
+  if (final) return final
+  throw new Error('流式响应未完成')
+}
+
+async function postGameTurn(
+  path: string,
+  body: FormData | undefined,
+  handlers?: TurnStreamHandlers,
+): Promise<GameTurnResponse> {
+  activeTurnAbort?.abort()
+  activeTurnAbort = new AbortController()
+  const signal = activeTurnAbort.signal
+
+  const startTime = Date.now()
+  logger.info('API', `→ POST ${path}`)
+  const res = await apiFetch(`${BASE}${path}`, { method: 'POST', body, signal })
+  const contentType = res.headers.get('content-type') || ''
+  const empty: GameTurnResponse = {
+    story: '',
+    options: [],
+    state: {} as GameTurnResponse['state'],
+  }
+
+  if (!res.ok) {
+    if (contentType.includes('application/json')) {
+      const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+      return { ...empty, error: (data as { error?: string }).error || `HTTP ${res.status}` }
+    }
+    return { ...empty, error: `HTTP ${res.status}` }
+  }
+
+  if (contentType.includes('text/event-stream')) {
+    const data = await consumeTurnStream(res, handlers)
+    logger.info('API', `✓ POST ${path} (stream) — ${Date.now() - startTime}ms`)
+    return data
+  }
+
+  const data = await res.json() as GameTurnResponse
+  logger.info('API', `✓ POST ${path} — ${Date.now() - startTime}ms`)
+  return data
+}
+
+export async function nextTurn(
+  choice: string,
+  handlers?: TurnStreamHandlers,
+): Promise<GameTurnResponse> {
+  const formData = new FormData()
+  formData.append('choice', choice)
+  return postGameTurn('/api/next', formData, handlers)
+}
+
+export async function startGame(
+  handlers?: TurnStreamHandlers,
+): Promise<GameTurnResponse> {
+  return postGameTurn('/api/start', undefined, handlers)
 }
 
 export async function getSettingsStatus(): Promise<{ configured: boolean; error?: string }> {
@@ -438,15 +606,17 @@ export interface GameGenSettings {
   }
 }
 
+const _FALLBACK_BOUNDS = storyTargetBounds(1000, 300)
+
 const GAME_GEN_FALLBACK: GameGenSettings = {
   story_length: 1000,
   min: 300,
-    max: 281851,
-    recommended: 1000,
-    target_min: 850,
-    target_max: 1150,
-    max_tokens: 4850,
-    matched_max_tokens: 4850,
+  max: 281851,
+  recommended: 1000,
+  target_min: _FALLBACK_BOUNDS.min,
+  target_max: _FALLBACK_BOUNDS.max,
+  max_tokens: 4850,
+  matched_max_tokens: 4850,
   max_output_tokens: 384000,
   context_tokens: 1000000,
   temperature: 0.8,
@@ -462,8 +632,9 @@ const GAME_GEN_FALLBACK: GameGenSettings = {
 function parseGameGenSettings(data: Partial<GameGenSettings>): GameGenSettings {
   const storyLength = data.story_length ?? GAME_GEN_FALLBACK.story_length
   const min = data.min ?? GAME_GEN_FALLBACK.min
-  const targetMin = data.target_min ?? Math.max(min, Math.floor(storyLength * 0.85))
-  const targetMax = data.target_max ?? Math.floor(storyLength * 1.15)
+  const bounds = storyTargetBounds(storyLength, min)
+  const targetMin = data.target_min ?? bounds.min
+  const targetMax = data.target_max ?? bounds.max
   return {
     story_length: storyLength,
     min,

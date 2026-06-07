@@ -186,6 +186,7 @@ def apply_game_gen_settings(
         reload_story_length()
         reload_max_tokens()
         reload_context_settings()
+        ensure_story_length_token_sync()
     if temperature is not None:
         save_temperature(max(0.1, min(config.DEEPSEEK_MAX_TEMPERATURE, temperature)))
         reload_temperature()
@@ -274,6 +275,8 @@ def apply_engine_settings(
         save_story_length(clamp_story_length(story_length))
         reload_story_length()
         reload_max_tokens()
+        reload_context_settings()
+        ensure_story_length_token_sync()
     elif max_tokens is not None:
         save_max_tokens(config.cap_output_tokens(max_tokens))
         reload_max_tokens()

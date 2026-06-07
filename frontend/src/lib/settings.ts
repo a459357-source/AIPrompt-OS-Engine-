@@ -23,6 +23,7 @@ export interface AppSettings {
 
   // UI
   animations: boolean
+  typewriterEffect: boolean
   sidebarDefault: string
   charPanelPosition: string
   language: string
@@ -32,7 +33,7 @@ export const DEFAULTS: AppSettings = {
   fontSize: 17,
   lineHeight: 1.8,
   fontFamily: 'system',
-  maxWidth: 800,
+  maxWidth: 960,
   bgTheme: 'dark',
   paragraphSpacing: 'standard',
 
@@ -45,7 +46,8 @@ export const DEFAULTS: AppSettings = {
   autoExport: 'off',
 
   animations: true,
-  sidebarDefault: 'expanded',
+  typewriterEffect: false,
+  sidebarDefault: 'collapsed',
   charPanelPosition: 'right',
   language: 'zh',
 }
@@ -57,7 +59,9 @@ export function loadSettings(): AppSettings {
     const raw = localStorage.getItem(KEY)
     if (!raw) return { ...DEFAULTS }
     const parsed = JSON.parse(raw)
-    return { ...DEFAULTS, ...parsed }
+    const merged = { ...DEFAULTS, ...parsed } as AppSettings
+    merged.maxWidth = normalizeMaxWidth(Number(merged.maxWidth) || DEFAULTS.maxWidth)
+    return merged
   } catch {
     return { ...DEFAULTS }
   }
@@ -92,7 +96,11 @@ async function syncEngineSettingsToBackend(patch: Partial<AppSettings>) {
 }
 
 export function saveSettings(s: Partial<AppSettings>, opts?: { skipEngineSync?: boolean }) {
-  _settings = { ...getSettings(), ...s }
+  const patch = { ...s }
+  if (patch.maxWidth != null) {
+    patch.maxWidth = normalizeMaxWidth(Number(patch.maxWidth))
+  }
+  _settings = { ...getSettings(), ...patch }
   localStorage.setItem(KEY, JSON.stringify(_settings))
   applySettings(_settings)
   applyDocumentLanguage(_settings.language as 'zh' | 'en' | 'ja')
@@ -171,7 +179,23 @@ export function clampAutoAdvanceRounds(n: number): number {
 export const LINE_HEIGHT_OPTIONS = [1.6, 1.8, 2.0, 2.4]
 export const FONT_SIZE_OPTIONS = [14, 17, 20, 24, 28]
 export const MAX_WIDTH_OPTIONS = [
-  { value: 600, label: '窄栏' },
-  { value: 800, label: '标准' },
-  { value: 100, label: '全宽' }, // 100 = 100%
-]
+  { value: 100, label: '铺满' },
+  { value: 1200, label: '宽' },
+  { value: 960, label: '标准' },
+  { value: 720, label: '适中' },
+  { value: 560, label: '窄' },
+] as const
+
+export const MAX_WIDTH_VALUES = MAX_WIDTH_OPTIONS.map((o) => o.value)
+
+/** Map legacy / invalid maxWidth to a valid option (Select 需要匹配项). */
+export function normalizeMaxWidth(width: number): number {
+  if (MAX_WIDTH_VALUES.includes(width as (typeof MAX_WIDTH_VALUES)[number])) {
+    return width
+  }
+  const legacy: Record<number, number> = { 600: 560, 800: 960 }
+  if (legacy[width] != null) return legacy[width]
+  return MAX_WIDTH_VALUES.reduce((best, cur) =>
+    Math.abs(cur - width) < Math.abs(best - width) ? cur : best,
+  )
+}

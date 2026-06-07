@@ -1,12 +1,17 @@
-/** Parse relationship hint strings from AI options into display chips. */
+/** Parse relationship / stat / faction / event hints from AI option text. */
+
+export type HintKind = 'character' | 'faction' | 'stat' | 'event'
 
 export interface RelationHint {
+  kind: HintKind
   name: string
   metric: string
   metricLabel: string
   icon: string
   delta: number
-  tone: 'up' | 'down' | 'neutral' | 'new'
+  tone: 'up' | 'down' | 'neutral' | 'new' | 'event' | 'warning'
+  /** Full phrase for event / faction warnings */
+  text?: string
 }
 
 const METRIC_ICONS: Record<string, string> = {
@@ -16,6 +21,9 @@ const METRIC_ICONS: Record<string, string> = {
   dependence: '🔗',
   hostility: '⚔️',
   attraction: '💫',
+  stat: '📊',
+  faction: '🏛️',
+  event: '⚡',
   default: '💞',
 }
 
@@ -26,6 +34,7 @@ const METRIC_LABELS: Record<string, string> = {
   dependence: '依赖',
   hostility: '敌意',
   attraction: '吸引',
+  stat: '数值',
   new: '新人',
 }
 
@@ -43,92 +52,191 @@ const METRIC_WORDS = new Set(Object.keys(METRIC_ALIASES).filter((k) => /^[a-z]/i
 const METRIC_TOKEN =
   'affection|trust|respect|dependence|hostility|attraction|好感度?|信任度?|尊重度?|依赖度?|敌意度?|吸引度?'
 
-function makeHint(name: string, metric: string, delta: number): RelationHint {
+const DELTA = '[+\\-➕➖−－]'
+
+function makeHint(
+  kind: HintKind,
+  name: string,
+  metric: string,
+  delta: number,
+  extra?: Partial<RelationHint>,
+): RelationHint {
+  const tone =
+    extra?.tone
+    ?? (kind === 'event' ? 'event' : delta > 0 ? 'up' : delta < 0 ? 'down' : 'neutral')
   return {
+    kind,
     name,
     metric,
-    metricLabel: METRIC_LABELS[metric] || metric,
-    icon: METRIC_ICONS[metric] || METRIC_ICONS.default,
+    metricLabel: extra?.metricLabel ?? (extra?.text ? '' : (METRIC_LABELS[metric] || metric)),
+    icon:
+      extra?.icon
+      ?? (kind === 'event' ? METRIC_ICONS.event : kind === 'faction' ? METRIC_ICONS.faction : kind === 'stat' ? METRIC_ICONS.stat : METRIC_ICONS[metric] || METRIC_ICONS.default),
     delta,
-    tone: delta > 0 ? 'up' : delta < 0 ? 'down' : 'neutral',
+    tone,
+    ...extra,
   }
 }
 
 function parseDelta(sign: string, value: number): number {
-  return sign === '↓' || sign === '➖' || sign === '-' ? -value : value
+  if (!sign || sign === '+' || sign === '➕') return value
+  return -value
 }
 
-export function parseRelationHints(text: string): RelationHint[] {
-  if (!text?.trim()) return []
+function resolveMetric(raw: string): string {
+  return METRIC_ALIASES[raw.toLowerCase()] || METRIC_ALIASES[raw] || 'trust'
+}
+
+/** 「若成功则苏晴」→「苏晴」 */
+function cleanCharacterName(name: string): string {
+  const cleaned = name.replace(/^若(?:成功|失败)?(?:则|时|后)?/, '').trim()
+  return cleaned || name
+}
+
+export function parseOptionEffects(text: string): { hints: RelationHint[]; narrative: string[] } {
+  if (!text?.trim()) return { hints: [], narrative: [] }
+
   const hints: RelationHint[] = []
   const seen = new Set<string>()
+  const consumed = new Set<string>()
 
-  const add = (name: string, metric: string, delta: number) => {
-    const key = `${name}:${metric}:${delta}`
+  const add = (hint: RelationHint) => {
+    const key = `${hint.kind}:${hint.name}:${hint.metric}:${hint.delta}:${hint.text ?? ''}`
     if (seen.has(key)) return
     seen.add(key)
-    hints.push(makeHint(name, metric, delta))
+    hints.push(hint)
   }
 
-  // Split by comma /顿号 — each segment may carry its own character name
-  const segments = text.split(/[,，、]/).map((s) => s.trim()).filter(Boolean)
-  const parts = segments.length > 1 ? segments : [text.trim()]
+  const mark = (snippet: string) => {
+    if (snippet.trim()) consumed.add(snippet.trim())
+  }
 
-  for (const part of parts) {
-    // 「景璃 affection+2 trust+1」— name once, multiple English metrics
+  // ── 1. Character / stat metrics (segment order, carry character name) ──
+  const segments = text.split(/[,，、]/).map((s) => s.trim()).filter(Boolean)
+  let lastCharacter = ''
+
+  for (const part of segments) {
     const multiMatch = part.match(
-      new RegExp(`^([\\u4e00-\\u9fff·]{1,12})\\s+((?:${METRIC_TOKEN})\\s*[+\\-➕➖]?\\s*\\d+\\s*)+$`, 'i'),
+      new RegExp(`^([\\u4e00-\\u9fff·]{1,12})\\s+((?:${METRIC_TOKEN})\\s*${DELTA}?\\s*\\d+\\s*)+$`, 'i'),
     )
     if (multiMatch) {
-      const charName = multiMatch[1]
-      const metricRe = new RegExp(`(${METRIC_TOKEN})\\s*([+\\-➕➖]?)\\s*(\\d+)`, 'gi')
+      lastCharacter = multiMatch[1]
+      lastCharacter = cleanCharacterName(lastCharacter)
+      const metricRe = new RegExp(`(${METRIC_TOKEN})\\s*(${DELTA}?)\\s*(\\d+)`, 'gi')
       let m: RegExpExecArray | null
       while ((m = metricRe.exec(part)) !== null) {
-        const metric = METRIC_ALIASES[m[1].toLowerCase()] || METRIC_ALIASES[m[1]] || 'trust'
-        add(charName, metric, parseDelta(m[2] || '+', parseInt(m[3], 10)))
+        add(makeHint('character', lastCharacter, resolveMetric(m[1]), parseDelta(m[2] || '+', parseInt(m[3], 10))))
       }
+      mark(part)
       continue
     }
 
-    // 「艾琳↑5」 / 「艾琳 信任度+10」
-    const arrowRe = /([\u4e00-\u9fff·]{1,12})\s*([↑➕\+↓➖\-])\s*(\d+)/g
-    let m: RegExpExecArray | null
-    while ((m = arrowRe.exec(part)) !== null) {
-      add(m[1], 'trust', parseDelta(m[2], parseInt(m[3], 10)))
-    }
-
-    const namedMetricRe = new RegExp(
-      `([\\u4e00-\\u9fff·]{1,12})\\s*(${METRIC_TOKEN})\\s*([+\\-➕➖]?)\\s*(\\d+)`,
+    const charMetricRe = new RegExp(
+      `([\\u4e00-\\u9fff·]{2,8})(${METRIC_TOKEN})\\s*(${DELTA}?)\\s*(\\d+)`,
       'gi',
     )
-    while ((m = namedMetricRe.exec(part)) !== null) {
-      const metric = METRIC_ALIASES[m[2].toLowerCase()] || METRIC_ALIASES[m[2]] || 'trust'
-      add(m[1], metric, parseDelta(m[3] || '+', parseInt(m[4], 10)))
+    let matchedChar = false
+    let m: RegExpExecArray | null
+    while ((m = charMetricRe.exec(part)) !== null) {
+      matchedChar = true
+      lastCharacter = cleanCharacterName(m[1])
+      add(makeHint('character', lastCharacter, resolveMetric(m[2]), parseDelta(m[3] || '+', parseInt(m[4], 10))))
+    }
+    if (matchedChar) {
+      mark(part)
+      continue
+    }
+
+    const bareMetricRe = new RegExp(`^(${METRIC_TOKEN})\\s*(${DELTA}?)\\s*(\\d+)$`, 'i')
+    const bare = part.match(bareMetricRe)
+    if (bare && lastCharacter) {
+      add(makeHint('character', lastCharacter, resolveMetric(bare[1]), parseDelta(bare[2] || '+', parseInt(bare[3], 10))))
+      mark(part)
+      continue
+    }
+
+    const customStatRe = new RegExp(`^([\\u4e00-\\u9fff·]{2,10}(?:值|度))\\s*(${DELTA}?)\\s*(\\d+)$`)
+    const statMatch = part.match(customStatRe)
+    if (statMatch) {
+      const label = statMatch[1]
+      add(makeHint('stat', label.replace(/[值度]$/, '') || label, 'stat', parseDelta(statMatch[2] || '+', parseInt(statMatch[3], 10)), {
+        metricLabel: label,
+      }))
+      mark(part)
+      continue
+    }
+
+    const arrowRe = /([\u4e00-\u9fff·]{1,12})\s*([↑➕\+↓➖\-])\s*(\d+)/g
+    while ((m = arrowRe.exec(part)) !== null) {
+      lastCharacter = cleanCharacterName(m[1])
+      add(makeHint('character', lastCharacter, 'trust', parseDelta(m[2], parseInt(m[3], 10))))
+      mark(part)
     }
   }
 
-  // Fallback: scan whole text for stray English metrics (avoid matching metric as character)
-  if (hints.length === 0) {
-    const bareRe = new RegExp(`\\b(${METRIC_TOKEN})\\s*([+\\-➕➖]?)\\s*(\\d+)`, 'gi')
+  // ── 2. Events ──
+  const eventPatterns = [
+    /但?可能触发[^，,、|]+(?:出手|反击|干预|现身|降临)?/g,
+    /可能(?:导致|引发|引来)[^，,、|]+/g,
+    /(?:重要|重大)事件[^，,、|]*/g,
+  ]
+  for (const re of eventPatterns) {
+    let m: RegExpExecArray | null
+    const clone = new RegExp(re.source, re.flags)
+    while ((m = clone.exec(text)) !== null) {
+      const phrase = m[0].replace(/^但/, '').trim()
+      add(makeHint('event', '', 'event', 0, { tone: 'event', text: phrase, icon: '⚡' }))
+      mark(m[0])
+    }
+  }
+
+  // ── 3. Faction conflict / reputation (不含「好感」，避免与角色混淆) ──
+  const factionConflictRe = /(?:直接)?与([\u4e00-\u9fff·]{2,10})(?:势力|门派|宗|帮|盟|教|族|国|军)?冲突/g
+  let fm: RegExpExecArray | null
+  while ((fm = factionConflictRe.exec(text)) !== null) {
+    add(makeHint('faction', fm[1], 'faction', 0, {
+      tone: 'warning',
+      text: `与${fm[1]}冲突`,
+      icon: '🏛️',
+    }))
+    mark(fm[0])
+  }
+
+  const factionDeltaRe = new RegExp(
+    `([\\u4e00-\\u9fff·]{2,10})(?:势力|门派)?(?:声望|关系|态度)\\s*(${DELTA}?)\\s*(\\d+)`,
+    'g',
+  )
+  while ((fm = factionDeltaRe.exec(text)) !== null) {
+    add(makeHint('faction', fm[1], 'faction', parseDelta(fm[2] || '+', parseInt(fm[3], 10))))
+    mark(fm[0])
+  }
+
+  // ── 4. Fallback English metrics ──
+  if (!hints.some((h) => h.kind === 'character')) {
+    const bareRe = new RegExp(`\\b(${METRIC_TOKEN})\\s*(${DELTA}?)\\s*(\\d+)`, 'gi')
     let m: RegExpExecArray | null
     while ((m = bareRe.exec(text)) !== null) {
       if (METRIC_WORDS.has(m[1].toLowerCase())) {
-        const metric = METRIC_ALIASES[m[1].toLowerCase()] || 'trust'
-        add('角色', metric, parseDelta(m[2] || '+', parseInt(m[3], 10)))
+        add(makeHint('character', '角色', resolveMetric(m[1]), parseDelta(m[2] || '+', parseInt(m[3], 10))))
       }
     }
   }
 
   if (/新人|new/i.test(text)) {
-    hints.push({
-      name: '新人',
-      metric: 'new',
-      metricLabel: METRIC_LABELS.new,
-      icon: '✨',
-      delta: 0,
-      tone: 'new',
-    })
+    add(makeHint('character', '新人', 'new', 0, { tone: 'new', metricLabel: METRIC_LABELS.new, icon: '✨' }))
   }
 
-  return hints
+  const narrative = segments.filter((s) => !consumed.has(s) && s.length > 1)
+
+  return { hints, narrative }
+}
+
+export function parseRelationHints(text: string): RelationHint[] {
+  return parseOptionEffects(text).hints
+}
+
+export function deltaArrow(delta: number): string {
+  if (delta > 0) return '↑'
+  if (delta < 0) return '↓'
+  return '·'
 }

@@ -55,7 +55,7 @@ def test_update_trust_basic():
     """信任度更新基本功能"""
     mem = _fresh_memory()
     mem["characters"]["林夜"] = {"trust": 0.5, "flags": []}
-    update_trust(mem, "林夜", 0.1, turn=1)
+    update_trust(mem, "林夜", 0.1, turn=1, allow_create=True)
     assert abs(mem["characters"]["林夜"]["trust"] - 0.6) < 0.01
     print("✅ 信任度更新: PASS")
 
@@ -163,7 +163,10 @@ def test_resolve_chosen_option_by_letter():
 def test_apply_trust_deltas_from_choice_letter():
     """通过 A/B/C/D 选择应用关系变化"""
     mem = _fresh_memory()
-    mem["characters"]["艾琳"] = {"trust": 0.5, "flags": [], "metric_history": {"trust": [[0, 0.5]]}}
+    mem["characters"]["艾琳"] = {
+        "trust": 0.5, "flags": [], "tier": "核心",
+        "metric_history": {"trust": [[0, 0.5]]},
+    }
     opts = ["帮助艾琳 → 发展 | 友好 | 艾琳↑10"]
     apply_trust_deltas(mem, story="", choice="A", turn=1, prev_options=opts)
     assert mem["characters"]["艾琳"]["trust"] > 0.5

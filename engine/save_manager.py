@@ -27,6 +27,13 @@ logger = logging.getLogger(__name__)
 
 from engine.constants import MAX_CHAPTER_BYTES_IN_SAVE
 
+
+def _load_candidate_pool() -> dict:
+    try:
+        return io_utils.read_json(config.CANDIDATE_NPCS_PATH)
+    except Exception:
+        return {}
+
 # Maximum chapter content to include in a save (avoid giant save files)
 _MAX_CHAPTER_BYTES = MAX_CHAPTER_BYTES_IN_SAVE
 
@@ -66,6 +73,7 @@ def save(slot: str) -> dict | None:
             "session_state": state,
             "memory": memory,
             "story_graph": graph,
+            "candidate_npcs": _load_candidate_pool(),
             "chapter": chapter,
         }
 
@@ -122,6 +130,10 @@ def load(slot: str) -> dict | None:
             snapshot.get("story_graph", {}),
             chapter=snapshot.get("chapter", ""),
         )
+        io_utils.write_json(
+            config.CANDIDATE_NPCS_PATH,
+            snapshot.get("candidate_npcs", {}),
+        )
     except Exception as exc:
         logger.error("Failed to restore save '%s': %s", slot, exc)
         return None
@@ -139,6 +151,57 @@ def load(slot: str) -> dict | None:
 def autosave() -> dict | None:
     """Convenience wrapper: save to the autosave slot."""
     return save(config.AUTOSAVE_SLOT)
+
+
+def snapshot_turn(turn: int) -> dict | None:
+    """Rolling turn snapshot every SNAPSHOT_TURN_INTERVAL turns."""
+    slot = f"snapshot_T{turn}"
+    result = save(slot)
+    if result:
+        _prune_old_snapshots(keep=3)
+    return result
+
+
+def _prune_old_snapshots(*, keep: int = 3) -> None:
+    """Keep only the newest *keep* snapshot_T* files."""
+    config.SAVES_DIR.mkdir(parents=True, exist_ok=True)
+    snaps = sorted(
+        config.SAVES_DIR.glob("snapshot_T*.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for old in snaps[keep:]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+
+
+def save_runtime_memory(partial: dict) -> None:
+    """Persist in-flight generation for disconnect recovery."""
+    try:
+        io_utils.write_json(config.RUNTIME_MEMORY_PATH, partial)
+    except Exception as exc:
+        logger.debug("runtime_memory save skipped: %s", exc)
+
+
+def load_runtime_memory() -> dict | None:
+    path = config.RUNTIME_MEMORY_PATH
+    if not path.exists():
+        return None
+    try:
+        return io_utils.read_json(path, use_cache=False)
+    except Exception:
+        return None
+
+
+def clear_runtime_memory() -> None:
+    path = config.RUNTIME_MEMORY_PATH
+    if path.exists():
+        try:
+            path.unlink()
+        except OSError:
+            pass
 
 
 def list_saves() -> list[dict]:

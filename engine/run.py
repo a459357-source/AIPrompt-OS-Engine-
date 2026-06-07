@@ -38,6 +38,17 @@ if str(_PROJECT_ROOT) not in sys.path:
 import config
 from engine import io_utils
 from engine.builder import build_prompt
+from engine.story_length import (
+    count_story_chars,
+    clamp_story_text,
+    should_retry_story_length,
+    story_length_retry_min,
+    story_length_deficit,
+    build_continuation_user_prompt,
+)
+from engine.turn_budget import TurnAttemptBudget
+from engine.profiling import TurnProfiler
+from engine.background_tasks import schedule_dashboard_write
 from engine.deepseek_client import call_deepseek, DeepSeekError
 from engine.state_manager import apply_turn, validate_response
 from engine.router import load_graph, save_graph, get_current_node, append_node
@@ -112,33 +123,99 @@ def _should_autosave_now() -> bool:
     return False
 
 
-def _maybe_retry_repetition(
-    response: dict,
-    system_prompt: str,
-    user_prompt: str,
-    history: list,
-) -> dict:
+def _warn_if_repetitive(response: dict, history: list) -> None:
+    """Log repetition warnings only — no API rewrite (V2 forbid_retry)."""
     from engine.repetition import check_story_repetition
 
     story = response.get("story", "")
     repetitive, reason = check_story_repetition(story, history, config.REPETITION_CHECK)
-    if not repetitive:
+    if repetitive:
+        logger.warning("⚠️ 正文重复检测: %s（保留当前正文，不重试）", reason)
+
+
+def _continue_writing(
+    response: dict,
+    *,
+    system_prompt: str,
+    scene: str,
+    status: str,
+    target_len: int,
+    min_len: int,
+    max_len: int,
+    budget: TurnAttemptBudget,
+    on_story_delta=None,
+) -> dict:
+    """Append continuation when story is below min ratio (one extra generation max)."""
+    story = response.get("story", "")
+    story_chars = count_story_chars(story)
+    if not should_retry_story_length(story_chars, target_len) or not budget.can_generate():
         return response
 
-    logger.warning("⚠️ 正文重复检测: %s", reason)
-    if config.REPETITION_CHECK != "strict":
-        return response
-
-    retry_user = (
-        f"{user_prompt}\n\n"
-        f"【反重复 — 必须遵守】{reason}。请重写本轮 story，"
-        f"不得复述上一轮情节，必须推进新事件或新信息。"
+    deficit = story_length_deficit(story_chars, target_len)
+    budget.use_generation()
+    logger.warning(
+        "⚠️ 正文字数不足: 实际=%d < 阈值=%d，续写补偿（剩余 generation=%d）",
+        story_chars,
+        story_length_retry_min(target_len),
+        budget.remaining,
     )
+
+    cont_user = build_continuation_user_prompt(
+        story_tail=story,
+        deficit_chars=deficit,
+        scene=scene,
+        status=status,
+        min_len=min_len,
+        max_len=max_len,
+        target=target_len,
+    )
+    cont_tokens = config.tokens_for_story_length(max(deficit, 200))
+
     try:
-        return call_deepseek(system_prompt, retry_user)
+        cont_response = call_deepseek(
+            system_prompt,
+            cont_user,
+            max_tokens=cont_tokens,
+            on_story_delta=on_story_delta,
+            on_story_reset=None,
+        )
     except DeepSeekError as exc:
-        logger.warning("重复检测重试失败，保留首轮结果: %s", exc)
+        logger.warning("续写补偿失败，保留首轮正文: %s", exc)
         return response
+
+    cont_story = cont_response.get("story", "")
+    merged = {**response, "story": story + cont_story}
+    if cont_response.get("state"):
+        merged["state"] = cont_response["state"]
+    if cont_response.get("options"):
+        merged["options"] = cont_response["options"]
+
+    merged = _clamp_story_if_overlong(merged, max_len=max_len, min_len=min_len)
+    logger.info(
+        "📊 续写后字数: %d（目标=%d 阈值=%d）",
+        count_story_chars(merged.get("story", "")),
+        target_len,
+        story_length_retry_min(target_len),
+    )
+    return merged
+
+
+def _clamp_story_if_overlong(response: dict, *, max_len: int, min_len: int) -> dict:
+    """Hard-trim overlong story locally instead of another API rewrite."""
+    story = response.get("story", "")
+    chars = count_story_chars(story)
+    if chars <= max_len:
+        return response
+    clamped, did_clamp = clamp_story_text(story, max_len, min_len=min_len)
+    if not did_clamp:
+        return response
+    logger.warning(
+        "⚠️ 正文字数硬截断: 原=%d → %d（上限=%d）",
+        chars,
+        count_story_chars(clamped),
+        max_len,
+    )
+    return {**response, "story": clamped}
 
 
 def get_last_step_error() -> str:
@@ -146,12 +223,14 @@ def get_last_step_error() -> str:
     return _last_step_error
 
 
-def _count_story_chars(text: str) -> int:
-    """Count story body chars (ignore whitespace), matching frontend badge."""
-    return len(text.replace(" ", "").replace("\n", "").replace("\r", ""))
 
-
-def step(choice: str | None = None) -> dict | None:
+def step(
+    choice: str | None = None,
+    *,
+    on_story_delta: Callable[[str], None] | None = None,
+    on_story_reset: Callable[[], None] | None = None,
+    on_progress: Callable[[str, dict], None] | None = None,
+) -> dict | None:
     """
     Execute one turn: generate story + options, apply to state,
     update graph & memory.  Returns the response dict (story, options,
@@ -171,12 +250,32 @@ def step(choice: str | None = None) -> dict | None:
     if settings_note:
         logger.info("📌 本轮使用刚修改的快捷设置: %s", settings_note)
 
-    runtime = load_runtime(clear_cache=True)
+    from engine.generation_control import clear_cancel, is_cancelled, reset_partial
+
+    clear_cancel()
+    reset_partial()
+    profiler = TurnProfiler()
+    profiler.mark("turn_start")
+
+    runtime = load_runtime(clear_cache=False)
     begin_transaction()
+
+    config.reload_story_length()
+    config.reload_max_tokens()
+    config.reload_option_count()
+    config.reload_stream()
+    config.ensure_story_length_token_sync()
+
+    def _progress(phase: str, **extra) -> None:
+        if on_progress:
+            on_progress(phase, extra)
 
     # 1. Build prompt
     try:
+        profiler.mark("prompt_start")
+        _progress("building_prompt")
         system_prompt, user_prompt = build_prompt(current_choice=choice)
+        profiler.mark("prompt_done")
     except Exception as exc:
         end_transaction()
         _last_step_error = f"构建提示词失败: {exc}"
@@ -184,59 +283,87 @@ def step(choice: str | None = None) -> dict | None:
         return None
 
     target_len = config.STORY_LENGTH
-    min_len = config.min_story_length_for_target(target_len)
-    max_len = config.max_story_length_for_target(target_len)
+    min_retry = story_length_retry_min(target_len)
+    min_len, max_len, float_margin = config.story_length_acceptable_range(target_len)
+    pre_state = runtime.session
+    scene = pre_state.get("scene", "")
+    status = pre_state.get("status", "SETUP")
+    budget = TurnAttemptBudget()
+
     logger.info(
-        "📋 生成参数: 目标字数=%d 至少=%d 最多=%d 最大Token=%d 自动压缩=%s 压缩阈值=%d 上下文消息=%d",
+        "📋 生成参数: 目标字数=%d 至少=%d 最多=%d (±%d) 重试阈值=%d 最大Token=%d 流式=%s "
+        "generation预算=%d 上下文轮数=%d",
         target_len,
         min_len,
         max_len,
+        float_margin,
+        min_retry,
         config.MAX_TOKENS,
-        config.AUTO_COMPRESS,
-        config.COMPRESS_THRESHOLD,
+        config.STREAM,
+        budget.max_generations,
         config.MAX_CONTEXT_MESSAGES,
     )
 
-    # 2. Call DeepSeek
+    # 2. First generation
+    profiler.mark("ai_start")
+    budget.use_generation()
+    _progress("generating", target_chars=target_len)
+
+    def _delta_wrapper(delta: str) -> None:
+        from engine.generation_control import update_partial_story, get_partial_story
+        update_partial_story(get_partial_story() + delta)
+        if on_story_delta:
+            on_story_delta(delta)
+
     try:
-        response = call_deepseek(system_prompt, user_prompt)
+        response = call_deepseek(
+            system_prompt,
+            user_prompt,
+            on_story_delta=_delta_wrapper if on_story_delta else None,
+            on_story_reset=on_story_reset,
+        )
     except DeepSeekError as exc:
         end_transaction()
         _last_step_error = str(exc)
         logger.error("DeepSeek API error: %s", exc)
         return None
+    profiler.mark("ai_done")
 
-    story_chars = _count_story_chars(response.get("story", ""))
-    if story_chars > max_len:
-        logger.warning(
-            "⚠️ 正文字数超出上限: 实际=%d > 最多=%d（目标=%d），尝试一次压缩重写",
-            story_chars,
-            max_len,
-            target_len,
-        )
-        retry_user = (
-            f"{user_prompt}\n\n"
-            f"【字数修正 — 必须遵守】上一轮 story 约 {story_chars} 字，超出上限 {max_len} 字。"
-            f"请重写本轮：story 正文必须在 {min_len}–{max_len} 字之间，目标约 {target_len} 字，"
-            f"精简描写与对话，宁可略短也不要超长。"
-        )
-        try:
-            response = call_deepseek(system_prompt, retry_user)
-            retry_chars = _count_story_chars(response.get("story", ""))
-            logger.info(
-                "📊 字数重试: 原=%d 重试后=%d 上限=%d",
-                story_chars,
-                retry_chars,
-                max_len,
-            )
-            story_chars = retry_chars
-        except DeepSeekError as exc:
-            logger.warning("字数重试失败，保留首轮结果: %s", exc)
+    response = _clamp_story_if_overlong(response, max_len=max_len, min_len=min_len)
 
-    pre_state = runtime.session
-    response = _maybe_retry_repetition(
-        response, system_prompt, user_prompt, pre_state.get("history", []),
+    if is_cancelled():
+        end_transaction()
+        _last_step_error = "生成已取消"
+        from engine.save_manager import save_runtime_memory
+        from engine.generation_control import get_partial_story
+        save_runtime_memory({"story": get_partial_story(), "cancelled": True})
+        return None
+
+    # 3. Continuation if length insufficient (max 1 extra generation)
+    profiler.mark("continuation_start")
+    _progress("continuation")
+    response = _continue_writing(
+        response,
+        system_prompt=system_prompt,
+        scene=scene,
+        status=status,
+        target_len=target_len,
+        min_len=min_len,
+        max_len=max_len,
+        budget=budget,
+        on_story_delta=_delta_wrapper if on_story_delta else None,
     )
+    profiler.mark("continuation_done")
+
+    story_chars = count_story_chars(response.get("story", ""))
+    if should_retry_story_length(story_chars, target_len):
+        logger.warning(
+            "⚠️ 续写后仍低于阈值 %d（实际=%d），直接接受（V2 禁止第三次生成）",
+            min_retry,
+            story_chars,
+        )
+
+    _warn_if_repetitive(response, pre_state.get("history", []))
 
     # 3. Validate
     warnings = validate_response(response)
@@ -272,30 +399,44 @@ def step(choice: str | None = None) -> dict | None:
 
     _safe_call(_write_chapter, "chapter.md write",
                response, new_state, choice)
-    _safe_call(_write_dashboard_html, "dashboard HTML write")
+    turn_num = new_state.get("turn", 0)
+    if turn_num % config.DASHBOARD_UPDATE_INTERVAL == 0:
+        schedule_dashboard_write()
+    profiler.mark("memory_start")
+    _safe_call(_maybe_chapter_summary, "chapter summary update", new_state, runtime.memory)
+    profiler.mark("memory_done")
     _safe_call(obsidian_live.on_turn, "Obsidian live export",
                response, new_state, choice)
     _safe_call(_log_turn, "turn log append", response, choice)
+    profiler.mark("save_start")
+    if turn_num % config.SNAPSHOT_TURN_INTERVAL == 0:
+        from engine.save_manager import snapshot_turn
+        _safe_call(snapshot_turn, "turn snapshot", turn_num)
     if _should_autosave_now():
         _safe_call(do_autosave, "autosave")
     else:
         logger.debug("Autosave skipped (interval=%ss)", config.AUTO_SAVE_INTERVAL)
+    profiler.mark("save_done")
     _safe_call(_maybe_auto_export, "auto export", response, new_state, choice, prev_chapter)
 
-    # Clear cache after all post-turn steps to ensure next turn reads fresh data
-    io_utils.clear_cache()
+    profiler.flush(turn_num)
+    from engine.save_manager import clear_runtime_memory
+    clear_runtime_memory()
+    io_utils.clear_cache(session_only=True)
 
     story_text = response.get("story", "")
-    story_chars = _count_story_chars(story_text)
+    story_chars = count_story_chars(story_text)
     gap = story_chars - target_len
     pct = (story_chars / target_len * 100) if target_len else 0
+    log_min, log_max, log_margin = config.story_length_acceptable_range(target_len)
     logger.info(
-        "📊 本轮生成明细: turn=%s choice=%s | 目标=%d 范围=%d-%d 实际=%d (%d%%) 差距=%+d | max_tokens=%d",
+        "📊 本轮生成明细: turn=%s choice=%s | 目标=%d 范围=%d-%d (±%d) 实际=%d (%d%%) 差距=%+d | max_tokens=%d",
         new_state.get("turn", "?"),
         choice or "—",
         target_len,
-        min_len,
-        max_len,
+        log_min,
+        log_max,
+        log_margin,
         story_chars,
         int(pct),
         gap,
@@ -492,10 +633,11 @@ def run_web(host: str = "0.0.0.0", port: int = 8000, no_browser: bool = False) -
 # ── Output helpers ─────────────────────────────────────────────────
 
 def _write_dashboard_html() -> None:
-    """Write the analytics dashboard HTML to output/ (no Obsidian needed)."""
+    """Sync dashboard write (CLI/tools); game turns use schedule_dashboard_write()."""
     try:
-        from engine.dashboard import write_standalone
-        write_standalone()
+        from engine.background_tasks import flush_dashboard_now
+
+        flush_dashboard_now()
     except Exception:
         logger.error("Failed to write dashboard HTML:\n%s", traceback.format_exc())
 
@@ -595,6 +737,12 @@ def _get_prev_options(state: dict) -> list[str]:
     return []
 
 
+def _maybe_chapter_summary(state: dict, memory: dict) -> None:
+    from engine.memory_layers import maybe_update_chapter_summary
+
+    maybe_update_chapter_summary(state, memory)
+
+
 def _update_graph(
     response: dict,
     state: dict,
@@ -644,7 +792,8 @@ def _update_memory(
         init_world_state(memory, world_pack, turn, persist=False)
         auto_register_npcs(memory, state, world_pack, turn, story, persist=False)
         prev_options = _get_prev_options(state)
-        apply_trust_deltas(memory, story, choice, turn, prev_options, persist=False)
+        apply_trust_deltas(memory, story, choice, turn, prev_options, persist=False,
+                           world_pack=world_pack, session=state)
         update_factions(memory, story, turn, persist=False)
 
     except Exception:

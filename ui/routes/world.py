@@ -308,6 +308,8 @@ async def create_new_story(
         if isinstance(char_data["relationship"], str): char_data["relationship"] = [char_data["relationship"]]
         world_pack["world"]["characters"].append(char_data)
     io_utils.write_yaml(config.WORLD_PACK_PATH, world_pack)
+    from engine.memory_layers import build_world_summary_from_pack
+    io_utils.write_json(config.WORLD_SUMMARY_PATH, build_world_summary_from_pack(world_pack))
 
     # Build initial state with dynamic characters
     state_chars = {}
@@ -417,6 +419,9 @@ async def create_new_story(
         "relationship_system": rel_config,
     }
     commit_bundle(initial_state, initial_memory, initial_graph, chapter="")
+
+    from engine.candidate_npcs import reset_pool
+    reset_pool(persist=True)
 
     # Save factory-reset snapshot so reset() can restore the user's world
     io_utils.write_json(config.WORLD_INIT_PATH, {

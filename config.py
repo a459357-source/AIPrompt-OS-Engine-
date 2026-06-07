@@ -32,11 +32,31 @@ DASHBOARD_HTML_PATH  = OUTPUT_DIR / "dashboard.html"
 DATA_DIR             = ROOT / "data"
 STORY_GRAPH_PATH     = DATA_DIR / "story_graph.json"
 MEMORY_PATH          = DATA_DIR / "memory.json"
+CANDIDATE_NPCS_PATH  = DATA_DIR / "candidate_npcs.json"
 SAVES_DIR            = DATA_DIR / "saves"
 WORLD_INIT_PATH      = DATA_DIR / "world_init.json"
 API_USAGE_PATH       = DATA_DIR / "api_usage.jsonl"
+WORLD_SUMMARY_PATH   = DATA_DIR / "world_summary.json"
+CHAPTER_SUMMARIES_PATH = DATA_DIR / "chapter_summaries.json"
+TURN_PROFILE_PATH    = DATA_DIR / "turn_profile.jsonl"
+RUNTIME_MEMORY_PATH  = DATA_DIR / "runtime_memory.json"
 LOG_PATH             = DATA_DIR / "app.log"
 ERROR_LOG_PATH       = DATA_DIR / "error.log"
+
+# ── V2 performance / memory constants ─────────────────────────────
+HOT_CONTEXT_MAX_TOKENS = 4000
+HOT_CONTEXT_TURNS = 5
+CHAPTER_SUMMARY_INTERVAL = 5
+TURN_MAX_GENERATIONS = 2
+API_MAX_PARSE_ATTEMPTS = 2
+DASHBOARD_UPDATE_INTERVAL = 10
+SNAPSHOT_TURN_INTERVAL = 5
+LONG_TERM_MEMORY_MAX_CHARS = 2000
+PROMPT_TOKEN_BUDGET = 7000
+
+STORY_LENGTH_MIN_RATIO_SHORT = 0.80   # target 0–1000
+STORY_LENGTH_MIN_RATIO_MEDIUM = 0.85  # 1000–3000
+STORY_LENGTH_MIN_RATIO_LONG = 0.90    # 3000+
 
 FRONTEND_DIST        = BUNDLE_ROOT / "frontend" / "dist"
 if not (FRONTEND_DIST / "index.html").exists():
@@ -239,12 +259,21 @@ def api_limits() -> dict[str, int | float]:
 MIN_STORY_LENGTH = 300
 DEFAULT_STORY_LENGTH = 1000
 RECOMMENDED_STORY_LENGTH = DEFAULT_STORY_LENGTH
-# JSON 回复含 story + options + state，需为正文字数与结构化字段分别留 budget
+# 目标字数浮动：设定 <1000 固定 ±200；≥1000 为 max(200, 15%) 且溢出上限 1000
+STORY_LENGTH_SHORT_THRESHOLD = 1000
+STORY_LENGTH_SHORT_FLOAT = 200
+STORY_LENGTH_LONG_RATIO = 0.15
+STORY_LENGTH_MAX_OVERFLOW = 1000
+# JSON 回复含 story + options + state；overhead 随选项数缩放
 STORY_CHAR_TO_TOKEN = 1.35
-JSON_OUTPUT_OVERHEAD_TOKENS = 3500
+JSON_OUTPUT_BASE_OVERHEAD = 400
+JSON_OUTPUT_PER_OPTION = 80
+JSON_STATE_BUFFER = 200
+# 默认 4 选项时的 overhead（用于 MAX_STORY_LENGTH 估算）
+JSON_OUTPUT_OVERHEAD_TOKENS = JSON_OUTPUT_BASE_OVERHEAD + 4 * JSON_OUTPUT_PER_OPTION + JSON_STATE_BUFFER
 MAX_STORY_LENGTH = int(
     (DEEPSEEK_MAX_OUTPUT_TOKENS - JSON_OUTPUT_OVERHEAD_TOKENS) / STORY_CHAR_TO_TOKEN
-)  # ~281851
+)
 
 
 def clamp_story_length(length: int) -> int:
@@ -252,10 +281,17 @@ def clamp_story_length(length: int) -> int:
     return max(MIN_STORY_LENGTH, min(MAX_STORY_LENGTH, int(length)))
 
 
-def tokens_for_story_length(length: int) -> int:
+def json_output_overhead_tokens(option_count: int | None = None) -> int:
+    """Token budget for options + state JSON (excludes story body)."""
+    n = option_count if option_count is not None else DEFAULT_OPTION_COUNT
+    return JSON_OUTPUT_BASE_OVERHEAD + n * JSON_OUTPUT_PER_OPTION + JSON_STATE_BUFFER
+
+
+def tokens_for_story_length(length: int, option_count: int | None = None) -> int:
     """Map target story length to max_tokens (official output cap)."""
     chars = clamp_story_length(length)
-    needed = int(chars * STORY_CHAR_TO_TOKEN) + JSON_OUTPUT_OVERHEAD_TOKENS
+    n = option_count if option_count is not None else _load_option_count()
+    needed = int(chars * STORY_CHAR_TO_TOKEN) + json_output_overhead_tokens(n)
     return cap_output_tokens(needed)
 
 
@@ -295,16 +331,36 @@ def ensure_story_length_context_sync(*, force_compress: bool = False) -> None:
             reload_context_settings()
 
 
-def min_story_length_for_target(length: int | None = None) -> int:
-    """Minimum acceptable story chars (~85% of target)."""
+def story_length_float_margin(length: int | None = None) -> int:
+    """Acceptable ± chars from target (see STORY_LENGTH_* constants)."""
     target = clamp_story_length(length if length is not None else STORY_LENGTH)
-    return max(MIN_STORY_LENGTH, int(target * 0.85))
+    if target < STORY_LENGTH_SHORT_THRESHOLD:
+        return STORY_LENGTH_SHORT_FLOAT
+    pct = int(target * STORY_LENGTH_LONG_RATIO)
+    return min(STORY_LENGTH_MAX_OVERFLOW, max(STORY_LENGTH_SHORT_FLOAT, pct))
+
+
+def story_length_acceptable_range(length: int | None = None) -> tuple[int, int, int]:
+    """Return (min, max, margin) for validation and logging."""
+    target = clamp_story_length(length if length is not None else STORY_LENGTH)
+    margin = story_length_float_margin(target)
+    return (
+        max(MIN_STORY_LENGTH, target - margin),
+        target + margin,
+        margin,
+    )
+
+
+def min_story_length_for_target(length: int | None = None) -> int:
+    """Minimum acceptable story chars for the given target."""
+    lo, _, _ = story_length_acceptable_range(length)
+    return lo
 
 
 def max_story_length_for_target(length: int | None = None) -> int:
-    """Maximum acceptable story chars (~115% of target)."""
-    target = clamp_story_length(length if length is not None else STORY_LENGTH)
-    return max(min_story_length_for_target(target), int(target * 1.15))
+    """Maximum acceptable story chars for the given target."""
+    _, hi, _ = story_length_acceptable_range(length)
+    return hi
 
 
 def story_length_limits() -> dict[str, int]:
@@ -411,7 +467,7 @@ def reload_top_p() -> float:
 
 
 # ── Streaming ───────────────────────────────────────────────────────
-DEFAULT_STREAM = False
+DEFAULT_STREAM = True
 
 
 def _load_stream() -> bool:
@@ -429,7 +485,7 @@ def reload_stream() -> bool:
 
 
 # ── Context management ──────────────────────────────────────────────
-DEFAULT_MAX_CONTEXT_MESSAGES = 20
+DEFAULT_MAX_CONTEXT_MESSAGES = HOT_CONTEXT_TURNS
 DEFAULT_AUTO_COMPRESS = True
 DEFAULT_COMPRESS_THRESHOLD = 4000
 

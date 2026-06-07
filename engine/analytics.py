@@ -40,22 +40,8 @@ _NAME_VERB_CHARS = set(
 
 
 def _is_valid_character_name(name: str) -> bool:
-    """Reject narrative fragments and English metric tokens mistaken as names."""
-    name = (name or "").strip()
-    if len(name) < 2 or len(name) > 6:
-        return False
-    if name.lower() in _METRIC_TOKENS:
-        return False
-    if re.fullmatch(r"[a-zA-Z_]+", name):
-        return False
-    cjk = sum(1 for c in name if "\u4e00" <= c <= "\u9fff")
-    if cjk < len(name):
-        return False
-    if name[0] in _NAME_BAD_START:
-        return False
-    if any(c in _NAME_VERB_CHARS for c in name[1:]):
-        return False
-    return True
+    from engine.memory_names import is_valid_character_name as _check
+    return _check(name)
 
 
 def _canonical_character_names(memory: dict | None = None) -> list[str]:
@@ -104,6 +90,7 @@ def compute_all() -> dict:
         "branch_stats": branch_stats(),
         "scene_summary": scene_summary(),
         "summary": summary_stats(),
+        "world_state_v2": world_state_v2(),
     }
 
 
@@ -556,4 +543,143 @@ def summary_stats() -> dict:
         "total_chars": total_chars,
         "nodes": len(graph.get("nodes", {})),
         "edges": len(graph.get("edges", [])),
+    }
+
+
+def world_state_v2() -> dict:
+    """
+    Dashboard V2 — 世界状态快照：势力、事件、关系网、世界时间、地点。
+    只读聚合，不修改持久化数据。
+    """
+    from engine.memory import get_faction_stats_for_ui
+
+    state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+    memory = io_utils.read_json(config.MEMORY_PATH)
+    world_root = io_utils.read_yaml(config.WORLD_PACK_PATH)
+    world = world_root.get("world", world_root)
+
+    turn = int(state.get("turn", 0))
+    chapter = int(state.get("chapter", 1))
+    scene = (state.get("scene") or "").strip()
+    era = (world.get("era") or "故事开端").strip()
+
+    # 世界时间：以回合+章节为主轴（无独立 world_time 字段时的 V2 派生）
+    history = state.get("history", [])
+    scene_history = [h.get("scene", "") for h in history if h.get("scene")]
+
+    factions = get_faction_stats_for_ui(memory)
+
+    events_raw = memory.get("world_events", [])
+    events = []
+    for e in events_raw if isinstance(events_raw, list) else []:
+        events.append({
+            "id": e.get("id", ""),
+            "title": e.get("title", ""),
+            "status": e.get("status", "pending"),
+            "importance": e.get("importance", 50),
+            "trigger_turn": e.get("trigger_turn", 0),
+            "related_factions": e.get("related_factions", []),
+            "related_characters": e.get("related_characters", []),
+        })
+
+    custom = world_root.get("custom") or world.get("custom") or world.get("custom_rules") or {}
+    if isinstance(custom, str):
+        try:
+            custom = json.loads(custom)
+        except Exception:
+            custom = {}
+    rel_seed = custom.get("characterRelations") or world.get("characterRelations") or {}
+
+    canonical = set(_canonical_character_names(memory))
+    nodes: list[dict] = []
+    edges: list[dict] = []
+
+    wp_chars = {c.get("name"): c for c in world.get("characters", []) if c.get("name")}
+    mem_chars = memory.get("characters", {})
+    protagonist = next(
+        (c.get("name") for c in world.get("characters", []) if c.get("isMain")),
+        None,
+    ) or next((c.get("name") for c in state.get("characters", {}).values() if "主角" in (c.get("role") or "")), "主角")
+
+    for name in sorted(canonical):
+        wp = wp_chars.get(name, {})
+        mem = mem_chars.get(name, {})
+        seed = rel_seed.get(name, {}) if isinstance(rel_seed, dict) else {}
+        trust = float(mem.get("trust", seed.get("trust", 50) / 100 if seed.get("trust", 0) > 1 else seed.get("trust", 0.5)))
+        if trust > 1:
+            trust /= 100.0
+        nodes.append({
+            "name": name,
+            "is_main": bool(wp.get("isMain")),
+            "faction": wp.get("faction") or mem.get("faction", ""),
+            "relationship_type": mem.get("relationship_type") or seed.get("relationshipType", ""),
+            "trust_pct": round(max(0, min(1, trust)) * 100),
+            "tags": (seed.get("tags") or mem.get("flags", []))[:6],
+            "tier": mem.get("tier", ""),
+        })
+
+    # 关系网边：角色↔势力 + 角色↔角色（同势力/关系类型）
+    faction_names = {f["name"] for f in factions}
+    for n in nodes:
+        fac = n.get("faction")
+        if fac and fac in faction_names:
+            edges.append({
+                "from": n["name"],
+                "to": fac,
+                "kind": "member_of",
+                "label": "所属",
+            })
+
+    for name, seed in (rel_seed.items() if isinstance(rel_seed, dict) else []):
+        if name not in canonical:
+            continue
+        rtype = seed.get("relationshipType", "")
+        if rtype:
+            edges.append({
+                "from": protagonist,
+                "to": name,
+                "kind": "relation",
+                "label": rtype,
+            })
+
+    # 势力间态度
+    faction_links: list[dict] = []
+    attitudes = memory.get("faction_attitudes", {})
+    for src, targets in attitudes.items():
+        if src not in faction_names:
+            continue
+        for tgt, adata in targets.items():
+            if tgt not in faction_names:
+                continue
+            att = float(adata.get("attitude", 0.5))
+            faction_links.append({
+                "from": src,
+                "to": tgt,
+                "attitude": att,
+                "label": "友好" if att >= 0.65 else "敌对" if att <= 0.35 else "中立",
+            })
+
+    locations = world.get("locations") or []
+    loc_list = [
+        {"name": loc.get("name", ""), "desc": (loc.get("desc") or "")[:80]}
+        for loc in locations if isinstance(loc, dict) and loc.get("name")
+    ]
+
+    return {
+        "location": scene,
+        "locations": loc_list,
+        "world_time": {
+            "turn": turn,
+            "chapter": chapter,
+            "era": era,
+            "label": f"第{chapter}章 · 第{turn}轮",
+            "scene_changes": len(set(scene_history)),
+        },
+        "factions": factions,
+        "faction_links": faction_links,
+        "events": events,
+        "relationship_network": {
+            "nodes": nodes,
+            "edges": edges,
+        },
     }

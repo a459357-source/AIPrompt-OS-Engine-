@@ -9,11 +9,11 @@ import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { StatusToast } from '@/components/StatusToast'
-import { getGameState, startGame, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, type HistoryTurn, type GameGenSettings } from '@/lib/api'
+import { getGameState, startGame, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, cancelGeneration, type HistoryTurn, type GameGenSettings } from '@/lib/api'
 import { logger } from '@/lib/logger'
-import { parseRelationHints } from '@/lib/relationHints'
+import { parseOptionEffects, deltaArrow, type RelationHint } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
-import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS } from '@/lib/settings'
+import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS, MAX_WIDTH_OPTIONS } from '@/lib/settings'
 import { t } from '@/lib/i18n'
 
 /** Keep in sync with config.py */
@@ -42,12 +42,7 @@ function countStoryChars(text: string) {
   return text.replace(/\s/g, '').length
 }
 
-function storyTargetBounds(target: number, hardMin: number) {
-  return {
-    min: Math.max(hardMin, Math.floor(target * 0.85)),
-    max: Math.floor(target * 1.15),
-  }
-}
+import { storyTargetBounds, storyLengthRangeLabel } from '@/lib/storyLength'
 
 
 interface CharInfo {
@@ -75,36 +70,126 @@ interface FactionInfo {
   power?: { military: number; economic: number; political: number; technology: number }
 }
 
-function RelationChips({ text }: { text: string }) {
-  const hints = parseRelationHints(text)
-  if (!hints.length) return null
-  return (
-    <div className="flex flex-wrap gap-1.5 ml-5 mt-1">
-      {hints.map((h, j) => (
-        <span
-          key={j}
-          className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded border ${
-            h.tone === 'up'
-              ? 'border-game-success/40 text-game-success bg-game-success/10'
-              : h.tone === 'down'
-                ? 'border-game-danger/40 text-game-danger bg-game-danger/10'
-                : h.tone === 'new'
-                  ? 'border-game-accent/40 text-game-accent bg-game-accent/10'
-                  : 'border-game-border text-game-muted'
-          }`}
-        >
-          <span>{h.icon}</span>
-          <span>{h.name}</span>
-          {h.tone !== 'new' && (
-            <span className="text-game-dim">{h.metricLabel}</span>
+function hintChipClass(h: RelationHint): string {
+  if (h.kind === 'event' || h.tone === 'event') {
+    return 'border-amber-400/70 text-amber-200 bg-amber-500/20 shadow-sm shadow-amber-500/10'
+  }
+  if (h.kind === 'faction' || h.tone === 'warning') {
+    if (h.delta > 0) {
+      return 'border-emerald-400/50 text-emerald-200 bg-emerald-500/15'
+    }
+    if (h.delta < 0) {
+      return 'border-rose-400/60 text-rose-200 bg-rose-500/15'
+    }
+    return 'border-sky-400/60 text-sky-200 bg-sky-500/15 shadow-sm shadow-sky-500/10'
+  }
+  if (h.tone === 'new') {
+    return 'border-violet-400/50 text-violet-200 bg-violet-500/15'
+  }
+  if (h.tone === 'up') {
+    return 'border-emerald-400/60 text-emerald-200 bg-emerald-500/15'
+  }
+  if (h.tone === 'down') {
+    return 'border-rose-500/70 text-rose-200 bg-rose-500/20'
+  }
+  return 'border-game-border text-game-muted bg-game-bg/40'
+}
+
+function RelationChips({ text, compact = false }: { text: string; compact?: boolean }) {
+  const { hints, narrative } = parseOptionEffects(text)
+  if (!hints.length && !narrative.length) return null
+
+  const chipCls = compact
+    ? 'inline-flex flex-row items-center gap-0.5 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded border font-medium leading-none shrink-0'
+    : 'inline-flex flex-row items-center gap-1 whitespace-nowrap text-xs px-2 py-0.5 rounded-md border font-medium'
+
+  const wrapCls = compact
+    ? 'flex flex-row flex-wrap gap-1.5 items-center justify-center w-full'
+    : 'flex flex-wrap gap-1.5 justify-center'
+
+  const renderChip = (h: RelationHint, j: number) => (
+    <span key={j} className={`${chipCls} ${hintChipClass(h)}`}>
+      <span className="shrink-0 text-[10px]">{h.icon}</span>
+      {h.kind === 'event' && h.text ? (
+        <span className="font-semibold">{h.text}</span>
+      ) : (
+        <>
+          {h.kind === 'faction' && h.text ? (
+            <span className="font-bold">{h.text}</span>
+          ) : h.name ? (
+            <span className={`font-bold ${h.kind === 'character' ? 'text-amber-100' : ''}`}>{h.name}</span>
+          ) : null}
+          {!compact && h.kind !== 'event' && h.metric !== 'new' && h.metricLabel && (
+            <span className="opacity-90">{h.metricLabel}</span>
           )}
-          {h.tone !== 'new' && (
-            <span className="font-bold tabular-nums">
-              {h.delta > 0 ? '+' : ''}{h.delta}
+          {h.kind !== 'event' && h.metric !== 'new' && h.delta !== 0 && (
+            <span
+              className={`font-bold tabular-nums ${h.delta > 0 ? 'text-emerald-300' : 'text-rose-300'}`}
+            >
+              {compact ? (
+                <>{h.delta > 0 ? '+' : ''}{h.delta}</>
+              ) : (
+                <span className="inline-flex items-center gap-0.5">
+                  <span aria-hidden>{deltaArrow(h.delta)}</span>
+                  {h.delta > 0 ? '+' : ''}{h.delta}
+                </span>
+              )}
             </span>
           )}
-        </span>
+        </>
+      )}
+    </span>
+  )
+
+  if (compact) {
+    return (
+      <div className={wrapCls}>
+        {hints.map(renderChip)}
+        {narrative.map((line, i) => (
+          <span key={`n-${i}`} className="text-[10px] text-game-dim leading-tight text-center">{line}</span>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 ml-5 mt-1.5">
+      {hints.length > 0 && <div className={wrapCls}>{hints.map(renderChip)}</div>}
+      {narrative.map((line, i) => (
+        <p key={`n-${i}`} className="text-xs text-game-dim leading-relaxed">{line}</p>
       ))}
+    </div>
+  )
+}
+
+function OptionEffectsInline({
+  effects,
+  effectText,
+  attitude,
+}: {
+  effects: ReturnType<typeof parseOptionEffects> | null
+  effectText: string
+  attitude: string
+}) {
+  if (!effects && !attitude.trim()) return null
+  const hasHints = (effects?.hints.length ?? 0) > 0
+  const hasNarrative = (effects?.narrative.length ?? 0) > 0
+  if (!attitude.trim() && !hasHints && !hasNarrative && !effectText.trim()) return null
+
+  return (
+    <div className="w-full flex flex-wrap gap-1.5 items-center justify-center px-1 py-0.5">
+      {attitude.trim() && (
+        <Badge variant="accent" size="sm" className="shrink-0 text-[10px] px-1.5 py-0 h-auto leading-tight whitespace-nowrap">
+          {attitude.trim()}
+        </Badge>
+      )}
+      {hasHints || hasNarrative ? (
+        <RelationChips text={effectText} compact />
+      ) : (
+        effectText.trim() && (
+          <span className="text-[10px] text-game-muted leading-tight text-center">{effectText.trim()}</span>
+        )
+      )}
     </div>
   )
 }
@@ -173,6 +258,8 @@ export default function Game() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [choosing, setChoosing] = useState(false)
+  const [genProgress, setGenProgress] = useState('')
+  const [genStoryChars, setGenStoryChars] = useState(0)
   const [customInput, setCustomInput] = useState('')
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [charPanelOpen, setCharPanelOpen] = useState(false)
@@ -185,8 +272,6 @@ export default function Game() {
   const [storyLengthMin, setStoryLengthMin] = useState(300)
   const [storyLengthMax, setStoryLengthMax] = useState(281851)
   const [storyLengthRecommended, setStoryLengthRecommended] = useState(1000)
-  const [storyLengthTargetMin, setStoryLengthTargetMin] = useState(850)
-  const [storyLengthTargetMax, setStoryLengthTargetMax] = useState(1150)
   const [storyLengthDraft, setStoryLengthDraft] = useState('1000')
   const [maxTokens, setMaxTokens] = useState(1800)
   const [maxOutputTokens, setMaxOutputTokens] = useState(384000)
@@ -210,6 +295,46 @@ export default function Game() {
   const genSettingsSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const mountedRef = useRef(true)
+  const typewriterBufRef = useRef('')
+  const typewriterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const flushTypewriter = useCallback(() => {
+    if (typewriterTimerRef.current) return
+    typewriterTimerRef.current = setInterval(() => {
+      const buf = typewriterBufRef.current
+      if (!buf.length) {
+        if (typewriterTimerRef.current) clearInterval(typewriterTimerRef.current)
+        typewriterTimerRef.current = null
+        return
+      }
+      const ch = buf[0]
+      typewriterBufRef.current = buf.slice(1)
+      setStory((prev) => prev + ch)
+      setGenStoryChars((n) => n + (/\s/.test(ch) ? 0 : 1))
+    }, 18)
+  }, [])
+
+  const appendStoryDelta = useCallback((delta: string) => {
+    if (!mountedRef.current || !delta) return
+    if (appSettings.typewriterEffect) {
+      typewriterBufRef.current += delta
+      flushTypewriter()
+    } else {
+      setStory((prev) => prev + delta)
+      setGenStoryChars((n) => n + countStoryChars(delta))
+    }
+  }, [appSettings.typewriterEffect, flushTypewriter])
+
+  const resetStreamStory = useCallback(() => {
+    typewriterBufRef.current = ''
+    if (typewriterTimerRef.current) {
+      clearInterval(typewriterTimerRef.current)
+      typewriterTimerRef.current = null
+    }
+    if (mountedRef.current) {
+      setStory('')
+      setGenStoryChars(0)
+    }
+  }, [])
   const autoAdvanceDelaySec = 5
   const pendingGenPatchRef = useRef<{
     storyLength?: number
@@ -257,7 +382,21 @@ export default function Game() {
 
       if (data.not_started) {
         logger.info('Game', 'Game not started — calling startGame()')
-        const started = await startGame()
+        setStory('')
+        let firstDelta = false
+        const started = await startGame({
+          onStoryDelta: (delta) => {
+            appendStoryDelta(delta)
+            if (!firstDelta && mountedRef.current) {
+              firstDelta = true
+              setLoading(false)
+            }
+          },
+          onStoryReset: resetStreamStory,
+          onProgress: (phase) => {
+            if (mountedRef.current) setGenProgress(phase)
+          },
+        })
         if (started.error || !started.story) {
           setError(started.error || '开篇生成失败')
           setLoading(false)
@@ -266,7 +405,7 @@ export default function Game() {
         applyTurnData({
           story: started.story,
           options: started.options,
-          state: started.state as Record<string, unknown>,
+          state: started.state as unknown as Record<string, unknown>,
         })
         logger.info('Game', 'Opening scene generated')
         setLoading(false)
@@ -285,7 +424,7 @@ export default function Game() {
       setError(msg)
     }
     setLoading(false)
-  }, [applyTurnData])
+  }, [applyTurnData, appendStoryDelta, resetStreamStory])
 
   useEffect(() => { loadGame() }, [loadGame])
 
@@ -295,8 +434,6 @@ export default function Game() {
     setStoryLengthMin(data.min)
     setStoryLengthMax(data.max)
     setStoryLengthRecommended(data.recommended)
-    setStoryLengthTargetMin(data.target_min ?? storyTargetBounds(data.story_length, data.min).min)
-    setStoryLengthTargetMax(data.target_max ?? storyTargetBounds(data.story_length, data.min).max)
     setMaxTokens(data.max_tokens)
     setMaxOutputTokens(data.max_output_tokens)
     setContextTokens(data.context_tokens)
@@ -512,17 +649,17 @@ export default function Game() {
 
   const currentStoryChars = countStoryChars(story)
   const activeStoryTarget = parseDraftLength(storyLengthDraft, storyLength)
-  const { min: previewTargetMin, max: previewTargetMax } = useMemo(
-    () => storyTargetBounds(activeStoryTarget, storyLengthMin),
-    [activeStoryTarget, storyLengthMin],
+  const savedStoryBounds = useMemo(
+    () => storyTargetBounds(storyLength, storyLengthMin),
+    [storyLength, storyLengthMin],
   )
   const storyLengthGap = currentStoryChars - storyLength
   const storyLengthInRange =
-    currentStoryChars >= storyLengthTargetMin && currentStoryChars <= storyLengthTargetMax
+    currentStoryChars >= savedStoryBounds.min && currentStoryChars <= savedStoryBounds.max
   const storyLengthBadgeClass =
     storyLengthInRange
       ? 'border-game-success/40 text-game-success'
-      : currentStoryChars > storyLengthTargetMax
+      : currentStoryChars > savedStoryBounds.max
         ? 'border-game-danger/40 text-game-danger'
         : 'border-amber-500/40 text-amber-400'
 
@@ -537,10 +674,20 @@ export default function Game() {
   const handleChoice = useCallback(async (choice: string, opts?: { auto?: boolean }) => {
     if (!opts?.auto) setAutoAdvancePaused(true)
     setChoosing(true)
+    resetStreamStory()
+    setGenProgress('building_prompt')
+    setGenStoryChars(0)
     logger.info('Game', `Choice: ${choice}`)
+    const streamHandlers = {
+      onStoryDelta: appendStoryDelta,
+      onStoryReset: resetStreamStory,
+      onProgress: (phase: string) => {
+        if (mountedRef.current) setGenProgress(phase)
+      },
+    }
     try {
       await persistGenSettingsBeforeTurn()
-      const data = await nextTurn(choice)
+      const data = await nextTurn(choice, streamHandlers)
       if (!mountedRef.current) return
       if (data.error) { setError(data.error); setChoosing(false); return }
       setError('')
@@ -574,8 +721,11 @@ export default function Game() {
         setError(msg)
       }
     }
-    if (mountedRef.current) setChoosing(false)
-  }, [persistGenSettingsBeforeTurn])
+    if (mountedRef.current) {
+      setChoosing(false)
+      setGenProgress('')
+    }
+  }, [persistGenSettingsBeforeTurn, appendStoryDelta, resetStreamStory])
 
   useEffect(() => {
     setGenSettingsOpen(appSettings.sidebarDefault === 'expanded')
@@ -759,7 +909,33 @@ export default function Game() {
                 {scene && <span className="text-game-muted text-xs truncate max-w-[250px]">📍 {scene}</span>}
               </div>
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-wrap justify-end">
+                <div className="hidden md:flex items-center gap-0.5 mr-1">
+                  {MAX_WIDTH_OPTIONS.map(({ value, label }) => (
+                    <Button
+                      key={value}
+                      type="button"
+                      size="xs"
+                      className="text-[11px] px-1.5"
+                      variant={appSettings.maxWidth === value ? 'primary' : 'ghost'}
+                      disabled={choosing}
+                      onClick={() => saveSettings({ maxWidth: value })}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-xs text-game-muted shrink-0">⚡ {t('game.quickSettings', lang)}</span>
+                  <Switch
+                    checked={genSettingsOpen}
+                    disabled={choosing}
+                    onCheckedChange={setGenSettingsOpen}
+                  />
+                  {!genSettingsSaving && genSettingsSaved && (
+                    <span className="text-[10px] text-game-success hidden sm:inline">已保存</span>
+                  )}
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -801,39 +977,39 @@ export default function Game() {
 
             {/* Story — scrollable */}
             <div ref={storyScrollRef} className="flex-1 overflow-y-auto min-h-0 space-y-3">
-            <Card className="border-game-border/70 bg-game-bg/40">
-              <button
-                type="button"
-                className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-game-primary/5 transition-colors"
-                onClick={() => setGenSettingsOpen((v) => !v)}
-              >
-                <span className="text-sm font-medium text-game-muted">⚡ {t('game.quickSettings', lang)}</span>
-                <span className="text-xs text-game-dim flex items-center gap-2">
-                  {!genSettingsSaving && genSettingsSaved && <span className="text-game-success">已保存</span>}
-                  {!genSettingsSaving && genSettingsSaveError && (
-                    <span className="text-game-danger">保存失败</span>
-                  )}
-                  <span>{genSettingsOpen ? '收起 ▲' : '展开 ▼'}</span>
-                </span>
-              </button>
-              {genSettingsOpen && (
-                <CardContent className="pt-0 pb-3 px-4">
-                  <p className="text-[11px] text-game-dim mb-3 rounded-md border border-game-border/50 bg-game-bg/40 px-2.5 py-1.5">
-                    模型与压缩开关在 <strong className="text-game-muted">设置 → API</strong> 中配置
-                  </p>
-                  {(genSettingsSaved || genSettingsSaveError) && (
-                    <div className="mb-2 text-xs">
-                      {genSettingsSaved && (
-                        <span className="text-game-success">✅ 已保存，下一轮生成生效</span>
-                      )}
-                      {genSettingsSaveError && (
-                        <span className="text-game-danger">❌ 保存失败：{genSettingsSaveError}</span>
-                      )}
-                    </div>
-                  )}
+            {genSettingsOpen && (
+              <div className="border border-game-border/70 rounded-lg bg-game-bg/40 px-4 py-3 shrink-0">
+                <p className="text-[11px] text-game-dim mb-2 rounded-md border border-game-border/50 bg-game-bg/40 px-2.5 py-1.5">
+                  模型与压缩开关在 <strong className="text-game-muted">设置 → API</strong> 中配置
+                </p>
+                {(genSettingsSaved || genSettingsSaveError) && (
+                  <div className="mb-2 text-xs">
+                    {genSettingsSaved && (
+                      <span className="text-game-success">✅ 已保存，下一轮生成生效</span>
+                    )}
+                    {genSettingsSaveError && (
+                      <span className="text-game-danger">❌ 保存失败：{genSettingsSaveError}</span>
+                    )}
+                  </div>
+                )}
+                <div className="flex md:hidden items-center gap-0.5 mb-3 flex-wrap">
+                  {MAX_WIDTH_OPTIONS.map(({ value, label }) => (
+                    <Button
+                      key={value}
+                      type="button"
+                      size="xs"
+                      className="text-[11px]"
+                      variant={appSettings.maxWidth === value ? 'primary' : 'ghost'}
+                      disabled={choosing}
+                      onClick={() => saveSettings({ maxWidth: value })}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
                   <QuickGenRow
                     label="目标字数"
-                    hint={`每轮正文目标长度，允许 ${previewTargetMin.toLocaleString()}–${previewTargetMax.toLocaleString()} 字（±15%）；停输约 1 秒保存，选选项前强制同步`}
+                    hint="停输约 1 秒保存，选选项前强制同步"
                   >
                     <Input
                       type="text"
@@ -867,11 +1043,9 @@ export default function Game() {
                         </span>
                       )}
                     </Badge>
-                    {!storyLengthInRange && story && (
-                      <span className="text-[11px] text-game-muted">
-                        目标 {storyLength.toLocaleString()}，允许 {storyLengthTargetMin.toLocaleString()}–{storyLengthTargetMax.toLocaleString()}
-                      </span>
-                    )}
+                    <span className="text-[11px] text-game-dim basis-full sm:basis-auto">
+                      {storyLengthRangeLabel(activeStoryTarget, storyLengthMin)}
+                    </span>
                   </QuickGenRow>
                   <QuickGenRow
                     label="最大 Token"
@@ -1008,12 +1182,13 @@ export default function Game() {
                       </Button>
                     ))}
                   </QuickGenRow>
-                </CardContent>
-              )}
-            </Card>
-            <Card>
-              <CardContent className="pt-4 md:px-8 mx-auto w-full" style={{ maxWidth: 'var(--story-max-width)' }}>
-                <p className="text-sm font-medium text-game-muted mb-4">📖 {t('game.story', lang)}</p>
+              </div>
+            )}
+            <Card className="border-game-border/70 w-full">
+              <CardContent
+                className="pt-4 pb-6 px-4 md:px-8 w-full mx-auto"
+                style={{ maxWidth: 'var(--story-max-width)' }}
+              >
                 {appSettings.animations ? (
                   <motion.div key={turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
                     {story.split('\n').filter(Boolean).map((paragraph, i) => (
@@ -1135,7 +1310,7 @@ export default function Game() {
                       </button>
                     </div>
                   </div>
-                  <div className="space-y-3 pt-1">
+                  <div className="space-y-1.5 pt-1">
                   {options.map((choice, i) => {
                     // Parse "行动 → 可能发展 | 态度 | 人际影响"
                     const parts = choice.split(/\s*[→]\s*/)
@@ -1145,23 +1320,26 @@ export default function Game() {
                     const consequence = segments[0] || ''
                     const attitude = segments[1] || ''
                     const relation = segments[2] || ''
+                    const effectText = [consequence, relation].filter(Boolean).join('，')
+                    const effects = showConsequences && effectText ? parseOptionEffects(effectText) : null
+                    const letter = String.fromCharCode(65 + i)
                     return (
                       <Button key={`${turn}-${i}`} variant="outline" disabled={choosing}
-                        onClick={() => handleChoice(String.fromCharCode(65 + i))}
-                        className="w-full justify-start text-left h-auto py-3 px-4 hover:bg-game-primary/10 hover:border-game-primary/50 transition-all"
+                        onClick={() => handleChoice(letter)}
+                        className="w-full flex flex-col items-center justify-center text-center h-auto py-2 px-3 hover:bg-game-primary/10 hover:border-game-primary/50 transition-all"
                       >
-                        <div className="flex flex-col gap-1 min-w-0">
-                          <div className="flex items-start gap-2 flex-wrap">
-                            <span className="text-game-accent font-bold shrink-0 mt-0.5">{String.fromCharCode(65 + i)}.</span>
-                            <span className="text-base font-medium text-game-text">{action}</span>
-                            {showConsequences && attitude && (
-                              <Badge variant="accent" size="sm" className="shrink-0 text-[10px]">{attitude.trim()}</Badge>
-                            )}
+                        <div className="flex w-full flex-col gap-1.5 min-w-0 items-center">
+                          <div className="flex gap-2 min-w-0 justify-center text-center w-full">
+                            <span className="text-game-accent font-bold shrink-0 text-sm leading-snug">{letter}.</span>
+                            <span className="text-sm font-medium text-game-text leading-snug text-center">{action}</span>
                           </div>
-                          {showConsequences && consequence && (
-                            <p className="text-sm text-game-muted ml-5 pl-0.5">{consequence.trim()}</p>
+                          {showConsequences && (
+                            <OptionEffectsInline
+                              effects={effects}
+                              effectText={effectText}
+                              attitude={attitude}
+                            />
                           )}
-                          {relation && <RelationChips text={relation} />}
                         </div>
                       </Button>
                     )
@@ -1327,10 +1505,25 @@ export default function Game() {
         </div>
       )}
 
-      {(choosing || genSettingsSaving) && (
-        <GameBusyOverlay
-          message={choosing ? 'AI 正在生成下一段剧情…' : '正在保存快捷设置…'}
-        />
+      {choosing && (
+        <div className="fixed inset-x-0 bottom-16 md:bottom-0 z-40 border-t border-game-border bg-game-card/95 px-4 py-2 flex items-center justify-between gap-3 text-sm">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-game-accent/30 border-t-game-accent shrink-0" />
+            <span className="text-game-muted truncate">
+              {genProgress === 'building_prompt' && '构建提示词…'}
+              {genProgress === 'generating' && `生成中 · 已 ${genStoryChars} 字`}
+              {genProgress === 'continuation' && `续写补偿 · 已 ${genStoryChars} 字`}
+              {!genProgress && `生成中 · 已 ${genStoryChars} 字`}
+            </span>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void cancelGeneration()}>
+            取消
+          </Button>
+        </div>
+      )}
+
+      {genSettingsSaving && (
+        <GameBusyOverlay message="正在保存快捷设置…" />
       )}
     </div>
   )

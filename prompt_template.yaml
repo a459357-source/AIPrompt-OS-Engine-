@@ -1,4 +1,4 @@
-# ── Prompt Template (optimized for speed) ──
+# ── Prompt Template (V2 — layered memory) ──
 
 system: |
   你是 Galgame AI 叙事引擎。用中文创作，小说体，注重心理描写与环境氛围。每轮 story 正文须严格控制在 {{STORY_LENGTH_MIN}}–{{STORY_LENGTH_MAX}} 字之间，目标约 {{STORY_LENGTH}} 字；不得明显偏短，也不得超出上限。
@@ -60,17 +60,12 @@ system: |
 
 user: |
   WORLD: {{WORLD}}
-  STATE: {{STATE_JSON}}
+  {{LONG_TERM_MEMORY}}
+  {{RECENT_SUMMARIES}}
+  {{HOT_CONTEXT}}
   {{LAST_CHOICE}}
   {{CHARACTERS_CONTEXT}}
   {{RELATIONSHIP_SYSTEM}}
-  {{MEMORY_CONTEXT}}
-  {{TIER_CONTEXT}}
-  {{FACTION_CONTEXT}}
-  {{FACTION_SCOPE}}
-  {{ARTIFACT_CONTEXT}}
-  {{EVENT_CONTEXT}}
-  {{WORLD_STATE}}
   ENGINE: {{ENGINE_RULES}}
   {{FORCE_EVENT_PROMPT}}
 

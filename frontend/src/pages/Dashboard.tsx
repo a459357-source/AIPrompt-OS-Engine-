@@ -112,7 +112,20 @@ export default function Dashboard() {
     )
   }
 
+  if (!data) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col items-center justify-center min-h-[40vh] gap-6 text-center"
+      >
+        <div className="text-5xl">📊</div>
+        <p className="text-game-muted text-sm">暂无仪表盘数据</p>
+        <Button variant="outline" onClick={loadDashboard}>🔄 重试</Button>
+      </motion.div>
+    )
+  }
+
   const a = data.analytics
+  const ws = a?.world_state_v2
   const costEst = a?.api_usage?.totals?.cost_usd ?? (data.total_tokens / 1_000_000 * 0.2)
 
   const statsData = [
@@ -260,6 +273,116 @@ export default function Dashboard() {
           </motion.div>
         ))}
       </div>
+
+      {/* World State V2 */}
+      {ws && (
+        <Card className="border-game-primary/30">
+          <CardHeader>
+            <CardTitle className="text-sm">🌍 世界状态 V2</CardTitle>
+            <CardDescription>
+              势力 · 事件 · 关系网 · 世界时间 · 地点（压力测试/长局监控）
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div className="rounded-lg border border-game-border/60 p-3 space-y-1">
+                <p className="text-[10px] text-game-muted uppercase tracking-wide">世界时间</p>
+                <p className="font-medium text-game-accent">{ws.world_time.label}</p>
+                <p className="text-xs text-game-dim">{ws.world_time.era}</p>
+                <p className="text-[11px] text-game-muted">场景变迁 {ws.world_time.scene_changes} 次</p>
+              </div>
+              <div className="rounded-lg border border-game-border/60 p-3 space-y-1 md:col-span-2">
+                <p className="text-[10px] text-game-muted uppercase tracking-wide">当前地点</p>
+                <p className="text-sm text-game-text leading-relaxed">{ws.location || '—'}</p>
+                {ws.locations.length > 0 && (
+                  <p className="text-[11px] text-game-dim mt-1">
+                    世界观地点：{ws.locations.map((l) => l.name).join(' · ')}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-medium text-game-muted mb-2">🏛️ 势力 ({ws.factions.length})</p>
+                {ws.factions.length === 0 ? (
+                  <p className="text-game-dim text-xs">暂无势力数据</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {ws.factions.map((f) => (
+                      <div key={f.name} className="text-xs border border-game-border/40 rounded-md p-2">
+                        <div className="flex justify-between gap-2">
+                          <span className="font-medium">{f.name}</span>
+                          <Badge variant="outline" size="sm">{f.reputation_pct > 0 ? '+' : ''}{f.reputation_pct}%</Badge>
+                        </div>
+                        <p className="text-game-dim mt-0.5">{f.relation_to_player} · 影响力 {f.influence}</p>
+                        {f.goals[0] && <p className="text-game-muted mt-1 truncate">{f.goals[0]}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-game-muted mb-2">📅 世界事件 ({ws.events.length})</p>
+                {ws.events.length === 0 ? (
+                  <p className="text-game-dim text-xs">暂无事件（对局推进后由引擎调度）</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {ws.events.slice(0, 12).map((e) => (
+                      <div key={e.id || e.title} className="text-xs border border-game-border/40 rounded-md p-2">
+                        <div className="flex justify-between gap-2">
+                          <span className="font-medium truncate">{e.title}</span>
+                          <Badge
+                            variant={e.status === 'active' ? 'warning' : e.status === 'resolved' ? 'success' : 'outline'}
+                            size="sm"
+                          >
+                            {e.status}
+                          </Badge>
+                        </div>
+                        <p className="text-game-dim mt-0.5">T{e.trigger_turn} · 重要度 {e.importance}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <p className="text-xs font-medium text-game-muted mb-2">
+                🔗 关系网 ({ws.relationship_network.nodes.length} 节点 · {ws.relationship_network.edges.length} 边)
+              </p>
+              {ws.relationship_network.nodes.length === 0 ? (
+                <p className="text-game-dim text-xs">暂无关系数据</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {ws.relationship_network.nodes.map((n) => (
+                    <Badge
+                      key={n.name}
+                      variant={n.is_main ? 'accent' : 'primary'}
+                      size="sm"
+                      className="text-[11px]"
+                    >
+                      {n.name}
+                      {n.relationship_type ? ` · ${n.relationship_type}` : ''}
+                      {' '}({n.trust_pct}%)
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              {ws.faction_links.length > 0 && (
+                <p className="text-[11px] text-game-dim mt-2">
+                  势力关系：{ws.faction_links.slice(0, 6).map((l) => `${l.from}→${l.to}(${l.label})`).join(' · ')}
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Story branch graph */}
       <Card>

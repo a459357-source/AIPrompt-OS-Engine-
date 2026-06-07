@@ -58,10 +58,10 @@ def is_transactional() -> bool:
     return _in_transaction()
 
 
-def load_runtime(*, clear_cache: bool = True) -> RuntimeState:
+def load_runtime(*, clear_cache: bool = False) -> RuntimeState:
     """Load session, memory, graph (and chapter text) into a RuntimeState snapshot."""
     if clear_cache:
-        io_utils.clear_cache()
+        io_utils.clear_cache(session_only=True)
     chapter = ""
     if config.CHAPTER_PATH.exists():
         try:
@@ -145,7 +145,7 @@ def commit_runtime(state: RuntimeState, *, chapter: str | None = None) -> None:
                 config.CHAPTER_PATH.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(chapter_staging, config.CHAPTER_PATH)
 
-            io_utils.clear_cache()
+            io_utils.clear_cache(session_only=True)
             logger.debug("RuntimeState committed (turn=%s)", state.session.get("turn", "?"))
         except Exception as exc:
             logger.error("commit_runtime failed — originals preserved: %s", exc, exc_info=True)

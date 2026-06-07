@@ -118,56 +118,33 @@ async def api_game_state():
 @router.post("/start")
 async def api_start_game():
     """Generate the opening scene (POST — has side effects)."""
-    from fastapi.responses import JSONResponse
-    from engine.run import step, get_last_step_error
+    from ui.turn_stream import turn_response
 
-    if not config.DEEPSEEK_API_KEY:
-        return JSONResponse(
-            {"error": "未配置 DeepSeek API Key，请先在设置页填写"},
-            status_code=400,
-        )
+    return turn_response(None, opening=True)
 
-    result = step(None)
-    if result is None:
-        err = get_last_step_error() or "AI 生成失败，请重试"
-        return JSONResponse({"error": err}, status_code=500)
 
-    try:
-        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
-    except Exception:
-        state = {}
+@router.post("/next")
+async def api_next_turn(choice: str = Form("A")):
+    """Advance the game with a choice and return new state as JSON or SSE."""
+    from ui.turn_stream import turn_response
 
-    memory = load_memory()
-    mem_chars = memory.get("characters", {})
-    try:
-        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
-        world_chars = world_pack.get("world", {}).get("characters", [])
-        faction_map = {wc["name"]: wc.get("faction", "") for wc in world_chars if "name" in wc}
-    except Exception:
-        faction_map = {}
+    return turn_response(choice)
 
-    chars_with_trust = _merge_characters_with_memory(state.get("characters", {}), mem_chars, faction_map)
 
-    # Faction data (consistent with /api/game-state)
-    factions_data: list[dict] = []
-    try:
-        factions_data = get_faction_stats_for_ui(memory)
-    except Exception:
-        pass
+@router.post("/cancel-generation")
+async def api_cancel_generation():
+    """Request cancellation of in-flight turn generation."""
+    from ui.turn_stream import cancel_active_generation
 
-    return JSONResponse({
-        "story": result["story"],
-        "options": result["options"],
-        "state": {
-            "turn": state.get("turn", result.get("turn", 1)),
-            "status": state.get("status", result.get("status", "SETUP")),
-            "scene": state.get("scene", result.get("scene", "")),
-            "characters": chars_with_trust,
-            "factions": factions_data,
-            "force_event_pending": False,
-            "chapter": state.get("chapter", 1),
-        },
-    })
+    return JSONResponse(cancel_active_generation())
+
+
+@router.get("/generation-status")
+async def api_generation_status():
+    """Partial story for disconnect recovery."""
+    from ui.turn_stream import get_generation_status
+
+    return JSONResponse(get_generation_status())
 
 
 @router.get("/npcs")
@@ -402,59 +379,6 @@ async def api_dashboard():
         },
     })
 
-
-@router.post("/next")
-async def api_next_turn(choice: str = Form("A")):
-    """Advance the game with a choice and return new state as JSON."""
-    from fastapi.responses import JSONResponse
-    from engine.run import step
-
-    try:
-        result = step(choice)
-    except Exception:
-        import logging
-        logging.getLogger("api").error("next_turn failed", exc_info=True)
-        return JSONResponse({"error": "AI 生成失败，请重试"}, status_code=500)
-
-    if result is None:
-        return JSONResponse({"error": "AI 生成失败，请重试"}, status_code=500)
-
-    try:
-        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
-    except Exception:
-        state = {}
-
-    # Merge trust data into characters (consistent with /api/game-state)
-    memory = load_memory()
-    mem_chars = memory.get("characters", {})
-    try:
-        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
-        world_chars = world_pack.get("world", {}).get("characters", [])
-        faction_map = {wc["name"]: wc.get("faction", "") for wc in world_chars if "name" in wc}
-    except Exception:
-        faction_map = {}
-    chars_with_trust = _merge_characters_with_memory(state.get("characters", {}), mem_chars, faction_map)
-
-    # Faction data (consistent with /api/game-state)
-    factions_data: list[dict] = []
-    try:
-        factions_data = get_faction_stats_for_ui(memory)
-    except Exception:
-        pass
-
-    return JSONResponse({
-        "story": result["story"],
-        "options": result["options"],
-        "state": {
-            "turn": state.get("turn", result.get("turn", 0)),
-            "status": state.get("status", result.get("status", "SETUP")),
-            "scene": state.get("scene", result.get("scene", "")),
-            "characters": chars_with_trust,
-            "factions": factions_data,
-            "force_event_pending": state.get("force_event_pending", False),
-            "chapter": state.get("chapter", 1),
-        },
-    })
 
 
 
