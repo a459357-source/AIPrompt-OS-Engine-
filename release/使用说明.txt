@@ -2,7 +2,8 @@ PromptOS 发布包使用说明
 ====================
 
 【给别人用】
-1. 只发送 release\PromptOS-win64.zip（不要附带 data 文件夹）
+1. 只发送 release\PromptOS-win64-v{版本}.zip（不要附带 data 文件夹）
+   例：PromptOS-win64-v2.0.1.zip
 2. 对方解压后双击 PromptOS.exe
 3. 首次打开会弹出窗口，请填写各自的 DeepSeek API Key
    （也可在「设置」页填写；Key 仅保存在本机 data\apikey.json）
@@ -15,7 +16,9 @@ PromptOS 发布包使用说明
 
 【重新打包（确保无个人数据）】
   cd prompt-os-engine
-  python build_release.py
+  python build_release.py              # 默认 patch+1，产出 PromptOS-win64-vX.Y.Z.zip
+  python build_release.py --no-bump    # 不递增，用当前 APP_VERSION 重打
+  python build_release.py --version 2.1.0   # 指定大/小版本
 
   打包脚本会默认：重置 data/ 与进度文件、清空 output/ 与日志、
   删除测试脚本与报告，并在 zip 前剥离 dist/PromptOS/data/。

@@ -21,6 +21,60 @@ else:
     ROOT = Path(__file__).resolve().parent
     BUNDLE_ROOT = ROOT
 
+_ENGINE_YAML_PATH = ROOT / "engine.yaml"
+_CONFIG_PY_PATH = Path(__file__).resolve()
+
+
+def parse_app_version(version: str) -> tuple[int, int, int]:
+    """Parse semver 'major.minor.patch'."""
+    m = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", version.strip())
+    if not m:
+        raise ValueError(f"invalid semver: {version!r}")
+    return int(m.group(1)), int(m.group(2)), int(m.group(3))
+
+
+def bump_patch_version(version: str) -> str:
+    """Increment patch segment (default release bump)."""
+    major, minor, patch = parse_app_version(version)
+    return f"{major}.{minor}.{patch + 1}"
+
+
+def release_zip_basename(version: str | None = None) -> str:
+    """Windows release archive base name (without .zip)."""
+    ver = version or APP_VERSION
+    return f"PromptOS-win64-v{ver}"
+
+
+def persist_app_version(version: str) -> None:
+    """Write APP_VERSION to config.py and engine.yaml (source of truth sync)."""
+    parse_app_version(version)
+    global APP_VERSION
+    APP_VERSION = version
+
+    cfg_text = _CONFIG_PY_PATH.read_text(encoding="utf-8")
+    cfg_text, n_cfg = re.subn(
+        r'^APP_VERSION = "[^"]+"',
+        f'APP_VERSION = "{version}"',
+        cfg_text,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    if n_cfg != 1:
+        raise RuntimeError("failed to update APP_VERSION in config.py")
+    _CONFIG_PY_PATH.write_text(cfg_text, encoding="utf-8")
+
+    eng_text = _ENGINE_YAML_PATH.read_text(encoding="utf-8")
+    eng_text, n_eng = re.subn(
+        r'^(\s*version:\s*")[^"]+(")',
+        rf"\g<1>{version}\2",
+        eng_text,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    if n_eng != 1:
+        raise RuntimeError("failed to update version in engine.yaml")
+    _ENGINE_YAML_PATH.write_text(eng_text, encoding="utf-8")
+
 
 def bundle_path(*parts: str) -> Path:
     """Resolve a read-only shipped asset under PyInstaller _MEIPASS (_internal).

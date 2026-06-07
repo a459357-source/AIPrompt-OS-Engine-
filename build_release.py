@@ -3,15 +3,27 @@
 
 Default: always run scripts/reset_user_data.py first (see .cursor/rules/release-build.mdc).
 Never ship api keys, saves, logs, or test artifacts in release zip.
+
+Versioning:
+  - Zip name: release/PromptOS-win64-v{APP_VERSION}.zip
+  - Default (no flags): bump patch in config.py + engine.yaml, then build
+  - --no-bump: keep current APP_VERSION
+  - --version X.Y.Z: set explicit version (major/minor/patch)
 """
 from __future__ import annotations
 
+import argparse
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import config
+
 RELEASE = ROOT / "release"
 DIST = ROOT / "dist"
 
@@ -27,6 +39,40 @@ OUTPUT_ARTIFACTS = [
     ROOT / "output" / "fangzheng_simulation_report.html",
     ROOT / "output" / "browser_report",
 ]
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Build PromptOS release zip")
+    parser.add_argument(
+        "--no-bump",
+        action="store_true",
+        help="不递增版本号，使用当前 APP_VERSION 打包",
+    )
+    parser.add_argument(
+        "--version",
+        metavar="X.Y.Z",
+        help="指定版本号（大/小版本需显式指定；默认仅 patch+1）",
+    )
+    return parser.parse_args(argv)
+
+
+def resolve_release_version(args: argparse.Namespace) -> str:
+    if args.version:
+        config.parse_app_version(args.version)
+        return args.version
+    if args.no_bump:
+        return config.APP_VERSION
+    return config.bump_patch_version(config.APP_VERSION)
+
+
+def prepare_release_version(args: argparse.Namespace) -> str:
+    version = resolve_release_version(args)
+    if version != config.APP_VERSION:
+        print(f"=== 0. 版本 {config.APP_VERSION} → {version} ===")
+        config.persist_app_version(version)
+    else:
+        print(f"=== 0. 版本 {version}（未递增）===")
+    return version
 
 
 def run(cmd: list[str], cwd: Path | None = None) -> None:
@@ -142,23 +188,27 @@ def sanitize_exe_dir(exe_dir: Path) -> None:
             print(f"  stripped dist/PromptOS/{name}")
 
 
-def make_zip(exe_dir: Path) -> Path:
+def make_zip(exe_dir: Path, version: str) -> Path:
     print("\n=== 5. 生成发布 zip ===")
     RELEASE.mkdir(parents=True, exist_ok=True)
-    zip_base = RELEASE / "PromptOS-win64"
-    if zip_base.with_suffix(".zip").exists():
-        zip_base.with_suffix(".zip").unlink()
+    zip_base = RELEASE / config.release_zip_basename(version)
+    zip_path = zip_base.with_suffix(".zip")
+    if zip_path.exists():
+        zip_path.unlink()
     archive = shutil.make_archive(str(zip_base), "zip", root_dir=exe_dir.parent, base_dir=exe_dir.name)
     print(f"  {archive}")
     return Path(archive)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    version = prepare_release_version(args)
     clean()
     build_frontend()
     exe_dir = build_exe()
-    zip_path = make_zip(exe_dir)
+    zip_path = make_zip(exe_dir, version)
     print("\n=== 完成 ===")
+    print(f"  版本:     v{version}")
     print(f"  程序目录: {exe_dir}")
     print(f"  发布包:   {zip_path}")
     print("  首次运行请在「设置」页填写 DeepSeek API Key")

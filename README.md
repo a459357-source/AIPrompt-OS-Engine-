@@ -48,11 +48,13 @@ python build_release.py
 | 路径 | 说明 |
 |------|------|
 | `dist/PromptOS/PromptOS.exe` | 可执行程序（内置前端，单端口 8000） |
-| `release/PromptOS-win64.zip` | 发给用户的压缩包 |
+| `release/PromptOS-win64-v{版本}.zip` | 发给用户的压缩包（含版本号，如 `v2.0.1`） |
+
+**版本规则**：`python build_release.py` 默认将 `APP_VERSION` patch +1 并写入 `config.py` / `engine.yaml`；大/小版本用 `--version 2.1.0`；仅重打当前版用 `--no-bump`。
 
 **给他人使用：**
 
-1. 只发送 `release/PromptOS-win64.zip`（不要附带 `data/`）
+1. 只发送 `release/PromptOS-win64-v*.zip`（不要附带 `data/`）
 2. 解压后双击 `PromptOS.exe`（或 `release/启动 PromptOS.bat`）
 3. 首次运行按弹窗填写 **DeepSeek API Key**（保存在本机 `data/apikey.json`）
 4. 在「新故事」创建世界并开始游戏
