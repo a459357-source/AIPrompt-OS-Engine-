@@ -22,9 +22,11 @@ import json
 import logging
 import sys
 import threading
+import traceback
 import webbrowser
 from datetime import datetime
 from pathlib import Path
+from typing import Callable, Any
 
 # Ensure the project root (prompt-os-engine/) is on sys.path so that
 # `import config` and `from engine import ...` work regardless of cwd.
@@ -64,9 +66,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger("run")
 
-# Store the previous turn's AI response options so we can apply the
-# chosen option's trust deltas when the next turn runs.
-_prev_options: list[str] = []
+# _prev_options removed — previous-turn options are now read from
+# session_state.history[-1]["options"] inside _update_memory,
+# eliminating the module-level global that was not thread-safe.
+
+
+# ── Safe call wrapper ──────────────────────────────────────────────
+
+def _safe_call(fn: Callable, label: str, *args: Any, **kwargs: Any) -> bool:
+    """Call *fn* and return True.  On any exception, log the full
+    traceback to error.log + console and return False — never raise.
+
+    Use for non-critical post-turn steps where one subsystem failure
+    must not crash the entire turn.
+    """
+    try:
+        fn(*args, **kwargs)
+        return True
+    except Exception:
+        logger.error(
+            "❌ %s 失败（非致命，继续执行）:\n%s",
+            label, traceback.format_exc(),
+        )
+        return False
 
 
 # ── Core step (stateless, for web/cli reuse) ───────────────────────
@@ -109,30 +131,19 @@ def step(choice: str | None = None) -> dict | None:
         logger.error("Failed to apply turn: %s", exc)
         return None
 
-    # 5. Update story graph
-    _update_graph(response, new_state, choice)
-
-    # 6. Update character memory (with previous turn's chosen option)
-    _update_memory(response, new_state, choice)
-
-    # 7. Write chapter.md
-    _write_chapter(response, new_state, choice)
-
-    # 8. Write dashboard HTML → output/ (always, no Obsidian needed)
-    _write_dashboard_html()
-
-    # 9. Live export to Obsidian vault (optional)
-    obsidian_live.on_turn(response, new_state, choice)
-
-    # 10. Log turn
-    _log_turn(response, choice)
-
-    # 11. Store current options for next turn's trust delta processing
-    global _prev_options
-    _prev_options = response.get("options", [])
-
-    # 12. Autosave
-    do_autosave()
+    # 5-12. Non-critical post-turn steps — each wrapped so one failure
+    #       doesn't crash the whole turn.  Full tracebacks go to error.log.
+    _safe_call(_update_graph, "story graph update",
+               response, new_state, choice)
+    _safe_call(_update_memory, "character memory update",
+               response, new_state, choice)
+    _safe_call(_write_chapter, "chapter.md write",
+               response, new_state, choice)
+    _safe_call(_write_dashboard_html, "dashboard HTML write")
+    _safe_call(obsidian_live.on_turn, "Obsidian live export",
+               response, new_state, choice)
+    _safe_call(_log_turn, "turn log append", response, choice)
+    _safe_call(do_autosave, "autosave")
 
     logger.info("═══ TURN COMPLETE ═══")
 
@@ -225,42 +236,22 @@ def run_interactive() -> None:
 def run_one_turn() -> bool:
     """
     Execute one full turn in auto mode (no user input).
+    Delegates to step() — no duplicated pipeline.
     Returns True on success, False on failure.
     """
-    logger.info("═══ TURN START ═══")
-
-    try:
-        system_prompt, user_prompt = build_prompt()
-    except Exception as exc:
-        logger.error("Failed to build prompt: %s", exc)
+    result = step(None)  # choice=None → auto mode
+    if result is None:
         return False
-
+    # Auto mode extras: console summary
     try:
-        response = call_deepseek(system_prompt, user_prompt)
-    except DeepSeekError as exc:
-        logger.error("DeepSeek API error: %s", exc)
-        return False
-
-    warnings = validate_response(response)
-    for w in warnings:
-        logger.warning("Validation: %s", w)
-
-    try:
-        new_state = apply_turn(response)  # no choice in auto mode
-    except Exception as exc:
-        logger.error("Failed to apply turn: %s", exc)
-        return False
-
-    _update_graph(response, new_state, None)
-    _update_memory(response, new_state)
-    _write_chapter(response, new_state, None)
-    _write_dashboard_html()
-    obsidian_live.on_turn(response, new_state, None)
-    _log_turn(response, None)
-    do_autosave()
-    _print_summary(response, new_state)
-
-    logger.info("═══ TURN COMPLETE ═══")
+        new_state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+        _print_summary(
+            {"story": result["story"], "options": result["options"],
+             "state": result["state"]},
+            new_state,
+        )
+    except Exception:
+        logger.error("Failed to print summary:\n%s", traceback.format_exc())
     return True
 
 
@@ -331,8 +322,8 @@ def _write_dashboard_html() -> None:
     try:
         from engine.dashboard import write_standalone
         write_standalone()
-    except Exception as exc:
-        logger.warning("Failed to write dashboard HTML: %s", exc)
+    except Exception:
+        logger.error("Failed to write dashboard HTML:\n%s", traceback.format_exc())
 
 
 def _write_chapter(response: dict, state: dict, choice: str | None) -> None:
@@ -399,6 +390,19 @@ def _print_summary(response: dict, state: dict) -> None:
 
 # ── Graph & memory integration ─────────────────────────────────────
 
+def _get_prev_options(state: dict) -> list[str]:
+    """Read the previous turn's AI options from session history.
+
+    Thread-safe replacement for the old module-level _prev_options global.
+    The second-to-last history entry contains the options that were shown to
+    the player last turn — those are the ones whose trust deltas we need.
+    """
+    history = state.get("history", [])
+    if len(history) >= 2:
+        return history[-2].get("options", [])
+    return []
+
+
 def _update_graph(response: dict, state: dict, choice: str | None) -> None:
     """Append the current turn as a node in the story graph."""
     try:
@@ -420,8 +424,8 @@ def _update_graph(response: dict, state: dict, choice: str | None) -> None:
         )
         save_graph(graph)
         logger.info("Graph: node %s added (parent=%s, choice=%s)", new_id, current_node, effective_choice)
-    except Exception as exc:
-        logger.warning("Failed to update story graph: %s", exc)
+    except Exception:
+        logger.error("Failed to update story graph:\n%s", traceback.format_exc())
 
 
 def _update_memory(response: dict, state: dict, choice: str | None = None) -> None:
@@ -459,14 +463,16 @@ def _update_memory(response: dict, state: dict, choice: str | None = None) -> No
         memory = load_memory()
 
         # 3. Apply trust deltas (option-based + keyword heuristic)
-        apply_trust_deltas(memory, story, choice, turn, _prev_options)
+        # Read prev_options from session history (thread-safe, no global)
+        prev_options = _get_prev_options(state)
+        apply_trust_deltas(memory, story, choice, turn, prev_options)
         memory = load_memory()
 
         # 4. Update faction dynamics (reputation + attitudes + drift)
         update_factions(memory, story, turn)
 
-    except Exception as exc:
-        logger.warning("Failed to update memory: %s", exc)
+    except Exception:
+        logger.error("Failed to update memory:\n%s", traceback.format_exc())
 
 
 def _obsidian_setup() -> None:

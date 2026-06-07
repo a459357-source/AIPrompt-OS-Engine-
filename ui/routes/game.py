@@ -1,5 +1,5 @@
 """Main game pages: index, next_turn, save/load, graph, history, reset."""
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from engine.run import step
@@ -97,8 +97,8 @@ async def index():
     )
 
 
-@router.get("/next", response_class=HTMLResponse)
-async def next_turn(choice: str = Query(..., min_length=1, max_length=1)):
+@router.post("/next", response_class=HTMLResponse)
+async def next_turn(choice: str = Form(..., min_length=1, max_length=1)):
     """
     Advance the story with the player's choice (A/B/C/D).
     Returns the new story page.

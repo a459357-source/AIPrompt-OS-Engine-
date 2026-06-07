@@ -88,7 +88,7 @@ export async function createStory(formData: FormData): Promise<Response> {
   return fetch('/new', { method: 'POST', body: formData })
 }
 
-export async function getGameState(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; error?: string }> {
+export async function getGameState(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; not_started?: boolean; error?: string }> {
   const res = await fetch('/api/game-state')
   if (!res.ok) {
     const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
@@ -145,6 +145,17 @@ export interface DashboardData {
   total_tokens: number
   characters: { name: string; trust_pct: number; relation: string; flags: string[] }[]
   history: unknown[]
+  analytics?: {
+    metrics_curves?: Record<string, { labels: number[]; datasets: { name: string; data: number[] }[]; label: string }>
+    status_timeline?: { turn: number; status: string; scene: string }[]
+    word_counts?: { turn: number; words: number; chars: number }[]
+    choice_stats?: { labels: string[]; counts: number[] }
+    api_usage?: { per_turn: { turn: number; prompt_tokens: number; completion_tokens: number; total_tokens: number }[]; totals: { calls: number; total_tokens: number; cost_usd: number } }
+    character_frequency?: { labels: string[]; counts: number[] }
+    branch_stats?: { total_nodes: number; leaf_count: number; max_depth: number; avg_branches: number }
+    faction_curves?: Record<string, { labels: number[]; datasets: { name: string; data: number[] }[]; label: string }>
+    summary?: { turns: number; status: string; characters: number; total_words: number; nodes: number; edges: number }
+  }
   error?: string
 }
 
@@ -171,10 +182,21 @@ export async function getDashboard(): Promise<DashboardData> {
 }
 
 export async function nextTurn(choice: string): Promise<GameTurnResponse> {
-  const res = await fetch(`/api/next?choice=${encodeURIComponent(choice)}`)
+  const formData = new FormData()
+  formData.append('choice', choice)
+  const res = await fetch('/api/next', { method: 'POST', body: formData })
   if (!res.ok) {
     const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
     return { story: '', state: {} as GameTurnResponse['state'], options: [], error: (data as { error?: string }).error || 'Failed to advance' }
+  }
+  return res.json()
+}
+
+export async function startGame(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; error?: string }> {
+  const res = await fetch('/api/start', { method: 'POST' })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+    return { story: '', options: [], state: {}, error: (data as { error?: string }).error || 'Failed to start game' }
   }
   return res.json()
 }

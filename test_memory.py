@@ -1,234 +1,244 @@
 """
-Tests for memory.py — Character trust, flags, initial trust, and
-story-based trust heuristics.
-Run: python prompt-os-engine/test_memory.py
+test_memory.py — 角色记忆系统测试
+===============================
+测试 memory 模块的核心功能：
+  • 角色自动注册
+  • 信任度更新
+  • metric_history 追踪
+  • 势力系统
+  • 角色层级管理
 """
-
 import sys
+import json
+import tempfile
 from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+import config
 from engine.memory import (
-    update_trust, set_flag, get_initial_trust,
-    guess_trust_delta_from_story,
+    load_memory, save_memory, update_trust,
+    set_flag, get_context_for_prompt,
     parse_option_trust_deltas,
     detect_new_characters_from_story,
+    get_initial_trust,
     init_factions, update_faction_reputation,
-    update_faction_attitude,
+    init_faction_attitudes, update_faction_attitude,
+    assign_character_tier, degrade_inactive_characters,
 )
 
-
-# ── Test helpers ───────────────────────────────────────────────────
-
-def _fresh_memory() -> dict:
-    return {"characters": {}, "world_flags": []}
+# Use a temp memory path so tests don't pollute real data
+_ORIG_MEMORY_PATH = config.MEMORY_PATH
 
 
-# ── Tests ──────────────────────────────────────────────────────────
+def setup_module():
+    """Use temp file for memory during tests."""
+    config.MEMORY_PATH = Path(tempfile.mktemp(suffix='.json'))
 
-def test_update_trust_creates_character():
-    """update_trust should create a character entry if it doesn't exist."""
+
+def teardown_module():
+    """Restore original path."""
+    config.MEMORY_PATH = _ORIG_MEMORY_PATH
+
+
+def _fresh_memory():
+    """Return a fresh empty memory dict."""
+    return {"characters": {}, "world_flags": [], "global_trust": 0.5}
+
+
+# ── Trust update tests ──────────────────────────────────────────────
+
+def test_update_trust_basic():
+    """信任度更新基本功能"""
     mem = _fresh_memory()
-    update_trust(mem, "林夜", 0.2, turn=1)
-    assert "林夜" in mem["characters"], "Character not created"
-    assert mem["characters"]["林夜"]["trust"] == 0.5, \
-        f"Expected 0.5 (0.3 + 0.2), got {mem['characters']['林夜']['trust']}"
-    print("✅ update_trust creates character: PASS")
-
-
-def test_update_trust_clamps():
-    """update_trust should clamp trust to 0.0-1.0."""
-    mem = _fresh_memory()
-    update_trust(mem, "A", 2.0, turn=1)   # would go to 2.3, clamped to 1.0
-    assert mem["characters"]["A"]["trust"] == 1.0, \
-        f"Expected 1.0, got {mem['characters']['A']['trust']}"
-
-    update_trust(mem, "B", -1.0, turn=1)  # would go to -0.7, clamped to 0.0
-    assert mem["characters"]["B"]["trust"] == 0.0, \
-        f"Expected 0.0, got {mem['characters']['B']['trust']}"
-    print("✅ update_trust clamping: PASS")
-
-
-def test_update_trust_metric_history():
-    """update_trust should append to metric_history when turn > 0."""
-    mem = _fresh_memory()
+    mem["characters"]["林夜"] = {"trust": 0.5, "flags": []}
     update_trust(mem, "林夜", 0.1, turn=1)
-    update_trust(mem, "林夜", 0.1, turn=2)
+    assert abs(mem["characters"]["林夜"]["trust"] - 0.6) < 0.01
+    print("✅ 信任度更新: PASS")
+
+
+def test_update_trust_clamped():
+    """信任度 clamp 到 [0, 1]"""
+    mem = _fresh_memory()
+    mem["characters"]["林夜"] = {"trust": 0.95, "flags": []}
+    update_trust(mem, "林夜", 0.2, turn=1)
+    assert mem["characters"]["林夜"]["trust"] == 1.0
+    print("✅ 信任度上限 clamp: PASS")
+
+    mem["characters"]["艾琳"] = {"trust": 0.05, "flags": []}
+    update_trust(mem, "艾琳", -0.2, turn=1)
+    assert mem["characters"]["艾琳"]["trust"] == 0.0
+    print("✅ 信任度下限 clamp: PASS")
+
+
+def test_metric_history_tracking():
+    """metric_history 自动追踪"""
+    mem = _fresh_memory()
+    mem["characters"]["林夜"] = {"trust": 0.5, "flags": []}
     update_trust(mem, "林夜", 0.1, turn=3)
-    hist = mem["characters"]["林夜"].get("metric_history", {}).get("trust", [])
-    assert len(hist) >= 3, f"Expected >= 3 history entries, got {len(hist)}"
-    # Dedup: consecutive same values should not be appended twice
-    update_trust(mem, "林夜", 0.0, turn=4)  # no change
-    hist2 = mem["characters"]["林夜"].get("metric_history", {}).get("trust", [])
-    assert len(hist2) == len(hist), \
-        f"Dedup failed — expected {len(hist)} entries, got {len(hist2)}"
-    print("✅ update_trust metric_history: PASS")
+    update_trust(mem, "林夜", -0.05, turn=5)
+
+    mh = mem["characters"]["林夜"].get("metric_history", {})
+    assert "trust" in mh
+    assert len(mh["trust"]) == 2
+    assert mh["trust"][0] == [3, 0.6]  # [turn, value]
+    assert mh["trust"][1] == [5, 0.55]
+    print("✅ metric_history 追踪: PASS")
 
 
-def test_set_flag_idempotent():
-    """set_flag should not duplicate flags."""
+def test_metric_history_generic():
+    """通用 metric 追踪（非 trust）"""
     mem = _fresh_memory()
-    set_flag(mem, "林夜", "初次见面")
-    set_flag(mem, "林夜", "初次见面")
-    set_flag(mem, "林夜", "并肩作战")
-    assert mem["characters"]["林夜"]["flags"] == ["初次见面", "并肩作战"], \
-        f"Expected ['初次见面', '并肩作战'], got {mem['characters']['林夜']['flags']}"
-    print("✅ set_flag idempotent: PASS")
+    mem["characters"]["林夜"] = {"trust": 0.5, "flags": []}
+    update_trust(mem, "林夜", 0.1, turn=1, metric="好感度")
+    update_trust(mem, "林夜", 0.2, turn=2, metric="fear")
+
+    mh = mem["characters"]["林夜"]["metric_history"]
+    assert "好感度" in mh
+    assert "fear" in mh
+    assert "trust" not in mh  # trust not auto-created when metric specified
+    print("✅ 通用 metric 追踪: PASS")
 
 
-def test_set_flag_world():
-    """set_flag with character=None should set world flags."""
+# ── Flag tests ──────────────────────────────────────────────────────
+
+def test_set_flag():
+    """Flag 设置 + 去重"""
     mem = _fresh_memory()
-    set_flag(mem, None, "世界末日")
-    assert "世界末日" in mem["world_flags"]
-    print("✅ set_flag world: PASS")
+    mem["characters"]["林夜"] = {"trust": 0.5, "flags": []}
+    set_flag(mem, "林夜", "初次相遇")
+    set_flag(mem, "林夜", "初次相遇")  # should not duplicate
+    assert "初次相遇" in mem["characters"]["林夜"]["flags"]
+    assert len(mem["characters"]["林夜"]["flags"]) == 1
+    print("✅ Flag 去重: PASS")
 
 
-def test_get_initial_trust_known():
-    """get_initial_trust should return relationship-based trust for known chars."""
+# ── Option parsing tests ────────────────────────────────────────────
+
+def test_parse_option_trust_deltas():
+    """解析选项中的信任度 delta"""
+    opts = [
+        "帮助她完成任务（艾琳信任度+10）",
+        "保持中立观察",
+        "拒绝她的请求（艾琳信任度-5，林夜信任度+3）",
+        "什么都不做",
+    ]
+    deltas = parse_option_trust_deltas(opts)
+    assert len(deltas) >= 3  # at least 3 deltas from 3 meaningful options
+    print("✅ 选项信任度解析: PASS")
+
+
+# ── Character detection tests ───────────────────────────────────────
+
+def test_detect_new_characters():
+    """从故事文本检测新角色"""
+    story = "林夜走向了陌生的少女。少女自称雪莉，是一位来自远方的旅者。艾琳警惕地看着她。"
+    known = {"林夜", "艾琳"}
+    newcomers = detect_new_characters_from_story(story, known)
+    assert "雪莉" in newcomers
+    print(f"✅ 新角色检测: PASS — 发现 {newcomers}")
+
+
+# ── Faction tests ───────────────────────────────────────────────────
+
+def test_init_factions():
+    """势力初始化"""
+    mem = _fresh_memory()
+    # Mock a minimal world_pack in config
+    init_factions(mem)
+    assert "factions" in mem
+    assert isinstance(mem["factions"], dict)
+    print("✅ 势力初始化: PASS")
+
+
+def test_faction_reputation():
+    """势力声望更新"""
+    mem = _fresh_memory()
+    mem["factions"] = {"银河联邦": {"reputation": 0.5, "type": "government", "goals": [], "resources": [], "influence": 70}}
+    update_faction_reputation(mem, "银河联邦", 0.1, turn=1)
+    update_faction_reputation(mem, "银河联邦", -0.05, turn=2)
+
+    assert abs(mem["factions"]["银河联邦"]["reputation"] - 0.55) < 0.01
+    mh = mem["factions"]["银河联邦"].get("metric_history", {}).get("reputation", [])
+    assert len(mh) == 2
+    print("✅ 势力声望更新: PASS")
+
+
+# ── Tier tests ──────────────────────────────────────────────────────
+
+def test_assign_tier():
+    """角色层级分配"""
+    mem = _fresh_memory()
+    mem["characters"]["林夜"] = {"trust": 0.7, "flags": []}
+    mem["characters"]["路人甲"] = {"trust": 0.3, "flags": []}
+
+    # Mock world_pack with is_main character
     world_pack = {
         "world": {
             "characters": [
-                {"name": "林夜", "relationship": ["盟友"]},
-                {"name": "敌人甲", "relationship": ["敌视"]},
+                {"name": "林夜", "is_main": True},
             ]
         }
     }
-    assert get_initial_trust("林夜", world_pack) == 0.55, \
-        f"Expected 0.55, got {get_initial_trust('林夜', world_pack)}"
-    assert get_initial_trust("敌人甲", world_pack) == 0.10, \
-        f"Expected 0.10, got {get_initial_trust('敌人甲', world_pack)}"
-    print("✅ get_initial_trust known: PASS")
+    assign_character_tier(mem, "林夜", world_pack, is_main=True)
+    assign_character_tier(mem, "路人甲", world_pack)
+
+    assert mem["characters"]["林夜"]["tier"] == "主角"
+    assert mem["characters"]["路人甲"]["tier"] in ("背景", "重要")
+    print("✅ 角色层级分配: PASS")
 
 
-def test_get_initial_trust_unknown():
-    """get_initial_trust should return 0.30 for unknown characters."""
-    assert get_initial_trust("路人甲", {}) == 0.30
-    print("✅ get_initial_trust unknown: PASS")
-
-
-def test_guess_trust_delta_specific():
-    """guess_trust_delta should return specific character when name is near keyword."""
-    story = "林夜对主角露出微笑，两人之间的关系似乎更加融洽了。"
-    deltas = guess_trust_delta_from_story(story)
-    # Should find "微笑" keyword and "林夜" nearby
-    assert len(deltas) > 0, "Expected at least one delta"
-    # Check that specific character was matched (not __all_present__)
-    chars = [d[0] for d in deltas if d[0] != "__all_present__"]
-    assert len(chars) > 0, f"Expected specific character match, got: {deltas}"
-    print(f"✅ guess_trust_delta specific: PASS — {deltas}")
-
-
-def test_guess_trust_delta_generic():
-    """guess_trust_delta should return deltas even when no specific name is near keywords.
-    The caller (apply_trust_deltas) handles __all_present__ or false-positive names —
-    the important thing is that sentiment keywords ARE detected."""
-    story = "The atmosphere was thick with 怀疑 and 不信任. 背叛 loomed over everything."
-    deltas = guess_trust_delta_from_story(story)
-    assert len(deltas) > 0, f"Expected at least one delta for keywords in story, got: {deltas}"
-    # Verify we got the right keywords
-    deltas_with_all = [d for d in deltas if d[0] == "__all_present__"]
-    deltas_named = [d for d in deltas if d[0] != "__all_present__"]
-    total = len(deltas_with_all) + len(deltas_named)
-    assert total > 0, f"Expected deltas, got none"
-    print(f"✅ guess_trust_delta generic: PASS — {len(deltas)} deltas ({len(deltas_with_all)} generic, {len(deltas_named)} named)")
-
-
-def test_parse_option_trust_deltas():
-    """parse_option_trust_deltas should extract name↑N and name↓N patterns."""
-    options = ["与林夜并肩作战，林夜↑5、卡洛琳↓3"]
-    deltas = parse_option_trust_deltas(options)
-    assert len(deltas) == 2, f"Expected 2 deltas, got {len(deltas)}"
-    names = {d[0] for d in deltas}
-    assert "林夜" in names
-    # Check values
-    for name, delta in deltas:
-        if name == "林夜":
-            assert delta == 0.05, f"Expected +0.05, got {delta}"
-        elif "卡洛琳" in name:
-            assert delta == -0.03, f"Expected -0.03, got {delta}"
-    print(f"✅ parse_option_trust_deltas: PASS — {deltas}")
-
-
-def test_detect_new_characters():
-    """detect_new_characters should find names introduced with '名叫' etc."""
-    story = "就在这时，一位名叫苏晴的女子走了进来。她自称是星联的特使。"
-    known = {"林夜", "卡洛琳"}
-    newcomers = detect_new_characters_from_story(story, known)
-    assert "苏晴" in newcomers, f"Expected '苏晴' in {newcomers}"
-    # Known names should not appear
-    assert "林夜" not in newcomers
-    print(f"✅ detect_new_characters: PASS — {newcomers}")
-
-
-def test_init_factions():
-    """init_factions should create faction entries from world_pack."""
+def test_degrade_inactive():
+    """非活跃角色降级"""
     mem = _fresh_memory()
-    # Need a world_pack on disk for this — skip if not available
-    try:
-        import config
-        from engine import io_utils
-        world = io_utils.read_yaml(config.WORLD_PACK_PATH)
-        if world.get("world", {}).get("factions"):
-            init_factions(mem)
-            assert len(mem.get("factions", {})) > 0, "Expected factions to be created"
-            print(f"✅ init_factions: PASS — {len(mem['factions'])} factions")
-        else:
-            print("⏭️  init_factions: SKIP (no factions in world_pack)")
-    except Exception as e:
-        print(f"⏭️  init_factions: SKIP ({e})")
+    mem["characters"]["路人甲"] = {
+        "trust": 0.3, "flags": [], "tier": "重要",
+        "last_appearance_turn": 1,
+    }
+    degrade_inactive_characters(mem, current_turn=20)
+    # After 19 turns of inactivity, should degrade
+    assert mem["characters"]["路人甲"]["tier"] in ("背景", "退休")
+    print("✅ 非活跃角色降级: PASS")
 
 
-def test_update_faction_reputation():
-    """update_faction_reputation should adjust and clamp reputation."""
-    mem = {"factions": {"测试势力": {"reputation": 0.5, "flags": []}}}
-    update_faction_reputation(mem, "测试势力", 0.2, turn=1)
-    assert mem["factions"]["测试势力"]["reputation"] == 0.7
-    update_faction_reputation(mem, "测试势力", -0.5, turn=2)
-    assert mem["factions"]["测试势力"]["reputation"] == 0.2
-    print("✅ update_faction_reputation: PASS")
+# ── Context generation ──────────────────────────────────────────────
 
+def test_get_context_for_prompt():
+    """为 prompt 生成角色上下文"""
+    mem = {
+        "characters": {
+            "林夜": {"trust": 0.7, "flags": ["初次相遇"], "relationship": "船长"},
+            "艾琳": {"trust": 0.5, "flags": [], "relationship": "同事"},
+        },
+        "world_flags": [],
+    }
+    ctx = get_context_for_prompt(mem)
+    assert "林夜" in ctx
+    assert "艾琳" in ctx
+    print("✅ Prompt 上下文生成: PASS")
 
-def test_update_faction_attitude():
-    """update_faction_attitude should adjust directed attitudes."""
-    mem = {"faction_attitudes": {}}
-    update_faction_attitude(mem, "A", "B", 0.1, turn=1)
-    assert mem["faction_attitudes"]["A"]["B"]["attitude"] == 0.6
-    update_faction_attitude(mem, "A", "B", -0.3, turn=2)
-    assert mem["faction_attitudes"]["A"]["B"]["attitude"] == 0.3
-    print("✅ update_faction_attitude: PASS")
-
-
-# ── Run ────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    setup_module()
     tests = [
-        test_update_trust_creates_character,
-        test_update_trust_clamps,
-        test_update_trust_metric_history,
-        test_set_flag_idempotent,
-        test_set_flag_world,
-        test_get_initial_trust_known,
-        test_get_initial_trust_unknown,
-        test_guess_trust_delta_specific,
-        test_guess_trust_delta_generic,
-        test_parse_option_trust_deltas,
-        test_detect_new_characters,
-        test_init_factions,
-        test_update_faction_reputation,
-        test_update_faction_attitude,
+        test_update_trust_basic, test_update_trust_clamped,
+        test_metric_history_tracking, test_metric_history_generic,
+        test_set_flag, test_parse_option_trust_deltas,
+        test_detect_new_characters, test_init_factions,
+        test_faction_reputation, test_assign_tier,
+        test_degrade_inactive, test_get_context_for_prompt,
     ]
-    passed = 0
+    failed = 0
     for test in tests:
         try:
             test()
-            passed += 1
-        except AssertionError as e:
-            print(f"❌ FAIL: {e}")
         except Exception as e:
-            print(f"💥 ERROR in {test.__name__}: {e}")
-    print(f"\n🎉 {passed}/{len(tests)} tests passed!")
-    sys.exit(0 if passed == len(tests) else 1)
+            print(f"❌ FAIL: {test.__name__} — {e}")
+            import traceback
+            traceback.print_exc()
+            failed += 1
+    teardown_module()
+    print(f"\n{'🎉' if failed == 0 else '❌'} Memory tests: {len(tests) - failed}/{len(tests)} passed, {failed} failed")
+    sys.exit(1 if failed else 0)

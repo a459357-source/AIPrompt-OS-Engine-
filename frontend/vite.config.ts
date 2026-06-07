@@ -13,16 +13,16 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api/game-state': 'http://localhost:8000',
-      '/api/next': 'http://localhost:8000',
-      '/api/npcs': 'http://localhost:8000',
-      '/api/dashboard': 'http://localhost:8000',
-      '/api/history': 'http://localhost:8000',
+      // All API routes — no more manual whitelist drift
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      // Server-rendered pages (no /api prefix)
       '/generate-world': 'http://localhost:8000',
       '/generate-field': 'http://localhost:8000',
       '/generate-rules': 'http://localhost:8000',
       '/new': 'http://localhost:8000',
-      '/next': 'http://localhost:8000',
       '/npcs': 'http://localhost:8000',
       '/settings': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
@@ -33,6 +33,8 @@ export default defineConfig({
       '/export': 'http://localhost:8000',
       '/dashboard': 'http://localhost:8000',
       '/history': 'http://localhost:8000',
+      '/graph': 'http://localhost:8000',
+      '/shutdown': 'http://localhost:8000',
     },
   },
 })

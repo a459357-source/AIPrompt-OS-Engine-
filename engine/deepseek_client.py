@@ -10,6 +10,7 @@ Model    : deepseek-chat
 
 import json
 import logging
+import time
 import requests
 
 import config
@@ -59,17 +60,43 @@ def call_deepseek(
         logger.info("Calling DeepSeek API → %s (attempt %d, max_tokens=%d)",
                      config.DEEPSEEK_ENDPOINT, attempt + 1, mt)
 
-        try:
-            resp = requests.post(
-                config.DEEPSEEK_ENDPOINT,
-                headers=headers,
-                json=payload,
-                timeout=90,
-            )
-        except requests.RequestException as exc:
-            raise DeepSeekError(f"HTTP request failed: {exc}") from exc
+        # ── HTTP request with retry on transient errors ──────────
+        MAX_HTTP_RETRIES = 3
+        for http_attempt in range(MAX_HTTP_RETRIES):
+            try:
+                resp = requests.post(
+                    config.DEEPSEEK_ENDPOINT,
+                    headers=headers,
+                    json=payload,
+                    timeout=90,
+                )
+            except requests.RequestException as exc:
+                if http_attempt < MAX_HTTP_RETRIES - 1:
+                    delay = 2 ** http_attempt
+                    logger.warning(
+                        "HTTP request failed (attempt %d/%d): %s — retrying in %ds",
+                        http_attempt + 1, MAX_HTTP_RETRIES, exc, delay,
+                    )
+                    time.sleep(delay)
+                    continue
+                raise DeepSeekError(f"HTTP request failed after {MAX_HTTP_RETRIES} attempts: {exc}") from exc
 
-        if resp.status_code != 200:
+            # Success
+            if resp.status_code == 200:
+                break
+
+            # Retryable error codes
+            retryable = resp.status_code in (429, 500, 502, 503, 504)
+            if retryable and http_attempt < MAX_HTTP_RETRIES - 1:
+                delay = 2 ** http_attempt
+                logger.warning(
+                    "API returned %d (attempt %d/%d) — retrying in %ds",
+                    resp.status_code, http_attempt + 1, MAX_HTTP_RETRIES, delay,
+                )
+                time.sleep(delay)
+                continue
+
+            # Non-retryable or exhausted retries
             raise DeepSeekError(
                 f"API returned {resp.status_code}: {resp.text[:500]}"
             )

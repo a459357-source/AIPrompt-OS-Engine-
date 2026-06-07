@@ -25,6 +25,10 @@ PRICING = {
     "deepseek-reasoner": (0.55, 2.19),   # $0.55/M input, $2.19/M output
 }
 
+# Dashboard data size limit: keep at most N data points per metric curve.
+# Beyond this, older points are downsampled to prevent HTML bloat (>1MB).
+MAX_HISTORY_POINTS = 50
+
 
 def compute_all() -> dict:
     """Compute all analytics and return a single serializable dict."""
@@ -101,6 +105,7 @@ def metrics_curves() -> dict[str, dict]:
         datasets = []
         for name, history in char_data.items():
             if history:
+                history = _downsample_history(history)
                 turns = [h[0] for h in history]
                 vals = [int(h[1] * 100) for h in history]
                 all_turns.update(turns)
@@ -130,6 +135,7 @@ def faction_curves() -> dict:
     for name, data in factions.items():
         mh = data.get("metric_history", {}).get("reputation", [])
         if mh:
+            mh = _downsample_history(mh)
             turns = [h[0] for h in mh]
             vals = [int(h[1] * 100) for h in mh]
         else:
@@ -161,6 +167,7 @@ def faction_attitude_curves() -> dict:
             att = data.get("attitude", 0.5)
             mh = data.get("metric_history", {}).get("attitude", [])
             if mh:
+                mh = _downsample_history(mh)
                 turns = [h[0] for h in mh]
                 vals = [int(h[1] * 100) for h in mh]
             else:
@@ -175,6 +182,28 @@ def faction_attitude_curves() -> dict:
             }
 
     return result
+
+
+def _downsample_history(history: list, max_points: int = MAX_HISTORY_POINTS) -> list:
+    """Keep at most *max_points* data points, preserving recent data.
+
+    When the list exceeds max_points, we keep all points from the second
+    half and downsample the first half uniformly.  This protects the
+    dashboard HTML from ballooning past 1 MB after 200+ turns.
+    """
+    if len(history) <= max_points:
+        return history
+    # Keep all recent points (second half), downsample older half
+    split = len(history) // 2
+    older = history[:split]
+    recent = history[split:]
+    # Uniform downsample of older half
+    keep_older = max_points - len(recent)
+    if keep_older <= 0:
+        return recent[-max_points:]
+    step = max(1, len(older) // keep_older)
+    sampled = older[::step][-keep_older:]
+    return sampled + recent
 
 
 def _empty_curve() -> dict:

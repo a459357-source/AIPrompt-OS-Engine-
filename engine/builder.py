@@ -156,12 +156,46 @@ def build_prompt() -> tuple[str, str]:
     else:
         last_choice_text = "这是故事的开始，没有上一轮选择。"
 
+    # ── Truncate history to avoid token-limit overflow ──────────
+    # DeepSeek context limit is 128K tokens (~400K chars Chinese).
+    # Each turn's full story can be 1-3K chars; 15+ turns → easily >100K.
+    # We keep the last 10 turns for context and summarize older turns.
+    MAX_HISTORY_TURNS = 10
+    full_history = session_state.get("history", [])
+    if len(full_history) > MAX_HISTORY_TURNS:
+        recent = full_history[-MAX_HISTORY_TURNS:]
+        older_count = len(full_history) - MAX_HISTORY_TURNS
+        # Build a state copy with truncated history + summary of older turns
+        state_for_prompt = dict(session_state)
+        state_for_prompt["history"] = recent
+        # Add a summary of older history
+        older_summaries = []
+        for h in full_history[:older_count]:
+            older_summaries.append(
+                f"T{h.get('turn','?')} [{h.get('status','?')}] {h.get('scene','?')}: "
+                f"{h.get('summary', h.get('story',''))[:80]}"
+            )
+        state_for_prompt["history_summary"] = (
+            f"（之前 {older_count} 轮摘要）\n" + "\n".join(older_summaries)
+        )
+        logger.info(
+            "Prompt: history truncated %d → %d turns (saved ~%d turns as summary)",
+            len(full_history), len(recent), older_count,
+        )
+    else:
+        state_for_prompt = session_state
+
+    # ── Estimate token usage and warn ───────────────────────────
+    _warn_if_approaching_limit(system_prompt, state_for_prompt, world_pack,
+                                memory_context, tier_context, faction_attitude_context,
+                                event_context, world_state_context)
+
     # ── Interpolate user prompt ────────────────────────────────
     user_raw = template.get("user", "")
     user_prompt = (
         user_raw
         .replace("{{WORLD}}", json.dumps(world_pack, ensure_ascii=False, indent=2))
-        .replace("{{STATE_JSON}}", json.dumps(session_state, ensure_ascii=False, indent=2))
+        .replace("{{STATE_JSON}}", json.dumps(state_for_prompt, ensure_ascii=False, indent=2))
         .replace("{{ENGINE_RULES}}", json.dumps(engine_config, ensure_ascii=False, indent=2))
         .replace("{{FORCE_EVENT_PROMPT}}", force_prompt)
         .replace("{{LAST_CHOICE}}", last_choice_text)
@@ -245,3 +279,30 @@ def _min_level_index(levels: list[str]) -> int:
         return min(config.INTERACTION_LEVELS.index(lv) for lv in levels)
     except ValueError:
         return 0
+
+
+def _warn_if_approaching_limit(
+    system_prompt: str, state: dict, world_pack: dict,
+    memory_context: str, tier_context: str, faction_context: str,
+    event_context: str, world_state_context: str,
+) -> None:
+    """Estimate total prompt tokens and warn if approaching 128K limit."""
+    # Rough estimate: Chinese ≈ 0.5 tokens/char, English ≈ 0.25 tokens/char
+    # Conservative: use 0.6 to be safe
+    total_chars = (
+        len(system_prompt) +
+        len(json.dumps(world_pack, ensure_ascii=False)) +
+        len(json.dumps(state, ensure_ascii=False)) +
+        len(memory_context) + len(tier_context) + len(faction_context) +
+        len(event_context) + len(world_state_context)
+    )
+    estimated_tokens = int(total_chars * 0.6)
+
+    if estimated_tokens > 100_000:
+        logger.warning(
+            "⚠️ Prompt ~%d tokens — approaching 128K limit. "
+            "Consider reducing STORY_LENGTH or resetting history.",
+            estimated_tokens,
+        )
+    elif estimated_tokens > 70_000:
+        logger.info("Prompt ~%d tokens (within safe range)", estimated_tokens)

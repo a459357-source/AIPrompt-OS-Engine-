@@ -56,10 +56,16 @@ def write_markdown(path: Path, content: str, frontmatter: dict | None = None) ->
 
 
 def append_markdown(path: Path, content: str, frontmatter: dict | None = None) -> None:
-    """Append to a Markdown file (for multi-turn chapter accumulation)."""
+    """Append to a Markdown file (for multi-turn chapter accumulation).
+
+    Only writes YAML frontmatter when the file is empty (first turn).
+    Subsequent appends skip frontmatter to avoid violating the Markdown
+    spec which allows at most one YAML frontmatter block per file.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
+    is_empty = not path.exists() or path.stat().st_size == 0
     with open(path, "a", encoding="utf-8") as fh:
-        if frontmatter:
+        if frontmatter and is_empty:
             fh.write("---\n")
             yaml.dump(frontmatter, fh, allow_unicode=True, default_flow_style=False, sort_keys=False)
             fh.write("---\n\n")

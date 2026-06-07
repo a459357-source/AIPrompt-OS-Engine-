@@ -15,9 +15,12 @@ router = APIRouter(prefix="/api", tags=["api"])
 
 @router.get("/game-state")
 async def api_game_state():
-    """Return current game state as JSON for the React frontend."""
+    """Return current game state as JSON (read-only, no side effects).
+
+    If the game has not started yet (no history), returns a 'not_started'
+    flag so the frontend can prompt the user to call POST /api/start.
+    """
     from fastapi.responses import JSONResponse
-    from engine.run import step
 
     try:
         state = io_utils.read_yaml(config.SESSION_STATE_PATH)
@@ -25,22 +28,30 @@ async def api_game_state():
         return JSONResponse({"error": "没有活动中的游戏，请先创建故事"}, status_code=404)
 
     history = state.get("history", [])
-    if history:
-        last = history[-1]
-        story = last.get("story", last.get("summary", ""))
-        options = last.get("options", [])
-    else:
-        # No history — auto-generate the opening scene
-        result = step(None)
-        if result is not None:
-            try:
-                state = io_utils.read_yaml(config.SESSION_STATE_PATH)
-            except Exception:
-                pass
-            story = result["story"]
-            options = result["options"]
-        else:
-            return JSONResponse({"error": "AI 生成失败，请检查 API Key 后刷新"}, status_code=500)
+    if not history:
+        # Game not started — return minimal state, no AI call
+        chars_with_trust: dict[str, dict] = {}
+        raw_chars = state.get("characters", {})
+        for key, sc in raw_chars.items():
+            chars_with_trust[key] = {**sc, "trust": 0.5, "trust_pct": 50, "flags": [], "tier": ""}
+        return JSONResponse({
+            "not_started": True,
+            "story": "",
+            "options": [],
+            "state": {
+                "turn": 0,
+                "status": state.get("status", "SETUP"),
+                "scene": state.get("scene", ""),
+                "characters": chars_with_trust,
+                "factions": [],
+                "force_event_pending": False,
+                "chapter": state.get("chapter", 1),
+            },
+        })
+
+    last = history[-1]
+    story = last.get("story", last.get("summary", ""))
+    options = last.get("options", [])
 
     # Merge trust data from memory.json into characters
     try:
@@ -82,6 +93,50 @@ async def api_game_state():
             "characters": chars_with_trust,
             "factions": factions_data,
             "force_event_pending": state.get("force_event_pending", False),
+            "chapter": state.get("chapter", 1),
+        },
+    })
+
+
+@router.post("/start")
+async def api_start_game():
+    """Generate the opening scene (POST — has side effects)."""
+    from fastapi.responses import JSONResponse
+    from engine.run import step
+
+    result = step(None)
+    if result is None:
+        return JSONResponse({"error": "AI 生成失败，请检查 API Key 后刷新"}, status_code=500)
+
+    try:
+        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+    except Exception:
+        state = {}
+
+    memory = load_memory()
+    mem_chars = memory.get("characters", {})
+
+    chars_with_trust: dict[str, dict] = {}
+    raw_chars = state.get("characters", {})
+    for key, sc in raw_chars.items():
+        name = sc.get("name", key)
+        mem = mem_chars.get(name, {})
+        trust = mem.get("trust", 0.5)
+        chars_with_trust[key] = {
+            **sc, "trust": trust, "trust_pct": round(trust * 100),
+            "flags": mem.get("flags", []), "tier": mem.get("tier", ""),
+        }
+
+    return JSONResponse({
+        "story": result["story"],
+        "options": result["options"],
+        "state": {
+            "turn": state.get("turn", result.get("turn", 1)),
+            "status": state.get("status", result.get("status", "SETUP")),
+            "scene": state.get("scene", result.get("scene", "")),
+            "characters": chars_with_trust,
+            "factions": [],
+            "force_event_pending": False,
             "chapter": state.get("chapter", 1),
         },
     })
@@ -227,8 +282,10 @@ async def api_history():
 
 @router.get("/dashboard")
 async def api_dashboard():
-    """Return dashboard stats as JSON."""
+    """Return dashboard stats + analytics as JSON."""
     from fastapi.responses import JSONResponse
+    from engine.analytics import compute_all
+
     try:
         state = io_utils.read_yaml(config.SESSION_STATE_PATH)
         memory = load_memory()
@@ -286,6 +343,9 @@ async def api_dashboard():
     except Exception:
         pass
 
+    # Full analytics from analytics engine
+    analytics = compute_all()
+
     return JSONResponse({
         "turn": turn,
         "status": status,
@@ -298,12 +358,13 @@ async def api_dashboard():
         "api_calls": api_calls,
         "total_tokens": total_tokens,
         "characters": char_trust,
-        "history": state.get("history", [])[-5:],  # last 5 turns
+        "history": state.get("history", [])[-5:],
+        "analytics": analytics,
     })
 
 
-@router.get("/next")
-async def api_next_turn(choice: str = "A"):
+@router.post("/next")
+async def api_next_turn(choice: str = Form("A")):
     """Advance the game with a choice and return new state as JSON."""
     from fastapi.responses import JSONResponse
     from engine.run import step
