@@ -499,6 +499,7 @@ export default function Game() {
   const [autoAdvancePaused, setAutoAdvancePaused] = useState(true)
   const [autoAdvanceRemaining, setAutoAdvanceRemaining] = useState(0)
   const [autoAdvanceCountdown, setAutoAdvanceCountdown] = useState(autoAdvanceDelaySec)
+  const [openingPending, setOpeningPending] = useState(false)
 
   const applyTurnData = useCallback((data: {
     story: string
@@ -507,6 +508,7 @@ export default function Game() {
   }) => {
     setStory(data.story)
     setOptions(data.options || [])
+    if ((data.options?.length ?? 0) > 0) setOpeningPending(false)
     const st = data.state
     setTurn((st.turn as number) || 1)
     setStatus((st.status as string) || 'SETUP')
@@ -537,20 +539,38 @@ export default function Game() {
         if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
         if (gen.active && gen.story) {
           logger.info('Game', 'Opening generation in flight — waiting')
+          setOpeningPending(true)
           setStory(gen.story)
           setLoading(false)
           try {
             const ready = await waitForGameReady()
             if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
             applyTurnData(ready)
+            setOpeningPending(false)
           } catch (e) {
             if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
-            setError(formatFetchError(e))
+            logger.warn('Game', 'Opening wait timeout — clearing stale generation')
+            await cancelGeneration()
+            setOpeningPending(true)
+            setStory('')
+            setError('')
+            // fall through to startGameOnce below
           }
-          return
+          if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
+          const recheck = await getGameState()
+          if (!recheck.not_started && recheck.story) {
+            applyTurnData({
+              story: recheck.story,
+              options: recheck.options,
+              state: recheck.state as Record<string, unknown>,
+            })
+            setOpeningPending(false)
+            return
+          }
         }
 
         logger.info('Game', 'Game not started — calling startGameOnce()')
+        setOpeningPending(true)
         setStory('')
         let firstDelta = false
         const started = await startGameOnce({
@@ -577,6 +597,7 @@ export default function Game() {
           options: started.options,
           state: started.state as unknown as Record<string, unknown>,
         })
+        setOpeningPending(false)
         logger.info('Game', 'Opening scene ready')
         setLoading(false)
         return
@@ -1627,7 +1648,7 @@ export default function Game() {
             {/* Choices — fixed at bottom */}
             <div className={cn('shrink-0 border-t border-neural-cyan/15 glass-panel rounded-none border-x-0 pt-3 pb-1', readingMode && 'game-chrome-hidden')}>
             <AnimatePresence>
-              {options.length > 0 && (
+              {options.length > 0 ? (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="flex flex-col gap-2 min-w-0 flex-1">
@@ -1769,6 +1790,52 @@ export default function Game() {
                     </motion.div>
                   )}
                   </div>
+                </motion.div>
+              ) : (
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="px-4 pb-3 space-y-3">
+                  {openingPending || choosing ? (
+                    <p className="text-sm text-game-muted flex items-center gap-2 py-2">
+                      <span className="inline-block h-4 w-4 border-2 border-game-accent/30 border-t-game-accent rounded-full animate-spin shrink-0" />
+                      正在生成选项，请稍候…
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-game-muted py-1">
+                        {turn > 0
+                          ? '暂无选项，可直接输入你想做的事继续推进'
+                          : '开局尚未完成，请重新加载以生成选项'}
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        <Button variant="outline" size="sm" disabled={choosing} onClick={loadGame}>
+                          🔄 重新加载
+                        </Button>
+                      </div>
+                      {turn > 0 && (
+                        !showCustomInput ? (
+                          <Button variant="ghost" size="sm" disabled={choosing}
+                            onClick={() => setShowCustomInput(true)}
+                            className="w-full text-game-dim hover:text-game-text border border-dashed border-game-border"
+                          >
+                            ✏️ 自定义输入…
+                          </Button>
+                        ) : (
+                          <div className="flex gap-2">
+                            <input value={customInput} onChange={(e) => setCustomInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && customInput.trim()) { handleChoice(customInput.trim()); setCustomInput(''); setShowCustomInput(false) }
+                                if (e.key === 'Escape') { setShowCustomInput(false); setCustomInput('') }
+                              }}
+                              placeholder="输入你想做的事…" disabled={choosing} autoFocus
+                              className="flex-1 bg-game-bg border border-game-border rounded-md px-3 py-2 text-sm text-game-text placeholder:text-game-dim focus:outline-none focus:border-game-primary"
+                            />
+                            <Button variant="accent" size="sm" disabled={choosing || !customInput.trim()}
+                              onClick={() => { if (customInput.trim()) { handleChoice(customInput.trim()); setCustomInput(''); setShowCustomInput(false) } }}
+                            >确定</Button>
+                          </div>
+                        )
+                      )}
+                    </>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

@@ -20,6 +20,8 @@ from engine.save_manager import load_runtime_memory
 
 logger = logging.getLogger("api")
 
+_active_workers = 0
+
 
 def build_turn_payload(result: dict) -> dict[str, Any]:
     """Merge step() result with session/memory for frontend."""
@@ -71,18 +73,30 @@ def build_turn_payload(result: dict) -> dict[str, Any]:
 
 def cancel_active_generation() -> dict[str, bool]:
     """Signal the in-flight worker to stop after current API call."""
+    from engine.save_manager import clear_runtime_memory
+
     request_cancel()
+    if _active_workers == 0:
+        clear_runtime_memory()
     return {"cancelled": True}
 
 
 def get_generation_status() -> dict[str, Any]:
     """Return partial in-flight story for disconnect recovery."""
-    partial = load_runtime_memory()
-    if not partial:
-        return {"active": False, "story": ""}
+    partial = load_runtime_memory() or {}
+    story = partial.get("story", "")
+    in_process = _active_workers > 0
+    if in_process:
+        return {
+            "active": True,
+            "story": story,
+            "cancelled": bool(partial.get("cancelled")),
+        }
+    if partial.get("active") is True and story:
+        return {"active": False, "story": story, "stale": True}
     return {
-        "active": bool(partial.get("story")),
-        "story": partial.get("story", ""),
+        "active": False,
+        "story": story,
         "cancelled": bool(partial.get("cancelled")),
     }
 
@@ -92,7 +106,9 @@ def run_step_sync(
     event_queue: queue.Queue,
 ) -> dict | None:
     """Run step() in worker thread, pushing SSE events to *event_queue*."""
+    global _active_workers
     clear_cancel()
+    _active_workers += 1
 
     def on_story_delta(delta: str) -> None:
         event_queue.put({"type": "story", "delta": delta})
@@ -109,6 +125,7 @@ def run_step_sync(
     def on_progress(phase: str, extra: dict) -> None:
         event_queue.put({"type": "progress", "phase": phase, **extra})
 
+    result = None
     try:
         result = step(
             choice,
@@ -118,13 +135,19 @@ def run_step_sync(
         )
     except Exception:
         logger.error("step() failed", exc_info=True)
+        from engine.save_manager import clear_runtime_memory
+        clear_runtime_memory()
         event_queue.put({
             "type": "error",
             "error": get_last_step_error() or "AI 生成失败，请重试",
         })
         return None
+    finally:
+        _active_workers -= 1
 
     if result is None:
+        from engine.save_manager import clear_runtime_memory
+        clear_runtime_memory()
         err = get_last_step_error() or "AI 生成失败，请重试"
         event_queue.put({"type": "error", "error": err})
         return None
