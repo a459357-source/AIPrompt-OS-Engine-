@@ -33,6 +33,7 @@ system: |
   - 每个关系自带 tags(标签) 和 importantMoments(关键经历)
   - AI 生成剧情时优先参考 importantMoments 和 tags，而非简单数值
   - 关键事件(拯救/牺牲/告白/背叛)记录为 importantMoment，同时更新多维数值
+  - 关系数值与人格核心（CHARACTER_BRAIN）共同决定行为；触犯禁忌(taboo)时即使 affection 很高，角色也可拒绝或强烈反弹，不得无条件顺从
 
   【关键物品规则 — 强制】
   - 关键物品可转移（获得/遗失/偷窃/交易/拍卖/继承/赠予）。
@@ -71,6 +72,7 @@ user: |
   {{DIRECTOR_ADVICE}}
   {{LAST_CHOICE}}
   {{CHARACTERS_CONTEXT}}
+  {{CHARACTER_BRAIN}}
   {{RELATIONSHIP_SYSTEM}}
   ENGINE: {{ENGINE_RULES}}
   {{FORCE_EVENT_PROMPT}}

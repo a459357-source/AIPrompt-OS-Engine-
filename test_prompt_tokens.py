@@ -50,7 +50,7 @@ def test_prompt_under_budget_with_long_history():
                 return {"rules": []}
             return {
                 "system": "sys {{FORCE_EVENT_NOTICE}} {{STORY_LENGTH}} {{STORY_LENGTH_MIN}} {{STORY_LENGTH_MAX}} {{AI_BEHAVIOR_RULES}} {{OPTION_COUNT}} {{CUSTOM_RULES}} {{MAIN_GOAL}}",
-                "user": "{{WORLD}}\n{{LONG_TERM_MEMORY}}\n{{RECENT_SUMMARIES}}\n{{HOT_CONTEXT}}\n{{LAST_CHOICE}}\n{{CHARACTERS_CONTEXT}}\n{{RELATIONSHIP_SYSTEM}}\n{{ENGINE_RULES}}\n{{FORCE_EVENT_PROMPT}}",
+                "user": "{{WORLD}}\n{{LONG_TERM_MEMORY}}\n{{RECENT_SUMMARIES}}\n{{HOT_CONTEXT}}\n{{LAST_CHOICE}}\n{{CHARACTERS_CONTEXT}}\n{{CHARACTER_BRAIN}}\n{{RELATIONSHIP_SYSTEM}}\n{{ENGINE_RULES}}\n{{FORCE_EVENT_PROMPT}}",
             }
         ry.side_effect = _yaml
 
@@ -169,7 +169,7 @@ def test_prompt_router_filters_unrelated_factions():
                 return {"rules": []}
             return {
                 "system": "sys {{FORCE_EVENT_NOTICE}} {{STORY_LENGTH}} {{STORY_LENGTH_MIN}} {{STORY_LENGTH_MAX}} {{AI_BEHAVIOR_RULES}} {{OPTION_COUNT}} {{CUSTOM_RULES}} {{MAIN_GOAL}}",
-                "user": "{{WORLD}}\n{{LONG_TERM_MEMORY}}\n{{RECENT_SUMMARIES}}\n{{HOT_CONTEXT}}\n{{LAST_CHOICE}}\n{{CHARACTERS_CONTEXT}}\n{{RELATIONSHIP_SYSTEM}}\n{{ENGINE_RULES}}\n{{FORCE_EVENT_PROMPT}}",
+                "user": "{{WORLD}}\n{{LONG_TERM_MEMORY}}\n{{RECENT_SUMMARIES}}\n{{HOT_CONTEXT}}\n{{LAST_CHOICE}}\n{{CHARACTERS_CONTEXT}}\n{{CHARACTER_BRAIN}}\n{{RELATIONSHIP_SYSTEM}}\n{{ENGINE_RULES}}\n{{FORCE_EVENT_PROMPT}}",
             }
         ry.side_effect = _yaml
 

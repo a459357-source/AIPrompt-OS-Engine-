@@ -1,22 +1,138 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { StatusToast } from '@/components/StatusToast'
 import { CharacterCard } from '@/components/CharacterCard'
+import { TagInput } from '@/components/TagInput'
 import { InspectorPanel } from '@/components/layout/InspectorPanel'
 import { usePageShell } from '@/components/layout/usePageShell'
 import { SectionHeader } from '@/components/neural/SectionHeader'
 import { GlassPanel } from '@/components/neural/GlassPanel'
 import { Users } from 'lucide-react'
-import { getNpcs, generateNpc, type NpcData } from '@/lib/api'
+import {
+  getNpcs,
+  generateNpc,
+  patchNpcPersonality,
+  EMPTY_PERSONALITY_BRAIN,
+  type NpcData,
+  type PersonalityBrain,
+} from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { useAppSettings } from '@/hooks/useAppSettings'
 import { t } from '@/lib/i18n'
 
 type FilterType = 'all' | 'main' | 'npc'
+
+function mergePersonality(npc: NpcData | null): PersonalityBrain {
+  if (!npc?.personality) return { ...EMPTY_PERSONALITY_BRAIN }
+  return {
+    desire: npc.personality.desire || npc.goal || '',
+    fear: npc.personality.fear || '',
+    taboo: npc.personality.taboo || '',
+    secret: npc.personality.secret || npc.secret || '',
+    values: npc.personality.values?.length
+      ? npc.personality.values
+      : [...(npc.personality_tags || [])],
+  }
+}
+
+function PersonalityBrainEditor({
+  npc,
+  onSaved,
+}: {
+  npc: NpcData
+  onSaved: (personality: PersonalityBrain) => void
+}) {
+  const [draft, setDraft] = useState<PersonalityBrain>(() => mergePersonality(npc))
+  const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
+
+  useEffect(() => {
+    setDraft(mergePersonality(npc))
+    setSaveMsg('')
+  }, [npc.name])
+
+  const handleSave = async () => {
+    setSaving(true)
+    setSaveMsg('')
+    try {
+      const result = await patchNpcPersonality(npc.name, draft)
+      if (result.error) {
+        setSaveMsg(result.error)
+        return
+      }
+      const saved = result.personality || draft
+      setDraft(saved)
+      onSaved(saved)
+      setSaveMsg('已保存')
+    } catch (e) {
+      setSaveMsg((e as Error).message || String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3 pt-3 border-t border-game-border/60">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-sm font-medium text-game-text">人格核心</h4>
+        <Button variant="primary" size="sm" onClick={handleSave} disabled={saving}>
+          {saving ? '保存中…' : '保存'}
+        </Button>
+      </div>
+      {saveMsg && (
+        <p className={`text-xs ${saveMsg === '已保存' ? 'text-game-success' : 'text-game-danger'}`}>{saveMsg}</p>
+      )}
+      <div className="space-y-2">
+        <label className="text-[10px] text-game-muted">欲望</label>
+        <Input
+          value={draft.desire}
+          onChange={(e) => setDraft((p) => ({ ...p, desire: e.target.value }))}
+          placeholder="角色最想要什么"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-[10px] text-game-muted">恐惧</label>
+        <Input
+          value={draft.fear}
+          onChange={(e) => setDraft((p) => ({ ...p, fear: e.target.value }))}
+          placeholder="角色最害怕什么"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-[10px] text-game-accent">禁忌</label>
+        <Input
+          value={draft.taboo}
+          onChange={(e) => setDraft((p) => ({ ...p, taboo: e.target.value }))}
+          placeholder="触犯时即使高好感也会拒绝"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-[10px] text-game-accent">秘密</label>
+        <Textarea
+          value={draft.secret}
+          onChange={(e) => setDraft((p) => ({ ...p, secret: e.target.value }))}
+          placeholder="隐藏秘密"
+          rows={2}
+          className="text-xs"
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-[10px] text-game-muted">价值观</label>
+        <TagInput
+          value={draft.values}
+          onChange={(values) => setDraft((p) => ({ ...p, values }))}
+          presets={['荣誉', '自由', '血统', '忠诚', '利益', '正义']}
+          placeholder="输入后回车添加"
+          color="primary"
+          compact
+        />
+      </div>
+    </div>
+  )
+}
 
 export default function NPCs() {
   const { language } = useAppSettings()
@@ -69,6 +185,12 @@ export default function NPCs() {
     setGenerating(false)
   }, [])
 
+  const handlePersonalitySaved = useCallback((name: string, personality: PersonalityBrain) => {
+    setCharacters((prev) =>
+      prev.map((c) => (c.name === name ? { ...c, personality } : c)),
+    )
+  }, [])
+
   const filtered = characters.filter((c) => {
     if (filter === 'main' && !c.isMain) return false
     if (filter === 'npc' && c.isMain) return false
@@ -107,6 +229,10 @@ export default function NPCs() {
           trustPct={selected.trust_pct}
           className="border-none shadow-none bg-transparent"
         />
+        <PersonalityBrainEditor
+          npc={selected}
+          onSaved={(personality) => handlePersonalitySaved(selected.name, personality)}
+        />
       </InspectorPanel>
     ) : (
       <InspectorPanel title={t('world.characters', lang)}>
@@ -129,13 +255,12 @@ export default function NPCs() {
         status={loading ? 'active' : 'idle'}
       />
       <GlassPanel className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <p className="text-xs text-game-dim">角色由对局与记忆系统自动维护</p>
+        <p className="text-xs text-game-dim">角色由对局与记忆系统自动维护；人格核心影响 AI 行为决策</p>
         <Button variant="neural" size="sm" onClick={handleGenerate} disabled={generating}>
           {generating ? '生成中…' : '✨ AI 生成角色'}
         </Button>
       </GlassPanel>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <Input
           value={search}
@@ -161,7 +286,6 @@ export default function NPCs() {
         </div>
       </div>
 
-      {/* Character Grid */}
       {characters.length === 0 && !loading ? (
         <motion.div
           initial={{ opacity: 0 }}
@@ -170,7 +294,7 @@ export default function NPCs() {
         >
           <p className="text-game-muted text-lg">还没有角色</p>
           <p className="text-game-dim text-sm">点击上方「✨ AI生成角色」创建第一个角色，或前往「新故事」创建完整故事</p>
-          <Button variant="neural" onClick={() => window.location.href = '/new'}>
+          <Button variant="neural" onClick={() => { window.location.href = '/new' }}>
             前往世界构建
           </Button>
         </motion.div>

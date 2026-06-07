@@ -385,6 +385,9 @@ async def create_new_story(
             "background": ch.get("background", ""),
             "special_ability": ch.get("special_ability", ""),
         }
+        from engine.character_brain import seed_personality_from_world
+
+        char_data["personality"] = seed_personality_from_world(char_data)
         if isinstance(char_data["role_tags"], str): char_data["role_tags"] = [char_data["role_tags"]]
         if isinstance(char_data["personality_tags"], str): char_data["personality_tags"] = [char_data["personality_tags"]]
         if isinstance(char_data["relationship"], str): char_data["relationship"] = [char_data["relationship"]]
@@ -454,6 +457,7 @@ async def create_new_story(
             "trust": initial_trust,
             "flags": [],
             "relationship": mem_rel,
+            "personality": char_data["personality"],
         }
         if secret:
             mem_chars[name].setdefault("flags", []).append(f"隐藏秘密：{secret}")

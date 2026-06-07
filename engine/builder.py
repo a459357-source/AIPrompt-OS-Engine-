@@ -10,6 +10,11 @@ import logging
 
 import config
 from engine import io_utils
+from engine.character_brain import (
+    build_character_brain_context,
+    ensure_personalities,
+    resolve_brain_character_names,
+)
 from engine.memory import load_memory
 from engine.memory_layers import (
     build_hot_context,
@@ -217,6 +222,11 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
 
     # ── Memory layers (V2) ─────────────────────────────────────
     memory = load_memory()
+    ensure_personalities(memory, world_pack)
+    brain_names = resolve_brain_character_names(session_state, memory, world_pack)
+    character_brain = ""
+    if config.CHARACTER_BRAIN_ENABLED:
+        character_brain = build_character_brain_context(brain_names, memory, world_pack)
     long_term = build_long_term_memory(memory, session_state)
     recent_summaries = build_recent_summaries(count=2)
     hot_context = build_hot_context(session_state, memory)
@@ -255,6 +265,7 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
         .replace("{{FORCE_EVENT_PROMPT}}", force_prompt)
         .replace("{{LAST_CHOICE}}", last_choice_text)
         .replace("{{CHARACTERS_CONTEXT}}", characters_context)
+        .replace("{{CHARACTER_BRAIN}}", character_brain)
         .replace("{{RELATIONSHIP_SYSTEM}}", relationship_context)
         .replace("{{STORY_LENGTH}}", str(target_len))
         .replace("{{STORY_LENGTH_MIN}}", str(min_len))

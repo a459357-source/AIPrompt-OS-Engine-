@@ -1,5 +1,5 @@
 """JSON API endpoints for the React frontend."""
-from fastapi import APIRouter, Form, Query
+from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import JSONResponse
 import os
 
@@ -8,6 +8,12 @@ from engine import io_utils
 from engine import save_manager
 from engine.memory import load_memory, get_char_stats_for_ui, get_faction_stats_for_ui
 from engine.deepseek_client import call_deepseek, DeepSeekError
+from engine.character_brain import (
+    ensure_personalities,
+    normalize_personality,
+    seed_personality_from_world,
+    sync_personality_to_world_pack,
+)
 import config
 
 router = APIRouter(prefix="/api", tags=["api"])
@@ -230,12 +236,14 @@ async def api_npcs():
 
     chars = world_pack.get("world", {}).get("characters", [])
     mem_chars = memory.get("characters", {})
+    ensure_personalities(memory, world_pack)
 
     result = []
     for ch in chars:
         name = ch.get("name", "")
         mem = mem_chars.get(name, {})
         trust_val = mem.get("trust", 0.5)
+        personality = normalize_personality(mem.get("personality") or seed_personality_from_world(ch))
         result.append({
             "name": name,
             "isMain": ch.get("is_main", False),
@@ -251,6 +259,7 @@ async def api_npcs():
             "trust": trust_val,
             "trust_pct": round(trust_val * 100),
             "flags": mem.get("flags", []),
+            "personality": personality,
         })
 
     stats = {
@@ -263,6 +272,55 @@ async def api_npcs():
     return JSONResponse({"characters": result, "stats": stats})
 
 
+@router.patch("/npcs/{name}/personality")
+async def api_patch_npc_personality(name: str, request: Request):
+    """Update a character's personality core in memory and world_pack."""
+    from fastapi.responses import JSONResponse
+
+    name = str(name or "").strip()
+    if not name:
+        return JSONResponse({"error": "角色名不能为空"}, status_code=400)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "请求体须为 JSON"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"error": "请求体须为 JSON 对象"}, status_code=400)
+
+    try:
+        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+    except Exception:
+        return JSONResponse({"error": "无法读取 world_pack"}, status_code=500)
+
+    world_chars = world_pack.get("world", {}).get("characters", [])
+    if not any(isinstance(c, dict) and c.get("name") == name for c in world_chars):
+        return JSONResponse({"error": f"未找到角色：{name}"}, status_code=404)
+
+    personality = normalize_personality(body)
+
+    try:
+        from engine.state_store import load_runtime, commit_runtime
+
+        runtime = load_runtime(clear_cache=True)
+        memory = runtime.memory
+        mem_chars = memory.setdefault("characters", {})
+        entry = mem_chars.setdefault(name, {"trust": 0.5, "flags": [], "relationship": ""})
+        entry["personality"] = personality
+        runtime.memory = memory
+        commit_runtime(runtime)
+    except Exception as exc:
+        return JSONResponse({"error": f"更新 memory 失败: {exc}"}, status_code=500)
+
+    try:
+        sync_personality_to_world_pack(world_pack, name, personality)
+        io_utils.write_yaml(config.WORLD_PACK_PATH, world_pack)
+    except Exception as exc:
+        return JSONResponse({"error": f"同步 world_pack 失败: {exc}"}, status_code=500)
+
+    return JSONResponse({"ok": True, "name": name, "personality": personality})
+
+
 @router.post("/npcs/generate")
 async def api_generate_npc(role_hint: str = Form("")):
     """AI-generate a new NPC and auto-add to world/state/memory."""
@@ -270,7 +328,13 @@ async def api_generate_npc(role_hint: str = Form("")):
     from engine.deepseek_client import call_deepseek, DeepSeekError
 
     system = "你是一个 Galgame 角色生成器。根据已有故事设定，生成一个与现有角色不重复的新NPC。只输出JSON。"
-    user = f"为当前故事生成一个新角色。角色定位参考：{role_hint or '重要配角'}。\n\n输出JSON格式：{{\"name\":\"角色名\",\"role_tags\":[\"身份\"],\"personality_tags\":[\"性格1\",\"性格2\",\"性格3\"],\"appearance\":\"外貌特征（10~30字）\",\"relationship\":[\"与主角关系\"],\"goal\":\"角色目标\",\"secret\":\"隐藏秘密\"}}"
+    user = (
+        f"为当前故事生成一个新角色。角色定位参考：{role_hint or '重要配角'}。\n\n"
+        "输出JSON格式："
+        '{"name":"角色名","role_tags":["身份"],"personality_tags":["性格1","性格2","性格3"],'
+        '"appearance":"外貌特征（10~30字）","relationship":["与主角关系"],"goal":"角色目标","secret":"隐藏秘密",'
+        '"personality":{"desire":"核心欲望","fear":"最深恐惧","taboo":"行为禁忌","secret":"隐藏秘密","values":["价值观1","价值观2"]}}'
+    )
 
     try:
         result = call_deepseek(system, user, temperature=0.9, max_tokens=config.MAX_TOKENS, skip_validation=True)
@@ -291,6 +355,8 @@ async def api_generate_npc(role_hint: str = Form("")):
         "background": result.get("background", ""),
         "special_ability": result.get("special_ability", ""),
     }
+    raw_personality = result.get("personality") if isinstance(result.get("personality"), dict) else {}
+    ch["personality"] = normalize_personality({**seed_personality_from_world(ch), **raw_personality})
 
     # Add to world_pack
     try:
@@ -321,6 +387,7 @@ async def api_generate_npc(role_hint: str = Form("")):
             "trust": 0.5,
             "flags": [],
             "relationship": ch["relationship"][0] if ch["relationship"] else "",
+            "personality": ch["personality"],
         }
         if ch.get("secret"):
             memory["characters"][name].setdefault("flags", []).append(f"隐藏秘密：{ch['secret']}")
@@ -329,7 +396,22 @@ async def api_generate_npc(role_hint: str = Form("")):
     except Exception:
         pass
 
-    return JSONResponse(ch)
+    return JSONResponse({
+        "name": name,
+        "isMain": False,
+        "role_tags": ch["role_tags"],
+        "personality_tags": ch["personality_tags"],
+        "appearance": ch["appearance"],
+        "relationship": ch["relationship"],
+        "goal": ch["goal"],
+        "secret": ch["secret"],
+        "background": ch.get("background", ""),
+        "special_ability": ch.get("special_ability", ""),
+        "trust": 0.5,
+        "trust_pct": 50,
+        "flags": [],
+        "personality": ch["personality"],
+    })
 
 
 @router.get("/history")

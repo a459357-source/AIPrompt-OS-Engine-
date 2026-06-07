@@ -17,6 +17,22 @@ export interface Character {
   trust_pct?: number   // 实际信任度 0-100，来自 memory.json（NPC 页面展示用）
 }
 
+export interface PersonalityBrain {
+  desire: string
+  fear: string
+  taboo: string
+  secret: string
+  values: string[]
+}
+
+export const EMPTY_PERSONALITY_BRAIN: PersonalityBrain = {
+  desire: '',
+  fear: '',
+  taboo: '',
+  secret: '',
+  values: [],
+}
+
 export interface WorldGenRequest {
   keywords: string
 }

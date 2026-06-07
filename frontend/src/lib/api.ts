@@ -256,6 +256,33 @@ export interface NpcData {
   trust: number
   trust_pct: number
   flags: string[]
+  personality?: import('@/lib/types').PersonalityBrain
+}
+
+export type PersonalityBrain = import('@/lib/types').PersonalityBrain
+
+export const EMPTY_PERSONALITY_BRAIN: PersonalityBrain = {
+  desire: '',
+  fear: '',
+  taboo: '',
+  secret: '',
+  values: [],
+}
+
+export async function patchNpcPersonality(
+  name: string,
+  personality: PersonalityBrain,
+): Promise<{ ok?: boolean; personality?: PersonalityBrain; error?: string }> {
+  const res = await apiFetch(`/api/npcs/${encodeURIComponent(name)}/personality`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(personality),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    return { error: data.error || `HTTP ${res.status}` }
+  }
+  return data
 }
 
 export async function getNpcs(): Promise<{ characters: NpcData[]; stats: { total: number; main: number; npc: number; avg_trust: number }; error?: string }> {
@@ -270,7 +297,7 @@ export async function generateNpc(roleHint?: string): Promise<NpcData & { error?
   const res = await apiFetch('/api/npcs/generate', { method: 'POST', body: fd })
   if (!res.ok) {
     const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
-    return { ...data, name: '', isMain: false, role_tags: [], personality_tags: [], appearance: '', relationship: [], goal: '', secret: '', background: '', special_ability: '', trust: 0, trust_pct: 0, flags: [] }
+    return { ...data, name: '', isMain: false, role_tags: [], personality_tags: [], appearance: '', relationship: [], goal: '', secret: '', background: '', special_ability: '', trust: 0, trust_pct: 0, flags: [], personality: EMPTY_PERSONALITY_BRAIN }
   }
   return res.json()
 }

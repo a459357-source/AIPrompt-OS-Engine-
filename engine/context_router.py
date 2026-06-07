@@ -474,12 +474,17 @@ def _keywords_overlap(keywords: set[str], text: str) -> bool:
     return bool(keywords & text_keywords)
 
 
-def _is_recent_character(name: str, last_turn: int, inputs: RouterInputs) -> bool:
+def is_recent_character(name: str, last_turn: int, inputs: RouterInputs) -> bool:
+    """True if character appeared recently or is named in recent context."""
     if inputs.current_turn <= 0:
         return False
     if last_turn > 0 and inputs.current_turn - last_turn <= config.CONTEXT_ROUTER_RECENT_TURNS:
         return True
     return name in inputs.recent_context
+
+
+def _is_recent_character(name: str, last_turn: int, inputs: RouterInputs) -> bool:
+    return is_recent_character(name, last_turn, inputs)
 
 
 def _is_long_absent(name: str, last_turn: int, inputs: RouterInputs) -> bool:

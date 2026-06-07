@@ -34,6 +34,7 @@ def setup_module():
     _ORIG_PATHS['memory'] = config.MEMORY_PATH
     _ORIG_PATHS['saves'] = config.SAVES_DIR
     _ORIG_PATHS['chapter'] = config.CHAPTER_PATH
+    _ORIG_PATHS['world_pack'] = config.WORLD_PACK_PATH
 
     config.SESSION_STATE_PATH = tmp / "state.yaml"
     config.STORY_GRAPH_PATH = tmp / "graph.json"
@@ -70,6 +71,8 @@ def teardown_module():
             config.SAVES_DIR = path
         elif key == 'chapter':
             config.CHAPTER_PATH = path
+        elif key == 'world_pack':
+            config.WORLD_PACK_PATH = path
 
 
 def test_health_endpoint():
@@ -146,6 +149,59 @@ def test_npcs_endpoint():
     assert "characters" in data
     assert "stats" in data
     print("✅ NPC 列表: PASS")
+
+
+def test_patch_npc_personality():
+    """PATCH /api/npcs/{name}/personality 更新人格核心"""
+    from ui.web_app import app
+    from fastapi.testclient import TestClient
+
+    tmp_world = config.SESSION_STATE_PATH.parent / "world_pack.yaml"
+    config.WORLD_PACK_PATH = tmp_world
+    io_utils.write_yaml(config.WORLD_PACK_PATH, {
+        "world": {
+            "characters": [
+                {"name": "林夜", "is_main": True, "goal": "航行", "personality_tags": ["冷静"]},
+            ],
+        },
+    })
+    io_utils.write_json(config.MEMORY_PATH, {
+        "characters": {
+            "林夜": {
+                "trust": 0.5,
+                "flags": [],
+                "personality": {
+                    "desire": "航行",
+                    "fear": "",
+                    "taboo": "",
+                    "secret": "",
+                    "values": ["冷静"],
+                },
+            },
+        },
+        "world_flags": [],
+    })
+
+    client = TestClient(app)
+    payload = {
+        "desire": "探索深空",
+        "fear": "失去船员",
+        "taboo": "被命令",
+        "secret": "隐藏坐标",
+        "values": ["自由", "责任"],
+    }
+    resp = client.patch("/api/npcs/林夜/personality", json=payload)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data.get("ok") is True
+    assert data["personality"]["taboo"] == "被命令"
+
+    get_resp = client.get("/api/npcs")
+    chars = get_resp.json()["characters"]
+    lin = next(c for c in chars if c["name"] == "林夜")
+    assert lin["personality"]["desire"] == "探索深空"
+    assert lin["personality"]["values"] == ["自由", "责任"]
+    print("✅ PATCH 人格核心: PASS")
 
 
 def test_history_endpoint():
