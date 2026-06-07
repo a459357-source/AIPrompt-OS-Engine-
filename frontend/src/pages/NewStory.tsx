@@ -660,17 +660,13 @@ export default function NewStory() {
                                 )
                               })}
                             </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-game-dim shrink-0">标签</span>
-                              <input
-                                type="text"
-                                defaultValue={(r.tags || []).join('、')}
-                                onBlur={(e) => updateRel('tags', e.target.value.split(/[、,，]/).map(s => s.trim()).filter(Boolean))}
-                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur() } }}
-                                placeholder="青梅竹马、救命恩人…"
-                                className="flex-1 text-[11px] h-6 bg-game-bg border border-game-border rounded px-2 text-game-text"
-                              />
-                            </div>
+                            <TagInput
+                              value={r.tags || []}
+                              onChange={(tags) => updateRel('tags', tags)}
+                              presets={['青梅竹马','救命恩人','秘密共享','竞争意识','单向暗恋','互相试探','过去纠葛','命运绑定','生死之交','不共戴天']}
+                              placeholder="关系标签…"
+                              color="accent"
+                            />
                           </div>
                         )
                       })}
