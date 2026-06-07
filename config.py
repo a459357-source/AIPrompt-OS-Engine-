@@ -239,9 +239,12 @@ def api_limits() -> dict[str, int | float]:
 MIN_STORY_LENGTH = 300
 DEFAULT_STORY_LENGTH = 1000
 RECOMMENDED_STORY_LENGTH = DEFAULT_STORY_LENGTH
-# JSON 回复含 state/options，needed ≈ length × ratio，上限受官方 max output 约束
-STORY_LENGTH_TOKEN_RATIO = 1.8
-MAX_STORY_LENGTH = int(DEEPSEEK_MAX_OUTPUT_TOKENS / STORY_LENGTH_TOKEN_RATIO)  # 213333
+# JSON 回复含 story + options + state，需为正文字数与结构化字段分别留 budget
+STORY_CHAR_TO_TOKEN = 1.35
+JSON_OUTPUT_OVERHEAD_TOKENS = 3500
+MAX_STORY_LENGTH = int(
+    (DEEPSEEK_MAX_OUTPUT_TOKENS - JSON_OUTPUT_OVERHEAD_TOKENS) / STORY_CHAR_TO_TOKEN
+)  # ~281851
 
 
 def clamp_story_length(length: int) -> int:
@@ -251,8 +254,23 @@ def clamp_story_length(length: int) -> int:
 
 def tokens_for_story_length(length: int) -> int:
     """Map target story length to max_tokens (official output cap)."""
-    needed = int(clamp_story_length(length) * STORY_LENGTH_TOKEN_RATIO)
+    chars = clamp_story_length(length)
+    needed = int(chars * STORY_CHAR_TO_TOKEN) + JSON_OUTPUT_OVERHEAD_TOKENS
     return cap_output_tokens(needed)
+
+
+def ensure_story_length_token_sync() -> None:
+    """Keep max_tokens aligned with story_length (fixes legacy saves)."""
+    matched = tokens_for_story_length(STORY_LENGTH)
+    if MAX_TOKENS != matched:
+        save_max_tokens(matched)
+        reload_max_tokens()
+
+
+def min_story_length_for_target(length: int | None = None) -> int:
+    """Minimum acceptable story chars (~85% of target)."""
+    target = clamp_story_length(length if length is not None else STORY_LENGTH)
+    return max(MIN_STORY_LENGTH, int(target * 0.85))
 
 
 def story_length_limits() -> dict[str, int]:

@@ -15,6 +15,8 @@ from config import (
     clamp_story_length,
     save_max_tokens,
     reload_max_tokens,
+    tokens_for_story_length,
+    ensure_story_length_token_sync,
     save_temperature,
     reload_temperature,
     save_top_p,
@@ -57,6 +59,9 @@ def settings_payload() -> dict:
 
 def game_settings_payload() -> dict:
     """Generation quick settings for the Game page."""
+    reload_story_length()
+    reload_max_tokens()
+    ensure_story_length_token_sync()
     limits = config.story_length_limits()
     return {
         **limits,

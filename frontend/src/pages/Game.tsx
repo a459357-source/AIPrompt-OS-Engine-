@@ -12,12 +12,13 @@ import { getGameState, startGame, nextTurn, getHistory, getGameGenSettings, upda
 import { logger } from '@/lib/logger'
 import { parseRelationHints } from '@/lib/relationHints'
 
-/** Keep in sync with config.STORY_LENGTH_TOKEN_RATIO */
-const STORY_LENGTH_TOKEN_RATIO = 1.8
+/** Keep in sync with config.py */
+const STORY_CHAR_TO_TOKEN = 1.35
+const JSON_OUTPUT_OVERHEAD = 3500
 
 function estimateMaxTokens(length: number, min: number, max: number, outputCap: number) {
   const clamped = Math.max(min, Math.min(max, length))
-  return Math.max(1, Math.min(outputCap, Math.floor(clamped * STORY_LENGTH_TOKEN_RATIO)))
+  return Math.max(1, Math.min(outputCap, Math.floor(clamped * STORY_CHAR_TO_TOKEN + JSON_OUTPUT_OVERHEAD)))
 }
 
 function parseDraftLength(draft: string, fallback: number) {
@@ -138,7 +139,7 @@ export default function Game() {
   const [history, setHistory] = useState<HistoryTurn[]>([])
   const [storyLength, setStoryLength] = useState(1000)
   const [storyLengthMin, setStoryLengthMin] = useState(300)
-  const [storyLengthMax, setStoryLengthMax] = useState(213333)
+  const [storyLengthMax, setStoryLengthMax] = useState(281851)
   const [storyLengthRecommended, setStoryLengthRecommended] = useState(1000)
   const [storyLengthDraft, setStoryLengthDraft] = useState('1000')
   const [maxTokens, setMaxTokens] = useState(1800)
@@ -301,11 +302,32 @@ export default function Game() {
     }
     const clamped = Math.max(storyLengthMin, Math.min(storyLengthMax, parsed))
     setStoryLengthDraft(String(clamped))
-    const expectedTokens = estimateMaxTokens(clamped, storyLengthMin, storyLengthMax, maxOutputTokens)
-    if (clamped !== storyLength || expectedTokens !== maxTokens) {
-      queueGenSettingsSave({ storyLength: clamped }, true)
+    queueGenSettingsSave({ storyLength: clamped }, true)
+  }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, queueGenSettingsSave])
+
+  const persistStoryLengthBeforeTurn = useCallback(async () => {
+    const parsed = parseInt(storyLengthDraft, 10)
+    if (!Number.isFinite(parsed)) return
+    const clamped = Math.max(storyLengthMin, Math.min(storyLengthMax, parsed))
+    if (clamped === storyLength) return
+    try {
+      const saved = await updateGameGenSettings({ storyLength: clamped })
+      applyGenSettings(saved)
+    } catch (e) {
+      logger.error('Game', 'Persist story length before turn failed', { error: String(e) })
     }
-  }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, maxOutputTokens, maxTokens, queueGenSettingsSave])
+  }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, applyGenSettings])
+
+  useEffect(() => {
+    const parsed = parseInt(storyLengthDraft, 10)
+    if (!Number.isFinite(parsed)) return
+    const clamped = Math.max(storyLengthMin, Math.min(storyLengthMax, parsed))
+    if (clamped === storyLength) return
+    const t = setTimeout(() => {
+      queueGenSettingsSave({ storyLength: clamped }, true)
+    }, 800)
+    return () => clearTimeout(t)
+  }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, queueGenSettingsSave])
 
   const commitCompressThresholdDraft = useCallback(() => {
     const parsed = parseInt(compressThresholdDraft, 10)
@@ -343,6 +365,7 @@ export default function Game() {
     setChoosing(true)
     logger.info('Game', `Choice: ${choice}`)
     try {
+      await persistStoryLengthBeforeTurn()
       const data = await nextTurn(choice)
       if (data.error) { setError(data.error); setChoosing(false); return }
       setStory(data.story)
@@ -368,7 +391,7 @@ export default function Game() {
       }
     }
     setChoosing(false)
-  }, [])
+  }, [persistStoryLengthBeforeTurn])
 
   const hasGame = !loading && !error && story.length > 0
 
@@ -550,7 +573,7 @@ export default function Game() {
                 <CardContent className="pt-0 pb-3 px-4">
                   <QuickGenRow
                     label="目标字数"
-                    hint="每轮正文目标长度，修改后下一轮生成生效"
+                    hint="每轮正文目标长度；停输约 1 秒自动保存，选选项前也会生效"
                   >
                     <Input
                       type="text"

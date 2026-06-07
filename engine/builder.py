@@ -32,6 +32,9 @@ def build_prompt() -> tuple[str, str]:
       2. Check force-event triggers.
       3. Interpolate the prompt template.
     """
+    config.reload_story_length()
+    config.reload_max_tokens()
+    config.ensure_story_length_token_sync()
 
     world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
     session_state = io_utils.read_yaml(config.SESSION_STATE_PATH)
@@ -131,11 +134,14 @@ def build_prompt() -> tuple[str, str]:
         relationship_context = "【关系系统】使用默认好感度系统。"
 
     # ── Interpolate system prompt ──────────────────────────────
+    target_len = config.STORY_LENGTH
+    min_len = config.min_story_length_for_target(target_len)
     system_raw = template.get("system", "")
     system_prompt = (
         system_raw
         .replace("{{FORCE_EVENT_NOTICE}}", force_notice)
-        .replace("{{STORY_LENGTH}}", str(config.STORY_LENGTH))
+        .replace("{{STORY_LENGTH}}", str(target_len))
+        .replace("{{STORY_LENGTH_MIN}}", str(min_len))
         .replace("{{CUSTOM_RULES}}", custom_rules_text)
         .replace("{{MAIN_GOAL}}", main_goal)
     )
@@ -216,6 +222,8 @@ def build_prompt() -> tuple[str, str]:
         .replace("{{ARTIFACT_CONTEXT}}", artifact_context)
         .replace("{{EVENT_CONTEXT}}", event_context)
         .replace("{{WORLD_STATE}}", world_state_context)
+        .replace("{{STORY_LENGTH}}", str(target_len))
+        .replace("{{STORY_LENGTH_MIN}}", str(min_len))
     )
 
     # ── Estimate token usage and warn ───────────────────────────
@@ -225,7 +233,10 @@ def build_prompt() -> tuple[str, str]:
                                 faction_scope_context, artifact_context,
                                 event_context, world_state_context)
 
-    logger.info("Prompt built — force_event=%s last_choice=%s", force_triggered, last_choice or "none")
+    logger.info(
+        "Prompt built — force_event=%s last_choice=%s story_length=%d max_tokens=%d",
+        force_triggered, last_choice or "none", target_len, config.MAX_TOKENS,
+    )
     return system_prompt, user_prompt
 
 
