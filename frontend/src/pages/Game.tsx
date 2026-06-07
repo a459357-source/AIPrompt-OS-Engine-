@@ -17,8 +17,7 @@ import { logger } from '@/lib/logger'
 import { parseOptionEffects, deltaArrow, type RelationHint } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
 import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS, MAX_WIDTH_OPTIONS } from '@/lib/settings'
-import { dispatchAdultModeChange, getAdultRelationLevel, applyAdultThemePack, type AdultThemeId } from '@/lib/theme'
-import { useAdultThemeOptional } from '@/contexts/AdultThemeContext'
+import { dispatchAdultModeChange, dispatchAdultThemeChange, getAdultRelationLevel, applyAdultThemePack, type AdultThemeId } from '@/lib/theme'
 import { t, tTheme } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
@@ -355,7 +354,6 @@ export default function Game() {
   const [adultThemeOptions, setAdultThemeOptions] = useState<string[]>([])
   const [adultThemeLabels, setAdultThemeLabels] = useState<Record<string, string>>({})
   const [adultAdvancedOpen, setAdultAdvancedOpen] = useState(false)
-  const adultThemeCtx = useAdultThemeOptional()
   const [expressionStyle, setExpressionStyle] = useState('light_novel')
   const [expressionStyleOptions, setExpressionStyleOptions] = useState<string[]>(['literary', 'romantic', 'light_novel', 'direct'])
   const [expressionStyleLabels, setExpressionStyleLabels] = useState<Record<string, string>>({})
@@ -562,24 +560,20 @@ export default function Game() {
     setAdultThemeLabels(data.adult_theme_labels)
     if (data.adult_mode) {
       applyAdultThemePack(themeId)
-      adultThemeCtx?.setAdultTheme(themeId)
+      dispatchAdultThemeChange(themeId)
     }
     setExpressionStyle(data.expression_style)
     setExpressionStyleOptions(data.expression_style_options)
     setExpressionStyleLabels(data.expression_style_labels)
     setContentWeights(data.content_weights)
     setPresetWeights(data.preset_weights)
-  }, [adultThemeCtx])
+  }, [])
 
   useEffect(() => {
     getGameGenSettings()
       .then(applyGenSettings)
       .catch((e) => logger.warn('Game', 'Load gen settings failed', { error: String(e) }))
   }, [applyGenSettings])
-
-  useEffect(() => {
-    dispatchAdultModeChange(adultMode)
-  }, [adultMode])
 
   useEffect(() => {
     if (!adultMode && readingMode) setReadingMode(false)
@@ -652,12 +646,12 @@ export default function Game() {
       const themeId = next.adultTheme as AdultThemeId
       setAdultTheme(themeId)
       applyAdultThemePack(themeId)
-      adultThemeCtx?.setAdultTheme(themeId)
+      dispatchAdultThemeChange(themeId)
     }
     if (next.expressionStyle != null) setExpressionStyle(next.expressionStyle)
     if (next.contentWeights != null) setContentWeights({ ...next.contentWeights })
     return next
-  }, [storyLengthMin, storyLengthMax, contextTokens, maxOutputTokens, adultTheme, presetWeights, adultThemeCtx])
+  }, [storyLengthMin, storyLengthMax, contextTokens, maxOutputTokens, adultTheme, presetWeights])
 
   const flushGenSettings = useCallback(async () => {
     const pending = pendingGenPatchRef.current

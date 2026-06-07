@@ -3,6 +3,8 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -11,6 +13,7 @@ import {
   applyUiTheme,
   dispatchAdultModeChange,
   ADULT_MODE_EVENT,
+  ADULT_THEME_EVENT,
   type UiTheme,
   type AdultThemeId,
 } from '@/lib/theme'
@@ -30,6 +33,10 @@ export function AdultThemeProvider({ children }: { children: ReactNode }) {
   const [adultMode, setAdultModeState] = useState(false)
   const [adultTheme, setAdultThemeState] = useState<AdultThemeId>('deep_purple')
   const [loading, setLoading] = useState(true)
+  const adultThemeRef = useRef(adultTheme)
+  adultThemeRef.current = adultTheme
+  const adultModeRef = useRef(adultMode)
+  adultModeRef.current = adultMode
 
   const applyTheme = useCallback((mode: boolean, themePack: AdultThemeId) => {
     applyUiTheme(mode ? 'adult' : 'normal', mode ? themePack : null)
@@ -37,12 +44,13 @@ export function AdultThemeProvider({ children }: { children: ReactNode }) {
 
   const setAdultMode = useCallback((v: boolean) => {
     setAdultModeState(v)
-    applyTheme(v, adultTheme)
+    applyTheme(v, adultThemeRef.current)
     dispatchAdultModeChange(v)
-  }, [adultTheme, applyTheme])
+  }, [applyTheme])
 
   const setAdultTheme = useCallback((v: AdultThemeId) => {
     setAdultThemeState(v)
+    adultThemeRef.current = v
     if (adultMode) applyTheme(true, v)
   }, [adultMode, applyTheme])
 
@@ -53,6 +61,7 @@ export function AdultThemeProvider({ children }: { children: ReactNode }) {
         const theme = (data.adult_theme || 'deep_purple') as AdultThemeId
         setAdultModeState(mode)
         setAdultThemeState(theme)
+        adultThemeRef.current = theme
         applyTheme(mode, theme)
       })
       .catch(() => applyUiTheme('normal'))
@@ -60,26 +69,40 @@ export function AdultThemeProvider({ children }: { children: ReactNode }) {
   }, [applyTheme])
 
   useEffect(() => {
-    const handler = (e: Event) => {
+    const onModeChange = (e: Event) => {
       const mode = !!(e as CustomEvent<{ adultMode: boolean }>).detail?.adultMode
-      setAdultModeState(mode)
-      applyTheme(mode, adultTheme)
+      setAdultModeState((prev) => (prev === mode ? prev : mode))
+      applyTheme(mode, adultThemeRef.current)
     }
-    window.addEventListener(ADULT_MODE_EVENT, handler)
-    return () => window.removeEventListener(ADULT_MODE_EVENT, handler)
-  }, [adultTheme, applyTheme])
+    const onThemeChange = (e: Event) => {
+      const theme = (e as CustomEvent<{ adultTheme: AdultThemeId }>).detail?.adultTheme
+      if (!theme) return
+      setAdultThemeState((prev) => (prev === theme ? prev : theme))
+      adultThemeRef.current = theme
+      if (adultModeRef.current) applyTheme(true, theme)
+    }
+    window.addEventListener(ADULT_MODE_EVENT, onModeChange)
+    window.addEventListener(ADULT_THEME_EVENT, onThemeChange)
+    return () => {
+      window.removeEventListener(ADULT_MODE_EVENT, onModeChange)
+      window.removeEventListener(ADULT_THEME_EVENT, onThemeChange)
+    }
+  }, [applyTheme])
+
+  const value = useMemo(
+    () => ({
+      adultMode,
+      adultTheme,
+      uiTheme: (adultMode ? 'adult' : 'normal') as UiTheme,
+      setAdultMode,
+      setAdultTheme,
+      loading,
+    }),
+    [adultMode, adultTheme, setAdultMode, setAdultTheme, loading],
+  )
 
   return (
-    <AdultThemeContext.Provider
-      value={{
-        adultMode,
-        adultTheme,
-        uiTheme: adultMode ? 'adult' : 'normal',
-        setAdultMode,
-        setAdultTheme,
-        loading,
-      }}
-    >
+    <AdultThemeContext.Provider value={value}>
       {children}
     </AdultThemeContext.Provider>
   )

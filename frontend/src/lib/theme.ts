@@ -94,7 +94,12 @@ export function applyUiTheme(theme: UiTheme, adultThemePack?: AdultThemeId | nul
 }
 
 export const ADULT_MODE_EVENT = 'adult-mode-changed'
+export const ADULT_THEME_EVENT = 'adult-theme-changed'
 
 export function dispatchAdultModeChange(adultMode: boolean) {
   window.dispatchEvent(new CustomEvent(ADULT_MODE_EVENT, { detail: { adultMode } }))
+}
+
+export function dispatchAdultThemeChange(adultTheme: AdultThemeId) {
+  window.dispatchEvent(new CustomEvent(ADULT_THEME_EVENT, { detail: { adultTheme } }))
 }
