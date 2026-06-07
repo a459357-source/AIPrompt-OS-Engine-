@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { useNeuralShell, type NavTreeItem } from './NeuralShellContext'
+import { usePageShellActions, type NavTreeItem } from './NeuralShellContext'
 
 interface UsePageShellOptions {
   navItems?: NavTreeItem[]
@@ -18,37 +18,41 @@ const EMPTY_NAV: NavTreeItem[] = []
 export function usePageShell({
   navItems = EMPTY_NAV,
   activeNavId = null,
+  onNavSelect,
   inspector = null,
   leftPanel = null,
   showLeftPanel = true,
   showRightPanel = true,
   hideShellPanels = false,
 }: UsePageShellOptions) {
-  const shell = useNeuralShell()
-  const shellRef = useRef(shell)
-  shellRef.current = shell
+  const { syncPageShell, resetShell } = usePageShellActions()
 
-  const inspectorRef = useRef(inspector)
-  const leftPanelRef = useRef(leftPanel)
-  const navItemsRef = useRef(navItems)
-  inspectorRef.current = inspector
-  leftPanelRef.current = leftPanel
-  navItemsRef.current = navItems
+  const patchRef = useRef({
+    navItems,
+    activeNavId,
+    onNavSelect,
+    inspector,
+    leftPanel,
+    showLeftPanel,
+    showRightPanel,
+    hideShellPanels,
+  })
+  patchRef.current = {
+    navItems,
+    activeNavId,
+    onNavSelect,
+    inspector,
+    leftPanel,
+    showLeftPanel,
+    showRightPanel,
+    hideShellPanels,
+  }
 
   useLayoutEffect(() => {
-    const s = shellRef.current
-    s.setNavItems(navItemsRef.current)
-    s.setActiveNavId(activeNavId)
-    s.setInspector(inspectorRef.current)
-    s.setLeftPanel(leftPanelRef.current)
-    s.setShowLeftPanel(showLeftPanel)
-    s.setShowRightPanel(showRightPanel)
-    s.setHideShellPanels(hideShellPanels)
+    syncPageShell(patchRef.current)
   })
 
-  useEffect(() => {
-    return () => shellRef.current.resetShell()
-  }, [])
+  useEffect(() => () => resetShell(), [resetShell])
 
-  return shell
+  return { syncPageShell, resetShell }
 }

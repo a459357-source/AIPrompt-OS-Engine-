@@ -132,9 +132,10 @@ export default function Dashboard() {
     characterRelations: {} as Record<string, unknown>,
   }), [data])
 
-  const shell = usePageShell({
+  usePageShell({
     navItems,
     activeNavId: activeSection,
+    onNavSelect: (id) => setActiveSection(id as DashSection),
     hideShellPanels: !data,
     inspector: data ? (
       <InspectorPanel title={navItems.find((n) => n.id === activeSection)?.label || ''}>
@@ -143,16 +144,6 @@ export default function Dashboard() {
       </InspectorPanel>
     ) : null,
   })
-
-  useEffect(() => {
-    shell.setActiveNavId(activeSection)
-  }, [activeSection, shell.setActiveNavId])
-
-  useEffect(() => {
-    if (shell.activeNavId && shell.activeNavId !== activeSection) {
-      setActiveSection(shell.activeNavId as DashSection)
-    }
-  }, [shell.activeNavId, activeSection])
 
   if (loading) {
     return (

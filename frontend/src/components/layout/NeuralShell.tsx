@@ -101,14 +101,15 @@ interface NeuralShellProps {
 
 export function NeuralShell({ children }: NeuralShellProps) {
   const {
-    navItems,
-    activeNavId,
+    layout: {
+      navItems,
+      activeNavId,
+      showLeftPanel,
+      showRightPanel,
+      hideShellPanels,
+    },
+    slots: { inspector, leftPanel },
     setActiveNavId,
-    inspector,
-    leftPanel,
-    showLeftPanel,
-    showRightPanel,
-    hideShellPanels,
   } = useNeuralShell()
   const [leftOpen, setLeftOpen] = useState(false)
   const [rightOpen, setRightOpen] = useState(false)

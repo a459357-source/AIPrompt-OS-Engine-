@@ -1,4 +1,12 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 
 export interface NavTreeItem {
   id: string
@@ -7,35 +15,46 @@ export interface NavTreeItem {
   children?: NavTreeItem[]
 }
 
-export interface NeuralShellState {
+export interface NeuralShellLayout {
   navItems: NavTreeItem[]
   activeNavId: string | null
-  inspector: ReactNode | null
-  leftPanel: ReactNode | null
   showLeftPanel: boolean
   showRightPanel: boolean
   hideShellPanels: boolean
 }
 
-interface NeuralShellContextValue extends NeuralShellState {
-  setNavItems: (items: NavTreeItem[]) => void
-  setActiveNavId: (id: string | null) => void
-  setInspector: (content: ReactNode | null) => void
-  setLeftPanel: (content: ReactNode | null) => void
-  setShowLeftPanel: (show: boolean) => void
-  setShowRightPanel: (show: boolean) => void
-  setHideShellPanels: (hide: boolean) => void
+export interface NeuralShellSlots {
+  inspector: ReactNode | null
+  leftPanel: ReactNode | null
+}
+
+export interface PageShellSync extends Partial<NeuralShellLayout>, Partial<NeuralShellSlots> {
+  onNavSelect?: (id: string) => void
+}
+
+interface PageShellActions {
+  syncPageShell: (patch: PageShellSync) => void
   resetShell: () => void
 }
 
-const defaultState: NeuralShellState = {
+interface NeuralShellDisplay {
+  layout: NeuralShellLayout
+  slots: NeuralShellSlots
+  paintTick: number
+  setActiveNavId: (id: string | null) => void
+}
+
+const defaultLayout: NeuralShellLayout = {
   navItems: [],
   activeNavId: null,
-  inspector: null,
-  leftPanel: null,
   showLeftPanel: true,
   showRightPanel: true,
   hideShellPanels: false,
+}
+
+const defaultSlots: NeuralShellSlots = {
+  inspector: null,
+  leftPanel: null,
 }
 
 function navItemsEqual(a: NavTreeItem[], b: NavTreeItem[]) {
@@ -44,68 +63,114 @@ function navItemsEqual(a: NavTreeItem[], b: NavTreeItem[]) {
   return a.every((item, i) => item.id === b[i]?.id)
 }
 
-const NeuralShellContext = createContext<NeuralShellContextValue | null>(null)
-
-export function NeuralShellProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<NeuralShellState>(defaultState)
-
-  const setNavItems = useCallback((items: NavTreeItem[]) => {
-    setState((s) => (navItemsEqual(s.navItems, items) ? s : { ...s, navItems: items }))
-  }, [])
-
-  const setActiveNavId = useCallback((id: string | null) => {
-    setState((s) => (s.activeNavId === id ? s : { ...s, activeNavId: id }))
-  }, [])
-
-  const setInspector = useCallback((content: ReactNode | null) => {
-    setState((s) => (Object.is(s.inspector, content) ? s : { ...s, inspector: content }))
-  }, [])
-
-  const setLeftPanel = useCallback((content: ReactNode | null) => {
-    setState((s) => (Object.is(s.leftPanel, content) ? s : { ...s, leftPanel: content }))
-  }, [])
-
-  const setShowLeftPanel = useCallback((show: boolean) => {
-    setState((s) => (s.showLeftPanel === show ? s : { ...s, showLeftPanel: show }))
-  }, [])
-
-  const setShowRightPanel = useCallback((show: boolean) => {
-    setState((s) => (s.showRightPanel === show ? s : { ...s, showRightPanel: show }))
-  }, [])
-
-  const setHideShellPanels = useCallback((hide: boolean) => {
-    setState((s) => (s.hideShellPanels === hide ? s : { ...s, hideShellPanels: hide }))
-  }, [])
-
-  const resetShell = useCallback(() => {
-    setState(defaultState)
-  }, [])
-
+function layoutEqual(a: NeuralShellLayout, b: NeuralShellLayout) {
   return (
-    <NeuralShellContext.Provider
-      value={{
-        ...state,
-        setNavItems,
-        setActiveNavId,
-        setInspector,
-        setLeftPanel,
-        setShowLeftPanel,
-        setShowRightPanel,
-        setHideShellPanels,
-        resetShell,
-      }}
-    >
-      {children}
-    </NeuralShellContext.Provider>
+    a.activeNavId === b.activeNavId
+    && a.showLeftPanel === b.showLeftPanel
+    && a.showRightPanel === b.showRightPanel
+    && a.hideShellPanels === b.hideShellPanels
+    && navItemsEqual(a.navItems, b.navItems)
   )
 }
 
+const PageShellActionsContext = createContext<PageShellActions | null>(null)
+const NeuralShellDisplayContext = createContext<NeuralShellDisplay | null>(null)
+
+export function NeuralShellProvider({ children }: { children: ReactNode }) {
+  const [layout, setLayout] = useState<NeuralShellLayout>(defaultLayout)
+  const [paintTick, setPaintTick] = useState(0)
+  const slotsRef = useRef<NeuralShellSlots>({ ...defaultSlots })
+  const onNavSelectRef = useRef<((id: string) => void) | undefined>(undefined)
+
+  const bumpPaint = useCallback(() => {
+    setPaintTick((t) => t + 1)
+  }, [])
+
+  const syncPageShell = useCallback((patch: PageShellSync) => {
+    if (patch.onNavSelect !== undefined) {
+      onNavSelectRef.current = patch.onNavSelect
+    }
+
+    let slotsChanged = false
+    if (patch.inspector !== undefined && !Object.is(slotsRef.current.inspector, patch.inspector)) {
+      slotsRef.current.inspector = patch.inspector
+      slotsChanged = true
+    }
+    if (patch.leftPanel !== undefined && !Object.is(slotsRef.current.leftPanel, patch.leftPanel)) {
+      slotsRef.current.leftPanel = patch.leftPanel
+      slotsChanged = true
+    }
+
+    let layoutChanged = false
+    setLayout((prev) => {
+      const nextLayout: NeuralShellLayout = {
+        navItems: patch.navItems ?? prev.navItems,
+        activeNavId: patch.activeNavId !== undefined ? patch.activeNavId : prev.activeNavId,
+        showLeftPanel: patch.showLeftPanel ?? prev.showLeftPanel,
+        showRightPanel: patch.showRightPanel ?? prev.showRightPanel,
+        hideShellPanels: patch.hideShellPanels ?? prev.hideShellPanels,
+      }
+      if (layoutEqual(prev, nextLayout)) return prev
+      layoutChanged = true
+      return nextLayout
+    })
+
+    if (slotsChanged) bumpPaint()
+  }, [bumpPaint])
+
+  const setActiveNavId = useCallback((id: string | null) => {
+    setLayout((prev) => {
+      if (prev.activeNavId === id) return prev
+      return { ...prev, activeNavId: id }
+    })
+    if (id) onNavSelectRef.current?.(id)
+  }, [])
+
+  const resetShell = useCallback(() => {
+    onNavSelectRef.current = undefined
+    slotsRef.current = { ...defaultSlots }
+    setLayout(defaultLayout)
+    bumpPaint()
+  }, [bumpPaint])
+
+  const actions = useMemo(
+    () => ({ syncPageShell, resetShell }),
+    [syncPageShell, resetShell],
+  )
+
+  const display = useMemo(
+    () => ({
+      layout,
+      slots: slotsRef.current,
+      paintTick,
+      setActiveNavId,
+    }),
+    [layout, paintTick, setActiveNavId],
+  )
+
+  return (
+    <PageShellActionsContext.Provider value={actions}>
+      <NeuralShellDisplayContext.Provider value={display}>
+        {children}
+      </NeuralShellDisplayContext.Provider>
+    </PageShellActionsContext.Provider>
+  )
+}
+
+/** Pages: sync shell slots without subscribing to shell display updates. */
+export function usePageShellActions() {
+  const ctx = useContext(PageShellActionsContext)
+  if (!ctx) throw new Error('usePageShellActions must be used within NeuralShellProvider')
+  return ctx
+}
+
+/** NeuralShell layout component only. */
 export function useNeuralShell() {
-  const ctx = useContext(NeuralShellContext)
+  const ctx = useContext(NeuralShellDisplayContext)
   if (!ctx) throw new Error('useNeuralShell must be used within NeuralShellProvider')
   return ctx
 }
 
 export function useNeuralShellOptional() {
-  return useContext(NeuralShellContext)
+  return useContext(NeuralShellDisplayContext)
 }

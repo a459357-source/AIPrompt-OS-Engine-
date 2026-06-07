@@ -1631,22 +1631,15 @@ export default function NewStory() {
     </InspectorPanel>
   )
 
-  const shell = usePageShell({
+  usePageShell({
     navItems,
     activeNavId: activeSection,
+    onNavSelect: (id) => {
+      setActiveSection(id as BuilderSection)
+      setSelectedNodeId(null)
+    },
     inspector,
   })
-
-  useEffect(() => {
-    shell.setActiveNavId(activeSection)
-  }, [activeSection, shell.setActiveNavId])
-
-  useEffect(() => {
-    if (shell.activeNavId && shell.activeNavId !== activeSection) {
-      setActiveSection(shell.activeNavId as BuilderSection)
-      setSelectedNodeId(null)
-    }
-  }, [shell.activeNavId, activeSection])
 
   return (
     <>
