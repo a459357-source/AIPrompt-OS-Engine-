@@ -240,3 +240,55 @@ export function deltaArrow(delta: number): string {
   if (delta < 0) return '↓'
   return '·'
 }
+
+/** 解析选项字符串：支持「行动→发展|态度|影响」与「行动|态度|影响」（无箭头） */
+export interface ParsedGameOption {
+  action: string
+  consequence: string
+  attitude: string
+  relation: string
+  effectText: string
+}
+
+const EFFECTS_LIKE = /(?:affection|trust|respect|dependence|hostility|attraction|[\u4e00-\u9fff·]{1,12}\s*(?:affection|trust|respect|dependence|hostility|attraction|[\u4e00-\u9fff]+(?:值|度)?\s*[+−\-↑↓➕➖]))/i
+
+export function parseGameOption(choice: string): ParsedGameOption {
+  const trimmed = choice.trim()
+  if (!trimmed) {
+    return { action: '', consequence: '', attitude: '', relation: '', effectText: '' }
+  }
+
+  const empty = { consequence: '', attitude: '', relation: '', effectText: '' }
+
+  if (/\s*[→]\s*/.test(trimmed)) {
+    const parts = trimmed.split(/\s*[→]\s*/)
+    const action = (parts[0] || trimmed).trim()
+    const meta = parts.slice(1).join(' → ').trim()
+    const segments = meta.split(/\s*\|\s*/).map((s) => s.trim())
+    const consequence = segments[0] || ''
+    const attitude = segments[1] || ''
+    const relation = segments.slice(2).join(' | ') || ''
+    const effectText = [consequence, relation].filter(Boolean).join('，')
+    return { action, consequence, attitude, relation, effectText }
+  }
+
+  const pipeParts = trimmed.split(/\s*\|\s*/).map((s) => s.trim()).filter(Boolean)
+  if (pipeParts.length >= 3) {
+    const action = pipeParts[0]
+    const attitude = pipeParts[pipeParts.length - 2]
+    const relation = pipeParts[pipeParts.length - 1]
+    const consequence = pipeParts.length > 3 ? pipeParts.slice(1, -2).join(' | ') : ''
+    const effectText = [consequence, relation].filter(Boolean).join('，')
+    return { action, consequence, attitude, relation, effectText }
+  }
+
+  if (pipeParts.length === 2) {
+    const [first, second] = pipeParts
+    if (EFFECTS_LIKE.test(second)) {
+      return { action: first, ...empty, relation: second, effectText: second }
+    }
+    return { action: first, ...empty, attitude: second }
+  }
+
+  return { action: trimmed, ...empty }
+}

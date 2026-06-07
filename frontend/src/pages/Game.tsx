@@ -14,7 +14,7 @@ import { usePageShell } from '@/components/layout/usePageShell'
 import { GlassPanel } from '@/components/neural/GlassPanel'
 import { getGameState, startGameOnce, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, cancelGeneration, getGenerationStatus, waitForGameReady, type HistoryTurn, type GameGenSettings, type ContentWeights } from '@/lib/api'
 import { logger } from '@/lib/logger'
-import { parseOptionEffects, deltaArrow, type RelationHint } from '@/lib/relationHints'
+import { parseOptionEffects, parseGameOption, deltaArrow, type RelationHint } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
 import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS, MAX_WIDTH_OPTIONS, storyMaxWidthCSSValue } from '@/lib/settings'
 import { dispatchAdultModeChange, dispatchAdultThemeChange, dispatchVisualThemeChange, getAdultRelationLevel, applyUiTheme, VISUAL_THEME_OPTIONS, VISUAL_THEME_LABELS, type AdultThemeId, type VisualThemeId } from '@/lib/theme'
@@ -139,6 +139,9 @@ function RelationChips({ text, compact = false }: { text: string; compact?: bool
           {!compact && h.kind !== 'event' && h.metric !== 'new' && h.metricLabel && (
             <span className="opacity-90">{h.metricLabel}</span>
           )}
+          {compact && h.kind === 'character' && h.metric !== 'new' && h.metricLabel && (
+            <span className="opacity-80 text-[9px]">{h.metricLabel}</span>
+          )}
           {h.kind !== 'event' && h.metric !== 'new' && h.delta !== 0 && (
             <span
               className={`font-bold tabular-nums ${h.delta > 0 ? 'text-emerald-300' : 'text-rose-300'}`}
@@ -216,7 +219,7 @@ function resolveHistoryChoice(choice: string, options: string[]): { text: string
   const idx = trimmed.charCodeAt(0) - 65
   const isLetter = /^[A-Z]$/i.test(trimmed)
   if (isLetter && options[idx]) {
-    return { text: options[idx].split('→')[0].trim(), isCustom: false }
+    return { text: parseGameOption(options[idx]).action, isCustom: false }
   }
   return { text: trimmed, isCustom: !isLetter }
 }
@@ -1960,15 +1963,8 @@ export default function Game() {
                   </div>
                   <div className="space-y-1.5 pt-1">
                   {options.map((choice, i) => {
-                    // Parse "行动 → 可能发展 | 态度 | 人际影响"
-                    const parts = choice.split(/\s*[→]\s*/)
-                    const action = parts[0] || choice
-                    const rest = parts.slice(1).join(' → ')
-                    const segments = rest.split(/\s*\|\s*/)
-                    const consequence = segments[0] || ''
-                    const attitude = segments[1] || ''
-                    const relation = segments[2] || ''
-                    const effectText = [consequence, relation].filter(Boolean).join('，')
+                    const parsed = parseGameOption(choice)
+                    const { action, attitude, effectText } = parsed
                     const effects = showConsequences && effectText ? parseOptionEffects(effectText) : null
                     const letter = String.fromCharCode(65 + i)
                     return (
@@ -2170,7 +2166,9 @@ export default function Game() {
                       // Resolve choice: if letter, map to option text; otherwise show as custom
                       const idx = h.choice.charCodeAt(0) - 65
                       const isLetter = /^[A-D]$/.test(h.choice)
-                      const choiceText = isLetter && h.options[idx] ? h.options[idx].split('→')[0].trim() : h.choice
+                      const choiceText = isLetter && h.options[idx]
+                        ? parseGameOption(h.options[idx]).action
+                        : h.choice
                       const isCustom = !isLetter
                       return (
                         <div className={`border rounded-md px-3 py-2 text-sm ${isCustom ? 'bg-game-secret/10 border-game-accent/30' : 'bg-game-surface border-game-border'}`}>
