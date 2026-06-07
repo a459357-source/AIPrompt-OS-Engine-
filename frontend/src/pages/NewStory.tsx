@@ -105,6 +105,7 @@ export default function NewStory() {
       rel_affection: 0,
       artifacts: [] as { name: string; type: 'personal'|'faction'|'world'; description: string; ownerType: 'character'|'faction'|'location'|'none'; ownerId: string; importance: number; abilities: string[]; tags: string[] }[],
       factions: [] as { name: string; type: string; description: string; goals: string[]; resources: string[]; controlledTerritories: string[]; subordinateOrganizations: string[]; keyAssets: string[]; power: { military: number; economic: number; political: number; technology: number }; influence: number; relation_to_player: string; leader: string }[],
+      customStats: [] as { key: string; label: string; max: number }[],
     },
   })
 
@@ -157,6 +158,7 @@ export default function NewStory() {
       }
       if (data.rel_stages) setValue('rel_stages', data.rel_stages)
       if (data.rel_affection != null) setValue('rel_affection', data.rel_affection)
+      if (data.stats) setValue('customStats', data.stats)
       if (data.factions) {
         const facs = (data.factions as Array<Record<string,unknown>>).map((f: Record<string,unknown>) => ({
           name: (f.name as string) || '',
@@ -257,33 +259,6 @@ export default function NewStory() {
     setGenerating(null)
   }, [getValues, setValue])
 
-  const handleRulesGen = useCallback(async () => {
-    setGenerating('rules')
-    logger.info('NewStory', 'handleRulesGen: starting')
-    showStatus('正在生成专属规则…', 'loading')
-    setFieldErrors((prev) => ({ ...prev, rules: null }))
-    try {
-      const chars = getValues('characters')
-      const data = await generateRules({
-        title: getValues('title'),
-        world: getValues('world'),
-        genre: getValues('genre').join('/'),
-        char1_name: chars[0]?.name || '主角',
-        char1_role: chars[0]?.role_tags?.[0] || '',
-        char2_name: chars[1]?.name || '',
-        char2_role: chars[1]?.role_tags?.[0] || '',
-      })
-      if (data.stages?.length) setValue('rel_stages', data.stages)
-      showStatus('✅ 专属规则生成完成', 'success')
-    } catch (e) {
-      const msg = (e as Error).message || String(e)
-      logger.error('NewStory', 'handleRulesGen: failed', { error: msg })
-      showStatus(`❌ ${msg}`, 'error')
-      setFieldErrors((prev) => ({ ...prev, rules: msg }))
-    }
-    setGenerating(null)
-  }, [getValues, setValue])
-
   const onSubmit = useCallback(async (data: FormValues) => {
     const fd = new FormData()
     fd.append('title', data.title)
@@ -293,6 +268,7 @@ export default function NewStory() {
     fd.append('main_goal', data.main_goal)
     fd.append('chars_json', JSON.stringify(data.characters))
     fd.append('rel_system', JSON.stringify({ stages: data.rel_stages, affection: data.rel_affection }))
+    fd.append('custom_rules', JSON.stringify({ stats: data.customStats || [], stages: data.rel_stages }))
     fd.append('artifacts_json', JSON.stringify(data.artifacts || []))
     fd.append('factions_json', JSON.stringify(data.factions || []))
     showStatus('正在创建故事…', 'loading')
@@ -719,15 +695,71 @@ export default function NewStory() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-xs text-game-dim">
-                  📊 默认追踪：好感度（陌生→恋人，7阶段）· 无需生成即可使用
-                </p>
+                {/* Current custom stats */}
+                {(() => {
+                  const stats = getValues('customStats') || []
+                  const stages = getValues('rel_stages') || []
+                  const hasRules = stats.length > 0 || !stages.every((s: string) => DEFAULT_STAGES.includes(s))
+                  return hasRules ? (
+                    <div className="bg-game-surface border border-game-border rounded-md p-3 space-y-2">
+                      {stats.length > 0 && (
+                        <div>
+                          <span className="text-[10px] text-game-muted">📊 追踪维度</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {stats.map((s: { key: string; label: string; max: number }) => (
+                              <Badge key={s.key} variant="accent" size="sm">{s.label} (0-{s.max})</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {stages.length > 0 && (
+                        <div>
+                          <span className="text-[10px] text-game-muted">💞 关系阶段 ({stages.length})</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {stages.map((s: string, i: number) => (
+                              <span key={i} className="flex items-center gap-0.5">
+                                <Badge variant="primary" size="sm">{s}</Badge>
+                                {i < stages.length - 1 && <span className="text-game-dim text-[10px]">→</span>}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-game-dim">
+                      📊 默认追踪：好感度 · 双向量表（崩坏↔羁绊）· 点击下方按钮 AI 根据当前故事内容生成专属规则
+                    </p>
+                  )
+                })()}
                 <AIButton
                   loading={generating === 'rules'}
                   error={fieldErrors.rules}
-                  onClick={handleRulesGen}
+                  onClick={async () => {
+                    setGenerating('rules')
+                    showStatus('正在根据当前内容推理专属规则…', 'loading')
+                    try {
+                      const allChars = getValues('characters') || []
+                      const data = await generateRules({
+                        title: getValues('title'),
+                        world: getValues('world') + '\n势力：' + JSON.stringify(getValues('factions') || []) + '\n物品：' + JSON.stringify(getValues('artifacts') || []),
+                        genre: getValues('genre').join('/'),
+                        char1_name: allChars[0]?.name || '主角',
+                        char1_role: allChars[0]?.role_tags?.[0] || '',
+                        char2_name: allChars[1]?.name || '',
+                        char2_role: allChars[1]?.role_tags?.[0] || '',
+                      })
+                      if (data.stages?.length) setValue('rel_stages', data.stages)
+                      if (data.stats?.length) setValue('customStats', data.stats)
+                      showStatus('✅ 专属规则生成完成', 'success')
+                    } catch (e) {
+                      const msg = (e as Error).message || String(e)
+                      showStatus(`❌ ${msg}`, 'error')
+                    }
+                    setGenerating(null)
+                  }}
                 >
-                  AI 生成专属规则
+                  ✨ 根据当前内容推理专属规则
                 </AIButton>
               </CardContent>
             </Card>
