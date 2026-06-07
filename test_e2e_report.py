@@ -187,7 +187,10 @@ for c in chars_config:
     <div class="card">
       <div class="card-title">{'⭐' if c['isMain'] else '👤'} {c['name']} <span class="badge">{tier}</span></div>
       <div class="dim">身份: {', '.join(c['role_tags'])}</div>
+      <div class="dim">外貌: {c.get('appearance', '') or '未设定'}</div>
       <div class="dim">性格: {', '.join(c['personality_tags'])}</div>
+      <div class="dim">背景: {c.get('background', '') or '未设定'}</div>
+      <div class="dim">能力: {c.get('special_ability', '') or '未设定'}</div>
       <div class="dim">目标: {c['goal']}</div>
       <div class="dim">🔒秘密: {c['secret']}</div>
       {trust_html}
