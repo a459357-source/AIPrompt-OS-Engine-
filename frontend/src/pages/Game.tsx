@@ -444,6 +444,7 @@ export default function Game() {
   const [contentWeights, setContentWeights] = useState<ContentWeights>({ story: 40, romance: 30, adult: 30 })
   const [presetWeights, setPresetWeights] = useState<Record<string, ContentWeights>>({})
   const [readingMode, setReadingMode] = useState(false)
+  const [relationPanelOpen, setRelationPanelOpen] = useState(true)
   const [genSettingsOpen, setGenSettingsOpen] = useState(
     () => getSettings().sidebarDefault === 'expanded',
   )
@@ -1195,6 +1196,7 @@ export default function Game() {
   const hasGame = !loading && !error && story.length > 0
   const lang = appSettings.language as 'zh' | 'en' | 'ja'
   const showCharPanel = appSettings.charPanelPosition !== 'hidden'
+  const relationPanelTitle = adultMode ? tTheme('nav.characters', lang, true) : t('game.status', lang)
   const storyParagraphStyle = {
     fontSize: 'var(--story-font-size)',
     lineHeight: 'var(--story-line-height)',
@@ -1240,19 +1242,22 @@ export default function Game() {
     if (!hasGame || !showCharPanel || readingMode) return null
     return (
       <InspectorPanel
-        title={adultMode ? tTheme('nav.characters', lang, true) : t('game.status', lang)}
+        title={relationPanelTitle}
         className={adultMode ? 'adult-relation-inspector' : undefined}
+        collapsible
+        onCollapse={() => setRelationPanelOpen(false)}
+        collapseLabel="收起关系面板"
       >
         <GameStatusList characters={characters} factions={factions} adultMode={adultMode} />
       </InspectorPanel>
     )
-  }, [hasGame, showCharPanel, readingMode, adultMode, lang, characters, factions])
+  }, [hasGame, showCharPanel, readingMode, adultMode, relationPanelTitle, characters, factions])
 
   usePageShell({
     leftPanel: gameLeftPanel,
     inspector: gameInspector,
     showLeftPanel: !!(hasGame && !readingMode),
-    showRightPanel: !!(hasGame && showCharPanel && !readingMode),
+    showRightPanel: !!(hasGame && showCharPanel && !readingMode && relationPanelOpen),
     hideShellPanels: !hasGame || readingMode,
   })
 
@@ -1359,6 +1364,17 @@ export default function Game() {
                 >
                   📜 回顾
                 </Button>
+                {showCharPanel && !readingMode && !relationPanelOpen && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1 text-game-muted hover:text-game-text"
+                    disabled={choosing}
+                    onClick={() => setRelationPanelOpen(true)}
+                  >
+                    {relationPanelTitle}
+                  </Button>
+                )}
               </div>
             </div>
 
