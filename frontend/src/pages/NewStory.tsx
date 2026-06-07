@@ -661,7 +661,8 @@ export default function NewStory() {
                                       type="range"
                                       min={0} max={100} value={val}
                                       onChange={(e) => update(key, parseInt(e.target.value))}
-                                      className="flex-1 h-1 accent-game-accent"
+                                      className="flex-1 h-4 cursor-pointer"
+                                      style={{ accentColor: key === 'hostility' ? '#da3633' : '#58a6ff' }}
                                     />
                                     <span className="text-[10px] text-game-muted w-6 text-right tabular-nums">{val}</span>
                                   </div>
