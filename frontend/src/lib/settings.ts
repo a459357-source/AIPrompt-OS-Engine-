@@ -53,15 +53,37 @@ export const DEFAULTS: AppSettings = {
 }
 
 const KEY = 'app-settings'
+const SETTINGS_VERSION_KEY = 'app-settings-version'
+const CURRENT_SETTINGS_VERSION = 2
+
+/** v1 默认 expanded；v2 默认 collapsed。仅迁移旧版未显式保存 typewriterEffect 的 expanded 记录。 */
+function applySettingsMigration(merged: AppSettings, raw: Record<string, unknown>): AppSettings {
+  const ver = Number(localStorage.getItem(SETTINGS_VERSION_KEY) || 0)
+  if (ver >= CURRENT_SETTINGS_VERSION) return merged
+
+  let next = merged
+  if (
+    raw.sidebarDefault === 'expanded'
+    && !('typewriterEffect' in raw)
+  ) {
+    next = { ...merged, sidebarDefault: 'collapsed' }
+    localStorage.setItem(KEY, JSON.stringify(next))
+  }
+  localStorage.setItem(SETTINGS_VERSION_KEY, String(CURRENT_SETTINGS_VERSION))
+  return next
+}
 
 export function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(KEY)
-    if (!raw) return { ...DEFAULTS }
-    const parsed = JSON.parse(raw)
+    if (!raw) {
+      localStorage.setItem(SETTINGS_VERSION_KEY, String(CURRENT_SETTINGS_VERSION))
+      return { ...DEFAULTS }
+    }
+    const parsed = JSON.parse(raw) as Record<string, unknown>
     const merged = { ...DEFAULTS, ...parsed } as AppSettings
     merged.maxWidth = normalizeMaxWidth(Number(merged.maxWidth) || DEFAULTS.maxWidth)
-    return merged
+    return applySettingsMigration(merged, parsed)
   } catch {
     return { ...DEFAULTS }
   }

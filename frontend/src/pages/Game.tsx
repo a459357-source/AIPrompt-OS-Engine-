@@ -352,9 +352,7 @@ export default function Game() {
   const [presetWeights, setPresetWeights] = useState<Record<string, ContentWeights>>({})
   const [readingMode, setReadingMode] = useState(false)
   const [relationPanelOpen, setRelationPanelOpen] = useState(true)
-  const [genSettingsOpen, setGenSettingsOpen] = useState(
-    () => getSettings().sidebarDefault === 'expanded',
-  )
+  const [genSettingsOpen, setGenSettingsOpen] = useState(false)
   const [genSettingsSaved, setGenSettingsSaved] = useState(false)
   const [genSettingsSaving, setGenSettingsSaving] = useState(false)
   const [genSettingsSaveError, setGenSettingsSaveError] = useState('')
