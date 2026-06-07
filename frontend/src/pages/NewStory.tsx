@@ -648,7 +648,8 @@ export default function NewStory() {
                                       min={0} max={100} value={val}
                                       onChange={(e) => update(key, Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
                                       onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
-                                      className="w-10 text-center text-[10px] h-5 bg-game-bg border border-game-border rounded text-game-text"
+                                      className="w-12 text-center text-[11px] h-6 bg-game-bg border border-game-border rounded text-game-text"
+                                      style={{minWidth: '36px'}}
                                     />
                                     <div className="flex-1 h-2 bg-game-border rounded-full overflow-hidden">
                                       <div className="h-full rounded-full transition-all" style={{width: `${val}%`, background: barColor}} />
