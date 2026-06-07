@@ -29,6 +29,34 @@ export interface WorldGenResponse {
   rel_stages?: string[]
   rel_affection?: number
   stats?: StatDimension[]
+  factions?: FactionGenItem[]
+  artifacts?: ArtifactGenItem[]
+}
+
+export interface FactionGenItem {
+  name: string
+  type: string
+  description: string
+  goals: string[]
+  resources: string[]
+  controlledTerritories: string[]
+  subordinateOrganizations: string[]
+  keyAssets: string[]
+  power: { military: number; economic: number; political: number; technology: number }
+  influence: number
+  relation_to_player: string
+  leader: string
+}
+
+export interface ArtifactGenItem {
+  name: string
+  type: string
+  description: string
+  ownerType: string
+  ownerId: string
+  importance: number
+  abilities: string[]
+  tags: string[]
 }
 
 export interface StatDimension {

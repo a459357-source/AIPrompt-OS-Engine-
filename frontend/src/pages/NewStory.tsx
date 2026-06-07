@@ -157,6 +157,36 @@ export default function NewStory() {
       }
       if (data.rel_stages) setValue('rel_stages', data.rel_stages)
       if (data.rel_affection != null) setValue('rel_affection', data.rel_affection)
+      if (data.factions) {
+        const facs = (data.factions as Array<Record<string,unknown>>).map((f: Record<string,unknown>) => ({
+          name: (f.name as string) || '',
+          type: (f.type as string) || 'organization',
+          description: (f.description as string) || '',
+          goals: (f.goals as string[]) || [],
+          resources: (f.resources as string[]) || [],
+          controlledTerritories: (f.controlledTerritories as string[]) || [],
+          subordinateOrganizations: (f.subordinateOrganizations as string[]) || [],
+          keyAssets: (f.keyAssets as string[]) || [],
+          power: (f.power as { military: number; economic: number; political: number; technology: number }) || { military: 0, economic: 0, political: 0, technology: 0 },
+          influence: (f.influence as number) || 50,
+          relation_to_player: (f.relation_to_player as string) || 'neutral',
+          leader: (f.leader as string) || '',
+        }))
+        setValue('factions', facs)
+      }
+      if (data.artifacts) {
+        const arts = (data.artifacts as Array<Record<string,unknown>>).map((a: Record<string,unknown>) => ({
+          name: (a.name as string) || '',
+          type: ((a.type as string) || 'personal') as 'personal'|'faction'|'world',
+          description: (a.description as string) || '',
+          ownerType: ((a.ownerType as string) || 'none') as 'character'|'faction'|'location'|'none',
+          ownerId: (a.ownerId as string) || '',
+          importance: (a.importance as number) || 50,
+          abilities: (a.abilities as string[]) || [],
+          tags: (a.tags as string[]) || [],
+        }))
+        setValue('artifacts', arts)
+      }
       showStatus('✅ 生成完成，可继续修改', 'success')
       setFieldErrors((prev) => ({ ...prev, world: null }))
     } catch (e) {

@@ -288,10 +288,38 @@ async def generate_world(keywords: str = Form("")):
       "special_ability": "特殊能力（主角）"
     }}
   ],
-  "rel_stages": ["陌生", "熟悉", "朋友", "信赖", "暧昧", "恋人"],
+  "rel_stages": ["崩坏", "敌视", "对立", "冷漠", "疏远", "陌生", "认识", "信赖", "盟友", "羁绊"],
   "rel_affection": 0,
   "stats": [
     {{"key": "trust", "label": "好感度", "max": 100}}
+  ],
+  "factions": [
+    {{
+      "name": "势力名",
+      "type": "government|corporation|family|organization|guild|school|religion|kingdom|other",
+      "description": "势力描述（20-80字）",
+      "goals": ["目标1", "目标2"],
+      "resources": ["资源1"],
+      "controlledTerritories": ["控制区域"],
+      "subordinateOrganizations": ["下属机构"],
+      "keyAssets": ["关键资产"],
+      "power": {{"military": 0, "economic": 0, "political": 0, "technology": 0}},
+      "influence": 50,
+      "relation_to_player": "neutral",
+      "leader": "首领名"
+    }}
+  ],
+  "artifacts": [
+    {{
+      "name": "物品名",
+      "type": "personal|faction|world",
+      "description": "物品描述（20-60字）",
+      "ownerType": "character|faction|none",
+      "ownerId": "持有者名",
+      "importance": 50,
+      "abilities": ["能力"],
+      "tags": ["标签"]
+    }}
   ]
 }}
 
@@ -299,10 +327,12 @@ async def generate_world(keywords: str = Form("")):
 1. 角色要有个性，包含外貌、性格标签、目标、隐藏秘密
 2. 主角和至少1个NPC之间要有潜在的戏剧冲突或情感张力
 3. 初始场景要具体、有画面感
-4. stats 根据故事类型设计2-3个专属追踪维度（如修仙→修为/道心，宫廷→忠诚/权势，悬疑→信任/线索），key用英文label用中文
-5. rel_stages 设计5-7个贴合故事的递进阶段
-6. 所有文字用中文
-7. 只输出JSON，不要输出markdown代码块或其他文字"""
+4. stats 根据故事类型设计2-3个专属追踪维度
+5. rel_stages 必须是双向的（负面←陌生→正面），共6-10个阶段
+6. factions 至少生成2个互相对立的势力，推动剧情冲突
+7. artifacts 生成2-3个有故事推动力的关键物品（传家宝/机密/武器/信物等）
+8. 所有文字用中文
+9. 只输出JSON，不要输出markdown代码块或其他文字"""
 
     try:
         result = call_deepseek(system, user, temperature=0.9, max_tokens=config.MAX_TOKENS * 2, skip_validation=True)
