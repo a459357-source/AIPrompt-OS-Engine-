@@ -86,6 +86,7 @@ export default function Dashboard() {
   useEffect(() => { loadDashboard() }, [loadDashboard])
 
   useEffect(() => {
+    if (activeSection !== 'branch') return
     const src = data?.story_graph?.mermaid
     const el = graphRef.current
     if (!src || !el || Object.keys(data?.story_graph?.nodes ?? {}).length === 0) {
@@ -102,7 +103,14 @@ export default function Dashboard() {
       setMermaidError(msg || '分支图渲染失败')
       logger.warn('Dashboard', 'Mermaid render failed', { error: msg })
     })
-  }, [data?.story_graph?.mermaid, data?.story_graph?.nodes])
+  }, [data?.story_graph?.mermaid, data?.story_graph?.nodes, activeSection])
+
+  const sectionIcon =
+    activeSection === 'timeline' ? Clock :
+    activeSection === 'network' ? Network :
+    activeSection === 'branch' ? GitBranch :
+    activeSection === 'factions' ? BarChart3 :
+    Activity
 
   const navItems = useMemo(() => [
     { id: 'overview', label: t('dashboard.overview', lang), icon: <Activity className="w-4 h-4" /> },
@@ -173,6 +181,23 @@ export default function Dashboard() {
       <InspectorPanel title={navItems.find((n) => n.id === activeSection)?.label || ''}>
         <p className="text-sm text-game-muted">第 {data.turn} 轮 · {data.status}</p>
         <p className="text-xs text-game-dim mt-2">📍 {data.scene}</p>
+        {activeSection === 'timeline' && (
+          <p className="text-xs text-game-muted mt-3">
+            共 {(data.analytics?.status_timeline?.filter((item) => item.turn > 0) ?? []).length} 条状态记录
+          </p>
+        )}
+        {activeSection === 'branch' && (
+          <p className="text-xs text-game-muted mt-3">{data.node_count} 节点 · {data.branch_count} 分支</p>
+        )}
+        {activeSection === 'factions' && data.analytics?.world_state_v2 && (
+          <p className="text-xs text-game-muted mt-3">{data.analytics.world_state_v2.factions.length} 个势力</p>
+        )}
+        {activeSection === 'network' && data.analytics?.world_state_v2 && (
+          <p className="text-xs text-game-muted mt-3">
+            {data.analytics.world_state_v2.relationship_network.nodes.length} 角色 ·{' '}
+            {data.analytics.world_state_v2.relationship_network.edges.length} 关系边
+          </p>
+        )}
       </InspectorPanel>
     ) : null,
   })
@@ -338,446 +363,338 @@ export default function Dashboard() {
   // ── Branch stats ─────────────────────────────────────────────────
   const bs = a?.branch_stats
 
-  const hasCharts = trustChart || apiChart || choiceChart || wordChart || freqChart || factionChart
-  const showAnalytics = hasCharts || statusTimeline.length > 0
-
-  if (activeSection === 'network' && data) {
-    return (
-      <div className="h-full w-full">
-        <StatusToast message="" type="info" />
-        <WorldGraphCanvas input={graphInput} layoutKey={dashboardLayoutKey} selectedNodeId={null} onSelectNode={() => {}} readOnly />
-      </div>
-    )
-  }
-
-  return (
-    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-6">
+  const sectionHeader = (
+    <>
       <SectionHeader
-        icon={Activity}
-        title={t('dashboard.title', lang)}
+        icon={sectionIcon}
+        title={navItems.find((n) => n.id === activeSection)?.label || t('dashboard.title', lang)}
         subtitle={`第 ${data.turn} 轮 · ${data.status} · ${data.scene}`}
         status="active"
       />
       <div className="flex justify-end">
         <Button variant="outline" size="sm" onClick={loadDashboard}>🔄 刷新</Button>
       </div>
+    </>
+  )
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {statsData.map((stat) => (
-          <motion.div key={stat.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="text-center hover:shadow-md transition-shadow">
-              <CardContent className="pt-5 pb-4 space-y-1.5">
-                <span className="text-xl">{stat.icon}</span>
-                <p className="text-2xl font-bold text-game-accent">{stat.value}</p>
-                <p className="text-[11px] text-game-muted">{stat.label}</p>
+  const statsCards = (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      {statsData.map((stat) => (
+        <motion.div key={stat.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+          <Card className="text-center hover:shadow-md transition-shadow">
+            <CardContent className="pt-5 pb-4 space-y-1.5">
+              <span className="text-xl">{stat.icon}</span>
+              <p className="text-2xl font-bold text-game-accent">{stat.value}</p>
+              <p className="text-[11px] text-game-muted">{stat.label}</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      ))}
+    </div>
+  )
+
+  if (activeSection === 'network') {
+    return (
+      <div className="h-full w-full relative">
+        <WorldGraphCanvas input={graphInput} layoutKey={dashboardLayoutKey} selectedNodeId={null} onSelectNode={() => {}} readOnly />
+        <div className="absolute top-3 left-12 md:left-4 z-10 max-w-md space-y-2">
+          <SectionHeader
+            icon={Network}
+            title={navItems.find((n) => n.id === 'network')?.label || t('dashboard.network', lang)}
+            subtitle={`第 ${data.turn} 轮 · ${data.status}`}
+            status="active"
+            className="pointer-events-none mb-0"
+          />
+          <div className="flex justify-end pointer-events-auto">
+            <Button variant="outline" size="sm" onClick={loadDashboard}>🔄 刷新</Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-6">
+      {sectionHeader}
+
+      {activeSection === 'overview' && (
+        <>
+          {statsCards}
+          {ws && (
+            <Card className="border-game-primary/30">
+              <CardHeader>
+                <CardTitle className="text-sm">🌍 世界状态概览</CardTitle>
+                <CardDescription>当前地点 · 势力 · 关系网摘要</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                  <div className="rounded-lg border border-game-border/60 p-3 space-y-1">
+                    <p className="text-[10px] text-game-muted uppercase tracking-wide">世界时间</p>
+                    <p className="font-medium text-game-accent">{ws.world_time.label}</p>
+                    <p className="text-xs text-game-dim">{ws.world_time.era}</p>
+                  </div>
+                  <div className="rounded-lg border border-game-border/60 p-3 space-y-1 md:col-span-2">
+                    <p className="text-[10px] text-game-muted uppercase tracking-wide">当前地点</p>
+                    <p className="text-sm text-game-text leading-relaxed">{ws.location || '—'}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {ws.factions.slice(0, 6).map((f) => (
+                    <Badge key={f.name} variant="outline" size="sm">{f.name} {f.reputation_pct > 0 ? '+' : ''}{f.reputation_pct}%</Badge>
+                  ))}
+                  {ws.relationship_network.nodes.slice(0, 8).map((n) => (
+                    <Badge key={n.name} variant={n.is_main ? 'accent' : 'primary'} size="sm">
+                      {n.name} ({n.trust_pct}%)
+                    </Badge>
+                  ))}
+                </div>
               </CardContent>
             </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* World State V2 */}
-      {ws && (
-        <Card className="border-game-primary/30">
-          <CardHeader>
-            <CardTitle className="text-sm">🌍 世界状态 V2</CardTitle>
-            <CardDescription>
-              势力 · 事件 · 关系网 · 世界时间 · 地点（压力测试/长局监控）
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-              <div className="rounded-lg border border-game-border/60 p-3 space-y-1">
-                <p className="text-[10px] text-game-muted uppercase tracking-wide">世界时间</p>
-                <p className="font-medium text-game-accent">{ws.world_time.label}</p>
-                <p className="text-xs text-game-dim">{ws.world_time.era}</p>
-                <p className="text-[11px] text-game-muted">场景变迁 {ws.world_time.scene_changes} 次</p>
-              </div>
-              <div className="rounded-lg border border-game-border/60 p-3 space-y-1 md:col-span-2">
-                <p className="text-[10px] text-game-muted uppercase tracking-wide">当前地点</p>
-                <p className="text-sm text-game-text leading-relaxed">{ws.location || '—'}</p>
-                {ws.locations.length > 0 && (
-                  <p className="text-[11px] text-game-dim mt-1">
-                    世界观地点：{ws.locations.map((l) => l.name).join(' · ')}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-medium text-game-muted mb-2">🏛️ 势力 ({ws.factions.length})</p>
-                {ws.factions.length === 0 ? (
-                  <p className="text-game-dim text-xs">暂无势力数据</p>
-                ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {ws.factions.map((f) => (
-                      <div key={f.name} className="text-xs border border-game-border/40 rounded-md p-2">
-                        <div className="flex justify-between gap-2">
-                          <span className="font-medium">{f.name}</span>
-                          <Badge variant="outline" size="sm">{f.reputation_pct > 0 ? '+' : ''}{f.reputation_pct}%</Badge>
-                        </div>
-                        <p className="text-game-dim mt-0.5">{f.relation_to_player} · 影响力 {f.influence}</p>
-                        {f.goals[0] && <p className="text-game-muted mt-1 truncate">{f.goals[0]}</p>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <p className="text-xs font-medium text-game-muted mb-2">📅 世界事件 ({ws.events.length})</p>
-                {ws.events.length === 0 ? (
-                  <p className="text-game-dim text-xs">暂无事件（对局推进后由引擎调度）</p>
-                ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {ws.events.slice(0, 12).map((e) => (
-                      <div key={e.id || e.title} className="text-xs border border-game-border/40 rounded-md p-2">
-                        <div className="flex justify-between gap-2">
-                          <span className="font-medium truncate">{e.title}</span>
-                          <Badge
-                            variant={e.status === 'active' ? 'warning' : e.status === 'resolved' ? 'success' : 'outline'}
-                            size="sm"
-                          >
-                            {e.status}
-                          </Badge>
-                        </div>
-                        <p className="text-game-dim mt-0.5">T{e.trigger_turn} · 重要度 {e.importance}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <Separator />
-
-            <div>
-              <p className="text-xs font-medium text-game-muted mb-2">
-                🔗 关系网 ({ws.relationship_network.nodes.length} 节点 · {ws.relationship_network.edges.length} 边)
-              </p>
-              {ws.relationship_network.nodes.length === 0 ? (
-                <p className="text-game-dim text-xs">暂无关系数据</p>
-              ) : (
-                <>
-                  <div className="flex flex-wrap gap-2">
-                    {ws.relationship_network.nodes.map((n) => (
-                      <Badge
-                        key={n.name}
-                        variant={n.is_main ? 'accent' : 'primary'}
-                        size="sm"
-                        className="text-[11px]"
-                      >
-                        {n.name}
-                        {n.relationship_type ? ` · ${n.relationship_type}` : ''}
-                        {' '}({n.trust_pct}%)
-                      </Badge>
-                    ))}
-                  </div>
-                  {ws.relationship_network.edges.length > 0 ? (
-                    <div className="mt-3 space-y-1 max-h-40 overflow-y-auto pr-1">
-                      {ws.relationship_network.edges.map((e, i) => (
-                        <p key={`${e.from}-${e.to}-${e.kind}-${i}`} className="text-[11px] text-game-muted">
-                          <span className="text-game-text">{e.from}</span>
-                          <span className="text-game-dim mx-1">→</span>
-                          <span className="text-game-text">{e.to}</span>
-                          <span className="text-game-dim ml-1">· {e.label}</span>
-                        </p>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-game-dim text-xs mt-2">暂无关联边（推进对局或完善角色关系设定后会自动生成）</p>
-                  )}
-                </>
-              )}
-              {ws.faction_links.length > 0 && (
-                <p className="text-[11px] text-game-dim mt-2">
-                  势力关系：{ws.faction_links.slice(0, 6).map((l) => `${l.from}→${l.to}(${l.label})`).join(' · ')}
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Story branch graph */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">🔀 剧情分支图</CardTitle>
-          <CardDescription>
-            故事节点与角色关联（当前节点：{data.story_graph?.current_node ?? '—'}）
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {data.node_count === 0 ? (
-            <p className="text-game-dim text-sm text-center py-6">暂无分支节点，进行游戏后将自动生成</p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border border-game-border/60 bg-game-bg/40 p-4">
-              {mermaidError ? (
-                <p className="text-game-dim text-sm text-center py-6">
-                  分支图暂时无法渲染（{mermaidError}）。节点数据仍可在上方「关系网络」查看。
-                </p>
-              ) : null}
-              <div ref={graphRef} className="min-w-[320px] flex justify-center" />
-            </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Char Trust + Story Info */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">💞 {tTheme('dashboard.affection', lang, adultMode)}</CardTitle>
-            <CardDescription>{tTheme('dashboard.affectionDesc', lang, adultMode)}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {data.characters.length === 0 ? (
-              <p className="text-game-dim text-sm text-center py-4">暂无角色</p>
-            ) : (
-              data.characters.map((c) => (
-                <div key={c.name} className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-game-text font-medium">{c.name}</span>
-                    <span className="text-game-dim">{c.trust_pct}%</span>
-                  </div>
-                  <div className="h-2.5 bg-game-border rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-game-primary to-game-accent rounded-full transition-all"
-                      style={{ width: `${c.trust_pct}%` }}
-                    />
-                  </div>
-                  {c.relation && (
-                    <p className="text-[10px] text-game-dim">{c.relation}</p>
-                  )}
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">📋 故事信息</CardTitle>
-            <CardDescription>当前进度概览</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-game-muted">章节</span>
-              <Badge variant="primary" size="sm">第 {data.chapter} 章</Badge>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-game-muted">状态</span>
-              <Badge
-                variant={
-                  data.status === 'TENSION' ? 'warning' :
-                  data.status === 'CLIMAX' ? 'danger' :
-                  data.status === 'COOLDOWN' ? 'success' : 'primary'
-                }
-                size="sm"
-              >
-                {data.status}
-              </Badge>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-game-muted">场景</span>
-              <span className="text-game-text text-xs">{data.scene || '—'}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between text-sm">
-              <span className="text-game-muted">分支数</span>
-              <span className="text-game-text">{data.branch_count}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-game-muted">节点数</span>
-              <span className="text-game-text">{data.node_count}</span>
-            </div>
-            {bs && (
-              <>
-                <Separator />
-                <div className="flex justify-between text-sm">
-                  <span className="text-game-muted">分支深度</span>
-                  <span className="text-game-text">{bs.max_depth}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-game-muted">平均分支</span>
-                  <span className="text-game-text">{bs.avg_branches}</span>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts Section */}
-      {showAnalytics && (
-        <>
-          <Separator className="my-2" />
-
-          {/* Trust over time */}
-          {trustChart && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">📈 {tTheme('dashboard.affectionChart', lang, adultMode)}</CardTitle>
-                <CardDescription>{tTheme('dashboard.affectionDesc', lang, adultMode)}</CardDescription>
+                <CardTitle className="text-sm">💞 {tTheme('dashboard.affection', lang, adultMode)}</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <Line data={trustChart} options={{
-                    ...CHART_OPTIONS_DARK,
-                    scales: {
-                      ...CHART_OPTIONS_DARK.scales,
-                      y: { ...CHART_OPTIONS_DARK.scales?.y, min: 0, max: 100 },
-                    },
-                  }} />
-                </div>
+              <CardContent className="space-y-3">
+                {data.characters.length === 0 ? (
+                  <p className="text-game-dim text-sm text-center py-4">暂无角色</p>
+                ) : (
+                  data.characters.map((c) => (
+                    <div key={c.name} className="space-y-1.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-game-text font-medium">{c.name}</span>
+                        <span className="text-game-dim">{c.trust_pct}%</span>
+                      </div>
+                      <div className="h-2.5 bg-game-border rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-game-primary to-game-accent rounded-full" style={{ width: `${c.trust_pct}%` }} />
+                      </div>
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">📋 故事信息</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between text-sm"><span className="text-game-muted">章节</span><Badge variant="primary" size="sm">第 {data.chapter} 章</Badge></div>
+                <div className="flex justify-between text-sm"><span className="text-game-muted">状态</span><Badge variant="primary" size="sm">{data.status}</Badge></div>
+                <div className="flex justify-between text-sm"><span className="text-game-muted">场景</span><span className="text-game-text text-xs">{data.scene || '—'}</span></div>
+                <Separator />
+                <div className="flex justify-between text-sm"><span className="text-game-muted">分支数</span><span>{data.branch_count}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-game-muted">节点数</span><span>{data.node_count}</span></div>
+              </CardContent>
+            </Card>
+          </div>
+          {(wordChart || apiChart || trustChart || freqChart) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {trustChart && (
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">📈 {tTheme('dashboard.affectionChart', lang, adultMode)}</CardTitle></CardHeader>
+                  <CardContent><div className="h-56"><Line data={trustChart} options={{ ...CHART_OPTIONS_DARK, scales: { ...CHART_OPTIONS_DARK.scales, y: { ...CHART_OPTIONS_DARK.scales?.y, min: 0, max: 100 } } }} /></div></CardContent>
+                </Card>
+              )}
+              {wordChart && (
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">📝 每轮字数</CardTitle></CardHeader>
+                  <CardContent><div className="h-56"><Bar data={wordChart} options={CHART_OPTIONS_DARK} /></div></CardContent>
+                </Card>
+              )}
+              {apiChart && (
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">🤖 Token 用量</CardTitle></CardHeader>
+                  <CardContent><div className="h-56"><Bar data={apiChart} options={{ ...CHART_OPTIONS_DARK, scales: { ...CHART_OPTIONS_DARK.scales, x: { ...CHART_OPTIONS_DARK.scales?.x, stacked: true }, y: { ...CHART_OPTIONS_DARK.scales?.y, stacked: true } } }} /></div></CardContent>
+                </Card>
+              )}
+              {freqChart && (
+                <Card>
+                  <CardHeader><CardTitle className="text-sm">👥 角色出场频率</CardTitle></CardHeader>
+                  <CardContent><div className="h-56"><Bar data={freqChart} options={{ ...CHART_OPTIONS_DARK, indexAxis: 'y' as const }} /></div></CardContent>
+                </Card>
+              )}
+            </div>
           )}
+          {!ws && !trustChart && !wordChart && (
+            <Card><CardContent className="py-8 text-center text-game-dim text-sm">进行更多轮次后，概览数据会逐步丰富</CardContent></Card>
+          )}
+        </>
+      )}
 
-          {/* Word counts + API on same row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {wordChart && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">📝 每轮字数</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-56">
-                    <Bar data={wordChart} options={CHART_OPTIONS_DARK} />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {apiChart && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">🤖 Token 用量</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-56">
-                    <Bar data={apiChart} options={{
-                      ...CHART_OPTIONS_DARK,
-                      scales: {
-                        ...CHART_OPTIONS_DARK.scales,
-                        x: { ...CHART_OPTIONS_DARK.scales?.x, stacked: true },
-                        y: { ...CHART_OPTIONS_DARK.scales?.y, stacked: true },
-                      },
-                    }} />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Choice + Character Freq */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {choiceChart && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">🎯 选择偏好</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-56 max-w-xs mx-auto">
-                    <Doughnut data={choiceChart} options={{
-                      responsive: true,
-                      maintainAspectRatio: true,
-                      plugins: {
-                        legend: { labels: { color: '#8b949e', font: { size: 11 } } },
-                      },
-                    }} />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {freqChart && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">👥 角色出场频率</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-56">
-                    <Bar data={freqChart} options={{
-                      ...CHART_OPTIONS_DARK,
-                      indexAxis: 'y' as const,
-                    }} />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Faction + Status timeline */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {factionChart && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">🏛️ 势力声望曲线</CardTitle>
-                  <CardDescription>各势力声望随回合变化（来自 memory.json）</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-56">
-                    <Line data={factionChart} options={{
-                      ...CHART_OPTIONS_DARK,
-                      scales: {
-                        ...CHART_OPTIONS_DARK.scales,
-                        y: { ...CHART_OPTIONS_DARK.scales?.y, min: 0, max: 100 },
-                      },
-                    }} />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {statusTimeline.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">🕐 状态时间线</CardTitle>
-                  <CardDescription>每轮叙事状态与场景（来自剧情图）</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+      {activeSection === 'timeline' && (
+        <>
+          {ws && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">🕐 叙事状态时间线</CardTitle>
+                <CardDescription>每轮状态机阶段与场景变迁</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {statusTimeline.length === 0 ? (
+                  <p className="text-game-dim text-sm text-center py-8">暂无时间线记录，推进对局后自动生成</p>
+                ) : (
+                  <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
                     {statusTimeline.map((item) => (
-                      <div
-                        key={`tl-${item.turn}-${item.scene}`}
-                        className="flex items-start gap-2 text-xs border-b border-game-border/50 pb-2 last:border-0"
-                      >
-                        <Badge variant="outline" size="sm" className="shrink-0 tabular-nums">
-                          T{item.turn}
-                        </Badge>
-                        <Badge
-                          variant={
-                            item.status === 'TENSION' ? 'warning' :
-                            item.status === 'CLIMAX' ? 'danger' :
-                            item.status === 'COOLDOWN' ? 'success' : 'primary'
-                          }
-                          size="sm"
-                          className="shrink-0"
-                        >
-                          {item.status}
-                        </Badge>
+                      <div key={`tl-${item.turn}-${item.scene}`} className="flex items-start gap-2 text-xs border border-game-border/40 rounded-md p-3">
+                        <Badge variant="outline" size="sm" className="shrink-0 tabular-nums">T{item.turn}</Badge>
+                        <Badge variant={item.status === 'TENSION' ? 'warning' : item.status === 'CLIMAX' ? 'danger' : item.status === 'COOLDOWN' ? 'success' : 'primary'} size="sm" className="shrink-0">{item.status}</Badge>
                         <span className="text-game-muted leading-relaxed">{item.scene || '—'}</span>
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+          {ws && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">📅 世界事件</CardTitle>
+                <CardDescription>引擎调度的事件与重要度</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {ws.events.length === 0 ? (
+                  <p className="text-game-dim text-sm text-center py-8">暂无世界事件</p>
+                ) : (
+                  <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                    {ws.events.map((e) => (
+                      <div key={e.id || e.title} className="text-xs border border-game-border/40 rounded-md p-3">
+                        <div className="flex justify-between gap-2">
+                          <span className="font-medium">{e.title}</span>
+                          <Badge variant={e.status === 'active' ? 'warning' : e.status === 'resolved' ? 'success' : 'outline'} size="sm">{e.status}</Badge>
+                        </div>
+                        <p className="text-game-dim mt-1">T{e.trigger_turn} · 重要度 {e.importance}</p>
+                        {e.related_characters.length > 0 && (
+                          <p className="text-game-muted mt-1">相关角色：{e.related_characters.join('、')}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+          {!ws && (
+            <Card><CardContent className="py-8 text-center text-game-dim text-sm">暂无时间线数据</CardContent></Card>
+          )}
         </>
       )}
 
-      {!showAnalytics && (
-        <Card>
-          <CardContent className="py-8 text-center text-game-dim text-sm">
-            📈 进行更多轮次后，这里会展示数据可视化图表
-          </CardContent>
-        </Card>
+      {activeSection === 'branch' && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">🔀 剧情分支图</CardTitle>
+              <CardDescription>
+                故事节点与选择路径（当前：{data.story_graph?.current_node ?? '—'}）
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {data.node_count === 0 ? (
+                <p className="text-game-dim text-sm text-center py-12">暂无分支节点，进行游戏后将自动生成</p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border border-game-border/60 bg-game-bg/40 p-4 min-h-[320px]">
+                  {mermaidError ? (
+                    <p className="text-game-dim text-sm text-center py-6">分支图暂时无法渲染（{mermaidError}）</p>
+                  ) : null}
+                  <div ref={graphRef} className="min-w-[320px] flex justify-center" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          {(bs || data.node_count > 0) && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: '分支节点', value: String(data.node_count) },
+                { label: '分支数', value: String(data.branch_count) },
+                ...(bs ? [
+                  { label: '最大深度', value: String(bs.max_depth) },
+                  { label: '平均分支', value: String(bs.avg_branches) },
+                ] : []),
+              ].map((item) => (
+                <Card key={item.label}>
+                  <CardContent className="pt-4 pb-3 text-center">
+                    <p className="text-xl font-bold text-game-accent">{item.value}</p>
+                    <p className="text-[11px] text-game-muted mt-1">{item.label}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+          {choiceChart && (
+            <Card>
+              <CardHeader><CardTitle className="text-sm">🎯 选择偏好分布</CardTitle></CardHeader>
+              <CardContent>
+                <div className="h-56 max-w-sm mx-auto"><Doughnut data={choiceChart} options={{ responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#8b949e', font: { size: 11 } } } } }} /></div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {activeSection === 'factions' && (
+        <>
+          {factionChart ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">🏛️ 势力声望曲线</CardTitle>
+                <CardDescription>各势力声望随回合变化</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-72">
+                  <Line data={factionChart} options={{
+                    ...CHART_OPTIONS_DARK,
+                    scales: { ...CHART_OPTIONS_DARK.scales, y: { ...CHART_OPTIONS_DARK.scales?.y, min: 0, max: 100 } },
+                  }} />
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card><CardContent className="py-8 text-center text-game-dim text-sm">暂无势力曲线数据，对局推进后会记录各势力声望变化</CardContent></Card>
+          )}
+          {ws && ws.factions.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">🏛️ 势力详情 ({ws.factions.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {ws.factions.map((f) => (
+                    <div key={f.name} className="text-sm border border-game-border/40 rounded-lg p-4 space-y-2">
+                      <div className="flex justify-between gap-2">
+                        <span className="font-bold">{f.name}</span>
+                        <Badge variant="outline" size="sm">{f.reputation_pct > 0 ? '+' : ''}{f.reputation_pct}%</Badge>
+                      </div>
+                      <p className="text-xs text-game-dim">{f.relation_to_player} · 影响力 {f.influence} · 首领 {f.leader || '—'}</p>
+                      {f.goals.length > 0 && <p className="text-xs text-game-muted">目标：{f.goals.join('；')}</p>}
+                      {f.attitudes.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {f.attitudes.slice(0, 4).map((a) => (
+                            <Badge key={a.target} variant="primary" size="sm" className="text-[10px]">{a.target} {a.label}</Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {ws.faction_links.length > 0 && (
+                  <>
+                    <Separator className="my-4" />
+                    <p className="text-xs font-medium text-game-muted mb-2">势力间关系</p>
+                    <div className="space-y-1">
+                      {ws.faction_links.map((l, i) => (
+                        <p key={`${l.from}-${l.to}-${i}`} className="text-xs text-game-muted">
+                          {l.from} → {l.to} · {l.label} ({l.attitude > 0 ? '+' : ''}{l.attitude})
+                        </p>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
     </div>
   )
