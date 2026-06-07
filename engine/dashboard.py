@@ -675,7 +675,7 @@ if(A.character_frequency&&A.character_frequency.labels){{makeChart('charFreqChar
         backgroundColor:colors[i%8]+'88',
         borderColor:colors[i%8],
         borderWidth:1
-      }}};}})
+      }};}})
     }},
     options:{{
       indexAxis:'y',

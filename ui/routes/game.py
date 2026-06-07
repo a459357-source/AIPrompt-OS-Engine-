@@ -7,7 +7,7 @@ from engine import io_utils, save_manager
 from engine.memory import load_memory, get_char_stats_for_ui
 from engine.router import load_graph
 from ui.obsidian_export import _generate_mermaid
-from ui.templates import HTML_TEMPLATE
+from ui.templates import HTML_TEMPLATE, _render_template
 import config
 
 router = APIRouter(tags=["game"])
