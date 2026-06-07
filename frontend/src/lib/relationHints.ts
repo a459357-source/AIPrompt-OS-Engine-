@@ -292,3 +292,43 @@ export function parseGameOption(choice: string): ParsedGameOption {
 
   return { action: trimmed, ...empty }
 }
+
+/** 单行状态摘要：艾莉丝 好感+2 信任+1 */
+export function formatOptionStatusMetrics(hints: RelationHint[]): string {
+  const charGroups = new Map<string, string[]>()
+  const extras: string[] = []
+
+  for (const h of hints) {
+    if (h.kind === 'event' && h.text) {
+      extras.push(h.text)
+      continue
+    }
+    if (h.kind === 'faction') {
+      const seg = h.text || (h.delta !== 0 ? `${h.name}${h.delta > 0 ? '+' : ''}${h.delta}` : h.name)
+      if (seg) extras.push(seg)
+      continue
+    }
+    if (h.kind === 'stat' && h.metricLabel) {
+      extras.push(
+        h.delta !== 0
+          ? `${h.metricLabel}${h.delta > 0 ? '+' : ''}${h.delta}`
+          : h.metricLabel,
+      )
+      continue
+    }
+    if (h.kind === 'character' && h.name && h.metric !== 'new') {
+      const seg =
+        h.delta !== 0
+          ? `${h.metricLabel}${h.delta > 0 ? '+' : ''}${h.delta}`
+          : h.metricLabel
+      if (seg) {
+        const list = charGroups.get(h.name) ?? []
+        list.push(seg)
+        charGroups.set(h.name, list)
+      }
+    }
+  }
+
+  const charParts = [...charGroups.entries()].map(([name, segs]) => `${name} ${segs.join(' ')}`)
+  return [...charParts, ...extras].join(' · ')
+}

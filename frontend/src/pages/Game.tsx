@@ -14,7 +14,7 @@ import { usePageShell } from '@/components/layout/usePageShell'
 import { GlassPanel } from '@/components/neural/GlassPanel'
 import { getGameState, startGameOnce, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, cancelGeneration, getGenerationStatus, waitForGameReady, type HistoryTurn, type GameGenSettings, type ContentWeights } from '@/lib/api'
 import { logger } from '@/lib/logger'
-import { parseOptionEffects, parseGameOption, deltaArrow, type RelationHint } from '@/lib/relationHints'
+import { parseOptionEffects, parseGameOption, formatOptionStatusMetrics } from '@/lib/relationHints'
 import { useAppSettings } from '@/hooks/useAppSettings'
 import { getSettings, saveSettings, clampAutoAdvanceRounds, AUTO_ADVANCE_ROUND_OPTIONS, MAX_WIDTH_OPTIONS, storyMaxWidthCSSValue } from '@/lib/settings'
 import { dispatchAdultModeChange, dispatchAdultThemeChange, dispatchVisualThemeChange, getAdultRelationLevel, applyUiTheme, VISUAL_THEME_OPTIONS, VISUAL_THEME_LABELS, type AdultThemeId, type VisualThemeId } from '@/lib/theme'
@@ -87,101 +87,6 @@ interface FactionInfo {
   power?: { military: number; economic: number; political: number; technology: number }
 }
 
-function hintChipClass(h: RelationHint): string {
-  if (h.kind === 'event' || h.tone === 'event') {
-    return 'border-amber-400/70 text-amber-200 bg-amber-500/20 shadow-sm shadow-amber-500/10'
-  }
-  if (h.kind === 'faction' || h.tone === 'warning') {
-    if (h.delta > 0) {
-      return 'border-emerald-400/50 text-emerald-200 bg-emerald-500/15'
-    }
-    if (h.delta < 0) {
-      return 'border-rose-400/60 text-rose-200 bg-rose-500/15'
-    }
-    return 'border-sky-400/60 text-sky-200 bg-sky-500/15 shadow-sm shadow-sky-500/10'
-  }
-  if (h.tone === 'new') {
-    return 'border-violet-400/50 text-violet-200 bg-violet-500/15'
-  }
-  if (h.tone === 'up') {
-    return 'border-emerald-400/60 text-emerald-200 bg-emerald-500/15'
-  }
-  if (h.tone === 'down') {
-    return 'border-rose-500/70 text-rose-200 bg-rose-500/20'
-  }
-  return 'border-game-border text-game-muted bg-game-bg/40'
-}
-
-function RelationChips({ text, compact = false }: { text: string; compact?: boolean }) {
-  const { hints, narrative } = parseOptionEffects(text)
-  if (!hints.length && !narrative.length) return null
-
-  const chipCls = compact
-    ? 'inline-flex flex-row items-center gap-0.5 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded border font-medium leading-none shrink-0'
-    : 'inline-flex flex-row items-center gap-1 whitespace-nowrap text-xs px-2 py-0.5 rounded-md border font-medium'
-
-  const wrapCls = compact
-    ? 'flex flex-row flex-wrap gap-1.5 items-center justify-center w-full'
-    : 'flex flex-wrap gap-1.5 justify-center'
-
-  const renderChip = (h: RelationHint, j: number) => (
-    <span key={j} className={`${chipCls} ${hintChipClass(h)}`}>
-      <span className="shrink-0 text-[10px]">{h.icon}</span>
-      {h.kind === 'event' && h.text ? (
-        <span className="font-semibold">{h.text}</span>
-      ) : (
-        <>
-          {h.kind === 'faction' && h.text ? (
-            <span className="font-bold">{h.text}</span>
-          ) : h.name ? (
-            <span className={`font-bold ${h.kind === 'character' ? 'text-amber-100' : ''}`}>{h.name}</span>
-          ) : null}
-          {!compact && h.kind !== 'event' && h.metric !== 'new' && h.metricLabel && (
-            <span className="opacity-90">{h.metricLabel}</span>
-          )}
-          {compact && h.kind === 'character' && h.metric !== 'new' && h.metricLabel && (
-            <span className="opacity-80 text-[9px]">{h.metricLabel}</span>
-          )}
-          {h.kind !== 'event' && h.metric !== 'new' && h.delta !== 0 && (
-            <span
-              className={`font-bold tabular-nums ${h.delta > 0 ? 'text-emerald-300' : 'text-rose-300'}`}
-            >
-              {compact ? (
-                <>{h.delta > 0 ? '+' : ''}{h.delta}</>
-              ) : (
-                <span className="inline-flex items-center gap-0.5">
-                  <span aria-hidden>{deltaArrow(h.delta)}</span>
-                  {h.delta > 0 ? '+' : ''}{h.delta}
-                </span>
-              )}
-            </span>
-          )}
-        </>
-      )}
-    </span>
-  )
-
-  if (compact) {
-    return (
-      <div className={wrapCls}>
-        {hints.map(renderChip)}
-        {narrative.map((line, i) => (
-          <span key={`n-${i}`} className="text-[10px] text-game-dim leading-tight text-center">{line}</span>
-        ))}
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex flex-col gap-1.5 ml-5 mt-1.5">
-      {hints.length > 0 && <div className={wrapCls}>{hints.map(renderChip)}</div>}
-      {narrative.map((line, i) => (
-        <p key={`n-${i}`} className="text-xs text-game-dim leading-relaxed">{line}</p>
-      ))}
-    </div>
-  )
-}
-
 function OptionEffectsInline({
   effects,
   effectText,
@@ -191,26 +96,28 @@ function OptionEffectsInline({
   effectText: string
   attitude: string
 }) {
-  if (!effects && !attitude.trim()) return null
-  const hasHints = (effects?.hints.length ?? 0) > 0
-  const hasNarrative = (effects?.narrative.length ?? 0) > 0
-  if (!attitude.trim() && !hasHints && !hasNarrative && !effectText.trim()) return null
+  const parsed = effects ?? (effectText.trim() ? parseOptionEffects(effectText) : { hints: [], narrative: [] })
+  const metricsLine = [
+    formatOptionStatusMetrics(parsed.hints),
+    parsed.narrative.filter(Boolean).join(' · '),
+  ].filter(Boolean).join(' · ')
+  const attitudeText = attitude.trim()
+
+  if (!attitudeText && !metricsLine) {
+    if (!effectText.trim()) return null
+    return (
+      <p className="w-full text-center text-[11px] leading-snug text-game-muted px-1">
+        {effectText.trim()}
+      </p>
+    )
+  }
 
   return (
-    <div className="w-full flex flex-wrap gap-1.5 items-center justify-center px-1 py-0.5">
-      {attitude.trim() && (
-        <Badge variant="accent" size="sm" className="shrink-0 text-[10px] px-1.5 py-0 h-auto leading-tight whitespace-nowrap">
-          {attitude.trim()}
-        </Badge>
-      )}
-      {hasHints || hasNarrative ? (
-        <RelationChips text={effectText} compact />
-      ) : (
-        effectText.trim() && (
-          <span className="text-[10px] text-game-muted leading-tight text-center">{effectText.trim()}</span>
-        )
-      )}
-    </div>
+    <p className="w-full text-center text-[11px] leading-snug text-game-muted px-1">
+      {attitudeText && <span className="text-game-accent/90">{attitudeText}</span>}
+      {attitudeText && metricsLine && <span className="text-game-dim"> · </span>}
+      {metricsLine && <span className="text-game-muted/90">{metricsLine}</span>}
+    </p>
   )
 }
 
@@ -1972,7 +1879,7 @@ export default function Game() {
                         onClick={() => handleChoice(letter)}
                         className="w-full flex flex-col items-center justify-center text-center h-auto py-2 px-3 transition-all"
                       >
-                        <div className="flex w-full flex-col gap-1.5 min-w-0 items-center">
+                        <div className="flex w-full flex-col gap-0.5 min-w-0 items-center">
                           <div className="flex gap-2 min-w-0 justify-center text-center w-full">
                             <span className="text-game-accent font-bold shrink-0 text-sm leading-snug">{letter}.</span>
                             <span className="text-sm font-medium text-game-text leading-snug text-center">{action}</span>
