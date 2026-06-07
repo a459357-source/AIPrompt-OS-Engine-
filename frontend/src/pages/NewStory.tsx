@@ -891,8 +891,10 @@ export default function NewStory() {
     if (adultMode) {
       return [
         { id: 'core', label: tTheme('world.core', lang, true), icon: <Globe className="w-4 h-4" /> },
-        { id: 'relations', label: tTheme('world.relations', lang, true), icon: <GitBranch className="w-4 h-4" /> },
         { id: 'factions', label: tTheme('world.factions', lang, true), icon: <Network className="w-4 h-4" /> },
+        { id: 'characters', label: t('world.nav.characters', lang), icon: <Users className="w-4 h-4" /> },
+        { id: 'relations', label: tTheme('world.relations', lang, true), icon: <GitBranch className="w-4 h-4" /> },
+        { id: 'artifacts', label: t('world.artifacts', lang), icon: <Gem className="w-4 h-4" /> },
       ]
     }
     return [
