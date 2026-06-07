@@ -166,7 +166,7 @@ export default function NewStory() {
       if (data.rel_stages) setValue('rel_stages', data.rel_stages)
       if (data.rel_affection != null) setValue('rel_affection', data.rel_affection)
       if (data.stats) {
-        const stats = (data.stats as Array<Record<string, unknown>>).map((s) => ({
+        const stats = data.stats.map((s) => ({
           key: String(s.key || 'stat'),
           label: String(s.label || s.key || '维度'),
           max: typeof s.max === 'number' ? s.max : 100,

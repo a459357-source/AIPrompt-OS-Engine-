@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
 import { logger } from '@/lib/logger'
+import { getEngineSettings, saveEngineSettings } from '@/lib/api'
 import {
   loadSettings,
   saveSettings,
@@ -146,29 +147,20 @@ export default function Settings() {
 
   // API settings
   useEffect(() => {
-    fetch('/settings')
-      .then((r) => r.text())
-      .then((html) => {
-        const keyMatch = html.match(/value="(sk-[^"]*)"/)
-        if (keyMatch) setApiKey(keyMatch[1])
-        const maskedMatch = html.match(/已配置 \((sk[^)]+)\)/)
-        if (maskedMatch) setApiKeyMasked(maskedMatch[1])
-        const mtMatch = html.match(/name="max_tokens"[^>]*>[\s\S]*?value="(\d+)" selected/)
-        if (mtMatch) setMaxTokens(parseInt(mtMatch[1]))
-        const tMatch = html.match(/name="temperature"[^>]*value="([\d.]+)"/)
-        if (tMatch) setTemperature(parseFloat(tMatch[1]))
-        const tpMatch = html.match(/name="top_p"[^>]*value="([\d.]+)"/)
-        if (tpMatch) setTopP(parseFloat(tpMatch[1]))
-        const sMatch = html.match(/name="stream"[^>]*>[\s\S]*?value="(\d)" selected/)
-        if (sMatch) setStream(sMatch[1] === '1')
-        const cmMatch = html.match(/name="max_context_messages"[^>]*value="(\d+)"/)
-        if (cmMatch) setMaxContextMsgs(parseInt(cmMatch[1]))
-        const acMatch = html.match(/name="auto_compress"[^>]*>[\s\S]*?value="(\d)" selected/)
-        if (acMatch) setAutoCompress(acMatch[1] === '1')
-        const ctMatch = html.match(/name="compress_threshold"[^>]*value="(\d+)"/)
-        if (ctMatch) setCompressThreshold(parseInt(ctMatch[1]))
+    getEngineSettings()
+      .then((data) => {
+        if (data.api_key_masked) setApiKeyMasked(data.api_key_masked)
+        setModel(data.model)
+        setStoryLength(data.story_length)
+        setMaxTokens(data.max_tokens)
+        setTemperature(data.temperature)
+        setTopP(data.top_p)
+        setStream(data.stream)
+        setMaxContextMsgs(data.max_context_messages)
+        setAutoCompress(data.auto_compress)
+        setCompressThreshold(data.compress_threshold)
       })
-      .catch(() => {})
+      .catch((e) => logger.error('Settings', 'Load engine settings failed', { error: String(e) }))
   }, [])
 
   const [apiSaving, setApiSaving] = useState(false)
@@ -177,19 +169,21 @@ export default function Settings() {
   const saveApiKey = useCallback(async () => {
     setApiSaving(true)
     setApiSaved(false)
-    const fd = new FormData()
-    if (apiKey) fd.append('api_key', apiKey)
-    fd.append('model', model)
-    fd.append('story_length', String(storyLength))
-    fd.append('max_tokens', String(maxTokens))
-    fd.append('temperature', String(temperature))
-    fd.append('top_p', String(topP))
-    fd.append('stream', stream ? '1' : '0')
-    fd.append('max_context_messages', String(maxContextMsgs))
-    fd.append('auto_compress', autoCompress ? '1' : '0')
-    fd.append('compress_threshold', String(compressThreshold))
     try {
-      await fetch('/settings', { method: 'POST', body: fd })
+      const data = await saveEngineSettings({
+        apiKey: apiKey || undefined,
+        model,
+        storyLength,
+        maxTokens,
+        temperature,
+        topP,
+        stream,
+        maxContextMsgs,
+        autoCompress,
+        compressThreshold,
+      })
+      if (data.api_key_masked) setApiKeyMasked(data.api_key_masked)
+      setApiKey('')
       setApiSaved(true)
       setSaved(true)
       setTimeout(() => { setSaved(false); setApiSaved(false) }, 2500)

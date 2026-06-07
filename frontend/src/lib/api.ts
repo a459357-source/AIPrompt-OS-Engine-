@@ -230,3 +230,55 @@ export async function saveApiKey(key: string): Promise<{ ok?: boolean; error?: s
   if (!res.ok) return { error: data.error || `HTTP ${res.status}` }
   return data
 }
+
+export interface EngineSettings {
+  configured: boolean
+  api_key_masked: string
+  model: string
+  models: Record<string, string>
+  story_length: number
+  max_tokens: number
+  temperature: number
+  top_p: number
+  stream: boolean
+  max_context_messages: number
+  auto_compress: boolean
+  compress_threshold: number
+}
+
+export async function getEngineSettings(): Promise<EngineSettings> {
+  const res = await fetch('/api/settings')
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+export async function saveEngineSettings(params: {
+  apiKey?: string
+  model: string
+  storyLength: number
+  maxTokens: number
+  temperature: number
+  topP: number
+  stream: boolean
+  maxContextMsgs: number
+  autoCompress: boolean
+  compressThreshold: number
+}): Promise<EngineSettings> {
+  const fd = new FormData()
+  if (params.apiKey) fd.append('api_key', params.apiKey)
+  fd.append('model', params.model)
+  fd.append('story_length', String(params.storyLength))
+  fd.append('max_tokens', String(params.maxTokens))
+  fd.append('temperature', String(params.temperature))
+  fd.append('top_p', String(params.topP))
+  fd.append('stream', params.stream ? '1' : '0')
+  fd.append('max_context_messages', String(params.maxContextMsgs))
+  fd.append('auto_compress', params.autoCompress ? '1' : '0')
+  fd.append('compress_threshold', String(params.compressThreshold))
+  const res = await fetch('/api/settings', { method: 'POST', body: fd })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(data.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}

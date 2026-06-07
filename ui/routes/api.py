@@ -466,3 +466,49 @@ async def api_save_settings_key(api_key: str = Form(...)):
     config.reload_api_key()
     return JSONResponse({"ok": True, "configured": True})
 
+
+@router.get("/settings")
+async def api_get_settings():
+    """Engine/API settings for the React settings page."""
+    from ui.routes.settings import settings_payload
+    return JSONResponse(settings_payload())
+
+
+@router.post("/settings")
+async def api_save_settings(
+    api_key: str = Form(""),
+    model: str = Form("deepseek-chat"),
+    story_length: int = Form(1500),
+    max_tokens: int = Form(2048),
+    temperature: float = Form(0.8),
+    top_p: float = Form(0.9),
+    stream: int = Form(0),
+    max_context_messages: int = Form(20),
+    auto_compress: int = Form(1),
+    compress_threshold: int = Form(4000),
+):
+    """Save engine settings from the React settings page."""
+    from ui.routes.settings import apply_engine_settings
+    return JSONResponse(apply_engine_settings(
+        api_key=api_key,
+        model=model,
+        story_length=story_length,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        top_p=top_p,
+        stream=stream,
+        max_context_messages=max_context_messages,
+        auto_compress=auto_compress,
+        compress_threshold=compress_threshold,
+    ))
+
+
+@router.post("/settings/clear")
+async def api_clear_settings_key():
+    """Clear stored API key."""
+    from config import clear_api_key, reload_api_key
+    clear_api_key()
+    reload_api_key()
+    from ui.routes.settings import settings_payload
+    return JSONResponse(settings_payload())
+

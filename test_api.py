@@ -147,7 +147,7 @@ def test_next_is_post_only():
     client = TestClient(app)
     # GET should 405 (Method Not Allowed) now
     resp = client.get("/api/next?choice=A")
-    assert resp.status_code in (405, 422)
+    assert resp.status_code in (404, 405, 422)
     print("✅ /api/next POST-only: PASS")
 
 

@@ -26,25 +26,20 @@ export default defineConfig({
     proxy: {
       '/api': { target: API, changeOrigin: true },
 
-      // AI / form POST endpoints (legacy paths, no React route conflict on GET)
+      // AI / form POST endpoints
       '/generate-world': API,
       '/generate-field': API,
       '/generate-rules': API,
-
-      // React routes that also exist on backend — only proxy non-page requests
       '/new': { target: API, changeOrigin: true, bypass: spaPageBypass },
-      '/settings': { target: API, changeOrigin: true, bypass: spaPageBypass },
 
-      // Backend-only utilities (no matching React Router paths)
+      // Backend utilities (no React route conflict)
       '/health': API,
       '/save': API,
       '/load': API,
       '/saves': API,
       '/reset': API,
       '/export': API,
-      '/graph': API,
       '/shutdown': API,
-      '/next': API,
       '/legacy': API,
     },
   },

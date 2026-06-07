@@ -1,23 +1,17 @@
-"""World creation: new story page, AI world/field/rules generators."""
+"""World creation: new story form POST and AI world/field/rules generators."""
 from fastapi import APIRouter, Form, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from engine import io_utils, save_manager
 from engine.memory import load_memory
 from engine.deepseek_client import call_deepseek, DeepSeekError
-from ui.templates import _NEW_PAGE, _PRESETS
 import config
 import json
 
 router = APIRouter(tags=["world"])
 
-@router.get("/new", response_class=HTMLResponse)
-async def new_story_page():
-    """Show the new story creation form."""
-    return HTMLResponse(_NEW_PAGE)
 
-
-@router.post("/new", response_class=HTMLResponse)
+@router.post("/new")
 async def create_new_story(
     title: str = Form(...),
     world: str = Form(""),

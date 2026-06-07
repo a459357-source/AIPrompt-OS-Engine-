@@ -1,17 +1,7 @@
 """
 web_app.py — FastAPI Web UI for the Galgame Runtime
 =====================================================
-Thin app factory that mounts route modules from ui/routes/.
-Previously a 3020-line monolithic file — now delegates to:
-  • ui/routes/api.py       — JSON API (game-state, npcs, history, etc.)
-  • ui/routes/game.py      — Main game pages (/, /next, save/load, etc.)
-  • ui/routes/world.py     — World creation & AI generators
-  • ui/routes/npc.py       — NPC management
-  • ui/routes/settings.py  — Settings, dashboard, export
-  • ui/templates.py        — HTML template constants
-
-Start with: python engine/run.py --mode web
-Or directly:  uvicorn ui.web_app:app --reload
+React SPA is the primary UI. Legacy HTML pages live under /legacy/* only.
 """
 
 from pathlib import Path
@@ -21,13 +11,13 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, RedirectResponse
 
 import config
 
-# Initialize file logging for uvicorn workers
 config.setup_logging()
 config.ensure_runtime_files()
 
@@ -37,7 +27,6 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Allow CORS for React dev server
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -49,46 +38,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve local JS libraries for offline dashboard / graph pages
 _static_dir = config.OUTPUT_DIR
 _static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
-# ── Mount route modules ────────────────────────────────────────────
-
-from ui.routes.api import router as api_router
-from ui.routes.game import router as game_router
-from ui.routes.world import router as world_router
-from ui.routes.npc import router as npc_router
-from ui.routes.settings import router as settings_router
-
-app.include_router(api_router)
-app.include_router(game_router)
-app.include_router(world_router)
-app.include_router(npc_router)
-app.include_router(settings_router)
+# React client routes — must win over removed legacy HTML GET handlers
+REACT_CLIENT_ROUTES = ("new", "game", "npcs", "dashboard", "settings")
 
 
-# ── Production SPA (built frontend/dist) ───────────────────────────
-
-if config.has_bundled_frontend():
-    from fastapi.responses import FileResponse
-    from fastapi import HTTPException
-
-    _dist = config.FRONTEND_DIST
-
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        """Serve React build for client-side routes (GET only)."""
-        if full_path.startswith(("api/", "static/")):
-            raise HTTPException(404)
-        fp = _dist / full_path
-        if full_path and fp.is_file():
-            return FileResponse(fp)
-        return FileResponse(_dist / "index.html")
+async def _serve_react_spa(request: Request):
+    """Serve bundled SPA or redirect dev traffic to the Vite server."""
+    if config.has_bundled_frontend():
+        return FileResponse(config.FRONTEND_DIST / "index.html")
+    return RedirectResponse(url=config.frontend_url(request.url.path), status_code=302)
 
 
-# ── Standalone utility routes (kept at root level for frontend compat) ──
+for _route in REACT_CLIENT_ROUTES:
+    app.add_api_route(f"/{_route}", _serve_react_spa, methods=["GET"])
+
 
 @app.get("/health")
 async def health():
@@ -98,8 +65,38 @@ async def health():
 
 @app.post("/shutdown")
 async def shutdown(token: str = ""):
-    """Gracefully shut down the server (requires local-only or token auth)."""
+    """Gracefully shut down the server."""
     import sys
-    # Only allow shutdown from localhost or with a simple token
-    # This prevents remote CSRF-style attacks from killing the server
     sys.exit(0)
+
+
+from ui.routes.api import router as api_router
+from ui.routes.game import router as game_router
+from ui.routes.world import router as world_router
+from ui.routes.settings import router as settings_router
+
+app.include_router(api_router)
+app.include_router(game_router)
+app.include_router(world_router)
+app.include_router(settings_router)
+
+
+if config.has_bundled_frontend():
+    from fastapi import HTTPException
+
+    _dist = config.FRONTEND_DIST
+    _SPA_EXCLUDE_PREFIXES = ("api/", "static/", "legacy/", "generate-")
+    _SPA_EXCLUDE_EXACT = frozenset({
+        "health", "export", "save", "load", "saves", "reset", "shutdown",
+        "new", "game", "npcs", "dashboard", "settings",
+    })
+
+    @app.get("/{full_path:path}")
+    async def serve_spa_fallback(full_path: str):
+        """Fallback for client-side routes not registered above."""
+        if full_path.startswith(_SPA_EXCLUDE_PREFIXES) or full_path in _SPA_EXCLUDE_EXACT:
+            raise HTTPException(404)
+        fp = _dist / full_path
+        if full_path and fp.is_file():
+            return FileResponse(fp)
+        return FileResponse(_dist / "index.html")

@@ -1,13 +1,11 @@
-"""Main game pages: index, next_turn, save/load, graph, history, reset."""
-from fastapi import APIRouter, Query, Form
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+"""Main game routes: SPA root, legacy debug page, save/load utilities."""
+from fastapi import APIRouter, Query
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse
 
 from engine.run import step
 from engine import io_utils, save_manager
 from engine.memory import load_memory, get_char_stats_for_ui
-from engine.router import load_graph
-from ui.obsidian_export import _generate_mermaid
-from ui.templates import HTML_TEMPLATE, _render_template
+from ui.templates import _render_template
 import config
 
 router = APIRouter(tags=["game"])
@@ -26,9 +24,8 @@ def _get_world_title() -> tuple[str, str]:
 
 @router.get("/")
 async def index():
-    """Redirect root to the React SPA (legacy HTML removed from /)."""
+    """Serve React SPA at root."""
     if config.has_bundled_frontend():
-        from fastapi.responses import FileResponse
         return FileResponse(config.FRONTEND_DIST / "index.html")
     return RedirectResponse(url=config.frontend_url(), status_code=302)
 
@@ -102,58 +99,6 @@ async def legacy_index():
     )
 
 
-@router.post("/next", response_class=HTMLResponse)
-async def next_turn(choice: str = Form(..., min_length=1, max_length=1)):
-    """
-    Advance the story with the player's choice (A/B/C/D).
-    Returns the new story page.
-    """
-    # Accept A/B/C/D or free-text (URL-encoded)
-    if choice not in ("A", "B", "C", "D"):
-        # Free-text choice — validate length and reject dangerous chars
-        if len(choice) > 200 or any(c in choice for c in "<>"):
-            return _render_template(
-                error="无效的输入，请使用 A-D 或简短的自定义文本。",
-                turn=0, status="?", scene="?",
-            )
-
-    result = step(choice)
-
-    if result is None:
-        return _render_template(
-            error="❌ 生成失败，请确认 API key 已设置且网络正常。",
-            turn=0, status="?", scene="?",
-        )
-
-    # Read updated state for character & force_event info
-    try:
-        updated_state = io_utils.read_yaml(config.SESSION_STATE_PATH)
-    except Exception:
-        updated_state = {}
-
-    memory = load_memory()
-    try:
-        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
-    except Exception:
-        world_pack = {}
-    char_stats = get_char_stats_for_ui(updated_state, memory, world_pack)
-    title, subtitle = _get_world_title()
-
-    return _render_template(
-        story=result["story"],
-        options=result["options"],
-        turn=result["turn"],
-        status=result["status"],
-        scene=result["scene"],
-        characters=updated_state.get("characters", result.get("state", {}).get("characters")),
-        force_event=updated_state.get("force_event_pending", False),
-        char_stats=char_stats,
-        title=title,
-        subtitle=subtitle,
-        chapter=updated_state.get("chapter", 1),
-    )
-
-
 # ── Save / Load routes ────────────────────────────────────────────
 
 @router.get("/save")
@@ -213,137 +158,6 @@ async def list_saves():
     """Return the list of all save slots as JSON."""
     from fastapi.responses import JSONResponse
     return JSONResponse(save_manager.list_saves())
-
-
-@router.get("/graph", response_class=HTMLResponse)
-async def story_graph_page():
-    """
-    Render an interactive Mermaid.js story graph page.
-    """
-    from engine.router import load_graph
-    from ui.obsidian_export import _generate_mermaid
-
-    mermaid_lines = _generate_mermaid()
-    mermaid_code = "\n".join(mermaid_lines)
-
-    graph_html = f"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<title>剧情分支图 — Prompt OS Galgame</title>
-<script src="/static/mermaid.min.js"></script>
-<style>
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh}}
-.topbar{{display:flex;align-items:center;justify-content:space-between;padding:10px 24px;border-bottom:1px solid #21262d;background:#0d1117}}
-.topbar h1{{font-size:1.15em;color:#58a6ff}}
-.back-btn{{display:inline-block;padding:5px 14px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.82em}}
-.back-btn:hover{{background:#1a3a5c;color:#79c0ff}}
-.content{{max-width:1100px;margin:0 auto;padding:16px 24px}}
-.info{{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px;margin-bottom:16px;font-size:0.82em;color:#8b949e;line-height:1.6}}
-.mermaid{{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:24px;overflow-x:auto}}
-</style>
-</head>
-<body>
-<div class="topbar">
-    <h1>🌳 剧情分支图</h1>
-    <a href="/" class="back-btn">← 返回游戏</a>
-</div>
-<div class="content">
-    <div class="info">
-        📖 每个节点代表一个剧情回合。边上的字母代表玩家在该节点的选择（A/B/C/D）。
-    </div>
-    <div class="mermaid">
-{mermaid_code}
-    </div>
-</div>
-<script>
-    mermaid.initialize({{ startOnLoad: true, theme: 'dark' }});
-</script>
-</body>
-</html>"""
-
-    return graph_html
-
-
-@router.get("/history", response_class=HTMLResponse)
-async def history_page():
-    """
-    Show all past turns as a scrollable history log.
-    """
-    try:
-        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
-    except Exception:
-        state = {}
-
-    history = state.get("history", [])
-    turn = state.get("turn", 0)
-    scene = state.get("scene", "")
-
-    if not history:
-        return HTMLResponse(
-            HTML_TEMPLATE.replace("{{STORY}}", "尚无历史记录。")
-            .replace("{{OPTIONS}}", "")
-            .replace("{{STATE_ROW}}", "")
-            .replace("{{SIDEBAR}}", "")
-            .replace("{{ERROR}}", "")
-        )
-
-    blocks: list[str] = []
-    for h in history:
-        t = h.get("turn", "?")
-        s = h.get("status", "?")
-        sc = h.get("scene", "?")
-        story = h.get("story", h.get("summary", ""))
-        choice = h.get("choice", "")
-
-        status_cn = {"SETUP": "序章", "BUILD": "展开", "TENSION": "张力", "CLIMAX": "高潮", "COOLDOWN": "余韵"}.get(s, s)
-
-        # HTML-escape story to prevent XSS via AI-generated content
-        safe_story = story.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        blocks.append(
-            f'<div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #30363d;">'
-            f'<div style="color:#8b949e;font-size:0.8em;margin-bottom:6px;">'
-            f'📖 第{t}轮 · {status_cn} · {sc}'
-            f'{(" · 选择: " + choice) if choice else ""}'
-            f'</div>'
-            f'<div style="line-height:1.8;white-space:pre-wrap;">{safe_story}</div>'
-            f'</div>'
-        )
-
-    history_html = "\n".join(blocks)
-
-    page = f"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta charset="UTF-8">
-    <title>历史回顾 — Prompt OS Galgame</title>
-    <style>
-        *{{box-sizing:border-box;margin:0;padding:0}}
-        body{{font-family:"Segoe UI","Noto Sans SC",system-ui,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh}}
-        .topbar{{display:flex;align-items:center;justify-content:space-between;padding:10px 24px;border-bottom:1px solid #21262d;background:#0d1117}}
-        .topbar h1{{font-size:1.15em;color:#58a6ff}}
-        .back-btn{{display:inline-block;padding:5px 14px;background:#1c2333;border:1px solid #58a6ff;border-radius:6px;color:#58a6ff;text-decoration:none;font-size:0.82em}}
-        .back-btn:hover{{background:#1a3a5c;color:#79c0ff}}
-        .content{{max-width:900px;margin:0 auto;padding:16px 24px}}
-        .hist-body{{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:20px 24px;line-height:1.8}}
-    </style>
-</head>
-<body>
-    <div class="topbar">
-        <h1>📜 历史回顾 · 共 {turn} 轮 · {scene}</h1>
-        <a href="/" class="back-btn">← 返回游戏</a>
-    </div>
-    <div class="content">
-        <div class="hist-body">
-            {history_html}
-        </div>
-    </div>
-</body>
-</html>"""
-
-    return HTMLResponse(page)
 
 
 @router.get("/reset", response_class=HTMLResponse)
