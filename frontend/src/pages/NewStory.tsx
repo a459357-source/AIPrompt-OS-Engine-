@@ -1281,7 +1281,7 @@ export default function NewStory() {
                   )}
                   <div className="flex items-center gap-3 pt-1">
                     <Label className="text-xs text-game-muted shrink-0">
-                      {adultMode ? tTheme('stat.affection', lang, true) : '初始好感度'}
+                      {adultMode ? `初始${tTheme('stat.affection', lang, true)}` : '初始好感度'}
                     </Label>
                     <input
                       type="range"

@@ -583,7 +583,7 @@ export default function Dashboard() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">📈 {tTheme('dashboard.affectionChart', lang, adultMode)}</CardTitle>
-                <CardDescription>{adultMode ? '角色关系随剧情推进的变化' : '角色信任度随剧情推进的变化'}</CardDescription>
+                <CardDescription>{tTheme('dashboard.affectionDesc', lang, adultMode)}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-64">
