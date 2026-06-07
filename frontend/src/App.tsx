@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { useAppSettings } from '@/hooks/useAppSettings'
+import { t } from '@/lib/i18n'
 import NewStory from './pages/NewStory'
 import Game from './pages/Game'
 import NPCs from './pages/NPCs'
@@ -12,16 +14,17 @@ import Settings from './pages/Settings'
 import { ApiKeyPrompt } from '@/components/ApiKeyPrompt'
 
 const NAV_LINKS = [
-  { to: '/new', icon: '🆕', label: '新故事' },
-  { to: '/game', icon: '🎮', label: '游戏' },
-  { to: '/npcs', icon: '👥', label: '角色' },
-  { to: '/dashboard', icon: '📊', label: '仪表盘' },
-  { to: '/settings', icon: '⚙️', label: '设置' },
+  { to: '/new', icon: '🆕', labelKey: 'nav.new' },
+  { to: '/game', icon: '🎮', labelKey: 'nav.game' },
+  { to: '/npcs', icon: '👥', labelKey: 'nav.npcs' },
+  { to: '/dashboard', icon: '📊', labelKey: 'nav.dashboard' },
+  { to: '/settings', icon: '⚙️', labelKey: 'nav.settings' },
 ]
 
 // ── Desktop NavBar ──
 function DesktopNav() {
   const location = useLocation()
+  const { language } = useAppSettings()
 
   return (
     <nav className="hidden md:flex items-center gap-1 px-4 py-2 border-b border-game-border bg-game-bg/95 backdrop-blur-sm sticky top-0 z-50">
@@ -39,7 +42,7 @@ function DesktopNav() {
           }`}
         >
           <span className="mr-1.5">{l.icon}</span>
-          {l.label}
+          {t(l.labelKey, language as 'zh' | 'en' | 'ja')}
         </Link>
       ))}
     </nav>
@@ -49,6 +52,7 @@ function DesktopNav() {
 // ── Mobile Bottom Nav ──
 function MobileBottomNav() {
   const location = useLocation()
+  const { language } = useAppSettings()
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-game-card/95 backdrop-blur-sm border-t border-game-border">
@@ -66,7 +70,7 @@ function MobileBottomNav() {
               }`}
             >
               <span className="text-lg">{l.icon}</span>
-              <span className="text-[10px] leading-none">{l.label}</span>
+              <span className="text-[10px] leading-none">{t(l.labelKey, language as 'zh' | 'en' | 'ja')}</span>
             </Link>
           )
         })}
@@ -79,6 +83,7 @@ function MobileBottomNav() {
 function MobileDrawer() {
   const location = useLocation()
   const [open, setOpen] = useState(false)
+  const { language } = useAppSettings()
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -106,7 +111,7 @@ function MobileDrawer() {
                 }`}
               >
                 <span className="text-lg">{l.icon}</span>
-                {l.label}
+                {t(l.labelKey, language as 'zh' | 'en' | 'ja')}
               </Link>
             )
           })}
@@ -132,6 +137,7 @@ function MobileTopBar() {
 // ── App ──
 function App() {
   const location = useLocation()
+  const { animations } = useAppSettings()
 
   return (
     <div className="min-h-screen bg-game-bg text-game-text pb-16 md:pb-0">
@@ -140,15 +146,30 @@ function App() {
       <MobileTopBar />
       <MobileBottomNav />
 
-      <AnimatePresence mode="wait">
-        <motion.main
-          key={location.pathname}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.2 }}
-          className="p-4 md:p-6"
-        >
+      {animations ? (
+        <AnimatePresence mode="wait">
+          <motion.main
+            key={location.pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="p-4 md:p-6"
+          >
+            <ErrorBoundary>
+              <Routes>
+                <Route path="/new" element={<NewStory />} />
+                <Route path="/game" element={<Game />} />
+                <Route path="/npcs" element={<NPCs />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/" element={<NewStory />} />
+              </Routes>
+            </ErrorBoundary>
+          </motion.main>
+        </AnimatePresence>
+      ) : (
+        <main className="p-4 md:p-6">
           <ErrorBoundary>
             <Routes>
               <Route path="/new" element={<NewStory />} />
@@ -159,8 +180,8 @@ function App() {
               <Route path="/" element={<NewStory />} />
             </Routes>
           </ErrorBoundary>
-        </motion.main>
-      </AnimatePresence>
+        </main>
+      )}
     </div>
   )
 }

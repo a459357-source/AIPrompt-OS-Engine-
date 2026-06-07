@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -16,7 +16,8 @@ import { Separator } from '@/components/ui/separator'
 import { TagInput } from '@/components/TagInput'
 import { AIButton } from '@/components/AIButton'
 import { StatusToast } from '@/components/StatusToast'
-import type { Character } from '@/lib/types'
+import type { Character, WorldGenResponse } from '@/lib/types'
+import { STORY_PRESETS, type StoryPreset } from '@/lib/storyPresets'
 
 // ── Schema ──
 const characterSchema = z.object({
@@ -76,6 +77,210 @@ const DEFAULT_STAGES = ['崩坏', '敌视', '对立', '冷漠', '疏远', '陌�
 
 const DEFAULT_REL = { relationshipType:'friend', affection:50, trust:50, respect:50, dependence:50, hostility:30, attraction:50, tags:[] as string[] }
 
+type CharRel = typeof DEFAULT_REL
+
+const REL_TYPE_SET = new Set(['friend', 'lover', 'family', 'teacher', 'rival', 'ally', 'enemy'])
+
+function clampRelMetric(value: unknown, fallback: number): number {
+  const n = typeof value === 'number' ? value : parseInt(String(value), 10)
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : fallback
+}
+
+function pickRelationRaw(
+  raw: Record<string, unknown> | undefined,
+  npcName: string,
+  usedKeys: Set<string>,
+): Record<string, unknown> {
+  if (!raw) return {}
+  if (raw[npcName] && typeof raw[npcName] === 'object') {
+    usedKeys.add(npcName)
+    return raw[npcName] as Record<string, unknown>
+  }
+  for (const [key, val] of Object.entries(raw)) {
+    if (usedKeys.has(key) || typeof val !== 'object' || val === null) continue
+    if (key === npcName || key.includes(npcName) || npcName.includes(key)) {
+      usedKeys.add(key)
+      return val as Record<string, unknown>
+    }
+  }
+  return {}
+}
+
+function normalizeCharacterRelations(
+  raw: Record<string, unknown> | undefined,
+  npcNames: string[],
+): Record<string, CharRel> {
+  const out: Record<string, CharRel> = {}
+  const usedKeys = new Set<string>()
+  for (const name of npcNames) {
+    const rel = pickRelationRaw(raw, name, usedKeys)
+    const relType = typeof rel.relationshipType === 'string' && REL_TYPE_SET.has(rel.relationshipType)
+      ? rel.relationshipType
+      : DEFAULT_REL.relationshipType
+    const tags = Array.isArray(rel.tags)
+      ? rel.tags.filter((t): t is string => typeof t === 'string' && !!t.trim())
+      : []
+    out[name] = {
+      relationshipType: relType,
+      affection: clampRelMetric(rel.affection, DEFAULT_REL.affection),
+      trust: clampRelMetric(rel.trust, DEFAULT_REL.trust),
+      respect: clampRelMetric(rel.respect, DEFAULT_REL.respect),
+      dependence: clampRelMetric(rel.dependence, DEFAULT_REL.dependence),
+      hostility: clampRelMetric(rel.hostility, DEFAULT_REL.hostility),
+      attraction: clampRelMetric(rel.attraction, DEFAULT_REL.attraction),
+      tags,
+    }
+  }
+  return out
+}
+
+type FactionRow = {
+  name: string
+  type: string
+  description: string
+  goals: string[]
+  resources: string[]
+  controlledTerritories: string[]
+  subordinateOrganizations: string[]
+  keyAssets: string[]
+  power: { military: number; economic: number; political: number; technology: number }
+  influence: number
+  relation_to_player: string
+  leader: string
+}
+
+function mapGeneratedFactions(raw: Array<Record<string, unknown>>): FactionRow[] {
+  return raw.map((f) => ({
+    name: (f.name as string) || '',
+    type: (f.type as string) || 'organization',
+    description: (f.description as string) || '',
+    goals: (f.goals as string[]) || [],
+    resources: (f.resources as string[]) || [],
+    controlledTerritories: (f.controlledTerritories as string[]) || [],
+    subordinateOrganizations: (f.subordinateOrganizations as string[]) || [],
+    keyAssets: (f.keyAssets as string[]) || [],
+    power: (f.power as FactionRow['power']) || { military: 0, economic: 0, political: 0, technology: 0 },
+    influence: (f.influence as number) || 50,
+    relation_to_player: (f.relation_to_player as string) || 'neutral',
+    leader: (f.leader as string) || '',
+  }))
+}
+
+function resolveCharacterFaction(
+  faction: unknown,
+  charName: string,
+  factions: FactionRow[],
+): string {
+  const names = factions.map((f) => f.name).filter(Boolean)
+  const raw = typeof faction === 'string' ? faction.trim() : ''
+  if (raw && names.includes(raw)) return raw
+  const byLeader = factions.find((f) => f.leader === charName)
+  if (byLeader?.name) return byLeader.name
+  if (raw) {
+    const fuzzy = names.find((n) => raw.includes(n) || n.includes(raw))
+    if (fuzzy) return fuzzy
+  }
+  return ''
+}
+
+type ArtifactRow = {
+  name: string
+  type: string
+  description: string
+  ownerType: string
+  ownerId: string
+  importance: number
+  abilities: string[]
+  tags: string[]
+}
+
+function resolveArtifactOwner(
+  ownerId: unknown,
+  ownerType: string,
+  charNames: string[],
+  facNames: string[],
+): string {
+  const raw = typeof ownerId === 'string' ? ownerId.trim() : ''
+  if (!raw) return ''
+  const pool = ownerType === 'character'
+    ? charNames
+    : ownerType === 'faction'
+      ? facNames
+      : [...charNames, ...facNames]
+  if (pool.includes(raw)) return raw
+  const fuzzy = pool.find((n) => raw.includes(n) || n.includes(raw))
+  return fuzzy || raw
+}
+
+function mapGeneratedArtifacts(
+  raw: Array<Record<string, unknown>>,
+  charNames: string[],
+  factions: FactionRow[],
+): ArtifactRow[] {
+  const facNames = factions.map((f) => f.name).filter(Boolean)
+  return raw.map((a) => ({
+    name: (a.name as string) || '',
+    type: ((a.type as string) || 'personal') as 'personal' | 'faction' | 'world',
+    description: (a.description as string) || '',
+    ownerType: ((a.ownerType as string) || 'none') as 'character' | 'faction' | 'location' | 'none',
+    ownerId: resolveArtifactOwner(a.ownerId, (a.ownerType as string) || 'none', charNames, facNames),
+    importance: (a.importance as number) || 50,
+    abilities: (a.abilities as string[]) || [],
+    tags: (a.tags as string[]) || [],
+  }))
+}
+
+function artifactFromGenData(
+  data: Record<string, unknown>,
+  charNames: string[],
+  facNames: string[],
+): ArtifactRow | null {
+  if (!data.name) return null
+  const ownerType = (data.ownerType as string) || 'none'
+  return {
+    name: String(data.name),
+    type: ((data.type as string) || 'personal') as 'personal' | 'faction' | 'world',
+    description: (data.description as string) || '',
+    ownerType: (ownerType || 'none') as 'character' | 'faction' | 'location' | 'none',
+    ownerId: resolveArtifactOwner(data.ownerId, ownerType, charNames, facNames),
+    importance: (data.importance as number) || 50,
+    abilities: (data.abilities as string[]) || [],
+    tags: (data.tags as string[]) || [],
+  }
+}
+
+function getOwnerNames(characters: FormValues['characters'], factionList: FactionRow[]) {
+  return {
+    charNames: characters.map((c) => c.name).filter(Boolean),
+    facNames: factionList.map((f) => f.name).filter(Boolean),
+  }
+}
+
+function assessWorldGenCompleteness(data: WorldGenResponse): string[] {
+  const warnings: string[] = []
+  if (!data.characters?.length) warnings.push('缺少角色')
+  else if (!data.characters.some((c) => !c.isMain)) warnings.push('缺少 NPC')
+  if (!data.factions?.length) warnings.push('缺少势力')
+  if (!data.artifacts?.length) warnings.push('缺少关键物品')
+  if (!data.stats?.length) warnings.push('缺少追踪维度')
+  const npcNames = (data.characters || []).filter((c) => !c.isMain && c.name).map((c) => c.name as string)
+  if (npcNames.length) {
+    const rels = (data.characterRelations || {}) as Record<string, { tags?: string[] }>
+    if (npcNames.some((n) => !rels[n]?.tags?.length)) warnings.push('部分关系标签未生成')
+  }
+  return warnings
+}
+
+interface NewStorySavedState {
+  form?: FormValues
+  factions?: FactionRow[]
+  artifacts?: ArtifactRow[]
+  characterRelations?: Record<string, CharRel>
+  customStats?: { key: string; label: string; max: number }[]
+  keywords?: string
+  activePreset?: string | null
+}
+
 // ── Main Page ──
 export default function NewStory() {
   const [aiStatus, setAiStatus] = useState('')
@@ -89,7 +294,8 @@ export default function NewStory() {
   const [artifacts, setArtifacts] = useState<{ name: string; type: string; description: string; ownerType: string; ownerId: string; importance: number; abilities: string[]; tags: string[] }[]>([])
   const [factions, setFactions] = useState<{ name: string; type: string; description: string; goals: string[]; resources: string[]; controlledTerritories: string[]; subordinateOrganizations: string[]; keyAssets: string[]; power: { military: number; economic: number; political: number; technology: number }; influence: number; relation_to_player: string; leader: string }[]>([])
   const [customStats, setCustomStats] = useState<{ key: string; label: string; max: number }[]>([])
-  const kwRef = useRef<HTMLTextAreaElement>(null)
+  const [keywords, setKeywords] = useState('')
+  const [activePreset, setActivePreset] = useState<string | null>(null)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -120,11 +326,35 @@ export default function NewStory() {
   const { fields, append, remove } = useFieldArray({ control, name: 'characters' })
   const watchAll = watch()
 
-  // Auto-save
-  const { restoredData } = useAutoSave('new-story-form', watchAll)
+  const saveBundle = useMemo<NewStorySavedState>(() => ({
+    form: watchAll,
+    factions,
+    artifacts,
+    characterRelations,
+    customStats,
+    keywords,
+    activePreset,
+  }), [watchAll, factions, artifacts, characterRelations, customStats, keywords, activePreset])
+
+  const { restoredData, clearSaved } = useAutoSave('new-story-draft-v2', saveBundle)
   useEffect(() => {
-    if (restoredData) {
-      Object.entries(restoredData).forEach(([key, val]) => {
+    if (!restoredData) return
+    const saved = restoredData as NewStorySavedState & Partial<FormValues>
+    if (saved.form && typeof saved.form === 'object') {
+      Object.entries(saved.form).forEach(([key, val]) => {
+        setValue(key as keyof FormValues, val as never)
+      })
+      setFactions(saved.factions || [])
+      setArtifacts(saved.artifacts || [])
+      setCharacterRelations(saved.characterRelations || {})
+      setCustomStats(saved.customStats || [])
+      if (saved.keywords != null) setKeywords(saved.keywords)
+      if (saved.activePreset != null) setActivePreset(saved.activePreset)
+      return
+    }
+    if ('title' in saved || 'characters' in saved) {
+      Object.entries(saved).forEach(([key, val]) => {
+        if (['factions', 'artifacts', 'characterRelations', 'customStats', 'keywords', 'activePreset', 'form'].includes(key)) return
         setValue(key as keyof FormValues, val as never)
       })
     }
@@ -135,84 +365,132 @@ export default function NewStory() {
     setAiStatusType(type)
   }
 
-  // ── AI Generation handlers ──
-  const handleWorldGen = useCallback(async () => {
-    setGenerating('world')
-    showStatus('正在生成世界观、角色和规则…', 'loading')
-    logger.info('NewStory', 'handleWorldGen: starting')
-    try {
-      const kw = kwRef.current?.value?.trim() || '奇幻冒险'
-      const data = await generateWorld(kw)
-      if (data.title) setValue('title', data.title)
-      if (data.world) setValue('world', data.world)
-      if (data.genre) setValue('genre', Array.isArray(data.genre) ? data.genre : [])
+  const applyWorldGenResult = useCallback((data: WorldGenResponse): string[] => {
+    if (!data.characters?.length) {
+      if (data.title) setValue('title', String(data.title).slice(0, 20))
+      if (data.world) setValue('world', String(data.world).trim().slice(0, 300))
+      if (data.genre?.length) setValue('genre', data.genre)
       if (data.scene) setValue('scene', data.scene)
       if (data.main_goal) setValue('main_goal', data.main_goal)
-      if (data.characters) {
-        const chars = data.characters.map((c, i) => ({
-          name: c.name || '',
-          isMain: c.isMain ?? i === 0,
-          role_tags: Array.isArray(c.role_tags) ? c.role_tags : (c.role_tags ? [c.role_tags] : []),
-          personality_tags: Array.isArray(c.personality_tags) ? c.personality_tags : [],
-          appearance: c.appearance || '',
-          relationship: Array.isArray(c.relationship) ? c.relationship : [],
-          goal: c.goal || '',
-          secret: c.secret || '',
-          background: c.background || '',
-          special_ability: c.special_ability || '',
-        }))
-        setValue('characters', chars)
+      return ['生成结果被截断，未更新角色/势力/物品/关系（已保留现有内容）。请提高 Token 后重试']
+    }
+
+    setFactions([])
+    setArtifacts([])
+    setCharacterRelations({})
+    setCustomStats([])
+    setActivePreset(null)
+
+    if (data.title) setValue('title', String(data.title).slice(0, 20))
+    if (data.world) setValue('world', String(data.world).trim().slice(0, 300))
+    if (data.genre) setValue('genre', Array.isArray(data.genre) ? data.genre : [])
+    if (data.scene) setValue('scene', data.scene)
+    if (data.main_goal) setValue('main_goal', data.main_goal)
+
+    const facs = data.factions
+      ? mapGeneratedFactions(data.factions as unknown as Array<Record<string, unknown>>)
+      : []
+    setFactions(facs)
+
+    let charNames: string[] = []
+    const chars = data.characters.map((c, i) => ({
+      name: c.name || '',
+      isMain: c.isMain ?? i === 0,
+      faction: resolveCharacterFaction(c.faction, c.name || '', facs),
+      role_tags: Array.isArray(c.role_tags) ? c.role_tags : (c.role_tags ? [c.role_tags] : []),
+      personality_tags: Array.isArray(c.personality_tags) ? c.personality_tags : [],
+      appearance: c.appearance || '',
+      relationship: Array.isArray(c.relationship) ? c.relationship : [],
+      goal: c.goal || '',
+      secret: c.secret || '',
+      background: c.background || '',
+      special_ability: c.special_ability || '',
+    }))
+    setValue('characters', chars)
+    charNames = chars.map((c) => c.name).filter(Boolean)
+    const npcNames = chars.filter((c) => !c.isMain && c.name).map((c) => c.name)
+    setCharacterRelations(normalizeCharacterRelations(
+      data.characterRelations as Record<string, unknown> | undefined,
+      npcNames,
+    ))
+
+    if (data.rel_stages) setValue('rel_stages', data.rel_stages)
+    if (data.rel_affection != null) setValue('rel_affection', data.rel_affection)
+    if (data.stats?.length) {
+      setCustomStats(data.stats.map((s) => ({
+        key: String(s.key || 'stat'),
+        label: String(s.label || s.key || '维度'),
+        max: typeof s.max === 'number' ? s.max : 100,
+      })))
+    }
+
+    const arts = data.artifacts
+      ? mapGeneratedArtifacts(
+        data.artifacts as unknown as Array<Record<string, unknown>>,
+        charNames,
+        facs,
+      )
+      : []
+    setArtifacts(arts)
+
+    return assessWorldGenCompleteness(data)
+  }, [setValue])
+
+  const runWorldGen = useCallback(async (kwOverride?: string) => {
+    setGenerating('world')
+    showStatus('正在生成世界观、角色和规则…', 'loading')
+    logger.info('NewStory', 'runWorldGen: starting')
+    try {
+      const kw = (kwOverride ?? keywords).trim() || '奇幻冒险'
+      const data = await generateWorld(kw)
+      const warnings = applyWorldGenResult(data)
+
+      if (data.characters?.length && !data.stats?.length) {
+        try {
+          const allChars = getValues('characters') || []
+          const rules = await generateRules({
+            title: getValues('title'),
+            world: getValues('world'),
+            genre: getValues('genre').join('/'),
+            char1_name: allChars[0]?.name || '主角',
+            char1_role: allChars[0]?.role_tags?.[0] || '',
+            char2_name: allChars[1]?.name || '',
+            char2_role: allChars[1]?.role_tags?.[0] || '',
+          })
+          if (rules.stats?.length) setCustomStats(rules.stats)
+          if (rules.stages?.length && !data.rel_stages?.length) {
+            setValue('rel_stages', rules.stages)
+          }
+        } catch {
+          // 规则补全失败不影响主流程
+        }
       }
-      if (data.rel_stages) setValue('rel_stages', data.rel_stages)
-      if (data.rel_affection != null) setValue('rel_affection', data.rel_affection)
-      if (data.stats) {
-        const stats = data.stats.map((s) => ({
-          key: String(s.key || 'stat'),
-          label: String(s.label || s.key || '维度'),
-          max: typeof s.max === 'number' ? s.max : 100,
-        }))
-        setCustomStats(stats)
+
+      if (warnings.length) {
+        showStatus(`⚠️ ${warnings.join('；')}。可在设置中提高 Token 后重试`, 'error')
+      } else {
+        showStatus('✅ 生成完成，可继续修改', 'success')
       }
-      if (data.factions) {
-        const facs = (data.factions as unknown as Array<Record<string,unknown>>).map((f: Record<string,unknown>) => ({
-          name: (f.name as string) || '',
-          type: (f.type as string) || 'organization',
-          description: (f.description as string) || '',
-          goals: (f.goals as string[]) || [],
-          resources: (f.resources as string[]) || [],
-          controlledTerritories: (f.controlledTerritories as string[]) || [],
-          subordinateOrganizations: (f.subordinateOrganizations as string[]) || [],
-          keyAssets: (f.keyAssets as string[]) || [],
-          power: (f.power as { military: number; economic: number; political: number; technology: number }) || { military: 0, economic: 0, political: 0, technology: 0 },
-          influence: (f.influence as number) || 50,
-          relation_to_player: (f.relation_to_player as string) || 'neutral',
-          leader: (f.leader as string) || '',
-        }))
-        setFactions( facs)
-      }
-      if (data.artifacts) {
-        const arts = (data.artifacts as unknown as Array<Record<string,unknown>>).map((a: Record<string,unknown>) => ({
-          name: (a.name as string) || '',
-          type: ((a.type as string) || 'personal') as 'personal'|'faction'|'world',
-          description: (a.description as string) || '',
-          ownerType: ((a.ownerType as string) || 'none') as 'character'|'faction'|'location'|'none',
-          ownerId: (a.ownerId as string) || '',
-          importance: (a.importance as number) || 50,
-          abilities: (a.abilities as string[]) || [],
-          tags: (a.tags as string[]) || [],
-        }))
-        setArtifacts( arts)
-      }
-      showStatus('✅ 生成完成，可继续修改', 'success')
-      setFieldErrors((prev) => ({ ...prev, world: null }))
+      setFieldErrors((prev) => ({ ...prev, world: warnings.some((w) => w.includes('截断')) ? warnings[0] : null }))
     } catch (e) {
       const msg = (e as Error).message || String(e)
-      logger.error('NewStory', 'handleWorldGen: failed', { error: msg })
+      logger.error('NewStory', 'runWorldGen: failed', { error: msg })
       showStatus(`❌ ${msg}`, 'error')
       setFieldErrors((prev) => ({ ...prev, world: msg }))
     }
     setGenerating(null)
-  }, [setValue])
+  }, [keywords, applyWorldGenResult, getValues, setValue])
+
+  const handleWorldGen = useCallback(() => runWorldGen(), [runWorldGen])
+
+  const handlePresetSelect = useCallback(async (preset: StoryPreset) => {
+    setActivePreset(preset.id)
+    const kw = [preset.keywords, preset.form.title, preset.form.world].filter(Boolean).join('\n')
+    setKeywords(kw)
+    setFieldErrors({})
+    showStatus(`正在基于「${preset.label.replace(/^[^\s]+\s*/, '')}」一键生成…`, 'loading')
+    await runWorldGen(kw)
+  }, [runWorldGen])
 
   const handleFieldGen = useCallback(async (field: string) => {
     setGenerating(field)
@@ -229,7 +507,7 @@ export default function NewStory() {
       })
       const story = data.story || data.title || ''
       if (field === 'title') setValue('title', story.replace(/["']/g, '').trim().slice(0, 20))
-      if (field === 'world') setValue('world', story.trim())
+      if (field === 'world') setValue('world', story.trim().slice(0, 300))
       if (field === 'main_goal') setValue('main_goal', (data.main_goal || story).trim())
       if (field === 'scene') setValue('scene', story.trim())
       showStatus('✅ 生成完成', 'success')
@@ -253,9 +531,13 @@ export default function NewStory() {
         title: getValues('title'),
         world: getValues('world'),
         char_role: '',
+        context: JSON.stringify((factions || []).map((f) => ({ name: f.name, leader: f.leader }))),
       })
       const chars = getValues('characters')
       if (data.name) chars[idx].name = data.name
+      if (data.faction !== undefined) {
+        chars[idx].faction = resolveCharacterFaction(data.faction, data.name || chars[idx].name || '', factions || [])
+      }
       if (data.role_tags) chars[idx].role_tags = Array.isArray(data.role_tags) ? data.role_tags : [data.role_tags]
       if (data.personality_tags) chars[idx].personality_tags = Array.isArray(data.personality_tags) ? data.personality_tags : [data.personality_tags]
       if (data.appearance) chars[idx].appearance = data.appearance
@@ -271,7 +553,47 @@ export default function NewStory() {
       setFieldErrors((prev) => ({ ...prev, [`char-${idx}`]: msg }))
     }
     setGenerating(null)
-  }, [getValues, setValue])
+  }, [getValues, setValue, factions])
+
+  const handleRelGen = useCallback(async (npcName: string) => {
+    const genKey = `rel-${npcName}`
+    setGenerating(genKey)
+    showStatus(`正在生成与 ${npcName} 的关系设定…`, 'loading')
+    setFieldErrors((prev) => ({ ...prev, [genKey]: null }))
+    try {
+      const allChars = getValues('characters')
+      const mainChar = allChars.find((c) => c.isMain) || allChars[0]
+      const npc = allChars.find((c) => c.name === npcName)
+      const context = [
+        mainChar?.name ? `主角：${mainChar.name}` : '',
+        mainChar?.personality_tags?.length ? `主角性格：${mainChar.personality_tags.join('、')}` : '',
+        npc?.name ? `NPC：${npc.name}` : '',
+        npc?.personality_tags?.length ? `NPC性格：${npc.personality_tags.join('、')}` : '',
+        npc?.relationship?.length ? `关系描述：${npc.relationship.join('、')}` : '',
+        npc?.goal ? `NPC目标：${npc.goal}` : '',
+        npc?.secret ? `NPC秘密：${npc.secret}` : '',
+      ].filter(Boolean).join('\n')
+      const data = await generateField({
+        field: 'character_relation',
+        title: getValues('title'),
+        world: getValues('world'),
+        char_name: npcName,
+        context,
+      })
+      const normalized = normalizeCharacterRelations({ [npcName]: data as Record<string, unknown> }, [npcName])
+      setCharacterRelations((prev) => ({
+        ...prev,
+        [npcName]: { ...(prev[npcName] || DEFAULT_REL), ...normalized[npcName] },
+      }))
+      showStatus('✅ 关系设定生成完成', 'success')
+    } catch (e) {
+      const msg = (e as Error).message || String(e)
+      logger.error('NewStory', `handleRelGen: ${npcName} failed`, { error: msg })
+      showStatus(`❌ ${msg}`, 'error')
+      setFieldErrors((prev) => ({ ...prev, [genKey]: msg }))
+    }
+    setGenerating(null)
+  }, [getValues])
 
   const onSubmit = useCallback(async (data: FormValues) => {
     const fd = new FormData()
@@ -288,11 +610,12 @@ export default function NewStory() {
     showStatus('正在创建故事…', 'loading')
     try {
       await createStory(fd)
+      clearSaved()
       window.location.href = '/game'
     } catch (e) {
       showStatus(`❌ ${(e as Error).message}`, 'error')
     }
-  }, [])
+  }, [customStats, characterRelations, artifacts, factions, clearSaved])
 
   const genre = watch('genre')
   const relStages = watch('rel_stages')
@@ -314,8 +637,9 @@ export default function NewStory() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Textarea
-                  ref={kwRef}
                   id="kw-input"
+                  value={keywords}
+                  onChange={(e) => setKeywords(e.target.value)}
                   placeholder="粘贴小说简介 / 世界观描述 / 关键词均可&#10;&#10;示例①：修仙 宗门 重生&#10;示例②：被退婚的废柴少年捡到神秘戒指…"
                   className="h-28 resize-y text-xs"
                 />
@@ -348,14 +672,16 @@ export default function NewStory() {
                 <CardTitle className="text-sm">📦 预设模板</CardTitle>
               </CardHeader>
               <CardContent className="space-y-1">
-                {['🚀 星痕纪元', '🌸 樱之诗', '⚔️ 剑与星辉', '🔍 第七日'].map((p) => (
+                {STORY_PRESETS.map((preset) => (
                   <Button
-                    key={p}
+                    key={preset.id}
                     type="button"
-                    variant="ghost"
+                    variant={activePreset === preset.id ? 'default' : 'ghost'}
                     className="w-full justify-start text-xs h-8"
+                    onClick={() => handlePresetSelect(preset)}
+                    disabled={generating === 'world'}
                   >
-                    {p}
+                    {preset.label}
                   </Button>
                 ))}
               </CardContent>
@@ -452,492 +778,11 @@ export default function NewStory() {
               </CardContent>
             </Card>
 
-            {/* Part 3: Characters — 编号顺延，Part2已合并到Part4专属规则 */}
+            {/* Part 2: Factions */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-primary/20 text-game-primary text-xs flex items-center justify-center">2</span>
-                  角色系统
-                </CardTitle>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  onClick={() => append({
-                    name: '', isMain: false, role_tags: [], personality_tags: [],
-                    appearance: '', relationship: [], goal: '', secret: '',
-                    background: '', special_ability: '',
-                  })}
-                >
-                  ➕ 新增 NPC
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                  <AnimatePresence>
-                    {fields.map((field, idx) => {
-                      const c = watch(`characters.${idx}`)
-                      const isMain = c?.isMain
-
-                      return (
-                        <motion.div
-                          key={field.id}
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                        >
-                          <Card className={`${isMain ? 'border-game-accent/50 bg-game-accent/[0.03]' : ''}`}>
-                            <CardHeader className="pb-2">
-                              <div className="flex items-center justify-between">
-                                <Badge variant={isMain ? 'accent' : 'success'} size="sm">
-                                  {isMain ? '⭐ 主角' : '👤 NPC'}
-                                </Badge>
-                                {!isMain && fields.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => remove(idx)}
-                                    className="text-game-dim hover:text-game-danger transition-colors text-sm"
-                                  >
-                                    ✕
-                                  </button>
-                                )}
-                              </div>
-                              <Input
-                                {...register(`characters.${idx}.name`)}
-                                placeholder="角色姓名"
-                                className="mt-2 font-bold"
-                              />
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                              {/* Role tags */}
-                              <div>
-                                <Label className="text-[11px]">身份 / 职业</Label>
-                                <TagInput
-                                  value={c?.role_tags || []}
-                                  onChange={(tags) => setValue(`characters.${idx}.role_tags`, tags)}
-                                  presets={ROLE_PRESETS}
-                                  placeholder="输入后回车添加…"
-                                  color="primary"
-                                />
-                              </div>
-
-                              {/* Faction */}
-                              <div>
-                                <Label className="text-[11px]">🏛️ 所属势力</Label>
-                                <select
-                                  value={c?.faction || ''}
-                                  onChange={(e) => setValue(`characters.${idx}.faction`, e.target.value)}
-                                  className="w-full bg-game-bg border border-game-border rounded-md px-2 py-1.5 text-xs text-game-text mt-0.5"
-                                >
-                                  <option value="">无</option>
-                                  {(factions || []).map((f: { name: string }) => (
-                                    <option key={f.name} value={f.name}>{f.name}</option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              {/* Goal (原关系字段已合并到Part3多维关系) */}
-                              <div>
-                                <Label className="text-[11px]">🎯 当前目标</Label>
-                                <Input
-                                  {...register(`characters.${idx}.goal`)}
-                                  placeholder="角色想要达成的事…"
-                                  className="text-xs h-8"
-                                />
-                              </div>
-
-                              {/* Priority 3: Secret */}
-                              <div>
-                                <Label className="text-[11px] text-game-accent">🔒 隐藏秘密</Label>
-                                <Input
-                                  {...register(`characters.${idx}.secret`)}
-                                  placeholder="用于制造剧情爆点…"
-                                  className="text-xs h-8 border-game-secret/40 bg-game-secret/10 text-game-accent placeholder:text-game-dim"
-                                />
-                              </div>
-
-                              {/* Priority 4: Personality */}
-                              <div>
-                                <Label className="text-[11px]">🎭 性格标签（3~5个）</Label>
-                                <TagInput
-                                  value={c?.personality_tags || []}
-                                  onChange={(tags) => setValue(`characters.${idx}.personality_tags`, tags)}
-                                  presets={PERSONALITY_PRESETS}
-                                  placeholder="选择或输入性格标签…"
-                                  color="accent"
-                                />
-                              </div>
-
-                              {/* Priority 5: Appearance */}
-                              <div>
-                                <Label className="text-[11px]">👤 外貌特征</Label>
-                                <Input
-                                  {...register(`characters.${idx}.appearance`)}
-                                  placeholder="银白长发，紫色眼瞳…"
-                                  className="text-xs h-8"
-                                />
-                              </div>
-
-                              <Separator />
-
-                              <AIButton
-                                loading={generating === `char-${idx}`}
-                                error={fieldErrors[`char-${idx}`]}
-                                onClick={() => handleCharGen(idx)}
-                              >
-                                {isMain ? '生成主角' : '生成此角色'}
-                              </AIButton>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      )
-                    })}
-                  </AnimatePresence>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Part 3: Custom Rules — 关系系统已合并到此 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-primary/20 text-game-primary text-xs flex items-center justify-center">3</span>
-                  专属规则 & 多维关系
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Who's involved — 每个NPC与主角的独立多维关系 */}
-                {(() => {
-                  const allChars = watch('characters') || []
-                  const mainChar = allChars.find((c: { isMain?: boolean }) => c.isMain) || allChars[0]
-                  const npcs = allChars.filter((c: { isMain?: boolean; name?: string }) => !c.isMain && c.name)
-                  const DIMS = [
-                    ['❤️好感', 'affection'], ['🤝信任', 'trust'], ['🙏尊重', 'respect'],
-                    ['🔗依赖', 'dependence'], ['⚔️敌意', 'hostility'], ['💫吸引', 'attraction'],
-                  ]
-                  const REL_TYPES = ['friend','lover','family','teacher','rival','ally','enemy']
-                  const REL_LABELS: Record<string,string> = {friend:'朋友',lover:'恋人',family:'家人',teacher:'师徒',rival:'对手',ally:'盟友',enemy:'敌人'}
-
-                  if (npcs.length === 0) return <p className="text-xs text-game-dim">添加 NPC 后自动显示关系对</p>
-
-                  return (
-                    <div className="space-y-3">
-                      {npcs.map((c: { name: string }) => {
-                        const r = characterRelations[c.name] || DEFAULT_REL
-                        const updateRel = (k: string, v: unknown) => {
-                          setCharacterRelations(prev => ({
-                            ...prev,
-                            [c.name]: { ...(prev[c.name] || DEFAULT_REL), [k]: v }
-                          }))
-                        }
-                        return (
-                          <div key={c.name} className="bg-game-surface border border-game-border rounded-md p-3 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 text-sm">
-                                <span className="font-bold text-game-accent">{mainChar?.name || '主角'}</span>
-                                <span className="text-game-accent">↔</span>
-                                <span className="font-bold text-game-primary">{c.name}</span>
-                              </div>
-                              <select
-                                value={r.relationshipType}
-                                onChange={(e) => { updateRel('relationshipType', e.target.value) }}
-                                className="bg-game-bg border border-game-border rounded-md px-2 py-0.5 text-[10px] text-game-text"
-                              >
-                                {REL_TYPES.map(t => <option key={t} value={t}>{REL_LABELS[t]}</option>)}
-                              </select>
-                            </div>
-                            <div className="grid grid-cols-3 gap-x-3 gap-y-1">
-                              {DIMS.map(([label, key]) => {
-                                const val = (r as unknown as Record<string,number>)[key] ?? 50
-                                const barColor = key === 'hostility' ? '#da3633' : '#58a6ff'
-                                return (
-                                  <div key={key} className="flex items-center gap-1">
-                                    <span className="text-[10px] text-game-dim w-12 shrink-0">{label}</span>
-                                    <input
-                                      type="number"
-                                      min={0} max={100} value={val}
-                                      onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) updateRel(key, Math.max(0, Math.min(100, v))) }}
-                                      onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
-                                      className="w-12 text-center text-[11px] h-6 bg-game-bg border border-game-border rounded text-game-text"
-                                      style={{minWidth: '36px'}}
-                                    />
-                                    <div className="flex-1 h-2 bg-game-border rounded-full overflow-hidden">
-                                      <div className="h-full rounded-full transition-all" style={{width: `${val}%`, background: barColor}} />
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                            <TagInput
-                              value={r.tags || []}
-                              onChange={(tags) => updateRel('tags', tags)}
-                              presets={['青梅竹马','救命恩人','秘密共享','竞争意识','单向暗恋','互相试探','过去纠葛','命运绑定','生死之交','不共戴天']}
-                              placeholder="关系标签…"
-                              color="accent"
-                            />
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )
-                })()}
-
-                {/* Current custom stats */}
-                {(() => {
-                  const stats = customStats || []
-                  return stats.length > 0 ? (
-                    <div>
-                      <span className="text-[10px] text-game-muted">📊 追踪维度</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {stats.map((s: { key: string; label: string; max: number }) => (
-                          <Badge key={s.key} variant="accent" size="sm">{s.label} (0-{s.max})</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null
-                })()}
-
-                <AIButton
-                  loading={generating === 'rules'}
-                  error={fieldErrors.rules}
-                  onClick={async () => {
-                    setGenerating('rules')
-                    showStatus('正在根据当前内容推理专属规则…', 'loading')
-                    try {
-                      const allChars = getValues('characters') || []
-                      const data = await generateRules({
-                        title: getValues('title'),
-                        world: getValues('world') + '\n势力：' + JSON.stringify(factions || []) + '\n物品：' + JSON.stringify(artifacts || []),
-                        genre: getValues('genre').join('/'),
-                        char1_name: allChars[0]?.name || '主角',
-                        char1_role: allChars[0]?.role_tags?.[0] || '',
-                        char2_name: allChars[1]?.name || '',
-                        char2_role: allChars[1]?.role_tags?.[0] || '',
-                      })
-                      if (data.stages?.length) setValue('rel_stages', data.stages)
-                      if (data.stats?.length) setCustomStats( data.stats)
-                      showStatus('✅ 专属规则生成完成', 'success')
-                    } catch (e) {
-                      const msg = (e as Error).message || String(e)
-                      showStatus(`❌ ${msg}`, 'error')
-                    }
-                    setGenerating(null)
-                  }}
-                >
-                  ✨ 根据当前内容推理专属规则
-                </AIButton>
-              </CardContent>
-            </Card>
-
-            {/* Part 5: Artifacts */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-accent/20 text-game-accent text-xs flex items-center justify-center">4</span>
-                  🗝️ 关键物品
-                </CardTitle>
-                <div className="flex gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    disabled={generating === 'artifacts-all'}
-                    onClick={async () => {
-                      setGenerating('artifacts-all')
-                      showStatus('正在批量生成关键物品…', 'loading')
-                      const current = artifacts || []
-                      const newArts: typeof current = []
-                      for (let i = 0; i < 3; i++) {
-                        try {
-                          const data = await generateField({
-                            field: 'artifact',
-                            title: getValues('title'),
-                            world: getValues('world'),
-                            genre: getValues('genre').join('/'),
-                          })
-                          if ((data as { name?: string }).name) {
-                            newArts.push({
-                              name: (data as { name: string }).name,
-                              type: ((data as { type?: string }).type || 'personal') as 'personal' | 'faction' | 'world',
-                              description: (data as { description?: string }).description || '',
-                              ownerType: ((data as { ownerType?: string }).ownerType || 'none') as 'character' | 'faction' | 'location' | 'none',
-                              ownerId: (data as { ownerId?: string }).ownerId || '',
-                              importance: (data as { importance?: number }).importance || 50,
-                              abilities: (data as { abilities?: string[] }).abilities || [],
-                              tags: (data as { tags?: string[] }).tags || [],
-                            })
-                          }
-                        } catch { /* continue */ }
-                      }
-                      setArtifacts( [...current, ...newArts])
-                      showStatus(`✅ 已生成 ${newArts.length} 个关键物品`, 'success')
-                      setGenerating(null)
-                    }}
-                  >
-                    {generating === 'artifacts-all' ? '⏳' : '✨'} 模块生成(×3)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    onClick={() => {
-                      const current = artifacts || []
-                      setArtifacts( [...current, {
-                        name: '', type: 'personal' as const, description: '',
-                        ownerType: 'none' as const, ownerId: '',
-                        importance: 50, abilities: [], tags: [],
-                      }])
-                    }}
-                  >
-                    ➕ 添加物品
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                  {(artifacts || []).map((art, idx) => (
-                    <motion.div
-                      key={idx}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                    >
-                      <Card className="border-game-accent/30">
-                        <CardHeader className="pb-1">
-                          <div className="flex items-center justify-between">
-                            <Badge variant="accent" size="sm">
-                              {art.type === 'world' ? '🌍 世界级' : art.type === 'faction' ? '🏛️ 势力资产' : '👤 个人物品'}
-                            </Badge>
-                            <div className="flex gap-1">
-                              <AIButton
-                                loading={generating === `artifact-${idx}`}
-                                onClick={async () => {
-                                  setGenerating(`artifact-${idx}`)
-                                  try {
-                                    const data = await generateField({
-                                      field: 'artifact',
-                                      title: getValues('title'),
-                                      world: getValues('world'),
-                                      genre: getValues('genre').join('/'),
-                                    })
-                                    if ((data as { name?: string }).name) {
-                                      const current = artifacts || []
-                                      current[idx] = {
-                                        name: (data as { name: string }).name,
-                                        type: ((data as { type?: string }).type || 'personal') as 'personal' | 'faction' | 'world',
-                                        description: (data as { description?: string }).description || '',
-                                        ownerType: ((data as { ownerType?: string }).ownerType || 'none') as 'character' | 'faction' | 'location' | 'none',
-                                        ownerId: (data as { ownerId?: string }).ownerId || '',
-                                        importance: (data as { importance?: number }).importance || 50,
-                                        abilities: (data as { abilities?: string[] }).abilities || [],
-                                        tags: (data as { tags?: string[] }).tags || [],
-                                      }
-                                      setArtifacts( [...current])
-                                    }
-                                    showStatus('✅ 物品生成完成', 'success')
-                                  } catch (e) { showStatus(`❌ ${(e as Error).message}`, 'error') }
-                                  setGenerating(null)
-                                }}
-                              >生成</AIButton>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const current = artifacts || []
-                                  current.splice(idx, 1)
-                                  setArtifacts( [...current])
-                                }}
-                                className="text-game-dim hover:text-game-danger transition-colors text-sm"
-                              >✕</button>
-                            </div>
-                          </div>
-                          <Input
-                            value={art.name}
-                            onChange={(e) => {
-                              const current = artifacts || []
-                              current[idx] = { ...current[idx], name: e.target.value }
-                              setArtifacts( [...current])
-                            }}
-                            placeholder="物品名称"
-                            className="mt-1 font-bold text-sm h-8"
-                          />
-                        </CardHeader>
-                        <CardContent className="space-y-2 pt-0">
-                          <div className="flex gap-2">
-                            <select
-                              value={art.type}
-                              onChange={(e) => {
-                                const current = artifacts || []
-                                current[idx] = { ...current[idx], type: e.target.value as 'personal' | 'faction' | 'world' }
-                                setArtifacts( [...current])
-                              }}
-                              className="bg-game-bg border border-game-border rounded-md px-2 py-1 text-xs text-game-text"
-                            >
-                              <option value="personal">个人物品</option>
-                              <option value="faction">势力资产</option>
-                              <option value="world">世界级</option>
-                            </select>
-                            <Input
-                              value={art.ownerId}
-                              onChange={(e) => {
-                                const current = artifacts || []
-                                current[idx] = { ...current[idx], ownerId: e.target.value }
-                                setArtifacts( [...current])
-                              }}
-                              placeholder="持有者（角色名/势力名）"
-                              className="flex-1 text-xs h-7"
-                            />
-                            <Input
-                              type="number"
-                              value={art.importance}
-                              onChange={(e) => {
-                                const current = artifacts || []
-                                current[idx] = { ...current[idx], importance: Math.max(1, Math.min(100, parseInt(e.target.value) || 50)) }
-                                setArtifacts( [...current])
-                              }}
-                              className="w-16 text-xs h-7"
-                              placeholder="重要度"
-                            />
-                          </div>
-                          <Input
-                            value={art.description}
-                            onChange={(e) => {
-                              const current = artifacts || []
-                              current[idx] = { ...current[idx], description: e.target.value }
-                              setArtifacts( [...current])
-                            }}
-                            placeholder="物品描述（用途、背景…）"
-                            className="text-xs h-7"
-                          />
-                          <div className="flex gap-1 flex-wrap">
-                            <TagInput
-                              value={art.tags || []}
-                              onChange={(tags) => {
-                                const current = artifacts || []
-                                current[idx] = { ...current[idx], tags }
-                                setArtifacts( [...current])
-                              }}
-                              presets={['国宝','机密','武器','货币','信物','钥匙','证据','传家宝']}
-                              placeholder="标签…"
-                              color="accent"
-                            />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                  {(artifacts || []).length === 0 && (
-                    <p className="text-game-dim text-xs text-center py-4 col-span-2">
-                      暂无关键物品 · 点击「✨ 模块生成」AI 批量生成，或「➕ 添加物品」手动填写
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Part 6: Factions */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-game-warning/20 text-game-warning text-xs flex items-center justify-center">5</span>
+                  <span className="w-6 h-6 rounded-full bg-game-warning/20 text-game-warning text-xs flex items-center justify-center">2</span>
                   🏛️ 势力
                 </CardTitle>
                 <div className="flex gap-1">
@@ -1177,6 +1022,482 @@ export default function NewStory() {
                   {(factions || []).length === 0 && (
                     <p className="text-game-dim text-xs text-center py-4 col-span-2">
                       暂无势力 · 点击「✨ 模块生成」AI 批量生成，或「➕ 添加势力」手动填写
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Part 3: Characters */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-game-primary/20 text-game-primary text-xs flex items-center justify-center">3</span>
+                  角色系统
+                </CardTitle>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() => append({
+                    name: '', isMain: false, role_tags: [], personality_tags: [],
+                    appearance: '', relationship: [], goal: '', secret: '',
+                    background: '', special_ability: '',
+                  })}
+                >
+                  ➕ 新增 NPC
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                  <AnimatePresence>
+                    {fields.map((field, idx) => {
+                      const c = watch(`characters.${idx}`)
+                      const isMain = c?.isMain
+
+                      return (
+                        <motion.div
+                          key={field.id}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                        >
+                          <Card className={`${isMain ? 'border-game-accent/50 bg-game-accent/[0.03]' : ''}`}>
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center justify-between">
+                                <Badge variant={isMain ? 'accent' : 'success'} size="sm">
+                                  {isMain ? '⭐ 主角' : '👤 NPC'}
+                                </Badge>
+                                {!isMain && fields.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => remove(idx)}
+                                    className="text-game-dim hover:text-game-danger transition-colors text-sm"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                              <Input
+                                {...register(`characters.${idx}.name`)}
+                                placeholder="角色姓名"
+                                className="mt-2 font-bold"
+                              />
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              {/* Role tags */}
+                              <div>
+                                <Label className="text-[11px]">身份 / 职业</Label>
+                                <TagInput
+                                  value={c?.role_tags || []}
+                                  onChange={(tags) => setValue(`characters.${idx}.role_tags`, tags)}
+                                  presets={ROLE_PRESETS}
+                                  placeholder="输入后回车添加…"
+                                  color="primary"
+                                />
+                              </div>
+
+                              {/* Faction */}
+                              <div>
+                                <Label className="text-[11px]">🏛️ 所属势力</Label>
+                                <select
+                                  value={c?.faction || ''}
+                                  onChange={(e) => setValue(`characters.${idx}.faction`, e.target.value)}
+                                  className="w-full bg-game-bg border border-game-border rounded-md px-2 py-1.5 text-xs text-game-text mt-0.5"
+                                >
+                                  <option value="">无</option>
+                                  {(factions || []).map((f: { name: string }) => (
+                                    <option key={f.name} value={f.name}>{f.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Goal (原关系字段已合并到Part3多维关系) */}
+                              <div>
+                                <Label className="text-[11px]">🎯 当前目标</Label>
+                                <Input
+                                  {...register(`characters.${idx}.goal`)}
+                                  placeholder="角色想要达成的事…"
+                                  className="text-xs h-8"
+                                />
+                              </div>
+
+                              {/* Priority 3: Secret */}
+                              <div>
+                                <Label className="text-[11px] text-game-accent">🔒 隐藏秘密</Label>
+                                <Input
+                                  {...register(`characters.${idx}.secret`)}
+                                  placeholder="用于制造剧情爆点…"
+                                  className="text-xs h-8 border-game-secret/40 bg-game-secret/10 text-game-accent placeholder:text-game-dim"
+                                />
+                              </div>
+
+                              {/* Priority 4: Personality */}
+                              <div>
+                                <Label className="text-[11px]">🎭 性格标签（3~5个）</Label>
+                                <TagInput
+                                  value={c?.personality_tags || []}
+                                  onChange={(tags) => setValue(`characters.${idx}.personality_tags`, tags)}
+                                  presets={PERSONALITY_PRESETS}
+                                  placeholder="选择或输入性格标签…"
+                                  color="accent"
+                                />
+                              </div>
+
+                              {/* Priority 5: Appearance */}
+                              <div>
+                                <Label className="text-[11px]">👤 外貌特征</Label>
+                                <Input
+                                  {...register(`characters.${idx}.appearance`)}
+                                  placeholder="银白长发，紫色眼瞳…"
+                                  className="text-xs h-8"
+                                />
+                              </div>
+
+                              <Separator />
+
+                              <AIButton
+                                loading={generating === `char-${idx}`}
+                                error={fieldErrors[`char-${idx}`]}
+                                onClick={() => handleCharGen(idx)}
+                              >
+                                {isMain ? '生成主角' : '生成此角色'}
+                              </AIButton>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      )
+                    })}
+                  </AnimatePresence>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Part 4: Custom Rules — 关系系统已合并到此 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-game-primary/20 text-game-primary text-xs flex items-center justify-center">4</span>
+                  专属规则 & 多维关系
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Who's involved — 每个NPC与主角的独立多维关系 */}
+                {(() => {
+                  const allChars = watch('characters') || []
+                  const mainChar = allChars.find((c: { isMain?: boolean }) => c.isMain) || allChars[0]
+                  const npcs = allChars.filter((c: { isMain?: boolean; name?: string }) => !c.isMain && c.name)
+                  const DIMS = [
+                    ['❤️好感', 'affection'], ['🤝信任', 'trust'], ['🙏尊重', 'respect'],
+                    ['🔗依赖', 'dependence'], ['⚔️敌意', 'hostility'], ['💫吸引', 'attraction'],
+                  ]
+                  const REL_TYPES = ['friend','lover','family','teacher','rival','ally','enemy']
+                  const REL_LABELS: Record<string,string> = {friend:'朋友',lover:'恋人',family:'家人',teacher:'师徒',rival:'对手',ally:'盟友',enemy:'敌人'}
+
+                  if (npcs.length === 0) return <p className="text-xs text-game-dim">添加 NPC 后自动显示关系对</p>
+
+                  return (
+                    <div className="space-y-3">
+                      {npcs.map((c: { name: string }) => {
+                        const r = characterRelations[c.name] || DEFAULT_REL
+                        const updateRel = (k: string, v: unknown) => {
+                          setCharacterRelations(prev => ({
+                            ...prev,
+                            [c.name]: { ...(prev[c.name] || DEFAULT_REL), [k]: v }
+                          }))
+                        }
+                        return (
+                          <div key={c.name} className="bg-game-surface border border-game-border rounded-md p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="font-bold text-game-accent">{mainChar?.name || '主角'}</span>
+                                <span className="text-game-accent">↔</span>
+                                <span className="font-bold text-game-primary">{c.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <AIButton
+                                  loading={generating === `rel-${c.name}`}
+                                  error={fieldErrors[`rel-${c.name}`]}
+                                  onClick={() => handleRelGen(c.name)}
+                                >
+                                  生成关系
+                                </AIButton>
+                                <select
+                                  value={r.relationshipType}
+                                  onChange={(e) => { updateRel('relationshipType', e.target.value) }}
+                                  className="bg-game-bg border border-game-border rounded-md px-2 py-0.5 text-[10px] text-game-text"
+                                >
+                                  {REL_TYPES.map(t => <option key={t} value={t}>{REL_LABELS[t]}</option>)}
+                                </select>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-x-3 gap-y-1">
+                              {DIMS.map(([label, key]) => {
+                                const val = (r as unknown as Record<string,number>)[key] ?? 50
+                                const barColor = key === 'hostility' ? '#da3633' : '#58a6ff'
+                                return (
+                                  <div key={key} className="flex items-center gap-1">
+                                    <span className="text-[10px] text-game-dim w-12 shrink-0">{label}</span>
+                                    <input
+                                      type="number"
+                                      min={0} max={100} value={val}
+                                      onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) updateRel(key, Math.max(0, Math.min(100, v))) }}
+                                      onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
+                                      className="w-12 text-center text-[11px] h-6 bg-game-bg border border-game-border rounded text-game-text"
+                                      style={{minWidth: '36px'}}
+                                    />
+                                    <div className="flex-1 h-2 bg-game-border rounded-full overflow-hidden">
+                                      <div className="h-full rounded-full transition-all" style={{width: `${val}%`, background: barColor}} />
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            <TagInput
+                              value={r.tags || []}
+                              onChange={(tags) => updateRel('tags', tags)}
+                              presets={['青梅竹马','救命恩人','秘密共享','竞争意识','单向暗恋','互相试探','过去纠葛','命运绑定','生死之交','不共戴天']}
+                              placeholder="关系标签…"
+                              color="accent"
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
+
+                {/* Current custom stats */}
+                {(() => {
+                  const stats = customStats || []
+                  return stats.length > 0 ? (
+                    <div>
+                      <span className="text-[10px] text-game-muted">📊 追踪维度</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {stats.map((s: { key: string; label: string; max: number }) => (
+                          <Badge key={s.key} variant="accent" size="sm">{s.label} (0-{s.max})</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null
+                })()}
+
+                <AIButton
+                  loading={generating === 'rules'}
+                  error={fieldErrors.rules}
+                  onClick={async () => {
+                    setGenerating('rules')
+                    showStatus('正在根据当前内容推理专属规则…', 'loading')
+                    try {
+                      const allChars = getValues('characters') || []
+                      const data = await generateRules({
+                        title: getValues('title'),
+                        world: getValues('world') + '\n势力：' + JSON.stringify(factions || []) + '\n物品：' + JSON.stringify(artifacts || []),
+                        genre: getValues('genre').join('/'),
+                        char1_name: allChars[0]?.name || '主角',
+                        char1_role: allChars[0]?.role_tags?.[0] || '',
+                        char2_name: allChars[1]?.name || '',
+                        char2_role: allChars[1]?.role_tags?.[0] || '',
+                      })
+                      if (data.stages?.length) setValue('rel_stages', data.stages)
+                      if (data.stats?.length) setCustomStats( data.stats)
+                      showStatus('✅ 专属规则生成完成', 'success')
+                    } catch (e) {
+                      const msg = (e as Error).message || String(e)
+                      showStatus(`❌ ${msg}`, 'error')
+                    }
+                    setGenerating(null)
+                  }}
+                >
+                  ✨ 根据当前内容推理专属规则
+                </AIButton>
+              </CardContent>
+            </Card>
+
+            {/* Part 5: Artifacts */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-game-accent/20 text-game-accent text-xs flex items-center justify-center">5</span>
+                  🗝️ 关键物品
+                </CardTitle>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    disabled={generating === 'artifacts-all'}
+                    onClick={async () => {
+                      setGenerating('artifacts-all')
+                      showStatus('正在批量生成关键物品…', 'loading')
+                      const current = artifacts || []
+                      const { charNames, facNames } = getOwnerNames(getValues('characters'), factions || [])
+                      const newArts: typeof current = []
+                      for (let i = 0; i < 3; i++) {
+                        try {
+                          const data = await generateField({
+                            field: 'artifact',
+                            title: getValues('title'),
+                            world: getValues('world'),
+                            genre: getValues('genre').join('/'),
+                            context: JSON.stringify({ characters: charNames, factions: facNames }),
+                          })
+                          const art = artifactFromGenData(data as Record<string, unknown>, charNames, facNames)
+                          if (art) newArts.push(art)
+                        } catch { /* continue */ }
+                      }
+                      setArtifacts( [...current, ...newArts])
+                      showStatus(`✅ 已生成 ${newArts.length} 个关键物品`, 'success')
+                      setGenerating(null)
+                    }}
+                  >
+                    {generating === 'artifacts-all' ? '⏳' : '✨'} 模块生成(×3)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => {
+                      const current = artifacts || []
+                      setArtifacts( [...current, {
+                        name: '', type: 'personal' as const, description: '',
+                        ownerType: 'none' as const, ownerId: '',
+                        importance: 50, abilities: [], tags: [],
+                      }])
+                    }}
+                  >
+                    ➕ 添加物品
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {(artifacts || []).map((art, idx) => (
+                    <motion.div
+                      key={idx}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                    >
+                      <Card className="border-game-accent/30">
+                        <CardHeader className="pb-1">
+                          <div className="flex items-center justify-between">
+                            <Badge variant="accent" size="sm">
+                              {art.type === 'world' ? '🌍 世界级' : art.type === 'faction' ? '🏛️ 势力资产' : '👤 个人物品'}
+                            </Badge>
+                            <div className="flex gap-1">
+                              <AIButton
+                                loading={generating === `artifact-${idx}`}
+                                onClick={async () => {
+                                  setGenerating(`artifact-${idx}`)
+                                  try {
+                                    const data = await generateField({
+                                      field: 'artifact',
+                                      title: getValues('title'),
+                                      world: getValues('world'),
+                                      genre: getValues('genre').join('/'),
+                                      context: JSON.stringify(getOwnerNames(getValues('characters'), factions || [])),
+                                    })
+                                    const { charNames, facNames } = getOwnerNames(getValues('characters'), factions || [])
+                                    const art = artifactFromGenData(data as Record<string, unknown>, charNames, facNames)
+                                    if (art) {
+                                      const current = artifacts || []
+                                      current[idx] = art
+                                      setArtifacts( [...current])
+                                    }
+                                    showStatus('✅ 物品生成完成', 'success')
+                                  } catch (e) { showStatus(`❌ ${(e as Error).message}`, 'error') }
+                                  setGenerating(null)
+                                }}
+                              >生成</AIButton>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const current = artifacts || []
+                                  current.splice(idx, 1)
+                                  setArtifacts( [...current])
+                                }}
+                                className="text-game-dim hover:text-game-danger transition-colors text-sm"
+                              >✕</button>
+                            </div>
+                          </div>
+                          <Input
+                            value={art.name}
+                            onChange={(e) => {
+                              const current = artifacts || []
+                              current[idx] = { ...current[idx], name: e.target.value }
+                              setArtifacts( [...current])
+                            }}
+                            placeholder="物品名称"
+                            className="mt-1 font-bold text-sm h-8"
+                          />
+                        </CardHeader>
+                        <CardContent className="space-y-2 pt-0">
+                          <div className="flex gap-2">
+                            <select
+                              value={art.type}
+                              onChange={(e) => {
+                                const current = artifacts || []
+                                current[idx] = { ...current[idx], type: e.target.value as 'personal' | 'faction' | 'world' }
+                                setArtifacts( [...current])
+                              }}
+                              className="bg-game-bg border border-game-border rounded-md px-2 py-1 text-xs text-game-text"
+                            >
+                              <option value="personal">个人物品</option>
+                              <option value="faction">势力资产</option>
+                              <option value="world">世界级</option>
+                            </select>
+                            <Input
+                              value={art.ownerId}
+                              onChange={(e) => {
+                                const current = artifacts || []
+                                current[idx] = { ...current[idx], ownerId: e.target.value }
+                                setArtifacts( [...current])
+                              }}
+                              placeholder="持有者（角色名/势力名）"
+                              className="flex-1 text-xs h-7"
+                            />
+                            <Input
+                              type="number"
+                              value={art.importance}
+                              onChange={(e) => {
+                                const current = artifacts || []
+                                current[idx] = { ...current[idx], importance: Math.max(1, Math.min(100, parseInt(e.target.value) || 50)) }
+                                setArtifacts( [...current])
+                              }}
+                              className="w-16 text-xs h-7"
+                              placeholder="重要度"
+                            />
+                          </div>
+                          <Input
+                            value={art.description}
+                            onChange={(e) => {
+                              const current = artifacts || []
+                              current[idx] = { ...current[idx], description: e.target.value }
+                              setArtifacts( [...current])
+                            }}
+                            placeholder="物品描述（用途、背景…）"
+                            className="text-xs h-7"
+                          />
+                          <div className="flex gap-1 flex-wrap">
+                            <TagInput
+                              value={art.tags || []}
+                              onChange={(tags) => {
+                                const current = artifacts || []
+                                current[idx] = { ...current[idx], tags }
+                                setArtifacts( [...current])
+                              }}
+                              presets={['国宝','机密','武器','货币','信物','钥匙','证据','传家宝']}
+                              placeholder="标签…"
+                              color="accent"
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                  {(artifacts || []).length === 0 && (
+                    <p className="text-game-dim text-xs text-center py-4 col-span-2">
+                      暂无关键物品 · 点击「✨ 模块生成」AI 批量生成，或「➕ 添加物品」手动填写
                     </p>
                   )}
                 </div>

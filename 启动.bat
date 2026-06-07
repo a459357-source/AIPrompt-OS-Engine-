@@ -1,6 +1,5 @@
 @echo off
-chcp 65001 >nul
-title Prompt OS Galgame — Full Stack
+title PromptOS Galgame Full Stack
 cd /d "%~dp0"
 
 echo.
@@ -9,11 +8,10 @@ echo    Prompt OS Galgame Runtime
 echo    AI Narrative Engine
 echo ================================================
 echo.
-echo [INFO] 运行日志: %~dp0data\app.log
-echo [INFO] 错误日志: %~dp0data\error.log
+echo [INFO] Log: %~dp0data\app.log
+echo [INFO] Errors: %~dp0data\error.log
 echo.
 
-:: ── Check Python ──
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Python not found. Install Python 3.10+
@@ -21,7 +19,6 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: ── Check Node.js ──
 node --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Node.js not found. Install Node.js 18+
@@ -29,14 +26,12 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: ── Install Python deps if needed ──
 pip show fastapi >nul 2>&1
 if %errorlevel% neq 0 (
     echo [INFO] Installing Python dependencies...
     pip install -r requirements.txt
 )
 
-:: ── Install frontend deps if needed ──
 if not exist "frontend\node_modules" (
     echo [INFO] Installing frontend dependencies...
     cd frontend
@@ -46,7 +41,6 @@ if not exist "frontend\node_modules" (
 
 if not exist "data" mkdir data
 
-:: ── Port check ──
 python scripts\port_guard.py 8000
 if %errorlevel% neq 0 (
     pause
@@ -59,25 +53,22 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [INFO] Starting backend  (API)  -^> http://127.0.0.1:8000
-echo [INFO] Starting frontend (UI)  -^> http://127.0.0.1:5173
-echo        若端口被占用，请先运行「停止.bat」
+echo [INFO] Backend  API -^> http://127.0.0.1:8000
+echo [INFO] Frontend UI -^> http://127.0.0.1:5173
+echo        If port in use, run stop.bat first
 echo.
-echo        Close this window to stop both servers.
+echo        Close this window to stop frontend; backend runs in another window
 echo.
 
-:: ── Start backend (keep window open on error) ──
-start "PromptOS-Backend" cmd /k "cd /d "%~dp0" && python -m uvicorn ui.web_app:app --host 127.0.0.1 --port 8000"
+start "PromptOS Backend" cmd /k "cd /d ""%~dp0"" && python -m uvicorn ui.web_app:app --host 127.0.0.1 --port 8000"
 
-:: ── Wait for backend then start frontend ──
 ping 127.0.0.1 -n 3 >nul
 
 cd frontend
 call npm run dev
 cd ..
 
-:: ── Cleanup on exit ──
-taskkill /f /fi "WINDOWTITLE eq PromptOS-Backend*" >nul 2>&1
+taskkill /f /fi "WINDOWTITLE eq PromptOS Backend*" >nul 2>&1
 echo.
 echo [INFO] Servers stopped.
 pause

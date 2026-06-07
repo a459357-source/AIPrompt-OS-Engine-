@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
 import { logger } from '@/lib/logger'
-import { getEngineSettings, saveEngineSettings } from '@/lib/api'
+import { getEngineSettings, saveEngineSettings, getAppSettings } from '@/lib/api'
 import {
   loadSettings,
   saveSettings,
@@ -16,13 +16,15 @@ import {
   MAX_WIDTH_OPTIONS,
   FONT_FAMILY_LABELS,
   BG_THEME_LABELS,
+  AUTO_ADVANCE_ROUND_OPTIONS,
 } from '@/lib/settings'
+import { t } from '@/lib/i18n'
+import { useAppSettings } from '@/hooks/useAppSettings'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Slider } from '@/components/ui/slider'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -47,12 +49,8 @@ const settingsSchema = z.object({
   maxWidth: z.number(),
   bgTheme: z.string(),
   paragraphSpacing: z.string(),
-  temperature: z.number().min(0.3).max(1.2),
-  optionCount: z.number(),
-  narrativePov: z.string(),
-  stylePreference: z.string(),
   autoAdvance: z.boolean(),
-  repetitionCheck: z.string(),
+  autoAdvanceRounds: z.number().min(1).max(50),
   autoSaveInterval: z.number(),
   maxSaveSlots: z.number(),
   exportFormat: z.string(),
@@ -104,6 +102,8 @@ function SelectRow({
 
 // ── Main Page ──
 export default function Settings() {
+  const { language } = useAppSettings()
+  const lang = language as 'zh' | 'en' | 'ja'
   const [saved, setSaved] = useState(false)
   const [apiKey, setApiKey] = useState('')
   const [apiKeyMasked, setApiKeyMasked] = useState('')
@@ -160,6 +160,18 @@ export default function Settings() {
   }, [location.pathname, loadEngineSettings])
 
   useEffect(() => {
+    getAppSettings()
+      .then((data) => {
+        if (!data) return
+        setValue('autoSaveInterval', data.auto_save_interval)
+        setValue('maxSaveSlots', data.max_save_slots)
+        setValue('exportFormat', data.export_format)
+        setValue('autoExport', data.auto_export)
+      })
+      .catch((e) => logger.warn('Settings', 'Load app settings failed', { error: String(e) }))
+  }, [setValue])
+
+  useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') loadEngineSettings()
     }
@@ -195,7 +207,7 @@ export default function Settings() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-game-accent font-bold text-xl">⚙️ 设置</h1>
+        <h1 className="text-game-accent font-bold text-xl">⚙️ {t('settings.title', lang)}</h1>
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: saved ? 1 : 0 }}
@@ -205,13 +217,13 @@ export default function Settings() {
         </motion.div>
       </div>
 
-      <Accordion type="multiple" defaultValue={['reading', 'ai', 'data', 'ui']} className="space-y-3">
+      <Accordion type="multiple" defaultValue={['reading', 'data', 'ui']} className="space-y-3">
         {/* ── Reading ── */}
         <AccordionItem value="reading" asChild>
           <Card>
             <AccordionTrigger className="px-5 py-3.5 hover:no-underline">
               <span className="font-bold text-sm flex items-center gap-2">
-                <span>📖</span> 阅读体验
+                <span>📖</span> {t('settings.reading', lang)}
               </span>
             </AccordionTrigger>
             <AccordionContent>
@@ -242,111 +254,12 @@ export default function Settings() {
           </Card>
         </AccordionItem>
 
-        {/* ── AI ── */}
-        <AccordionItem value="ai" asChild>
-          <Card>
-            <AccordionTrigger className="px-5 py-3.5 hover:no-underline">
-              <span className="font-bold text-sm flex items-center gap-2">
-                <span>🤖</span> AI 行为
-              </span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <CardContent className="space-y-5 pt-2">
-                {/* Temperature slider */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm text-game-muted">
-                      生成温度
-                    </Label>
-                    <Badge variant="outline" size="sm">{values.temperature.toFixed(1)}</Badge>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-game-dim w-8">保守</span>
-                    <Slider
-                      value={[values.temperature]}
-                      min={0.3}
-                      max={1.2}
-                      step={0.1}
-                      onValueChange={([v]) => setValue('temperature', v)}
-                      className="flex-1"
-                    />
-                    <span className="text-xs text-game-dim w-8 text-right">创意</span>
-                  </div>
-                </div>
-
-                <SelectRow label="选项数量" value={values.optionCount} options={[3, 4, 5]} onChange={(v) => setValue('optionCount', v as number)} />
-
-                <div className="flex items-center justify-between gap-4">
-                  <Label className="text-sm text-game-muted">叙事视角</Label>
-                  <div className="flex gap-1">
-                    {[
-                      { v: 'first', l: '第一人称' },
-                      { v: 'third', l: '第三人称' },
-                      { v: 'auto', l: '自动' },
-                    ].map((o) => (
-                      <Button
-                        key={o.v}
-                        type="button"
-                        variant={values.narrativePov === o.v ? 'primary' : 'ghost'}
-                        size="xs"
-                        onClick={() => setValue('narrativePov', o.v)}
-                      >
-                        {o.l}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-4">
-                  <Label className="text-sm text-game-muted">文风偏好</Label>
-                  <div className="flex gap-1 flex-wrap justify-end">
-                    {[
-                      { v: 'descriptive', l: '细腻描写' },
-                      { v: 'fast', l: '快节奏' },
-                      { v: 'dialogue', l: '对话为主' },
-                      { v: 'psycho', l: '心理刻画' },
-                      { v: 'balanced', l: '均衡' },
-                    ].map((o) => (
-                      <Button
-                        key={o.v}
-                        type="button"
-                        variant={values.stylePreference === o.v ? 'primary' : 'ghost'}
-                        size="xs"
-                        className="text-[11px]"
-                        onClick={() => setValue('stylePreference', o.v)}
-                      >
-                        {o.l}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm text-game-muted">自动推进</Label>
-                  <Switch
-                    checked={values.autoAdvance}
-                    onCheckedChange={(v) => setValue('autoAdvance', v)}
-                  />
-                </div>
-
-                <SelectRow
-                  label="重复检测"
-                  value={values.repetitionCheck}
-                  options={['strict', 'standard', 'loose']}
-                  onChange={(v) => setValue('repetitionCheck', v as string)}
-                  labels={{ strict: '严格', standard: '标准', loose: '宽松' }}
-                />
-              </CardContent>
-            </AccordionContent>
-          </Card>
-        </AccordionItem>
-
         {/* ── Data ── */}
         <AccordionItem value="data" asChild>
           <Card>
             <AccordionTrigger className="px-5 py-3.5 hover:no-underline">
               <span className="font-bold text-sm flex items-center gap-2">
-                <span>💾</span> 数据与存档
+                <span>💾</span> {t('settings.data', lang)}
               </span>
             </AccordionTrigger>
             <AccordionContent>
@@ -373,6 +286,9 @@ export default function Settings() {
                   onChange={(v) => setValue('autoExport', v as string)}
                   labels={{ off: '关闭', turn: '每轮', chapter: '每章' }}
                 />
+                <p className="text-xs text-game-dim">
+                  自动保存间隔控制引擎 autosave 频率；自动导出写入 <code className="text-game-muted">output/exports/</code>。
+                </p>
               </CardContent>
             </AccordionContent>
           </Card>
@@ -383,11 +299,29 @@ export default function Settings() {
           <Card>
             <AccordionTrigger className="px-5 py-3.5 hover:no-underline">
               <span className="font-bold text-sm flex items-center gap-2">
-                <span>🎨</span> UI 偏好
+                <span>🎨</span> {t('settings.ui', lang)}
               </span>
             </AccordionTrigger>
             <AccordionContent>
               <CardContent className="space-y-4 pt-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm text-game-muted">自动推进</Label>
+                  <Switch
+                    checked={values.autoAdvance}
+                    onCheckedChange={(v) => setValue('autoAdvance', v)}
+                  />
+                </div>
+                {values.autoAdvance && (
+                  <SelectRow
+                    label="推进轮数"
+                    value={values.autoAdvanceRounds}
+                    options={[...AUTO_ADVANCE_ROUND_OPTIONS]}
+                    onChange={(v) => setValue('autoAdvanceRounds', v as number)}
+                  />
+                )}
+                <p className="text-xs text-game-dim">
+                  开启后游戏页可自动选 A；可在对局内暂停/继续，每轮成功生成后扣减剩余轮数。
+                </p>
                 <div className="flex items-center justify-between">
                   <Label className="text-sm text-game-muted">动画效果</Label>
                   <Switch
@@ -426,7 +360,7 @@ export default function Settings() {
           <Card>
             <AccordionTrigger className="px-5 py-3.5 hover:no-underline">
               <span className="font-bold text-sm flex items-center gap-2">
-                <span>🔑</span> API 密钥
+                <span>🔑</span> {t('settings.api', lang)}
               </span>
             </AccordionTrigger>
             <AccordionContent>
@@ -457,7 +391,7 @@ export default function Settings() {
                   </Select>
                 </div>
                 <p className="text-xs text-game-dim rounded-md border border-game-border/60 bg-game-bg/50 px-3 py-2">
-                  字数、Token、温度、Top P、压缩阈值等生成参数已移至<strong className="text-game-muted">游戏页 → ⚡ 生成快捷设置</strong>，可在对局内随时调整。
+                  生成相关参数（字数、温度、选项数、视角、文风等）请在<strong className="text-game-muted">游戏页 → ⚡ 快捷设置</strong>中调整。
                 </p>
                 <div className="flex items-center justify-between">
                   <Label>📡 流式输出</Label>
@@ -509,6 +443,14 @@ export default function Settings() {
               Object.entries(DEFAULTS).forEach(([key, val]) => {
                 setValue(key as keyof SettingsForm, val as never)
               })
+              import('@/lib/api').then(({ updateAppSettings }) =>
+                updateAppSettings({
+                  autoSaveInterval: DEFAULTS.autoSaveInterval,
+                  maxSaveSlots: DEFAULTS.maxSaveSlots,
+                  exportFormat: DEFAULTS.exportFormat,
+                  autoExport: DEFAULTS.autoExport,
+                }).catch(() => {}),
+              )
             }
           }}
         >

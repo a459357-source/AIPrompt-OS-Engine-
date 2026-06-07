@@ -1,8 +1,9 @@
 @echo off
-chcp 65001 >nul
-title PromptOS — 停止服务
+title PromptOS Stop
 cd /d "%~dp0"
-echo 正在停止占用 8000 / 5173 端口的进程...
+echo Checking ports 8000 and 5173...
 python scripts\stop_servers.py
+echo.
+echo If ports are idle, run start.bat or start-standalone.bat
 echo.
 pause

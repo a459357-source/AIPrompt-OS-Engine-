@@ -57,7 +57,7 @@ def main() -> int:
     if killed:
         print(f"Done. Stopped {killed} process(es).")
     else:
-        print("No listening process on ports:", ", ".join(map(str, ports)))
+        print("[INFO] No PromptOS service on ports " + ", ".join(map(str, ports)) + " (idle)")
     return 0
 
 

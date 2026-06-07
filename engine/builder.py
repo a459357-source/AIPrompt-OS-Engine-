@@ -19,11 +19,41 @@ from engine.memory import (
 )
 from engine.events import get_event_context
 from engine.world_driver import get_world_state_context
+from engine.context_compress import compress_history_for_prompt
 
 logger = logging.getLogger(__name__)
 
 
-def build_prompt() -> tuple[str, str]:
+def _player_choice_prompt(choice: str | None, session_state: dict) -> str:
+    """Build LAST_CHOICE text; *choice* is what the player just picked this turn."""
+    if not choice:
+        return "这是故事的开始，没有上一轮选择。"
+
+    history = session_state.get("history", [])
+    prev_options = history[-1].get("options", []) if history else []
+    letter = choice.strip().upper()
+    count = config.OPTION_COUNT
+    choice_map = {chr(65 + i): i for i in range(count)}
+
+    if letter in choice_map and prev_options:
+        idx = choice_map[letter]
+        if 0 <= idx < len(prev_options):
+            return (
+                f"玩家本轮选择了选项 {letter}：{prev_options[idx]}\n"
+                "请在本轮 story 中直接写出该选择的行动与后果，不得推迟到下一轮。"
+            )
+        return (
+            f"玩家本轮选择了选项 {letter}。\n"
+            "请在本轮 story 中直接写出该选择的行动与后果，不得推迟到下一轮。"
+        )
+
+    return (
+        f"玩家本轮自定义行动：{choice.strip()}\n"
+        "请在本轮 story 中直接写出该行动与后果，不得推迟到下一轮。"
+    )
+
+
+def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
     """
     Build the (system_prompt, user_prompt) tuple for the current turn.
 
@@ -34,7 +64,9 @@ def build_prompt() -> tuple[str, str]:
     """
     config.reload_story_length()
     config.reload_max_tokens()
-    config.ensure_story_length_token_sync()
+    config.reload_context_settings()
+    config.reload_app_behavior()
+    config.ensure_story_length_context_sync()
 
     world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
     session_state = io_utils.read_yaml(config.SESSION_STATE_PATH)
@@ -136,12 +168,16 @@ def build_prompt() -> tuple[str, str]:
     # ── Interpolate system prompt ──────────────────────────────
     target_len = config.STORY_LENGTH
     min_len = config.min_story_length_for_target(target_len)
+    max_len = config.max_story_length_for_target(target_len)
     system_raw = template.get("system", "")
     system_prompt = (
         system_raw
         .replace("{{FORCE_EVENT_NOTICE}}", force_notice)
         .replace("{{STORY_LENGTH}}", str(target_len))
         .replace("{{STORY_LENGTH_MIN}}", str(min_len))
+        .replace("{{STORY_LENGTH_MAX}}", str(max_len))
+        .replace("{{AI_BEHAVIOR_RULES}}", config.ai_behavior_rules_text())
+        .replace("{{OPTION_COUNT}}", str(config.OPTION_COUNT))
         .replace("{{CUSTOM_RULES}}", custom_rules_text)
         .replace("{{MAIN_GOAL}}", main_goal)
     )
@@ -168,41 +204,24 @@ def build_prompt() -> tuple[str, str]:
     # ── World state (faction autonomous actions) ──────────────
     world_state_context = get_world_state_context(memory, session_state.get("turn", 0))
 
-    # ── Last choice context ────────────────────────────────────
-    last_choice = session_state.get("last_choice", "")
-    if last_choice:
-        last_choice_text = f"玩家上一轮选择了选项 {last_choice}。请基于此选择继续故事。"
-    else:
-        last_choice_text = "这是故事的开始，没有上一轮选择。"
+    # ── Player choice for THIS generation ───────────────────────
+    last_choice_text = _player_choice_prompt(current_choice, session_state)
 
-    # ── Truncate history to avoid token-limit overflow ──────────
-    # DeepSeek V4 context limit is 1M tokens.
-    # Each turn's full story can be 1-3K chars; many turns → large prompts.
-    # We keep the last 10 turns for context and summarize older turns.
-    MAX_HISTORY_TURNS = 10
+    # ── History compression (auto_compress + compress_threshold) ─
+    config.reload_context_settings()
     full_history = session_state.get("history", [])
-    if len(full_history) > MAX_HISTORY_TURNS:
-        recent = full_history[-MAX_HISTORY_TURNS:]
-        older_count = len(full_history) - MAX_HISTORY_TURNS
-        # Build a state copy with truncated history + summary of older turns
-        state_for_prompt = dict(session_state)
-        state_for_prompt["history"] = recent
-        # Add a summary of older history
-        older_summaries = []
-        for h in full_history[:older_count]:
-            older_summaries.append(
-                f"T{h.get('turn','?')} [{h.get('status','?')}] {h.get('scene','?')}: "
-                f"{h.get('summary', h.get('story',''))[:80]}"
-            )
-        state_for_prompt["history_summary"] = (
-            f"（之前 {older_count} 轮摘要）\n" + "\n".join(older_summaries)
-        )
-        logger.info(
-            "Prompt: history truncated %d → %d turns (saved ~%d turns as summary)",
-            len(full_history), len(recent), older_count,
-        )
+    recent_history, history_summary, compress_stats = compress_history_for_prompt(
+        full_history,
+        max_full_turns=config.MAX_CONTEXT_MESSAGES,
+        auto_compress=config.AUTO_COMPRESS,
+        compress_threshold=config.COMPRESS_THRESHOLD,
+    )
+    state_for_prompt = dict(session_state)
+    state_for_prompt["history"] = recent_history
+    if history_summary:
+        state_for_prompt["history_summary"] = history_summary
     else:
-        state_for_prompt = session_state
+        state_for_prompt.pop("history_summary", None)
 
     # ── Interpolate user prompt ────────────────────────────────
     user_raw = template.get("user", "")
@@ -224,6 +243,8 @@ def build_prompt() -> tuple[str, str]:
         .replace("{{WORLD_STATE}}", world_state_context)
         .replace("{{STORY_LENGTH}}", str(target_len))
         .replace("{{STORY_LENGTH_MIN}}", str(min_len))
+        .replace("{{STORY_LENGTH_MAX}}", str(max_len))
+        .replace("{{OPTION_COUNT}}", str(config.OPTION_COUNT))
     )
 
     # ── Estimate token usage and warn ───────────────────────────
@@ -234,8 +255,16 @@ def build_prompt() -> tuple[str, str]:
                                 event_context, world_state_context)
 
     logger.info(
-        "Prompt built — force_event=%s last_choice=%s story_length=%d max_tokens=%d",
-        force_triggered, last_choice or "none", target_len, config.MAX_TOKENS,
+        "Prompt built — force_event=%s current_choice=%s story_length=%d max_tokens=%d "
+        "auto_compress=%s compress_threshold=%d history_tokens=%d→%d",
+        force_triggered,
+        current_choice or "none",
+        target_len,
+        config.MAX_TOKENS,
+        config.AUTO_COMPRESS,
+        config.COMPRESS_THRESHOLD,
+        compress_stats.get("original_tokens", 0),
+        compress_stats.get("final_tokens", 0),
     )
     return system_prompt, user_prompt
 
@@ -264,8 +293,10 @@ def _detect_force_event(state: dict) -> tuple[bool, str]:
         else:
             break
 
-    if same_scene_count >= config.MAX_TURNS_SAME_SCENE:
-        reasons.append(f"同场景已达 {same_scene_count} 轮（阈值 {config.MAX_TURNS_SAME_SCENE}）")
+    thresholds = config.force_event_thresholds()
+
+    if same_scene_count >= thresholds["same_scene"]:
+        reasons.append(f"同场景已达 {same_scene_count} 轮（阈值 {thresholds['same_scene']}）")
 
     # ── Same-status detection ──────────────────────────────────
     same_status_count = 1
@@ -275,8 +306,8 @@ def _detect_force_event(state: dict) -> tuple[bool, str]:
         else:
             break
 
-    if same_status_count >= config.MAX_TURNS_SAME_STATUS:
-        reasons.append(f"状态 {current_status} 已持续 {same_status_count} 轮（阈值 {config.MAX_TURNS_SAME_STATUS}）")
+    if same_status_count >= thresholds["same_status"]:
+        reasons.append(f"状态 {current_status} 已持续 {same_status_count} 轮（阈值 {thresholds['same_status']}）")
 
     # ── Interaction stagnation detection ───────────────────────
     chars: dict = state.get("characters", {})
@@ -293,8 +324,8 @@ def _detect_force_event(state: dict) -> tuple[bool, str]:
         else:
             break
 
-    if stagnant_count >= config.MAX_TURNS_INTERACTION_STAGNANT:
-        reasons.append(f"互动等级停滞已达 {stagnant_count} 轮（阈值 {config.MAX_TURNS_INTERACTION_STAGNANT}）")
+    if stagnant_count >= thresholds["interaction"]:
+        reasons.append(f"互动等级停滞已达 {stagnant_count} 轮（阈值 {thresholds['interaction']}）")
 
     if reasons:
         return True, "；".join(reasons)

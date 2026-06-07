@@ -10,6 +10,162 @@ import json
 
 router = APIRouter(tags=["world"])
 
+_REL_TYPES = frozenset({"friend", "lover", "family", "teacher", "rival", "ally", "enemy"})
+_REL_METRICS = ("affection", "trust", "respect", "dependence", "hostility", "attraction")
+
+
+def _clamp_rel_metric(value, default: int = 50) -> int:
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0, min(100, n))
+
+
+def _normalize_character_relations(raw, npc_names: list[str]) -> dict:
+    """Normalize AI output for NewStory multidimensional relations."""
+    raw = _remap_relation_keys(raw, npc_names)
+    out = {}
+    for name in npc_names:
+        if not name:
+            continue
+        rel = raw.get(name) if isinstance(raw.get(name), dict) else {}
+        rel_type = rel.get("relationshipType", "friend")
+        if rel_type not in _REL_TYPES:
+            rel_type = "friend"
+        tags = rel.get("tags") or []
+        if not isinstance(tags, list):
+            tags = [tags] if tags else []
+        tags = [str(t).strip() for t in tags if t and str(t).strip()]
+        out[name] = {
+            "relationshipType": rel_type,
+            **{m: _clamp_rel_metric(rel.get(m), 50) for m in _REL_METRICS},
+            "tags": tags[:6],
+        }
+    return out
+
+
+def _parse_json_object_from_story(story: str) -> dict | None:
+    import re as _re
+    m = _re.search(r"\{[^{}]*\{[^{}]*\}[^{}]*\}", story)
+    if not m:
+        m = _re.search(r"\{[^}]+\}", story)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group())
+    except json.JSONDecodeError:
+        return None
+
+
+def _link_character_factions(characters, factions) -> list:
+    """Ensure each character.faction matches a generated faction name."""
+    if not isinstance(characters, list) or not characters:
+        return characters or []
+    if not isinstance(factions, list) or not factions:
+        return characters
+
+    name_map = {
+        str(f.get("name", "")).strip(): f
+        for f in factions
+        if isinstance(f, dict) and str(f.get("name", "")).strip()
+    }
+    if not name_map:
+        return characters
+
+    leader_map = {}
+    for fname, fac in name_map.items():
+        leader = str(fac.get("leader", "")).strip()
+        if leader:
+            leader_map[leader] = fname
+
+    linked = []
+    for ch in characters:
+        if not isinstance(ch, dict):
+            linked.append(ch)
+            continue
+        entry = dict(ch)
+        raw = str(entry.get("faction", "")).strip()
+        cname = str(entry.get("name", "")).strip()
+        resolved = raw if raw in name_map else ""
+        if not resolved and cname in leader_map:
+            resolved = leader_map[cname]
+        if not resolved and raw:
+            for fname in name_map:
+                if raw in fname or fname in raw:
+                    resolved = fname
+                    break
+        entry["faction"] = resolved
+        linked.append(entry)
+    return linked
+
+
+def _remap_relation_keys(raw, npc_names: list[str]) -> dict:
+    """Match characterRelations keys to actual NPC names (fuzzy)."""
+    if not isinstance(raw, dict):
+        return {}
+    remapped = {}
+    used_keys: set[str] = set()
+    for npc in npc_names:
+        if not npc:
+            continue
+        if npc in raw and isinstance(raw.get(npc), dict):
+            remapped[npc] = raw[npc]
+            used_keys.add(npc)
+            continue
+        for key, val in raw.items():
+            if key in used_keys or not isinstance(val, dict):
+                continue
+            key_str = str(key)
+            if key_str == npc or key_str in npc or npc in key_str:
+                remapped[npc] = val
+                used_keys.add(key_str)
+                break
+    return remapped
+
+
+def _link_artifact_owners(artifacts, characters, factions) -> list:
+    """Resolve artifact ownerId to known character or faction names."""
+    if not isinstance(artifacts, list):
+        return []
+    char_names = [
+        str(c.get("name", "")).strip()
+        for c in (characters or [])
+        if isinstance(c, dict) and str(c.get("name", "")).strip()
+    ]
+    fac_names = [
+        str(f.get("name", "")).strip()
+        for f in (factions or [])
+        if isinstance(f, dict) and str(f.get("name", "")).strip()
+    ]
+
+    def _resolve(name, owner_type: str) -> str:
+        raw = str(name or "").strip()
+        if not raw:
+            return ""
+        if owner_type == "character":
+            pool = char_names
+        elif owner_type == "faction":
+            pool = fac_names
+        else:
+            pool = char_names + fac_names
+        if raw in pool:
+            return raw
+        for candidate in pool:
+            if raw in candidate or candidate in raw:
+                return candidate
+        return raw
+
+    linked = []
+    for art in artifacts:
+        if not isinstance(art, dict):
+            continue
+        entry = dict(art)
+        owner_type = str(entry.get("ownerType", "none") or "none")
+        entry["ownerId"] = _resolve(entry.get("ownerId", ""), owner_type)
+        linked.append(entry)
+    return linked
+
 
 @router.post("/new")
 async def create_new_story(
@@ -304,10 +460,27 @@ async def generate_world(keywords: str = Form("")):
   "genre": ["标签1", "标签2"],
   "scene": "初始场景/地点名称",
   "main_goal": "故事主线目标（一句话）",
+  "factions": [
+    {{
+      "name": "势力名",
+      "type": "government|corporation|family|organization|guild|school|religion|kingdom|other",
+      "description": "势力描述（20-80字）",
+      "goals": ["目标1", "目标2"],
+      "resources": ["资源1"],
+      "controlledTerritories": ["控制区域"],
+      "subordinateOrganizations": ["下属机构"],
+      "keyAssets": ["关键资产"],
+      "power": {{"military": 0, "economic": 0, "political": 0, "technology": 0}},
+      "influence": 50,
+      "relation_to_player": "neutral",
+      "leader": "首领角色姓名（须与 characters 中某角色 name 一致）"
+    }}
+  ],
   "characters": [
     {{
       "name": "角色姓名",
       "isMain": true,
+      "faction": "势力名（必须与 factions 中某一项 name 完全一致）",
       "role_tags": ["身份标签"],
       "personality_tags": ["性格标签1", "性格标签2", "性格标签3"],
       "appearance": "外貌特征（10~30字）",
@@ -323,22 +496,6 @@ async def generate_world(keywords: str = Form("")):
   "stats": [
     {{"key": "trust", "label": "好感度", "max": 100}}
   ],
-  "factions": [
-    {{
-      "name": "势力名",
-      "type": "government|corporation|family|organization|guild|school|religion|kingdom|other",
-      "description": "势力描述（20-80字）",
-      "goals": ["目标1", "目标2"],
-      "resources": ["资源1"],
-      "controlledTerritories": ["控制区域"],
-      "subordinateOrganizations": ["下属机构"],
-      "keyAssets": ["关键资产"],
-      "power": {{"military": 0, "economic": 0, "political": 0, "technology": 0}},
-      "influence": 50,
-      "relation_to_player": "neutral",
-      "leader": "首领名"
-    }}
-  ],
   "artifacts": [
     {{
       "name": "物品名",
@@ -350,22 +507,58 @@ async def generate_world(keywords: str = Form("")):
       "abilities": ["能力"],
       "tags": ["标签"]
     }}
-  ]
+  ],
+  "characterRelations": {{
+    "NPC姓名（与 characters 中非主角一致）": {{
+      "relationshipType": "friend|lover|family|teacher|rival|ally|enemy",
+      "affection": 0,
+      "trust": 0,
+      "respect": 0,
+      "dependence": 0,
+      "hostility": 0,
+      "attraction": 0,
+      "tags": ["关系标签1", "关系标签2", "关系标签3"]
+    }}
+  }}
 }}
 
 要求：
-1. 角色要有个性，包含外貌、性格标签、目标、隐藏秘密
-2. 主角和至少1个NPC之间要有潜在的戏剧冲突或情感张力
-3. 初始场景要具体、有画面感
-4. stats 根据故事类型设计2-3个专属追踪维度
-5. rel_stages 必须是双向的（负面←陌生→正面），共6-10个阶段
-6. factions 至少生成2个互相对立的势力，推动剧情冲突
-7. artifacts 生成2-3个有故事推动力的关键物品（传家宝/机密/武器/信物等）
-8. 所有文字用中文
-9. 只输出JSON，不要输出markdown代码块或其他文字"""
+1. 先设计 factions（至少2个互相对立的势力），再为 characters 分配 faction；每个角色都必须有所属势力，faction 必须与 factions[].name 完全一致
+2. factions[].leader 应填写该势力首领的角色姓名，且该角色 faction 指向本势力
+3. characters 必须包含 1 名主角（isMain:true）和至少 1 名 NPC（isMain:false）
+4. 角色要有个性，包含外貌、性格标签、目标、隐藏秘密
+5. 主角和至少1个NPC之间要有潜在的戏剧冲突或情感张力
+6. 初始场景要具体、有画面感；world 不超过 300 字
+7. stats 根据故事类型设计2-3个专属追踪维度
+8. rel_stages 必须是双向的（负面←陌生→正面），共6-10个阶段
+9. artifacts 生成2-3个有故事推动力的关键物品；ownerId 必须与已有角色名或势力名一致
+10. characterRelations 的 key 必须与 NPC 的 name 完全一致；tags 选 2-4 个；六维数值要体现角色设定与戏剧张力
+11. 所有文字用中文
+12. 只输出JSON，不要输出markdown代码块或其他文字"""
 
     try:
         result = call_deepseek(system, user, temperature=0.9, max_tokens=config.world_gen_output_tokens(), skip_validation=True)
+        if isinstance(result.get("world"), str):
+            result["world"] = result["world"].strip()[:300]
+        if result.get("characters") and result.get("factions"):
+            result["characters"] = _link_character_factions(
+                result.get("characters"), result.get("factions")
+            )
+        if result.get("artifacts"):
+            result["artifacts"] = _link_artifact_owners(
+                result.get("artifacts"),
+                result.get("characters"),
+                result.get("factions"),
+            )
+        npc_names = [
+            c.get("name", "")
+            for c in (result.get("characters") or [])
+            if not c.get("isMain") and c.get("name")
+        ]
+        if npc_names:
+            result["characterRelations"] = _normalize_character_relations(
+                result.get("characterRelations"), npc_names
+            )
         return JSONResponse(result)
     except DeepSeekError as exc:
         import logging
@@ -404,7 +597,16 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
         ctx = f"标题：{title}，世界观：{world[:200] if world else context[:200]}"
         user = f"为以下 Galgame 推荐3-5个风格标签（校园、恋爱、后宫、日常、轻小说、科幻、奇幻、修仙、末日、悬疑、推理、克苏鲁、冒险、战争、搞笑、黑暗、治愈、百合、女性向）：\n{ctx}\n\n输出JSON数组：[\"标签1\", \"标签2\"]"
     elif field == "character":
-        user = f"为以下故事生成一个完整的角色，用 JSON 格式输出：\n故事标题：{title}\n世界观：{world[:300] if world else context[:300]}\n角色定位：{char_role or '重要NPC'}\n\n输出格式：{{\"name\":\"角色名\",\"isMain\":false,\"role_tags\":[\"身份\"],\"personality_tags\":[\"性格1\",\"性格2\",\"性格3\"],\"appearance\":\"外貌特征（10~30字）\",\"relationship\":[\"与主角关系\"],\"goal\":\"角色目标\",\"secret\":\"隐藏秘密\"}}\n\n要求：角色要有个性、有目标、有秘密，避免平淡。只输出JSON。"
+        faction_ctx = context[:500] if context else "（暂无势力，faction 留空字符串）"
+        user = f"""为以下故事生成一个完整的角色，用 JSON 格式输出：
+故事标题：{title}
+世界观：{world[:300] if world else context[:300]}
+已有势力：{faction_ctx}
+角色定位：{char_role or '重要NPC'}
+
+输出格式：{{"name":"角色名","isMain":false,"faction":"势力名（必须与已有势力 name 一致，无则留空）","role_tags":["身份"],"personality_tags":["性格1","性格2","性格3"],"appearance":"外貌特征（10~30字）","relationship":["与主角关系"],"goal":"角色目标","secret":"隐藏秘密"}}
+
+要求：角色要有个性、有目标、有秘密；若已有势力列表，必须为角色指定合适的 faction。只输出JSON。"""
     elif field == "rel_system":
         ctx = f"标题：{title}，世界观：{world[:200] if world else context[:200]}"
         user = f"为以下 Galgame 推荐关系阶段系统（必须是双向的！包含正面和负面阶段，共6-10个）：\n{ctx}\n\n关系应有正反两面，例如：崩坏←敌视←对立←冷漠←疏远←陌生→认识→信赖→盟友→羁绊\n\n输出JSON：{{\"rel_stages\":[\"负面阶段\",...,\"陌生\",...,\"正面阶段\"],\"rel_affection\":0}}"
@@ -412,6 +614,18 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
         user = f"为以下故事生成一个关键物品（Artifact），用 JSON 格式输出：\n故事标题：{title}\n世界观：{world[:300] if world else context[:300]}\n\n输出格式：{{\"name\":\"物品名称（8字内）\",\"type\":\"personal|faction|world\",\"description\":\"物品描述（20-60字）\",\"ownerType\":\"character|faction|location|none\",\"ownerId\":\"持有者名（与已有角色或势力匹配，或留空）\",\"importance\":50-95,\"abilities\":[\"能力1\",\"能力2\"],\"tags\":[\"标签1\",\"标签2\"]}}\n\n要求：物品要有故事推动力，可以是传家宝、机密文件、武器、货币、信物等。只输出JSON。"
     elif field == "faction":
         user = f"为以下故事生成一个势力（Faction），用 JSON 格式输出：\n故事标题：{title}\n世界观：{world[:300] if world else context[:300]}\n\n输出格式：{{\"name\":\"势力名（6字内）\",\"type\":\"government|corporation|family|organization|guild|school|religion|kingdom|other\",\"description\":\"势力描述（20-80字）\",\"goals\":[\"目标1\",\"目标2\"],\"resources\":[\"资源1\",\"资源2\"],\"controlledTerritories\":[\"控制区域\"],\"subordinateOrganizations\":[\"下属机构\"],\"keyAssets\":[\"关键资产\"],\"power\":{{\"military\":0-100,\"economic\":0-100,\"political\":0-100,\"technology\":0-100}},\"influence\":10-100,\"relation_to_player\":\"ally|friendly|neutral|hostile|enemy\",\"leader\":\"首领名\"}}\n\n要求：势力要有明确目标和资源，能独立推动剧情。只输出JSON。"
+    elif field == "character_relation":
+        if not char_name.strip():
+            return JR({"error": "请指定 NPC 姓名"}, status_code=400)
+        user = f"""为以下 Galgame 生成主角与 NPC「{char_name}」的多维关系设定，JSON 格式：
+故事标题：{title}
+世界观：{world[:300] if world else context[:300]}
+角色背景：{context[:400] if context else '（未提供）'}
+
+输出格式：
+{{"relationshipType":"friend|lover|family|teacher|rival|ally|enemy","affection":0-100,"trust":0-100,"respect":0-100,"dependence":0-100,"hostility":0-100,"attraction":0-100,"tags":["标签1","标签2","标签3"]}}
+
+要求：tags 选 2-4 个有戏剧张力的关系标签（青梅竹马、救命恩人、秘密共享、竞争意识、单向暗恋、互相试探、过去纠葛、命运绑定、生死之交、不共戴天 等）。六维数值要与角色性格和剧情张力一致。只输出 JSON。"""
     else:
         return JR({"error": f"未知字段类型: {field}"}, status_code=400)
 
@@ -441,6 +655,16 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
                     result.setdefault("relationship", [])
                     result.setdefault("goal", "")
                     result.setdefault("secret", "")
+                    result.setdefault("faction", "")
+                    if context.strip():
+                        try:
+                            fac_list = json.loads(context)
+                            if isinstance(fac_list, list):
+                                linked = _link_character_factions([result], fac_list)
+                                if linked:
+                                    result["faction"] = linked[0].get("faction", result.get("faction", ""))
+                        except json.JSONDecodeError:
+                            pass
                     return JR(result)
             story = result.get("story", "") or result.get("name", "") or ""
             import re as _re
@@ -505,6 +729,17 @@ async def generate_field(field: str = Form(""), title: str = Form(""), world: st
                 except Exception:
                     pass
             return JR({"name": story.strip()[:20], "type": "organization", "influence": 50, "relation_to_player": "neutral", "goals": [], "resources": []})
+        if field == "character_relation":
+            rel = None
+            if isinstance(result, dict) and (
+                "relationshipType" in result or "tags" in result or "affection" in result
+            ):
+                rel = result
+            if rel is None:
+                story = result.get("story", "") if isinstance(result, dict) else ""
+                rel = _parse_json_object_from_story(story) or {}
+            normalized = _normalize_character_relations({char_name: rel}, [char_name])
+            return JR(normalized.get(char_name, _normalize_character_relations({}, [char_name])[char_name]))
         if field == "genre":
             story = result.get("story", "")
             import re as _re2

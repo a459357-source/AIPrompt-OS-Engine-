@@ -22,6 +22,7 @@ import json
 import logging
 import sys
 import threading
+import time
 import traceback
 import webbrowser
 from datetime import datetime
@@ -94,11 +95,59 @@ def _safe_call(fn: Callable, label: str, *args: Any, **kwargs: Any) -> bool:
 # ── Core step (stateless, for web/cli reuse) ───────────────────────
 
 _last_step_error: str = ""
+_last_autosave_ts: float = 0.0
+
+
+def _should_autosave_now() -> bool:
+    """Respect auto_save_interval (0 = disabled)."""
+    interval = config.AUTO_SAVE_INTERVAL
+    if interval <= 0:
+        return False
+    global _last_autosave_ts
+    now = time.time()
+    if _last_autosave_ts <= 0 or (now - _last_autosave_ts) >= interval:
+        _last_autosave_ts = now
+        return True
+    return False
+
+
+def _maybe_retry_repetition(
+    response: dict,
+    system_prompt: str,
+    user_prompt: str,
+    history: list,
+) -> dict:
+    from engine.repetition import check_story_repetition
+
+    story = response.get("story", "")
+    repetitive, reason = check_story_repetition(story, history, config.REPETITION_CHECK)
+    if not repetitive:
+        return response
+
+    logger.warning("⚠️ 正文重复检测: %s", reason)
+    if config.REPETITION_CHECK != "strict":
+        return response
+
+    retry_user = (
+        f"{user_prompt}\n\n"
+        f"【反重复 — 必须遵守】{reason}。请重写本轮 story，"
+        f"不得复述上一轮情节，必须推进新事件或新信息。"
+    )
+    try:
+        return call_deepseek(system_prompt, retry_user)
+    except DeepSeekError as exc:
+        logger.warning("重复检测重试失败，保留首轮结果: %s", exc)
+        return response
 
 
 def get_last_step_error() -> str:
     """Human-readable reason for the most recent step() failure."""
     return _last_step_error
+
+
+def _count_story_chars(text: str) -> int:
+    """Count story body chars (ignore whitespace), matching frontend badge."""
+    return len(text.replace(" ", "").replace("\n", "").replace("\r", ""))
 
 
 def step(choice: str | None = None) -> dict | None:
@@ -108,23 +157,43 @@ def step(choice: str | None = None) -> dict | None:
     state) plus metadata, or None on failure.
 
     Args:
-        choice: The player's choice from the previous turn (A/B/C/D),
-                or None for the first turn.
+        choice: The player's selection for THIS generation (A/B/C/D or custom text),
+                or None for the opening turn.
     """
     global _last_step_error
     _last_step_error = ""
-    logger.info("═══ TURN START ═══")
+    logger.info("═══ TURN START ═══ choice=%s", choice or "—")
+
+    from ui.routes.settings import pop_pending_gen_settings_note
+
+    settings_note = pop_pending_gen_settings_note()
+    if settings_note:
+        logger.info("📌 本轮使用刚修改的快捷设置: %s", settings_note)
 
     # Clear the IO cache so every turn starts with fresh disk state
     io_utils.clear_cache()
 
     # 1. Build prompt
     try:
-        system_prompt, user_prompt = build_prompt()
+        system_prompt, user_prompt = build_prompt(current_choice=choice)
     except Exception as exc:
         _last_step_error = f"构建提示词失败: {exc}"
         logger.error("Failed to build prompt: %s", exc)
         return None
+
+    target_len = config.STORY_LENGTH
+    min_len = config.min_story_length_for_target(target_len)
+    max_len = config.max_story_length_for_target(target_len)
+    logger.info(
+        "📋 生成参数: 目标字数=%d 至少=%d 最多=%d 最大Token=%d 自动压缩=%s 压缩阈值=%d 上下文消息=%d",
+        target_len,
+        min_len,
+        max_len,
+        config.MAX_TOKENS,
+        config.AUTO_COMPRESS,
+        config.COMPRESS_THRESHOLD,
+        config.MAX_CONTEXT_MESSAGES,
+    )
 
     # 2. Call DeepSeek
     try:
@@ -134,12 +203,45 @@ def step(choice: str | None = None) -> dict | None:
         logger.error("DeepSeek API error: %s", exc)
         return None
 
+    story_chars = _count_story_chars(response.get("story", ""))
+    if story_chars > max_len:
+        logger.warning(
+            "⚠️ 正文字数超出上限: 实际=%d > 最多=%d（目标=%d），尝试一次压缩重写",
+            story_chars,
+            max_len,
+            target_len,
+        )
+        retry_user = (
+            f"{user_prompt}\n\n"
+            f"【字数修正 — 必须遵守】上一轮 story 约 {story_chars} 字，超出上限 {max_len} 字。"
+            f"请重写本轮：story 正文必须在 {min_len}–{max_len} 字之间，目标约 {target_len} 字，"
+            f"精简描写与对话，宁可略短也不要超长。"
+        )
+        try:
+            response = call_deepseek(system_prompt, retry_user)
+            retry_chars = _count_story_chars(response.get("story", ""))
+            logger.info(
+                "📊 字数重试: 原=%d 重试后=%d 上限=%d",
+                story_chars,
+                retry_chars,
+                max_len,
+            )
+            story_chars = retry_chars
+        except DeepSeekError as exc:
+            logger.warning("字数重试失败，保留首轮结果: %s", exc)
+
+    pre_state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+    response = _maybe_retry_repetition(
+        response, system_prompt, user_prompt, pre_state.get("history", []),
+    )
+
     # 3. Validate
     warnings = validate_response(response)
     for w in warnings:
         logger.warning("Validation: %s", w)
 
-    # 4. Apply to state (with choice from *previous* turn)
+    # 4. Apply to state (record choice with the story we just generated)
+    prev_chapter = pre_state.get("chapter", 1)
     try:
         new_state = apply_turn(response, choice)
     except Exception as exc:
@@ -159,10 +261,45 @@ def step(choice: str | None = None) -> dict | None:
     _safe_call(obsidian_live.on_turn, "Obsidian live export",
                response, new_state, choice)
     _safe_call(_log_turn, "turn log append", response, choice)
-    _safe_call(do_autosave, "autosave")
+    if _should_autosave_now():
+        _safe_call(do_autosave, "autosave")
+    else:
+        logger.debug("Autosave skipped (interval=%ss)", config.AUTO_SAVE_INTERVAL)
+    _safe_call(_maybe_auto_export, "auto export", response, new_state, choice, prev_chapter)
 
     # Clear cache after all post-turn steps to ensure next turn reads fresh data
     io_utils.clear_cache()
+
+    story_text = response.get("story", "")
+    story_chars = _count_story_chars(story_text)
+    gap = story_chars - target_len
+    pct = (story_chars / target_len * 100) if target_len else 0
+    logger.info(
+        "📊 本轮生成明细: turn=%s choice=%s | 目标=%d 范围=%d-%d 实际=%d (%d%%) 差距=%+d | max_tokens=%d",
+        new_state.get("turn", "?"),
+        choice or "—",
+        target_len,
+        min_len,
+        max_len,
+        story_chars,
+        int(pct),
+        gap,
+        config.MAX_TOKENS,
+    )
+    if story_chars < min_len:
+        logger.warning(
+            "⚠️ 正文字数低于下限: 实际=%d < 至少=%d（目标=%d），可在 app.log 查看完整参数",
+            story_chars,
+            min_len,
+            target_len,
+        )
+    elif story_chars > max_len:
+        logger.warning(
+            "⚠️ 正文字数仍超出上限: 实际=%d > 最多=%d（目标=%d）",
+            story_chars,
+            max_len,
+            target_len,
+        )
 
     logger.info("═══ TURN COMPLETE ═══")
 
@@ -346,6 +483,24 @@ def _write_dashboard_html() -> None:
         write_standalone()
     except Exception:
         logger.error("Failed to write dashboard HTML:\n%s", traceback.format_exc())
+
+
+def _maybe_auto_export(
+    response: dict,
+    state: dict,
+    choice: str | None,
+    prev_chapter: int,
+) -> None:
+    mode = config.AUTO_EXPORT
+    if mode == "off":
+        return
+    from engine.story_export import export_turn
+
+    new_chapter = state.get("chapter", prev_chapter)
+    if mode == "turn":
+        export_turn(response, state, choice)
+    elif mode == "chapter" and new_chapter > prev_chapter:
+        export_turn(response, state, choice, suffix=f"_chapter_{new_chapter}")
 
 
 def _write_chapter(response: dict, state: dict, choice: str | None) -> None:

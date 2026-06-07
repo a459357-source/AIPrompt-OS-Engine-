@@ -1,5 +1,7 @@
 // ── Settings types, defaults, and localStorage persistence ──
 
+import { applyDocumentLanguage } from './i18n'
+
 export interface AppSettings {
   // Reading
   fontSize: number
@@ -9,15 +11,11 @@ export interface AppSettings {
   bgTheme: string
   paragraphSpacing: string
 
-  // AI
-  temperature: number
-  optionCount: number
-  narrativePov: string
-  stylePreference: string
+  // Gameplay (frontend only)
   autoAdvance: boolean
-  repetitionCheck: string
+  autoAdvanceRounds: number
 
-  // Data
+  // Data (synced to backend via /api/app-settings)
   autoSaveInterval: number
   maxSaveSlots: number
   exportFormat: string
@@ -38,12 +36,8 @@ export const DEFAULTS: AppSettings = {
   bgTheme: 'dark',
   paragraphSpacing: 'standard',
 
-  temperature: 0.8,
-  optionCount: 4,
-  narrativePov: 'auto',
-  stylePreference: 'balanced',
   autoAdvance: false,
-  repetitionCheck: 'standard',
+  autoAdvanceRounds: 3,
 
   autoSaveInterval: 60,
   maxSaveSlots: 3,
@@ -76,10 +70,45 @@ export function getSettings(): AppSettings {
   return _settings
 }
 
-export function saveSettings(s: Partial<AppSettings>) {
+const ENGINE_SYNC_KEYS = new Set<keyof AppSettings>([
+  'autoSaveInterval',
+  'maxSaveSlots',
+  'exportFormat',
+  'autoExport',
+])
+
+let _syncTimer: ReturnType<typeof setTimeout> | null = null
+
+async function syncEngineSettingsToBackend(patch: Partial<AppSettings>) {
+  const keys = Object.keys(patch) as (keyof AppSettings)[]
+  if (!keys.some((k) => ENGINE_SYNC_KEYS.has(k))) return
+  const { updateAppSettings } = await import('./api')
+  await updateAppSettings({
+    autoSaveInterval: patch.autoSaveInterval,
+    maxSaveSlots: patch.maxSaveSlots,
+    exportFormat: patch.exportFormat,
+    autoExport: patch.autoExport,
+  })
+}
+
+export function saveSettings(s: Partial<AppSettings>, opts?: { skipEngineSync?: boolean }) {
   _settings = { ...getSettings(), ...s }
   localStorage.setItem(KEY, JSON.stringify(_settings))
   applySettings(_settings)
+  applyDocumentLanguage(_settings.language as 'zh' | 'en' | 'ja')
+  window.dispatchEvent(new CustomEvent('app-settings-changed', { detail: _settings }))
+  if (opts?.skipEngineSync) return
+  if (_syncTimer) clearTimeout(_syncTimer)
+  _syncTimer = setTimeout(() => {
+    syncEngineSettingsToBackend(s).catch(() => {})
+  }, 400)
+}
+
+export function initSettings(): AppSettings {
+  _settings = loadSettings()
+  applySettings(_settings)
+  applyDocumentLanguage(_settings.language as 'zh' | 'en' | 'ja')
+  return _settings
 }
 
 export function applySettings(s: AppSettings) {
@@ -131,6 +160,12 @@ export const PARAGRAPH_SPACING: Record<string, string> = {
   compact: '0.8em',
   standard: '1.5em',
   relaxed: '2.5em',
+}
+
+export const AUTO_ADVANCE_ROUND_OPTIONS = [1, 3, 5, 10, 20] as const
+
+export function clampAutoAdvanceRounds(n: number): number {
+  return Math.max(1, Math.min(50, Math.floor(n)))
 }
 
 export const LINE_HEIGHT_OPTIONS = [1.6, 1.8, 2.0, 2.4]

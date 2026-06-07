@@ -1,4 +1,6 @@
 """Engine settings persistence and Obsidian export."""
+import logging
+
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
@@ -16,7 +18,26 @@ from config import (
     save_max_tokens,
     reload_max_tokens,
     tokens_for_story_length,
+    compress_threshold_for_story_length,
     ensure_story_length_token_sync,
+    ensure_story_length_context_sync,
+    save_option_count,
+    reload_option_count,
+    save_narrative_pov,
+    reload_narrative_pov,
+    save_style_preference,
+    reload_style_preference,
+    save_repetition_check,
+    reload_repetition_check,
+    save_auto_save_interval,
+    reload_auto_save_interval,
+    save_max_save_slots,
+    reload_max_save_slots,
+    save_export_format,
+    reload_export_format,
+    save_auto_export,
+    reload_auto_export,
+    reload_app_behavior,
     save_temperature,
     reload_temperature,
     save_top_p,
@@ -28,6 +49,69 @@ from config import (
 )
 
 router = APIRouter(tags=["settings"])
+gen_settings_logger = logging.getLogger("gen_settings")
+
+# Set by apply_game_gen_settings; consumed on next step() for correlated logging.
+_pending_gen_settings_note: str | None = None
+
+
+def pop_pending_gen_settings_note() -> str | None:
+    global _pending_gen_settings_note
+    note = _pending_gen_settings_note
+    _pending_gen_settings_note = None
+    return note
+
+
+def _gen_settings_snapshot() -> dict:
+    return {
+        "story_length": config.STORY_LENGTH,
+        "max_tokens": config.MAX_TOKENS,
+        "matched_max_tokens": config.tokens_for_story_length(config.STORY_LENGTH),
+        "compress_threshold": config.COMPRESS_THRESHOLD,
+        "matched_compress_threshold": config.compress_threshold_for_story_length(config.STORY_LENGTH),
+        "temperature": config.TEMPERATURE,
+        "top_p": config.TOP_P,
+        "max_context_messages": config.MAX_CONTEXT_MESSAGES,
+        "auto_compress": config.AUTO_COMPRESS,
+    }
+
+
+def _format_gen_settings_diff(before: dict, after: dict) -> str:
+    parts: list[str] = []
+    labels = {
+        "story_length": "目标字数",
+        "max_tokens": "最大Token",
+        "compress_threshold": "压缩阈值",
+        "temperature": "温度",
+        "top_p": "TopP",
+        "max_context_messages": "上下文消息上限",
+        "auto_compress": "自动压缩",
+    }
+    for key, label in labels.items():
+        if before.get(key) != after.get(key):
+            parts.append(f"{label} {before.get(key)}→{after.get(key)}")
+    return " | ".join(parts) if parts else "（无变更）"
+
+
+def log_gen_settings_change(before: dict, after: dict, *, source: str) -> None:
+    diff = _format_gen_settings_diff(before, after)
+    if diff == "（无变更）":
+        return
+    global _pending_gen_settings_note
+    _pending_gen_settings_note = diff
+    gen_settings_logger.info(
+        "⚙️ 快捷设置已修改 [%s] %s | 生效于下一轮生成",
+        source,
+        diff,
+    )
+    gen_settings_logger.info(
+        "   当前快照: 目标字数=%d 最大Token=%d 压缩阈值=%d 温度=%.2f TopP=%.2f",
+        after["story_length"],
+        after["max_tokens"],
+        after["compress_threshold"],
+        after["temperature"],
+        after["top_p"],
+    )
 
 
 def mask_api_key(key: str) -> str:
@@ -61,16 +145,25 @@ def game_settings_payload() -> dict:
     """Generation quick settings for the Game page."""
     reload_story_length()
     reload_max_tokens()
-    ensure_story_length_token_sync()
+    reload_context_settings()
+    reload_app_behavior()
+    ensure_story_length_context_sync()
     limits = config.story_length_limits()
     return {
         **limits,
         "story_length": config.STORY_LENGTH,
         "max_tokens": config.MAX_TOKENS,
         "matched_max_tokens": config.tokens_for_story_length(config.STORY_LENGTH),
+        "compress_threshold": config.COMPRESS_THRESHOLD,
+        "matched_compress_threshold": config.compress_threshold_for_story_length(config.STORY_LENGTH),
+        "auto_compress": config.AUTO_COMPRESS,
+        "max_context_messages": config.MAX_CONTEXT_MESSAGES,
         "temperature": config.TEMPERATURE,
         "top_p": config.TOP_P,
-        "compress_threshold": config.COMPRESS_THRESHOLD,
+        "option_count": config.OPTION_COUNT,
+        "narrative_pov": config.NARRATIVE_POV,
+        "style_preference": config.STYLE_PREFERENCE,
+        "repetition_check": config.REPETITION_CHECK,
         "api_limits": config.api_limits(),
     }
 
@@ -81,12 +174,18 @@ def apply_game_gen_settings(
     temperature: float | None = None,
     top_p: float | None = None,
     compress_threshold: int | None = None,
+    option_count: int | None = None,
+    narrative_pov: str | None = None,
+    style_preference: str | None = None,
+    repetition_check: str | None = None,
 ) -> dict:
     """Update generation quick settings (Game page)."""
+    before = _gen_settings_snapshot()
     if story_length is not None:
         save_story_length(clamp_story_length(story_length))
         reload_story_length()
         reload_max_tokens()
+        reload_context_settings()
     if temperature is not None:
         save_temperature(max(0.1, min(config.DEEPSEEK_MAX_TEMPERATURE, temperature)))
         reload_temperature()
@@ -100,12 +199,57 @@ def apply_game_gen_settings(
             max(500, min(config.DEEPSEEK_CONTEXT_TOKENS, compress_threshold)),
         )
         reload_context_settings()
+    if option_count is not None:
+        save_option_count(option_count)
+    if narrative_pov is not None:
+        save_narrative_pov(narrative_pov)
+    if style_preference is not None:
+        save_style_preference(style_preference)
+    if repetition_check is not None:
+        save_repetition_check(repetition_check)
+    if any(x is not None for x in (option_count, narrative_pov, style_preference, repetition_check)):
+        reload_app_behavior()
+    ensure_story_length_context_sync(force_compress=story_length is not None)
+    after = _gen_settings_snapshot()
+    log_gen_settings_change(before, after, source="game-settings")
     return game_settings_payload()
+
+
+def app_settings_payload() -> dict:
+    """Save/export settings (Settings page — not duplicated in Game quick panel)."""
+    reload_app_behavior()
+    return {
+        "auto_save_interval": config.AUTO_SAVE_INTERVAL,
+        "max_save_slots": config.MAX_SAVE_SLOTS,
+        "export_format": config.EXPORT_FORMAT,
+        "auto_export": config.AUTO_EXPORT,
+        "save_slots": config.all_save_slots(),
+    }
+
+
+def apply_app_settings(
+    *,
+    auto_save_interval: int | None = None,
+    max_save_slots: int | None = None,
+    export_format: str | None = None,
+    auto_export: str | None = None,
+) -> dict:
+    """Persist data/save settings from the Settings page."""
+    if auto_save_interval is not None:
+        save_auto_save_interval(auto_save_interval)
+    if max_save_slots is not None:
+        save_max_save_slots(max_save_slots)
+    if export_format is not None:
+        save_export_format(export_format)
+    if auto_export is not None:
+        save_auto_export(auto_export)
+    reload_app_behavior()
+    return app_settings_payload()
 
 
 def apply_engine_settings(
     api_key: str = "",
-    model: str = "deepseek-chat",
+    model: str | None = None,
     story_length: int | None = None,
     max_tokens: int | None = None,
     temperature: float | None = None,
@@ -123,7 +267,7 @@ def apply_engine_settings(
         except ValueError as exc:
             raise ValueError(str(exc)) from exc
         reload_api_key()
-    if model in AVAILABLE_MODELS:
+    if model is not None and model in AVAILABLE_MODELS:
         save_model(model)
         reload_model()
     if story_length is not None:

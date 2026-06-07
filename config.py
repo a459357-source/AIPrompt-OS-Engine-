@@ -87,8 +87,8 @@ def frontend_url(path: str = "/") -> str:
 
 
 # ── Save system ────────────────────────────────────────────────────
-MAX_SAVE_SLOTS = 3
 AUTOSAVE_SLOT = "autosave"
+DEFAULT_MAX_SAVE_SLOTS = 3
 
 # ── API Key storage ─────────────────────────────────────────────────
 APIKEY_PATH = DATA_DIR / "apikey.json"
@@ -259,6 +259,14 @@ def tokens_for_story_length(length: int) -> int:
     return cap_output_tokens(needed)
 
 
+def compress_threshold_for_story_length(length: int) -> int:
+    """Scale compress threshold with per-turn story size (longer turns → higher bar)."""
+    chars = clamp_story_length(length)
+    per_turn_tokens = int(chars * 0.6)
+    needed = DEFAULT_COMPRESS_THRESHOLD + per_turn_tokens * 5
+    return max(500, min(DEEPSEEK_CONTEXT_TOKENS, needed))
+
+
 def ensure_story_length_token_sync() -> None:
     """Keep max_tokens aligned with story_length (fixes legacy saves)."""
     matched = tokens_for_story_length(STORY_LENGTH)
@@ -267,17 +275,46 @@ def ensure_story_length_token_sync() -> None:
         reload_max_tokens()
 
 
+def ensure_story_length_context_sync(*, force_compress: bool = False) -> None:
+    """Keep max_tokens aligned; raise compress_threshold when below story-scaled minimum."""
+    matched_tokens = tokens_for_story_length(STORY_LENGTH)
+    matched_compress = compress_threshold_for_story_length(STORY_LENGTH)
+    updates: dict = {}
+    if MAX_TOKENS != matched_tokens:
+        updates["max_tokens"] = matched_tokens
+    if force_compress:
+        if COMPRESS_THRESHOLD != matched_compress:
+            updates["compress_threshold"] = matched_compress
+    elif COMPRESS_THRESHOLD < matched_compress:
+        updates["compress_threshold"] = matched_compress
+    if updates:
+        _update_settings(**updates)
+        if "max_tokens" in updates:
+            reload_max_tokens()
+        if "compress_threshold" in updates:
+            reload_context_settings()
+
+
 def min_story_length_for_target(length: int | None = None) -> int:
     """Minimum acceptable story chars (~85% of target)."""
     target = clamp_story_length(length if length is not None else STORY_LENGTH)
     return max(MIN_STORY_LENGTH, int(target * 0.85))
 
 
+def max_story_length_for_target(length: int | None = None) -> int:
+    """Maximum acceptable story chars (~115% of target)."""
+    target = clamp_story_length(length if length is not None else STORY_LENGTH)
+    return max(min_story_length_for_target(target), int(target * 1.15))
+
+
 def story_length_limits() -> dict[str, int]:
+    target = STORY_LENGTH
     limits = {
         "min": MIN_STORY_LENGTH,
         "max": MAX_STORY_LENGTH,
         "recommended": RECOMMENDED_STORY_LENGTH,
+        "target_min": min_story_length_for_target(target),
+        "target_max": max_story_length_for_target(target),
         "max_output_tokens": DEEPSEEK_MAX_OUTPUT_TOKENS,
         "context_tokens": DEEPSEEK_CONTEXT_TOKENS,
     }
@@ -291,9 +328,13 @@ def _load_story_length() -> int:
 
 
 def save_story_length(length: int) -> None:
-    """Persist story length and sync max_tokens to match."""
+    """Persist story length and sync max_tokens / compress_threshold to match."""
     length = clamp_story_length(length)
-    _update_settings(story_length=length, max_tokens=tokens_for_story_length(length))
+    _update_settings(
+        story_length=length,
+        max_tokens=tokens_for_story_length(length),
+        compress_threshold=compress_threshold_for_story_length(length),
+    )
 
 
 def reload_story_length() -> int:
@@ -424,6 +465,218 @@ def reload_context_settings() -> dict:
     return s
 
 
+# ── App behavior (AI narrative + save + export) ─────────────────────
+DEFAULT_OPTION_COUNT = 4
+DEFAULT_NARRATIVE_POV = "auto"
+DEFAULT_STYLE_PREFERENCE = "balanced"
+DEFAULT_REPETITION_CHECK = "standard"
+DEFAULT_AUTO_SAVE_INTERVAL = 60
+DEFAULT_EXPORT_FORMAT = "markdown"
+DEFAULT_AUTO_EXPORT = "off"
+
+NARRATIVE_POV_INSTRUCTIONS = {
+    "first": "使用第一人称「我」叙事，贴近主角内心。",
+    "third": "使用第三人称叙事（全知或限知均可）。",
+    "auto": "根据场景自动选择最合适的人称视角。",
+}
+STYLE_PREFERENCE_INSTRUCTIONS = {
+    "descriptive": "文风偏细腻描写，环境、动作与感官细节丰富。",
+    "fast": "文风偏快节奏，少铺垫，情节推进干脆。",
+    "dialogue": "以对话推动剧情，对话占比高。",
+    "psycho": "侧重心理刻画与内心独白。",
+    "balanced": "描写、对话、心理均衡。",
+}
+REPETITION_PROMPT_INSTRUCTIONS = {
+    "strict": "严禁重复已写过的情节、对话套路或场景描写；每轮必须有新信息。",
+    "standard": "避免明显重复已发生的情节与套路。",
+    "loose": "允许适度呼应前文，但不要整段复述。",
+}
+
+
+def _clamp_option_count(val: int) -> int:
+    return max(3, min(5, int(val)))
+
+
+def _load_option_count() -> int:
+    return _clamp_option_count(_read_settings().get("option_count", DEFAULT_OPTION_COUNT))
+
+
+def save_option_count(count: int) -> None:
+    _update_settings(option_count=_clamp_option_count(count))
+
+
+def reload_option_count() -> int:
+    global OPTION_COUNT
+    OPTION_COUNT = _load_option_count()
+    return OPTION_COUNT
+
+
+def _load_narrative_pov() -> str:
+    val = _read_settings().get("narrative_pov", DEFAULT_NARRATIVE_POV)
+    return val if val in NARRATIVE_POV_INSTRUCTIONS else DEFAULT_NARRATIVE_POV
+
+
+def save_narrative_pov(pov: str) -> None:
+    if pov not in NARRATIVE_POV_INSTRUCTIONS:
+        pov = DEFAULT_NARRATIVE_POV
+    _update_settings(narrative_pov=pov)
+
+
+def reload_narrative_pov() -> str:
+    global NARRATIVE_POV
+    NARRATIVE_POV = _load_narrative_pov()
+    return NARRATIVE_POV
+
+
+def _load_style_preference() -> str:
+    val = _read_settings().get("style_preference", DEFAULT_STYLE_PREFERENCE)
+    return val if val in STYLE_PREFERENCE_INSTRUCTIONS else DEFAULT_STYLE_PREFERENCE
+
+
+def save_style_preference(style: str) -> None:
+    if style not in STYLE_PREFERENCE_INSTRUCTIONS:
+        style = DEFAULT_STYLE_PREFERENCE
+    _update_settings(style_preference=style)
+
+
+def reload_style_preference() -> str:
+    global STYLE_PREFERENCE
+    STYLE_PREFERENCE = _load_style_preference()
+    return STYLE_PREFERENCE
+
+
+def _load_repetition_check() -> str:
+    val = _read_settings().get("repetition_check", DEFAULT_REPETITION_CHECK)
+    return val if val in REPETITION_PROMPT_INSTRUCTIONS else DEFAULT_REPETITION_CHECK
+
+
+def save_repetition_check(level: str) -> None:
+    if level not in REPETITION_PROMPT_INSTRUCTIONS:
+        level = DEFAULT_REPETITION_CHECK
+    _update_settings(repetition_check=level)
+
+
+def reload_repetition_check() -> str:
+    global REPETITION_CHECK
+    REPETITION_CHECK = _load_repetition_check()
+    return REPETITION_CHECK
+
+
+def _load_auto_save_interval() -> int:
+    val = int(_read_settings().get("auto_save_interval", DEFAULT_AUTO_SAVE_INTERVAL))
+    if val in (0, 30, 60, 300):
+        return val
+    return DEFAULT_AUTO_SAVE_INTERVAL
+
+
+def save_auto_save_interval(seconds: int) -> None:
+    val = int(seconds)
+    if val not in (0, 30, 60, 300):
+        val = DEFAULT_AUTO_SAVE_INTERVAL
+    _update_settings(auto_save_interval=val)
+
+
+def reload_auto_save_interval() -> int:
+    global AUTO_SAVE_INTERVAL
+    AUTO_SAVE_INTERVAL = _load_auto_save_interval()
+    return AUTO_SAVE_INTERVAL
+
+
+def _load_max_save_slots() -> int:
+    val = int(_read_settings().get("max_save_slots", DEFAULT_MAX_SAVE_SLOTS))
+    if val in (3, 5, 10):
+        return val
+    return DEFAULT_MAX_SAVE_SLOTS
+
+
+def save_max_save_slots(count: int) -> None:
+    val = int(count)
+    if val not in (3, 5, 10):
+        val = DEFAULT_MAX_SAVE_SLOTS
+    _update_settings(max_save_slots=val)
+
+
+def reload_max_save_slots() -> int:
+    global MAX_SAVE_SLOTS
+    MAX_SAVE_SLOTS = _load_max_save_slots()
+    return MAX_SAVE_SLOTS
+
+
+def _load_export_format() -> str:
+    val = _read_settings().get("export_format", DEFAULT_EXPORT_FORMAT)
+    return val if val in ("markdown", "text", "html") else DEFAULT_EXPORT_FORMAT
+
+
+def save_export_format(fmt: str) -> None:
+    if fmt not in ("markdown", "text", "html"):
+        fmt = DEFAULT_EXPORT_FORMAT
+    _update_settings(export_format=fmt)
+
+
+def reload_export_format() -> str:
+    global EXPORT_FORMAT
+    EXPORT_FORMAT = _load_export_format()
+    return EXPORT_FORMAT
+
+
+def _load_auto_export() -> str:
+    val = _read_settings().get("auto_export", DEFAULT_AUTO_EXPORT)
+    return val if val in ("off", "turn", "chapter") else DEFAULT_AUTO_EXPORT
+
+
+def save_auto_export(mode: str) -> None:
+    if mode not in ("off", "turn", "chapter"):
+        mode = DEFAULT_AUTO_EXPORT
+    _update_settings(auto_export=mode)
+
+
+def reload_auto_export() -> str:
+    global AUTO_EXPORT
+    AUTO_EXPORT = _load_auto_export()
+    return AUTO_EXPORT
+
+
+def reload_app_behavior() -> None:
+    reload_option_count()
+    reload_narrative_pov()
+    reload_style_preference()
+    reload_repetition_check()
+    reload_auto_save_interval()
+    reload_max_save_slots()
+    reload_export_format()
+    reload_auto_export()
+
+
+def valid_manual_save_slots() -> list[str]:
+    return [f"slot{i}" for i in range(1, MAX_SAVE_SLOTS + 1)]
+
+
+def all_save_slots() -> list[str]:
+    return [AUTOSAVE_SLOT, *valid_manual_save_slots()]
+
+
+def is_valid_save_slot(slot: str) -> bool:
+    return slot in all_save_slots()
+
+
+def force_event_thresholds() -> dict[str, int]:
+    scale = {"strict": 0.75, "standard": 1.0, "loose": 1.5}.get(REPETITION_CHECK, 1.0)
+    return {
+        "same_scene": max(2, int(MAX_TURNS_SAME_SCENE * scale)),
+        "same_status": max(2, int(MAX_TURNS_SAME_STATUS * scale)),
+        "interaction": max(2, int(MAX_TURNS_INTERACTION_STAGNANT * scale)),
+    }
+
+
+def ai_behavior_rules_text() -> str:
+    return (
+        f"【叙事视角】{NARRATIVE_POV_INSTRUCTIONS[NARRATIVE_POV]}\n"
+        f"【文风偏好】{STYLE_PREFERENCE_INSTRUCTIONS[STYLE_PREFERENCE]}\n"
+        f"【选项数量】必须输出恰好 {OPTION_COUNT} 个 options。\n"
+        f"【反重复】{REPETITION_PROMPT_INSTRUCTIONS[REPETITION_CHECK]}"
+    )
+
+
 # ── DeepSeek API ────────────────────────────────────────────────────
 DEEPSEEK_API_KEY = _load_api_key()
 DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions"
@@ -437,6 +690,7 @@ ctx = _load_context_settings()
 MAX_CONTEXT_MESSAGES = ctx["max_context_messages"]
 AUTO_COMPRESS = ctx["auto_compress"]
 COMPRESS_THRESHOLD = ctx["compress_threshold"]
+reload_app_behavior()
 
 # ── Obsidian live export ────────────────────────────────────────────
 # Path to an Obsidian vault folder.  When set, the engine writes

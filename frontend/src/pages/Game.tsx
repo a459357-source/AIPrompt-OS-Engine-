@@ -8,22 +8,44 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Separator } from '@/components/ui/separator'
 import { StatusToast } from '@/components/StatusToast'
-import { getGameState, startGame, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, type HistoryTurn, type GameGenSettings } from '@/lib/api'
+import { getGameState, startGame, nextTurn, getHistory, getGameGenSettings, updateGameGenSettings, formatFetchError, type HistoryTurn, type GameGenSettings } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { parseRelationHints } from '@/lib/relationHints'
+import { useAppSettings } from '@/hooks/useAppSettings'
+import { getSettings, clampAutoAdvanceRounds } from '@/lib/settings'
+import { t } from '@/lib/i18n'
 
 /** Keep in sync with config.py */
 const STORY_CHAR_TO_TOKEN = 1.35
 const JSON_OUTPUT_OVERHEAD = 3500
+const COMPRESS_BASE = 4000
+const COMPRESS_STORY_FACTOR = 5
 
 function estimateMaxTokens(length: number, min: number, max: number, outputCap: number) {
   const clamped = Math.max(min, Math.min(max, length))
   return Math.max(1, Math.min(outputCap, Math.floor(clamped * STORY_CHAR_TO_TOKEN + JSON_OUTPUT_OVERHEAD)))
 }
 
+function estimateCompressThreshold(length: number, min: number, max: number, contextCap: number) {
+  const clamped = Math.max(min, Math.min(max, length))
+  const perTurnTokens = Math.floor(clamped * 0.6)
+  return Math.max(500, Math.min(contextCap, COMPRESS_BASE + perTurnTokens * COMPRESS_STORY_FACTOR))
+}
+
 function parseDraftLength(draft: string, fallback: number) {
   const parsed = parseInt(draft, 10)
   return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function countStoryChars(text: string) {
+  return text.replace(/\s/g, '').length
+}
+
+function storyTargetBounds(target: number, hardMin: number) {
+  return {
+    min: Math.max(hardMin, Math.floor(target * 0.85)),
+    max: Math.floor(target * 1.15),
+  }
 }
 
 
@@ -120,7 +142,26 @@ function QuickGenRow({ label, children, hint }: { label: string; children: React
   )
 }
 
+/** 遮盖游戏主区域，不挡顶部/底部导航（z-30 < 导航 z-40/z-50） */
+function GameBusyOverlay({ message }: { message: string }) {
+  return (
+    <div
+      className="fixed inset-x-0 top-12 bottom-16 z-30 flex items-center justify-center md:bottom-0 md:top-11"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] pointer-events-auto" aria-hidden />
+      <div className="relative flex flex-col items-center gap-3 rounded-lg border border-game-border bg-game-card/95 px-10 py-8 shadow-2xl pointer-events-none">
+        <span className="inline-block h-9 w-9 animate-spin rounded-full border-2 border-game-accent/30 border-t-game-accent" />
+        <span className="text-sm text-game-text">{message}</span>
+      </div>
+    </div>
+  )
+}
+
 export default function Game() {
+  const appSettings = useAppSettings()
   const [story, setStory] = useState('')
   const [options, setOptions] = useState<string[]>([])
   const [turn, setTurn] = useState(0)
@@ -141,6 +182,8 @@ export default function Game() {
   const [storyLengthMin, setStoryLengthMin] = useState(300)
   const [storyLengthMax, setStoryLengthMax] = useState(281851)
   const [storyLengthRecommended, setStoryLengthRecommended] = useState(1000)
+  const [storyLengthTargetMin, setStoryLengthTargetMin] = useState(850)
+  const [storyLengthTargetMax, setStoryLengthTargetMax] = useState(1150)
   const [storyLengthDraft, setStoryLengthDraft] = useState('1000')
   const [maxTokens, setMaxTokens] = useState(1800)
   const [maxOutputTokens, setMaxOutputTokens] = useState(384000)
@@ -149,16 +192,35 @@ export default function Game() {
   const [topP, setTopP] = useState(0.9)
   const [compressThreshold, setCompressThreshold] = useState(4000)
   const [compressThresholdDraft, setCompressThresholdDraft] = useState('4000')
-  const [genSettingsOpen, setGenSettingsOpen] = useState(true)
+  const [optionCount, setOptionCount] = useState(4)
+  const [narrativePov, setNarrativePov] = useState('auto')
+  const [stylePreference, setStylePreference] = useState('balanced')
+  const [repetitionCheck, setRepetitionCheck] = useState('standard')
+  const [genSettingsOpen, setGenSettingsOpen] = useState(
+    () => getSettings().sidebarDefault === 'expanded',
+  )
   const [genSettingsSaved, setGenSettingsSaved] = useState(false)
+  const [genSettingsSaving, setGenSettingsSaving] = useState(false)
+  const [genSettingsSaveError, setGenSettingsSaveError] = useState('')
   const storyScrollRef = useRef<HTMLDivElement>(null)
   const genSettingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const genSettingsSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const mountedRef = useRef(true)
+  const autoAdvanceDelaySec = 5
   const pendingGenPatchRef = useRef<{
     storyLength?: number
     temperature?: number
     topP?: number
     compressThreshold?: number
+    optionCount?: number
+    narrativePov?: string
+    stylePreference?: string
+    repetitionCheck?: string
   }>({})
+  const [autoAdvancePaused, setAutoAdvancePaused] = useState(true)
+  const [autoAdvanceRemaining, setAutoAdvanceRemaining] = useState(0)
+  const [autoAdvanceCountdown, setAutoAdvanceCountdown] = useState(autoAdvanceDelaySec)
 
   const applyTurnData = useCallback((data: {
     story: string
@@ -215,7 +277,7 @@ export default function Game() {
       })
       logger.info('Game', `Loaded: turn=${(data.state as Record<string, unknown>).turn}`)
     } catch (e) {
-      const msg = (e as Error).message || String(e)
+      const msg = formatFetchError(e)
       logger.error('Game', 'Load failed', { error: msg })
       setError(msg)
     }
@@ -230,6 +292,8 @@ export default function Game() {
     setStoryLengthMin(data.min)
     setStoryLengthMax(data.max)
     setStoryLengthRecommended(data.recommended)
+    setStoryLengthTargetMin(data.target_min ?? storyTargetBounds(data.story_length, data.min).min)
+    setStoryLengthTargetMax(data.target_max ?? storyTargetBounds(data.story_length, data.min).max)
     setMaxTokens(data.max_tokens)
     setMaxOutputTokens(data.max_output_tokens)
     setContextTokens(data.context_tokens)
@@ -237,6 +301,10 @@ export default function Game() {
     setTopP(data.top_p)
     setCompressThreshold(data.compress_threshold)
     setCompressThresholdDraft(String(data.compress_threshold))
+    setOptionCount(data.option_count)
+    setNarrativePov(data.narrative_pov)
+    setStylePreference(data.style_preference)
+    setRepetitionCheck(data.repetition_check)
   }, [])
 
   useEffect(() => {
@@ -245,54 +313,119 @@ export default function Game() {
       .catch((e) => logger.warn('Game', 'Load gen settings failed', { error: String(e) }))
   }, [applyGenSettings])
 
+  const markGenSettingsSaved = useCallback(() => {
+    setGenSettingsSaveError('')
+    setGenSettingsSaved(true)
+    if (genSettingsSavedTimerRef.current) clearTimeout(genSettingsSavedTimerRef.current)
+    genSettingsSavedTimerRef.current = setTimeout(() => setGenSettingsSaved(false), 2000)
+  }, [])
+
+  const normalizeGenPatch = useCallback((patch: {
+    storyLength?: number
+    temperature?: number
+    topP?: number
+    compressThreshold?: number
+    optionCount?: number
+    narrativePov?: string
+    stylePreference?: string
+    repetitionCheck?: string
+  }) => {
+    const next = { ...patch }
+    if (next.storyLength != null) {
+      const clamped = Math.max(storyLengthMin, Math.min(storyLengthMax, next.storyLength))
+      next.storyLength = clamped
+      const matchedTokens = estimateMaxTokens(clamped, storyLengthMin, storyLengthMax, maxOutputTokens)
+      const matchedCompress = estimateCompressThreshold(clamped, storyLengthMin, storyLengthMax, contextTokens)
+      setStoryLength(clamped)
+      setMaxTokens(matchedTokens)
+      setCompressThreshold(matchedCompress)
+      setCompressThresholdDraft(String(matchedCompress))
+      next.compressThreshold = matchedCompress
+    }
+    if (next.temperature != null) setTemperature(next.temperature)
+    if (next.topP != null) setTopP(next.topP)
+    if (next.compressThreshold != null && next.storyLength == null) {
+      const clamped = Math.max(500, Math.min(contextTokens, next.compressThreshold))
+      setCompressThreshold(clamped)
+      setCompressThresholdDraft(String(clamped))
+      next.compressThreshold = clamped
+    }
+    if (next.optionCount != null) {
+      const clamped = Math.max(3, Math.min(5, next.optionCount))
+      setOptionCount(clamped)
+      next.optionCount = clamped
+    }
+    if (next.narrativePov != null) setNarrativePov(next.narrativePov)
+    if (next.stylePreference != null) setStylePreference(next.stylePreference)
+    if (next.repetitionCheck != null) setRepetitionCheck(next.repetitionCheck)
+    return next
+  }, [storyLengthMin, storyLengthMax, contextTokens, maxOutputTokens])
+
+  const flushGenSettings = useCallback(async () => {
+    const pending = pendingGenPatchRef.current
+    pendingGenPatchRef.current = {}
+    if (!Object.keys(pending).length) {
+      markGenSettingsSaved()
+      return
+    }
+    setGenSettingsSaving(true)
+    setGenSettingsSaveError('')
+    try {
+      logger.info('Game', 'Saving gen settings', pending)
+      const saved = await updateGameGenSettings(pending)
+      applyGenSettings(saved)
+      logger.info('Game', 'Gen settings saved', {
+        story_length: saved.story_length,
+        max_tokens: saved.max_tokens,
+        compress_threshold: saved.compress_threshold,
+      })
+      markGenSettingsSaved()
+    } catch (e) {
+      const msg = formatFetchError(e)
+      logger.error('Game', 'Save gen settings failed', { error: msg })
+      if (mountedRef.current) setGenSettingsSaveError(msg)
+    } finally {
+      if (mountedRef.current) setGenSettingsSaving(false)
+    }
+  }, [applyGenSettings, markGenSettingsSaved])
+
   const queueGenSettingsSave = useCallback((patch: {
     storyLength?: number
     temperature?: number
     topP?: number
     compressThreshold?: number
+    optionCount?: number
+    narrativePov?: string
+    stylePreference?: string
+    repetitionCheck?: string
   }, immediate = false) => {
-    if (patch.storyLength != null) {
-      const clamped = Math.max(storyLengthMin, Math.min(storyLengthMax, patch.storyLength))
-      patch.storyLength = clamped
-      setStoryLength(clamped)
-      setMaxTokens(estimateMaxTokens(clamped, storyLengthMin, storyLengthMax, maxOutputTokens))
-    }
-    if (patch.temperature != null) setTemperature(patch.temperature)
-    if (patch.topP != null) setTopP(patch.topP)
-    if (patch.compressThreshold != null) {
-      const clamped = Math.max(500, Math.min(contextTokens, patch.compressThreshold))
-      setCompressThreshold(clamped)
-      patch.compressThreshold = clamped
+    const normalized = normalizeGenPatch(patch)
+    pendingGenPatchRef.current = { ...pendingGenPatchRef.current, ...normalized }
+
+    const scheduleFlush = () => {
+      saveQueueRef.current = saveQueueRef.current.then(() => flushGenSettings())
     }
 
-    pendingGenPatchRef.current = { ...pendingGenPatchRef.current, ...patch }
-
-    const flush = async () => {
-      const pending = pendingGenPatchRef.current
-      pendingGenPatchRef.current = {}
-      if (!Object.keys(pending).length) return
-      try {
-        const saved = await updateGameGenSettings(pending)
-        applyGenSettings(saved)
-        setGenSettingsSaved(true)
-        setTimeout(() => setGenSettingsSaved(false), 1500)
-      } catch (e) {
-        logger.error('Game', 'Save gen settings failed', { error: String(e) })
-      }
+    if (genSettingsTimerRef.current) {
+      clearTimeout(genSettingsTimerRef.current)
+      genSettingsTimerRef.current = null
     }
-
-    if (genSettingsTimerRef.current) clearTimeout(genSettingsTimerRef.current)
     if (immediate) {
-      void flush()
+      scheduleFlush()
       return
     }
-    genSettingsTimerRef.current = setTimeout(() => { void flush() }, 600)
-  }, [storyLengthMin, storyLengthMax, contextTokens, maxOutputTokens, applyGenSettings])
+    genSettingsTimerRef.current = setTimeout(scheduleFlush, 600)
+  }, [normalizeGenPatch, flushGenSettings])
 
   const previewMaxTokens = useMemo(() => {
     const length = parseDraftLength(storyLengthDraft, storyLength)
     return estimateMaxTokens(length, storyLengthMin, storyLengthMax, maxOutputTokens)
   }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, maxOutputTokens])
+
+  const previewCompressThreshold = useMemo(() => {
+    const length = parseDraftLength(storyLengthDraft, storyLength)
+    return estimateCompressThreshold(length, storyLengthMin, storyLengthMax, contextTokens)
+  }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, contextTokens])
 
   const commitStoryLengthDraft = useCallback(() => {
     const parsed = parseInt(storyLengthDraft, 10)
@@ -305,18 +438,36 @@ export default function Game() {
     queueGenSettingsSave({ storyLength: clamped }, true)
   }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, queueGenSettingsSave])
 
-  const persistStoryLengthBeforeTurn = useCallback(async () => {
+  const persistGenSettingsBeforeTurn = useCallback(async () => {
+    if (genSettingsTimerRef.current) {
+      clearTimeout(genSettingsTimerRef.current)
+      genSettingsTimerRef.current = null
+    }
     const parsed = parseInt(storyLengthDraft, 10)
     if (!Number.isFinite(parsed)) return
     const clamped = Math.max(storyLengthMin, Math.min(storyLengthMax, parsed))
-    if (clamped === storyLength) return
+    const pending = { ...pendingGenPatchRef.current }
+    pendingGenPatchRef.current = {}
+    const patch = {
+      ...pending,
+      storyLength: clamped,
+      compressThreshold: estimateCompressThreshold(clamped, storyLengthMin, storyLengthMax, contextTokens),
+    }
     try {
-      const saved = await updateGameGenSettings({ storyLength: clamped })
+      logger.info('Game', 'Sync gen settings before turn', patch)
+      const saved = await updateGameGenSettings(patch)
       applyGenSettings(saved)
     } catch (e) {
-      logger.error('Game', 'Persist story length before turn failed', { error: String(e) })
+      logger.error('Game', 'Persist gen settings before turn failed', { error: String(e) })
     }
-  }, [storyLengthDraft, storyLength, storyLengthMin, storyLengthMax, applyGenSettings])
+  }, [storyLengthDraft, storyLengthMin, storyLengthMax, contextTokens, applyGenSettings])
+
+  useEffect(() => {
+    const parsed = parseInt(storyLengthDraft, 10)
+    if (!Number.isFinite(parsed)) return
+    const clamped = Math.max(storyLengthMin, Math.min(storyLengthMax, parsed))
+    setCompressThresholdDraft(String(estimateCompressThreshold(clamped, storyLengthMin, storyLengthMax, contextTokens)))
+  }, [storyLengthDraft, storyLengthMin, storyLengthMax, contextTokens])
 
   useEffect(() => {
     const parsed = parseInt(storyLengthDraft, 10)
@@ -337,7 +488,7 @@ export default function Game() {
     }
     const clamped = Math.max(500, Math.min(contextTokens, parsed))
     setCompressThresholdDraft(String(clamped))
-    if (clamped !== compressThreshold) queueGenSettingsSave({ compressThreshold: clamped }, true)
+    queueGenSettingsSave({ compressThreshold: clamped }, true)
   }, [compressThresholdDraft, compressThreshold, contextTokens, queueGenSettingsSave])
 
   const handleNumericFieldKeyDown = useCallback((e: React.KeyboardEvent, commit: () => void) => {
@@ -347,11 +498,30 @@ export default function Game() {
     }
   }, [])
 
-  useEffect(() => () => {
-    if (genSettingsTimerRef.current) clearTimeout(genSettingsTimerRef.current)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      if (genSettingsTimerRef.current) clearTimeout(genSettingsTimerRef.current)
+      if (genSettingsSavedTimerRef.current) clearTimeout(genSettingsSavedTimerRef.current)
+    }
   }, [])
 
-  const currentStoryChars = story.replace(/\s/g, '').length
+  const currentStoryChars = countStoryChars(story)
+  const activeStoryTarget = parseDraftLength(storyLengthDraft, storyLength)
+  const { min: previewTargetMin, max: previewTargetMax } = useMemo(
+    () => storyTargetBounds(activeStoryTarget, storyLengthMin),
+    [activeStoryTarget, storyLengthMin],
+  )
+  const storyLengthGap = currentStoryChars - storyLength
+  const storyLengthInRange =
+    currentStoryChars >= storyLengthTargetMin && currentStoryChars <= storyLengthTargetMax
+  const storyLengthBadgeClass =
+    storyLengthInRange
+      ? 'border-game-success/40 text-game-success'
+      : currentStoryChars > storyLengthTargetMax
+        ? 'border-game-danger/40 text-game-danger'
+        : 'border-amber-500/40 text-amber-400'
 
   // 新正文生成后滚回顶部，方便从开头阅读
   useEffect(() => {
@@ -361,12 +531,14 @@ export default function Game() {
     requestAnimationFrame(() => { el.scrollTop = 0 })
   }, [turn, story])
 
-  const handleChoice = useCallback(async (choice: string) => {
+  const handleChoice = useCallback(async (choice: string, opts?: { auto?: boolean }) => {
+    if (!opts?.auto) setAutoAdvancePaused(true)
     setChoosing(true)
     logger.info('Game', `Choice: ${choice}`)
     try {
-      await persistStoryLengthBeforeTurn()
+      await persistGenSettingsBeforeTurn()
       const data = await nextTurn(choice)
+      if (!mountedRef.current) return
       if (data.error) { setError(data.error); setChoosing(false); return }
       setStory(data.story)
       setOptions(data.options || [])
@@ -380,8 +552,15 @@ export default function Game() {
       })))
       const factionsData = data.state.factions as FactionInfo[] | undefined
       if (factionsData) setFactions(factionsData)
+      if (opts?.auto) {
+        setAutoAdvanceRemaining((r) => {
+          const next = r - 1
+          if (next <= 0) setAutoAdvancePaused(true)
+          return Math.max(0, next)
+        })
+      }
     } catch (e) {
-      const msg = (e as Error).message || String(e)
+      const msg = formatFetchError(e)
       logger.error('Game', 'Choice failed', { error: msg })
       // Detect truncation errors and add settings link
       if (msg.includes('截断') || msg.includes('Token') || msg.includes('unparseable')) {
@@ -390,10 +569,65 @@ export default function Game() {
         setError(msg)
       }
     }
-    setChoosing(false)
-  }, [persistStoryLengthBeforeTurn])
+    if (mountedRef.current) setChoosing(false)
+  }, [persistGenSettingsBeforeTurn])
+
+  useEffect(() => {
+    setGenSettingsOpen(appSettings.sidebarDefault === 'expanded')
+  }, [appSettings.sidebarDefault])
+
+  useEffect(() => {
+    if (!appSettings.autoAdvance) {
+      setAutoAdvancePaused(true)
+      setAutoAdvanceRemaining(0)
+      return
+    }
+    const rounds = clampAutoAdvanceRounds(appSettings.autoAdvanceRounds)
+    setAutoAdvanceRemaining(rounds)
+    setAutoAdvancePaused(false)
+  }, [appSettings.autoAdvance, appSettings.autoAdvanceRounds])
+
+  const autoAdvanceRunning =
+    appSettings.autoAdvance
+    && !autoAdvancePaused
+    && autoAdvanceRemaining > 0
+    && options.length > 0
+    && !choosing
+
+  useEffect(() => {
+    if (!autoAdvanceRunning) {
+      setAutoAdvanceCountdown(autoAdvanceDelaySec)
+      return
+    }
+    setAutoAdvanceCountdown(autoAdvanceDelaySec)
+    const tick = setInterval(() => {
+      setAutoAdvanceCountdown((c) => Math.max(0, c - 1))
+    }, 1000)
+    const timer = setTimeout(() => {
+      handleChoice('A', { auto: true })
+    }, autoAdvanceDelaySec * 1000)
+    return () => {
+      clearInterval(tick)
+      clearTimeout(timer)
+    }
+  }, [autoAdvanceRunning, turn, options.length, handleChoice])
+
+  const resumeAutoAdvance = useCallback(() => {
+    const rounds = clampAutoAdvanceRounds(appSettings.autoAdvanceRounds)
+    setAutoAdvanceRemaining((r) => (r > 0 ? r : rounds))
+    setAutoAdvancePaused(false)
+  }, [appSettings.autoAdvanceRounds])
 
   const hasGame = !loading && !error && story.length > 0
+  const lang = appSettings.language as 'zh' | 'en' | 'ja'
+  const showCharPanel = appSettings.charPanelPosition !== 'hidden'
+  const charPanelBottom = appSettings.charPanelPosition === 'bottom'
+  const storyParagraphStyle = {
+    fontSize: 'var(--story-font-size)',
+    lineHeight: 'var(--story-line-height)',
+    fontFamily: 'var(--story-font-family)',
+    marginBottom: 'var(--story-paragraph-spacing)',
+  } as const
 
   // Shared character + faction list component
   const StatusList = () => (
@@ -538,22 +772,15 @@ export default function Game() {
                   size="sm"
                   className="gap-1.5 text-game-muted hover:text-game-text"
                   onClick={() => setCharPanelOpen(!charPanelOpen)}
+                  style={{ display: showCharPanel ? undefined : 'none' }}
                 >
-                  📊 状态
+                  📊 {t('game.status', lang)}
                   {(characters.length > 0 || factions.length > 0) && (
                     <Badge variant="accent" size="sm" className="ml-0.5">{characters.length + factions.length}</Badge>
                   )}
                 </Button>
               </div>
             </div>
-
-            {/* Generating indicator — fixed, always visible */}
-            {choosing && (
-              <div className="shrink-0 flex items-center justify-center gap-2 py-3 bg-game-accent/10 border border-game-accent/30 rounded-lg text-sm text-game-accent animate-pulse">
-                <span className="inline-block w-3.5 h-3.5 border-2 border-game-accent/30 border-t-game-accent rounded-full animate-spin" />
-                AI 正在生成下一段剧情…
-              </div>
-            )}
 
             {/* Story — scrollable */}
             <div ref={storyScrollRef} className="flex-1 overflow-y-auto min-h-0 space-y-3">
@@ -563,17 +790,30 @@ export default function Game() {
                 className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-game-primary/5 transition-colors"
                 onClick={() => setGenSettingsOpen((v) => !v)}
               >
-                <span className="text-sm font-medium text-game-muted">⚡ 生成快捷设置</span>
+                <span className="text-sm font-medium text-game-muted">⚡ {t('game.quickSettings', lang)}</span>
                 <span className="text-xs text-game-dim flex items-center gap-2">
-                  {genSettingsSaved && <span className="text-game-success">已保存</span>}
+                  {!genSettingsSaving && genSettingsSaved && <span className="text-game-success">已保存</span>}
+                  {!genSettingsSaving && genSettingsSaveError && (
+                    <span className="text-game-danger">保存失败</span>
+                  )}
                   <span>{genSettingsOpen ? '收起 ▲' : '展开 ▼'}</span>
                 </span>
               </button>
               {genSettingsOpen && (
                 <CardContent className="pt-0 pb-3 px-4">
+                  {(genSettingsSaved || genSettingsSaveError) && (
+                    <div className="mb-2 text-xs">
+                      {genSettingsSaved && (
+                        <span className="text-game-success">✅ 已保存，下一轮生成生效</span>
+                      )}
+                      {genSettingsSaveError && (
+                        <span className="text-game-danger">❌ 保存失败：{genSettingsSaveError}</span>
+                      )}
+                    </div>
+                  )}
                   <QuickGenRow
                     label="目标字数"
-                    hint="每轮正文目标长度；停输约 1 秒自动保存，选选项前也会生效"
+                    hint={`每轮正文目标长度，允许 ${previewTargetMin.toLocaleString()}–${previewTargetMax.toLocaleString()} 字（±15%）；停输约 1 秒保存，选选项前强制同步`}
                   >
                     <Input
                       type="text"
@@ -586,24 +826,41 @@ export default function Game() {
                       onKeyDown={(e) => handleNumericFieldKeyDown(e, commitStoryLengthDraft)}
                       className="w-24 h-8 text-sm tabular-nums"
                     />
-                    <button
-                      type="button"
-                      disabled={choosing}
-                      onClick={() => {
-                        setStoryLengthDraft(String(storyLengthRecommended))
-                        queueGenSettingsSave({ storyLength: storyLengthRecommended }, true)
-                      }}
-                      className="text-xs text-game-accent hover:underline disabled:opacity-50"
-                    >
-                      建议 {storyLengthRecommended.toLocaleString()}
-                    </button>
-                    <Badge variant="outline" size="sm" className="tabular-nums">当前 {currentStoryChars} 字</Badge>
+                    {storyLength !== storyLengthRecommended && (
+                      <button
+                        type="button"
+                        disabled={choosing}
+                        onClick={() => {
+                          setStoryLengthDraft(String(storyLengthRecommended))
+                          queueGenSettingsSave({ storyLength: storyLengthRecommended }, true)
+                        }}
+                        className="text-xs text-game-accent hover:underline disabled:opacity-50"
+                      >
+                        默认 {storyLengthRecommended.toLocaleString()}
+                      </button>
+                    )}
+                    <Badge variant="outline" size="sm" className={`tabular-nums ${storyLengthBadgeClass}`}>
+                      当前 {currentStoryChars.toLocaleString()} 字
+                      {storyLengthGap !== 0 && (
+                        <span className="ml-1 opacity-90">
+                          ({storyLengthGap > 0 ? '+' : ''}{storyLengthGap.toLocaleString()})
+                        </span>
+                      )}
+                    </Badge>
+                    {!storyLengthInRange && story && (
+                      <span className="text-[11px] text-game-muted">
+                        目标 {storyLength.toLocaleString()}，允许 {storyLengthTargetMin.toLocaleString()}–{storyLengthTargetMax.toLocaleString()}
+                      </span>
+                    )}
                   </QuickGenRow>
                   <QuickGenRow
                     label="最大 Token"
-                    hint={`AI 单次回复上限，随字数自动匹配；官方最大 ${maxOutputTokens.toLocaleString()}`}
+                    hint={`随目标字数自动匹配（当前预览 ${previewMaxTokens.toLocaleString()}，已保存 ${maxTokens.toLocaleString()}）；官方最大 ${maxOutputTokens.toLocaleString()}`}
                   >
                     <Badge variant="outline" size="sm" className="tabular-nums">{previewMaxTokens.toLocaleString()}</Badge>
+                    {previewMaxTokens !== maxTokens && (
+                      <span className="text-[11px] text-game-accent">→ 保存后 {maxTokens.toLocaleString()}</span>
+                    )}
                   </QuickGenRow>
                   <QuickGenRow
                     label="上下文"
@@ -643,7 +900,7 @@ export default function Game() {
                   </QuickGenRow>
                   <QuickGenRow
                     label="压缩阈值"
-                    hint={`对话 token 超过此值时触发压缩；范围 500–${contextTokens.toLocaleString()}`}
+                    hint={`历史 token 超此值且「自动压缩」开启时摘要旧轮次（预览 ${previewCompressThreshold.toLocaleString()}）；开关在设置页`}
                   >
                     <Input
                       type="text"
@@ -656,24 +913,119 @@ export default function Game() {
                       onKeyDown={(e) => handleNumericFieldKeyDown(e, commitCompressThresholdDraft)}
                       className="w-28 h-8 text-sm tabular-nums"
                     />
+                    {previewCompressThreshold !== compressThreshold && parseDraftLength(storyLengthDraft, storyLength) !== storyLength && (
+                      <span className="text-[11px] text-game-accent tabular-nums">联动 {previewCompressThreshold.toLocaleString()}</span>
+                    )}
+                  </QuickGenRow>
+                  <QuickGenRow label="选项数量" hint="每轮 AI 输出的选项个数（3–5）">
+                    {[3, 4, 5].map((n) => (
+                      <Button
+                        key={n}
+                        type="button"
+                        size="xs"
+                        variant={optionCount === n ? 'primary' : 'ghost'}
+                        disabled={choosing}
+                        onClick={() => queueGenSettingsSave({ optionCount: n }, true)}
+                      >
+                        {n}
+                      </Button>
+                    ))}
+                  </QuickGenRow>
+                  <QuickGenRow label="叙事视角" hint="写入提示词，影响人称与叙述方式">
+                    {([
+                      { v: 'first', l: '第一人称' },
+                      { v: 'third', l: '第三人称' },
+                      { v: 'auto', l: '自动' },
+                    ] as const).map((o) => (
+                      <Button
+                        key={o.v}
+                        type="button"
+                        size="xs"
+                        variant={narrativePov === o.v ? 'primary' : 'ghost'}
+                        disabled={choosing}
+                        onClick={() => queueGenSettingsSave({ narrativePov: o.v }, true)}
+                      >
+                        {o.l}
+                      </Button>
+                    ))}
+                  </QuickGenRow>
+                  <QuickGenRow label="文风" hint="细腻 / 快节奏 / 对话 / 心理 / 均衡">
+                    {([
+                      { v: 'descriptive', l: '细腻' },
+                      { v: 'fast', l: '快' },
+                      { v: 'dialogue', l: '对话' },
+                      { v: 'psycho', l: '心理' },
+                      { v: 'balanced', l: '均衡' },
+                    ] as const).map((o) => (
+                      <Button
+                        key={o.v}
+                        type="button"
+                        size="xs"
+                        className="text-[11px]"
+                        variant={stylePreference === o.v ? 'primary' : 'ghost'}
+                        disabled={choosing}
+                        onClick={() => queueGenSettingsSave({ stylePreference: o.v }, true)}
+                      >
+                        {o.l}
+                      </Button>
+                    ))}
+                  </QuickGenRow>
+                  <QuickGenRow label="重复检测" hint="严格时相似度过高会重试；也影响 FORCE_EVENT 阈值">
+                    {([
+                      { v: 'strict', l: '严格' },
+                      { v: 'standard', l: '标准' },
+                      { v: 'loose', l: '宽松' },
+                    ] as const).map((o) => (
+                      <Button
+                        key={o.v}
+                        type="button"
+                        size="xs"
+                        variant={repetitionCheck === o.v ? 'primary' : 'ghost'}
+                        disabled={choosing}
+                        onClick={() => queueGenSettingsSave({ repetitionCheck: o.v }, true)}
+                      >
+                        {o.l}
+                      </Button>
+                    ))}
                   </QuickGenRow>
                 </CardContent>
               )}
             </Card>
             <Card>
-              <CardContent className="pt-4 md:px-8">
-                <p className="text-sm font-medium text-game-muted mb-4">📖 正文</p>
-                <motion.div key={turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-                  {story.split('\n').filter(Boolean).map((paragraph, i) => (
-                    <motion.p key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
-                      className="text-game-text leading-relaxed text-[17px] mb-5"
-                    >
-                      {paragraph}
-                    </motion.p>
-                  ))}
-                </motion.div>
+              <CardContent className="pt-4 md:px-8 mx-auto w-full" style={{ maxWidth: 'var(--story-max-width)' }}>
+                <p className="text-sm font-medium text-game-muted mb-4">📖 {t('game.story', lang)}</p>
+                {appSettings.animations ? (
+                  <motion.div key={turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+                    {story.split('\n').filter(Boolean).map((paragraph, i) => (
+                      <motion.p key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
+                        className="text-game-text"
+                        style={storyParagraphStyle}
+                      >
+                        {paragraph}
+                      </motion.p>
+                    ))}
+                  </motion.div>
+                ) : (
+                  <div>
+                    {story.split('\n').filter(Boolean).map((paragraph, i) => (
+                      <p key={i} className="text-game-text" style={storyParagraphStyle}>
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
+
+            {charPanelBottom && charPanelOpen && showCharPanel && (
+              <div className="shrink-0 border-t border-game-border bg-game-card p-4 max-h-48 overflow-auto">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-game-accent">📊 {t('game.status', lang)}</h3>
+                  <button type="button" onClick={() => setCharPanelOpen(false)} className="text-game-muted hover:text-game-text">✕</button>
+                </div>
+                <StatusList />
+              </div>
+            )}
             </div>{/* end scrollable area */}
 
             {/* Choices — fixed at bottom */}
@@ -681,9 +1033,40 @@ export default function Game() {
             <AnimatePresence>
               {options.length > 0 && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-game-muted font-medium">🎯 做出你的选择</p>
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-sm text-game-muted font-medium">🎯 {t('game.choices', lang)}</p>
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                      {appSettings.autoAdvance && (
+                        <>
+                          <span className="text-xs text-game-muted tabular-nums">
+                            剩余 {autoAdvanceRemaining}/{clampAutoAdvanceRounds(appSettings.autoAdvanceRounds)} 轮
+                            {autoAdvanceRunning && (
+                              <span className="text-game-accent ml-1">{autoAdvanceCountdown}s → A</span>
+                            )}
+                          </span>
+                          {autoAdvancePaused || autoAdvanceRemaining <= 0 ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="xs"
+                              disabled={choosing || !appSettings.autoAdvance}
+                              onClick={resumeAutoAdvance}
+                            >
+                              ▶ 继续自动
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="xs"
+                              disabled={choosing}
+                              onClick={() => setAutoAdvancePaused(true)}
+                            >
+                              ⏸ 暂停
+                            </Button>
+                          )}
+                        </>
+                      )}
                       <span className="text-xs text-game-muted/80 hidden sm:inline">
                         {showConsequences ? 'AI 预测每个选项的剧情发展和好感影响' : '已隐藏剧情推测'}
                       </span>
@@ -761,10 +1144,10 @@ export default function Game() {
           </div>
 
           {/* Character side panel — inline, pushes content */}
-          {charPanelOpen && (
+          {!charPanelBottom && charPanelOpen && showCharPanel && (
             <div className="w-64 shrink-0 border-l border-game-border bg-game-card p-4 overflow-auto max-h-[calc(100vh-64px)] sticky top-14">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-game-accent">📊 状态</h3>
+                <h3 className="text-sm font-bold text-game-accent">📊 {t('game.status', lang)}</h3>
                 <button onClick={() => setCharPanelOpen(false)} className="text-game-muted hover:text-game-text">✕</button>
               </div>
               <StatusList />
@@ -864,6 +1247,12 @@ export default function Game() {
             </div>
           </div>
         </div>
+      )}
+
+      {(choosing || genSettingsSaving) && (
+        <GameBusyOverlay
+          message={choosing ? 'AI 正在生成下一段剧情…' : '正在保存快捷设置…'}
+        />
       )}
     </div>
   )

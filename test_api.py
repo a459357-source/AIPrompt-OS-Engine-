@@ -151,6 +151,25 @@ def test_next_is_post_only():
     print("✅ /api/next POST-only: PASS")
 
 
+def test_game_settings_post():
+    """POST /api/game-settings saves generation quick settings."""
+    from ui.web_app import app
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    resp = client.post("/api/game-settings", data={"story_length": "4000"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data.get("ok") is True
+    assert data.get("story_length") == 4000
+    assert data.get("max_tokens") == 8900
+
+    resp_slash = client.post("/api/game-settings/", data={"story_length": "3000"})
+    assert resp_slash.status_code == 200
+    assert resp_slash.json().get("story_length") == 3000
+    print("✅ game-settings POST: PASS")
+
+
 def test_saves_endpoints():
     """存档端点"""
     from ui.web_app import app
@@ -174,6 +193,7 @@ if __name__ == "__main__":
         test_health_endpoint, test_game_state_readonly,
         test_dashboard_endpoint, test_npcs_endpoint,
         test_history_endpoint, test_next_is_post_only,
+        test_game_settings_post,
         test_saves_endpoints,
     ]
     failed = 0

@@ -22,8 +22,8 @@ def main() -> int:
         return 2
     port = int(sys.argv[1])
     if port_in_use(port):
-        print(f"[ERROR] 端口 {port} 已被占用，无法启动 PromptOS。")
-        print("  请先运行「停止.bat」关闭旧进程，或在任务管理器中结束 python/node。")
+        print(f"[ERROR] Port {port} is in use. Run stop.bat first.")
+        print("  Or end python/node in Task Manager.")
         return 1
     return 0
 

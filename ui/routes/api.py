@@ -480,7 +480,7 @@ async def api_get_settings():
 @router.post("/settings")
 async def api_save_settings(
     api_key: str = Form(""),
-    model: str = Form("deepseek-chat"),
+    model: str | None = Form(default=None),
     story_length: int | None = Form(default=None),
     max_tokens: int | None = Form(default=None),
     temperature: float | None = Form(default=None),
@@ -491,7 +491,26 @@ async def api_save_settings(
     compress_threshold: int | None = Form(default=None),
 ):
     """Save engine settings from the React settings page."""
-    from ui.routes.settings import apply_engine_settings
+    from ui.routes.settings import apply_engine_settings, apply_game_gen_settings
+
+    gen_only = (
+        not api_key.strip()
+        and model is None
+        and max_tokens is None
+        and stream is None
+        and max_context_messages is None
+        and auto_compress is None
+        and any(x is not None for x in (story_length, temperature, top_p, compress_threshold))
+    )
+    if gen_only:
+        payload = apply_game_gen_settings(
+            story_length=story_length,
+            temperature=temperature,
+            top_p=top_p,
+            compress_threshold=compress_threshold,
+        )
+        return JSONResponse({"ok": True, **payload})
+
     try:
         payload = apply_engine_settings(
             api_key=api_key,
@@ -521,6 +540,7 @@ async def api_clear_settings_key():
 
 
 @router.get("/game-settings")
+@router.get("/game-settings/")
 async def api_get_game_settings():
     """Generation quick settings for the Game page."""
     from ui.routes.settings import game_settings_payload
@@ -528,11 +548,16 @@ async def api_get_game_settings():
 
 
 @router.post("/game-settings")
+@router.post("/game-settings/")
 async def api_set_game_settings(
     story_length: int | None = Form(default=None),
     temperature: float | None = Form(default=None),
     top_p: float | None = Form(default=None),
     compress_threshold: int | None = Form(default=None),
+    option_count: int | None = Form(default=None),
+    narrative_pov: str | None = Form(default=None),
+    style_preference: str | None = Form(default=None),
+    repetition_check: str | None = Form(default=None),
 ):
     """Update generation quick settings from the Game page."""
     from ui.routes.settings import apply_game_gen_settings
@@ -541,11 +566,41 @@ async def api_set_game_settings(
         temperature=temperature,
         top_p=top_p,
         compress_threshold=compress_threshold,
+        option_count=option_count,
+        narrative_pov=narrative_pov,
+        style_preference=style_preference,
+        repetition_check=repetition_check,
+    )
+    return JSONResponse({"ok": True, **payload})
+
+
+@router.get("/app-settings")
+@router.get("/app-settings/")
+async def api_get_app_settings():
+    from ui.routes.settings import app_settings_payload
+    return JSONResponse(app_settings_payload())
+
+
+@router.post("/app-settings")
+@router.post("/app-settings/")
+async def api_set_app_settings(
+    auto_save_interval: int | None = Form(default=None),
+    max_save_slots: int | None = Form(default=None),
+    export_format: str | None = Form(default=None),
+    auto_export: str | None = Form(default=None),
+):
+    from ui.routes.settings import apply_app_settings
+    payload = apply_app_settings(
+        auto_save_interval=auto_save_interval,
+        max_save_slots=max_save_slots,
+        export_format=export_format,
+        auto_export=auto_export,
     )
     return JSONResponse({"ok": True, **payload})
 
 
 @router.get("/story-length")
+@router.get("/story-length/")
 async def api_get_story_length():
     """Current target length for generated story text (chars per turn)."""
     from ui.routes.settings import game_settings_payload
@@ -553,6 +608,7 @@ async def api_get_story_length():
 
 
 @router.post("/story-length")
+@router.post("/story-length/")
 async def api_set_story_length(story_length: int = Form(...)):
     """Update story length; applies from the next AI generation."""
     from ui.routes.settings import apply_game_gen_settings

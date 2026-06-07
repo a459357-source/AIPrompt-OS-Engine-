@@ -3,6 +3,7 @@
 export interface Character {
   name: string
   isMain: boolean
+  faction?: string
   role_tags: string[]
   personality_tags: string[]
   appearance: string
@@ -31,6 +32,7 @@ export interface WorldGenResponse {
   stats?: StatDimension[]
   factions?: FactionGenItem[]
   artifacts?: ArtifactGenItem[]
+  characterRelations?: Record<string, CharacterRelation>
 }
 
 export interface FactionGenItem {
@@ -65,6 +67,17 @@ export interface StatDimension {
   max: number
 }
 
+export interface CharacterRelation {
+  relationshipType: string
+  affection: number
+  trust: number
+  respect: number
+  dependence: number
+  hostility: number
+  attraction: number
+  tags: string[]
+}
+
 export interface FieldGenRequest {
   field: string
   title?: string
@@ -72,6 +85,7 @@ export interface FieldGenRequest {
   genre?: string
   context?: string
   char_role?: string
+  char_name?: string
 }
 
 export interface FieldGenResponse {
@@ -89,6 +103,15 @@ export interface FieldGenResponse {
   goal?: string
   secret?: string
   isMain?: boolean
+  faction?: string
+  relationshipType?: string
+  affection?: number
+  trust?: number
+  respect?: number
+  dependence?: number
+  hostility?: number
+  attraction?: number
+  tags?: string[]
   error?: string
 }
 

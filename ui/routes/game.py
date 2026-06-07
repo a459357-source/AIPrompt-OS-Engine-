@@ -109,7 +109,7 @@ async def save_game(slot: str = Query("autosave", min_length=1)):
     """
     from fastapi.responses import JSONResponse
 
-    valid_slots = {"autosave", "slot1", "slot2", "slot3"}
+    valid_slots = set(config.all_save_slots())
     if slot not in valid_slots:
         return JSONResponse(
             {"error": f"无效存档槽: {slot}，可选: {', '.join(sorted(valid_slots))}"},
@@ -132,7 +132,7 @@ async def load_game(slot: str = Query("autosave", min_length=1)):
     """
     from fastapi.responses import JSONResponse, RedirectResponse
 
-    valid_slots = {"autosave", "slot1", "slot2", "slot3"}
+    valid_slots = set(config.all_save_slots())
     if slot not in valid_slots:
         return JSONResponse(
             {"error": f"无效存档槽: {slot}，可选: {', '.join(sorted(valid_slots))}"},

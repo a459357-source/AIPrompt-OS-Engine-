@@ -99,8 +99,12 @@ def validate_response(ai_response: dict) -> list[str]:
         warnings.append("story field is too short or missing")
 
     opts = ai_response.get("options", [])
-    if not isinstance(opts, list) or len(opts) != 4:
-        warnings.append(f"options must be a list of 4; got {len(opts) if isinstance(opts, list) else type(opts).__name__}")
+    expected = config.OPTION_COUNT
+    if not isinstance(opts, list) or len(opts) != expected:
+        warnings.append(
+            f"options must be a list of {expected}; got "
+            f"{len(opts) if isinstance(opts, list) else type(opts).__name__}"
+        )
 
     return warnings
 

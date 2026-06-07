@@ -9,6 +9,33 @@ import { logger } from './logger'
 
 const BASE = ''
 
+const BACKEND_HINT =
+  '请先运行 prompt-os-engine 目录下的「启动.bat」（开发）或「启动-单机.bat」（单机），并保持后端窗口不要关闭。'
+
+/** Turn browser "Failed to fetch" into actionable Chinese. */
+export function formatFetchError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err)
+  const lower = msg.toLowerCase()
+  if (
+    msg === 'Failed to fetch'
+    || lower.includes('failed to fetch')
+    || lower.includes('networkerror')
+    || lower.includes('load failed')
+    || lower.includes('network request failed')
+  ) {
+    return `无法连接后端 API。${BACKEND_HINT}`
+  }
+  return msg
+}
+
+async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init)
+  } catch (err) {
+    throw new Error(formatFetchError(err))
+  }
+}
+
 async function post<T>(url: string, body: Record<string, string>): Promise<T> {
   const params = new URLSearchParams(body)
   const startTime = Date.now()
@@ -16,14 +43,14 @@ async function post<T>(url: string, body: Record<string, string>): Promise<T> {
 
   let res: Response
   try {
-    res = await fetch(`${BASE}${url}`, {
+    res = await apiFetch(`${BASE}${url}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString(),
     })
   } catch (err) {
     logger.error('API', `✗ POST ${url} — network error`, err)
-    throw err
+    throw new Error(formatFetchError(err))
   }
 
   if (!res.ok) {
@@ -61,6 +88,7 @@ export async function generateField(req: FieldGenRequest): Promise<FieldGenRespo
     genre: (req.genre || '').toString(),
     context: req.context || '',
     char_role: req.char_role || '',
+    char_name: req.char_name || '',
   })
 }
 
@@ -85,7 +113,7 @@ export async function generateRules(data: {
 }
 
 export async function createStory(formData: FormData): Promise<void> {
-  const res = await fetch('/new', { method: 'POST', body: formData, redirect: 'manual' })
+  const res = await apiFetch('/new', { method: 'POST', body: formData, redirect: 'manual' })
   if (res.type === 'opaqueredirect' || res.status === 303 || res.status === 302) {
     return
   }
@@ -96,7 +124,7 @@ export async function createStory(formData: FormData): Promise<void> {
 }
 
 export async function getGameState(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; not_started?: boolean; error?: string }> {
-  const res = await fetch('/api/game-state')
+  const res = await apiFetch('/api/game-state')
   if (!res.ok) {
     const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
     return { story: '', options: [], state: {}, error: (data as { error?: string }).error || 'Failed to load game' }
@@ -123,7 +151,7 @@ export interface NpcData {
 }
 
 export async function getNpcs(): Promise<{ characters: NpcData[]; stats: { total: number; main: number; npc: number; avg_trust: number }; error?: string }> {
-  const res = await fetch('/api/npcs')
+  const res = await apiFetch('/api/npcs')
   if (!res.ok) return { characters: [], stats: { total: 0, main: 0, npc: 0, avg_trust: 0 }, error: `HTTP ${res.status}` }
   return res.json()
 }
@@ -131,7 +159,7 @@ export async function getNpcs(): Promise<{ characters: NpcData[]; stats: { total
 export async function generateNpc(roleHint?: string): Promise<NpcData & { error?: string }> {
   const fd = new FormData()
   fd.append('role_hint', roleHint || '')
-  const res = await fetch('/api/npcs/generate', { method: 'POST', body: fd })
+  const res = await apiFetch('/api/npcs/generate', { method: 'POST', body: fd })
   if (!res.ok) {
     const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
     return { ...data, name: '', isMain: false, role_tags: [], personality_tags: [], appearance: '', relationship: [], goal: '', secret: '', background: '', special_ability: '', trust: 0, trust_pct: 0, flags: [] }
@@ -178,13 +206,13 @@ export interface HistoryTurn {
 }
 
 export async function getHistory(): Promise<{ turns: HistoryTurn[]; total: number; error?: string }> {
-  const res = await fetch('/api/history')
+  const res = await apiFetch('/api/history')
   if (!res.ok) return { turns: [], total: 0, error: `HTTP ${res.status}` }
   return res.json()
 }
 
 export async function getDashboard(): Promise<DashboardData> {
-  const res = await fetch('/api/dashboard')
+  const res = await apiFetch('/api/dashboard')
   if (!res.ok) return { turn: 0, status: '', scene: '', chapter: 0, word_count: 0, character_count: 0, branch_count: 0, node_count: 0, api_calls: 0, total_tokens: 0, characters: [], history: [], error: `HTTP ${res.status}` }
   return res.json()
 }
@@ -192,7 +220,7 @@ export async function getDashboard(): Promise<DashboardData> {
 export async function nextTurn(choice: string): Promise<GameTurnResponse> {
   const formData = new FormData()
   formData.append('choice', choice)
-  const res = await fetch('/api/next', { method: 'POST', body: formData })
+  const res = await apiFetch('/api/next', { method: 'POST', body: formData })
   if (!res.ok) {
     const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
     return { story: '', state: {} as GameTurnResponse['state'], options: [], error: (data as { error?: string }).error || 'Failed to advance' }
@@ -201,7 +229,7 @@ export async function nextTurn(choice: string): Promise<GameTurnResponse> {
 }
 
 export async function startGame(): Promise<{ story: string; options: string[]; state: Record<string, unknown>; error?: string }> {
-  const res = await fetch('/api/start', { method: 'POST' })
+  const res = await apiFetch('/api/start', { method: 'POST' })
   if (!res.ok) {
     const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
     return { story: '', options: [], state: {}, error: (data as { error?: string }).error || 'Failed to start game' }
@@ -211,7 +239,7 @@ export async function startGame(): Promise<{ story: string; options: string[]; s
 
 export async function getSettingsStatus(): Promise<{ configured: boolean; error?: string }> {
   try {
-    const res = await fetch('/api/settings-status')
+    const res = await apiFetch('/api/settings-status')
     if (!res.ok) return { configured: false, error: `HTTP ${res.status}` }
     return res.json()
   } catch {
@@ -221,7 +249,7 @@ export async function getSettingsStatus(): Promise<{ configured: boolean; error?
 
 export async function saveApiKey(key: string): Promise<{ ok?: boolean; error?: string }> {
   const params = new URLSearchParams({ api_key: key.trim() })
-  const res = await fetch('/api/settings-key', {
+  const res = await apiFetch('/api/settings-key', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
@@ -254,7 +282,7 @@ export interface EngineSettings {
 }
 
 export async function getEngineSettings(): Promise<EngineSettings> {
-  const res = await fetch('/api/settings')
+  const res = await apiFetch('/api/settings')
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
 }
@@ -282,7 +310,7 @@ export async function saveEngineSettings(params: {
   if (params.maxContextMsgs != null) fd.append('max_context_messages', String(params.maxContextMsgs))
   if (params.autoCompress != null) fd.append('auto_compress', params.autoCompress ? '1' : '0')
   if (params.compressThreshold != null) fd.append('compress_threshold', String(params.compressThreshold))
-  const res = await fetch('/api/settings', { method: 'POST', body: fd })
+  const res = await apiFetch('/api/settings', { method: 'POST', body: fd })
   if (!res.ok) {
     const data = await res.json().catch(() => ({})) as { error?: string }
     throw new Error(data.error || `HTTP ${res.status}`)
@@ -295,6 +323,8 @@ export interface GameGenSettings {
   min: number
   max: number
   recommended: number
+  target_min?: number
+  target_max?: number
   max_tokens: number
   matched_max_tokens: number
   max_output_tokens: number
@@ -302,6 +332,11 @@ export interface GameGenSettings {
   temperature: number
   top_p: number
   compress_threshold: number
+  matched_compress_threshold?: number
+  option_count: number
+  narrative_pov: string
+  style_preference: string
+  repetition_check: string
   api_limits?: {
     context_tokens: number
     max_output_tokens: number
@@ -317,21 +352,34 @@ const GAME_GEN_FALLBACK: GameGenSettings = {
   min: 300,
     max: 281851,
     recommended: 1000,
-    max_tokens: 8900,
-    matched_max_tokens: 8900,
+    target_min: 850,
+    target_max: 1150,
+    max_tokens: 4850,
+    matched_max_tokens: 4850,
   max_output_tokens: 384000,
   context_tokens: 1000000,
   temperature: 0.8,
   top_p: 0.9,
-  compress_threshold: 4000,
+  compress_threshold: 7000,
+  matched_compress_threshold: 7000,
+  option_count: 4,
+  narrative_pov: 'auto',
+  style_preference: 'balanced',
+  repetition_check: 'standard',
 }
 
 function parseGameGenSettings(data: Partial<GameGenSettings>): GameGenSettings {
+  const storyLength = data.story_length ?? GAME_GEN_FALLBACK.story_length
+  const min = data.min ?? GAME_GEN_FALLBACK.min
+  const targetMin = data.target_min ?? Math.max(min, Math.floor(storyLength * 0.85))
+  const targetMax = data.target_max ?? Math.floor(storyLength * 1.15)
   return {
-    story_length: data.story_length ?? GAME_GEN_FALLBACK.story_length,
-    min: data.min ?? GAME_GEN_FALLBACK.min,
+    story_length: storyLength,
+    min,
     max: data.max ?? GAME_GEN_FALLBACK.max,
     recommended: data.recommended ?? GAME_GEN_FALLBACK.recommended,
+    target_min: targetMin,
+    target_max: targetMax,
     max_tokens: data.max_tokens ?? GAME_GEN_FALLBACK.max_tokens,
     matched_max_tokens: data.matched_max_tokens ?? GAME_GEN_FALLBACK.matched_max_tokens,
     max_output_tokens: data.max_output_tokens ?? GAME_GEN_FALLBACK.max_output_tokens,
@@ -339,12 +387,17 @@ function parseGameGenSettings(data: Partial<GameGenSettings>): GameGenSettings {
     temperature: data.temperature ?? GAME_GEN_FALLBACK.temperature,
     top_p: data.top_p ?? GAME_GEN_FALLBACK.top_p,
     compress_threshold: data.compress_threshold ?? GAME_GEN_FALLBACK.compress_threshold,
+    matched_compress_threshold: data.matched_compress_threshold ?? GAME_GEN_FALLBACK.matched_compress_threshold,
+    option_count: data.option_count ?? GAME_GEN_FALLBACK.option_count,
+    narrative_pov: data.narrative_pov ?? GAME_GEN_FALLBACK.narrative_pov,
+    style_preference: data.style_preference ?? GAME_GEN_FALLBACK.style_preference,
+    repetition_check: data.repetition_check ?? GAME_GEN_FALLBACK.repetition_check,
     api_limits: data.api_limits,
   }
 }
 
 export async function getGameGenSettings(): Promise<GameGenSettings> {
-  const res = await fetch('/api/game-settings')
+  const res = await apiFetch('/api/game-settings')
   if (!res.ok) return GAME_GEN_FALLBACK
   return parseGameGenSettings(await res.json() as Partial<GameGenSettings>)
 }
@@ -358,18 +411,70 @@ export async function updateGameGenSettings(patch: {
   temperature?: number
   topP?: number
   compressThreshold?: number
+  optionCount?: number
+  narrativePov?: string
+  stylePreference?: string
+  repetitionCheck?: string
 }): Promise<GameGenSettings> {
   const fd = new FormData()
   if (patch.storyLength != null) fd.append('story_length', String(patch.storyLength))
   if (patch.temperature != null) fd.append('temperature', String(patch.temperature))
   if (patch.topP != null) fd.append('top_p', String(patch.topP))
   if (patch.compressThreshold != null) fd.append('compress_threshold', String(patch.compressThreshold))
-  const res = await fetch('/api/game-settings', { method: 'POST', body: fd })
-  const data = await res.json().catch(() => ({})) as Partial<GameGenSettings> & { error?: string }
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
-  return parseGameGenSettings(data)
+  if (patch.optionCount != null) fd.append('option_count', String(patch.optionCount))
+  if (patch.narrativePov != null) fd.append('narrative_pov', patch.narrativePov)
+  if (patch.stylePreference != null) fd.append('style_preference', patch.stylePreference)
+  if (patch.repetitionCheck != null) fd.append('repetition_check', patch.repetitionCheck)
+
+  const endpoints = ['/api/game-settings', '/api/settings']
+  let lastError = '保存失败'
+  for (const endpoint of endpoints) {
+    let res: Response
+    try {
+      res = await apiFetch(endpoint, { method: 'POST', body: fd })
+    } catch (err) {
+      throw new Error(formatFetchError(err))
+    }
+    const data = await res.json().catch(() => ({})) as Partial<GameGenSettings> & { error?: string }
+    if (res.ok) return parseGameGenSettings(data)
+    lastError = data.error || `HTTP ${res.status}`
+    if (res.status !== 405 && res.status !== 404) break
+  }
+  throw new Error(lastError)
 }
 
 export async function updateStoryLength(length: number): Promise<GameGenSettings> {
   return updateGameGenSettings({ storyLength: length })
+}
+
+export interface BackendAppSettings {
+  auto_save_interval: number
+  max_save_slots: number
+  export_format: string
+  auto_export: string
+  save_slots?: string[]
+}
+
+export async function getAppSettings(): Promise<BackendAppSettings | null> {
+  const res = await apiFetch('/api/app-settings')
+  if (!res.ok) return null
+  return res.json() as Promise<BackendAppSettings>
+}
+
+export async function updateAppSettings(patch: {
+  autoSaveInterval?: number
+  maxSaveSlots?: number
+  exportFormat?: string
+  autoExport?: string
+}): Promise<BackendAppSettings> {
+  const fd = new FormData()
+  if (patch.autoSaveInterval != null) fd.append('auto_save_interval', String(patch.autoSaveInterval))
+  if (patch.maxSaveSlots != null) fd.append('max_save_slots', String(patch.maxSaveSlots))
+  if (patch.exportFormat != null) fd.append('export_format', patch.exportFormat)
+  if (patch.autoExport != null) fd.append('auto_export', patch.autoExport)
+
+  const res = await apiFetch('/api/app-settings', { method: 'POST', body: fd })
+  const data = await res.json().catch(() => ({})) as BackendAppSettings & { error?: string }
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+  return data
 }

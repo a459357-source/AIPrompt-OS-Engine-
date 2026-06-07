@@ -1,20 +1,19 @@
 @echo off
-chcp 65001 >nul
-title PromptOS
+title PromptOS Standalone
 cd /d "%~dp0"
 
 echo.
 echo ================================================
-echo    PromptOS 单机模式 (内置前端 :8000)
+echo    PromptOS Standalone (UI on :8000)
 echo ================================================
 echo.
-echo [INFO] 运行日志: %~dp0data\app.log
-echo [INFO] 错误日志: %~dp0data\error.log
+echo [INFO] Log: %~dp0data\app.log
+echo [INFO] Errors: %~dp0data\error.log
 echo.
 
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] 未找到 Python，请先安装 Python 3.10+
+    echo [ERROR] Python not found. Install Python 3.10+
     pause
     exit /b 1
 )
@@ -26,10 +25,10 @@ if %errorlevel% neq 0 (
 )
 
 if not exist "frontend\dist\index.html" (
-    echo [INFO] 首次运行，正在构建前端...
+    echo [INFO] First run: building frontend...
     node --version >nul 2>&1
     if %errorlevel% neq 0 (
-        echo [ERROR] 构建前端需要 Node.js，请安装后重试
+        echo [ERROR] Node.js required to build frontend
         pause
         exit /b 1
     )
@@ -38,7 +37,7 @@ if not exist "frontend\dist\index.html" (
     call npm run build
     cd ..
     if not exist "frontend\dist\index.html" (
-        echo [ERROR] 前端构建失败，请检查上方 npm 输出
+        echo [ERROR] Frontend build failed. See npm output above.
         pause
         exit /b 1
     )
@@ -49,6 +48,6 @@ if not exist "data" mkdir data
 python launcher.py
 if %errorlevel% neq 0 (
     echo.
-    echo [ERROR] 启动失败，详见 data\error.log
+    echo [ERROR] Start failed. See data\error.log
 )
 pause
