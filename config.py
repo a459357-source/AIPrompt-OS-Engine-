@@ -1185,6 +1185,20 @@ _EXPLICIT_ADULT_PHRASES = (
     "AV", "黄片", "援交", "卖淫", "嫖娼",
 )
 
+# Unambiguous contextual phrases for adult-mode hint (stricter than _INTIMATE_CHOICE_KEYWORDS).
+_ADULT_HINT_STRONG_PHRASES = (
+    "脱光", "脱衣", "裸露", "裸身", "一丝不挂",
+    "深吻", "舌吻", "湿吻", "法式吻",
+    "爱抚", "揉捏", "揉胸", "捏胸", "探入", "进入她", "进入他", "插入她", "插入他",
+    "进入体内", "插入体",
+    "解开衣", "解衣", "褪下", "扯下",
+    "按在墙", "按在身", "按在床", "压在身", "压在她", "压在他身上",
+    "扑倒在床", "扑倒她", "扑倒他",
+    "缠绵", "欢爱", "侵犯", "占有", "强暴", "强奸",
+    "情欲", "色欲", "肉欲", "发情",
+    "抚摸她", "抚摸他", "抚摸身", "抚摸胸", "手探入",
+)
+
 
 def is_clearly_adult_content(text: str) -> bool:
     """Heuristic: text is clearly adult-oriented (suggest enabling adult mode)."""
@@ -1195,7 +1209,7 @@ def is_clearly_adult_content(text: str) -> bool:
         return True
     if count_orgasm_markers(t) >= 1:
         return True
-    return count_intimate_markers(t) >= 2
+    return any(p in t for p in _ADULT_HINT_STRONG_PHRASES)
 
 
 def suggest_adult_mode_for_options(options: list) -> bool:
