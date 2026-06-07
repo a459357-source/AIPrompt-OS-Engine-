@@ -958,6 +958,39 @@ def force_event_thresholds() -> dict[str, int]:
     }
 
 
+def _adult_intensity_lines(adult_w: int, profile: str) -> list[str]:
+    """Tiered explicit-content directives from adult weight + profile."""
+    w = max(0, min(100, int(adult_w)))
+    if profile == "adult_first":
+        w = max(w, 50)
+    elif profile == "story_first":
+        w = min(w, 55)
+
+    high_at = 55 if profile == "adult_first" else 65
+    medium_at = 30 if profile == "adult_first" else 35
+
+    if w >= high_at:
+        return [
+            "【成人强度 · 高】",
+            "- 当角色关系与场景允许时，正文须包含明确的性描写：写出动作、触感、对话与生理反应，禁止用「一番云雨」「后来他们做了爱」等省略写法。",
+            "- 玩家选择亲密/色情向行动时，必须在同一轮 story 内完整执行并描写过程，不得跳切、淡出或以角色突然拒绝搪塞。",
+            "- options 中至少 2 个须为可直接推进性行为或露骨身体接触的明确行动（写具体做什么，勿用「更进一步」等模糊语）。",
+            "- 亲密场景可跨轮持续展开，直到自然转场；高成人倾向下不要连续多轮回避或仅暗示。",
+        ]
+    if w >= medium_at:
+        return [
+            "【成人强度 · 中】",
+            "- 可详细描写接吻、爱抚、脱衣与身体感官，描写应具体、有张力。",
+            "- 当剧情允许时，主动制造可导向亲密的空间（独处、夜晚、情绪爆发后的靠近等）。",
+            "- options 中至少 1 个应提供明显亲密/色情倾向的选择。",
+        ]
+    return [
+        "【成人强度 · 低】",
+        "- 以暧昧、张力与暗示为主；亲吻与爱抚可到细节，性行为可留待关系更成熟时。",
+        "- 选项可含牵手、拥抱与带暗示的对话。",
+    ]
+
+
 def content_preference_rules_text() -> str:
     """根据 content_weights 生成倾向化内容偏好指令。"""
     w = CONTENT_WEIGHTS
@@ -976,10 +1009,13 @@ def content_preference_rules_text() -> str:
             "- 所有选项必须是全年龄向。"
         )
 
+    profile = ADULT_PROFILE if ADULT_PROFILE in ADULT_PROFILE_OPTIONS else DEFAULT_ADULT_PROFILE
+    profile_desc = ADULT_PROFILE_DESCRIPTIONS.get(profile, "")
+
     lines = [
         "【内容偏好】",
         "",
-        "当前模式：成人模式",
+        "当前模式：成人模式（已解除全年龄限制，允许成人向与性描写）",
         "",
         "内容倾向：",
         f"剧情：{story_w}%",
@@ -989,11 +1025,12 @@ def content_preference_rules_text() -> str:
         "生成要求：",
         "- 优先保证剧情逻辑连续性。",
         "- 所有关系发展必须符合人物性格与当前情境。",
-        "- 亲密互动应作为人物关系发展的自然结果。",
-        "- 根据内容倾向动态调整生成重点。",
+        "- 根据上方百分比决定本轮正文与 options 中剧情/感情/成人描写的篇幅比重。",
         "- 成人内容不得破坏剧情连贯性。",
-        "- 即使成人内容占比较高，也必须保持人物成长与主线推进。",
     ]
+    if profile_desc:
+        lines.append(f"- 当前预设：{profile_desc}")
+    lines.extend(_adult_intensity_lines(adult_w, profile))
     return "\n".join(lines)
 
 
@@ -1004,6 +1041,10 @@ def ai_behavior_rules_text() -> str:
         style_instruction = EXPRESSION_STYLE_INSTRUCTIONS.get(
             EXPRESSION_STYLE, EXPRESSION_STYLE_INSTRUCTIONS["light_novel"]
         )
+        if EXPRESSION_STYLE == "direct" and CONTENT_WEIGHTS.get("adult", 0) >= 50:
+            style_instruction += (
+                " 成人模式下允许直白描写性接触细节、体位与生理反应，不用隐喻或「省略号」代替。"
+            )
         style_label = EXPRESSION_STYLE_LABELS.get(EXPRESSION_STYLE, "轻小说风")
         expression_line = f"【表达风格 · {style_label}】{style_instruction}"
 

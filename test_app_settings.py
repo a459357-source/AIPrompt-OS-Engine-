@@ -37,3 +37,18 @@ def test_ai_behavior_rules_contains_option_count():
     config.reload_option_count()
     text = config.ai_behavior_rules_text()
     assert "3 个 options" in text
+
+
+def test_adult_mode_high_weight_prompts_explicit_content():
+    config.save_adult_mode(True)
+    config.save_adult_profile("adult_first")
+    config.save_content_weights({"story": 0, "romance": 0, "adult": 100})
+    config.reload_app_behavior()
+    text = config.content_preference_rules_text()
+    assert "成人强度 · 高" in text
+    assert "明确的性描写" in text
+    assert "解除全年龄限制" in text
+    behavior = config.ai_behavior_rules_text()
+    assert "直白描写性接触细节" in behavior
+    config.save_adult_mode(False)
+    config.reload_app_behavior()
