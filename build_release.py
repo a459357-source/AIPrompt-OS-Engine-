@@ -6,9 +6,10 @@ Never ship api keys, saves, logs, or test artifacts in release zip.
 
 Versioning:
   - Zip name: release/PromptOS-win64-v{APP_VERSION}.zip
-  - Default (no flags): bump patch in config.py + engine.yaml, then build
+  - See RELEASE_VERSIONING.md for release type → command table
+  - Default: bump patch, then build
   - --no-bump: keep current APP_VERSION
-  - --version X.Y.Z: set explicit version (major/minor/patch)
+  - --version X.Y.Z: set explicit MAJOR/MINOR/PATCH
 """
 from __future__ import annotations
 

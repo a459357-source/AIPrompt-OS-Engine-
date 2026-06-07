@@ -50,7 +50,14 @@ python build_release.py
 | `dist/PromptOS/PromptOS.exe` | 可执行程序（内置前端，单端口 8000） |
 | `release/PromptOS-win64-v{版本}.zip` | 发给用户的压缩包（含版本号，如 `v2.0.1`） |
 
-**版本规则**：`python build_release.py` 默认将 `APP_VERSION` patch +1 并写入 `config.py` / `engine.yaml`；大/小版本用 `--version 2.1.0`；仅重打当前版用 `--no-bump`。
+**版本规则**（详见 [`RELEASE_VERSIONING.md`](RELEASE_VERSIONING.md)）：
+
+| 发布类型 | 版本示例 | 命令 |
+|----------|----------|------|
+| 修 bug / 小更新 | `2.0.1` | `python build_release.py` |
+| 新功能（兼容） | `2.1.0` | `python build_release.py --version 2.1.0` |
+| 大改版（不兼容） | `3.0.0` | `python build_release.py --version 3.0.0` |
+| 重打同版本 zip | `2.0.0` | `python build_release.py --no-bump` |
 
 **给他人使用：**
 

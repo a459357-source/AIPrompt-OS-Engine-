@@ -16,13 +16,15 @@ PromptOS 发布包使用说明
 
 【重新打包（确保无个人数据）】
   cd prompt-os-engine
-  python build_release.py              # 默认 patch+1，产出 PromptOS-win64-vX.Y.Z.zip
-  python build_release.py --no-bump    # 不递增，用当前 APP_VERSION 重打
-  python build_release.py --version 2.1.0   # 指定大/小版本
 
-  打包脚本会默认：重置 data/ 与进度文件、清空 output/ 与日志、
-  删除测试脚本与报告，并在 zip 前剥离 dist/PromptOS/data/。
-  详见仓库 .cursor/rules/release-build.mdc
+  发布类型          版本示例    命令
+  ─────────────────────────────────────────────────────────
+  修 bug / 小更新   2.0.1       python build_release.py
+  新功能（兼容）    2.1.0       python build_release.py --version 2.1.0
+  大改版（不兼容）  3.0.0       python build_release.py --version 3.0.0
+  重打同版本 zip    2.0.0       python build_release.py --no-bump
+
+  完整说明见仓库 RELEASE_VERSIONING.md 与 .cursor/rules/release-build.mdc
 
 【日志】
 - 运行日志: PromptOS\data\app.log
