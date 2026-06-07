@@ -210,6 +210,16 @@ function OptionEffectsInline({
   )
 }
 
+function resolveHistoryChoice(choice: string, options: string[]): { text: string; isCustom: boolean } {
+  const trimmed = choice.trim()
+  const idx = trimmed.charCodeAt(0) - 65
+  const isLetter = /^[A-Z]$/i.test(trimmed)
+  if (isLetter && options[idx]) {
+    return { text: options[idx].split('→')[0].trim(), isCustom: false }
+  }
+  return { text: trimmed, isCustom: !isLetter }
+}
+
 function AffectionBar({ value, adultMode = false }: { value: number; name?: string; adultMode?: boolean }) {
   const safe = Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 50
 
@@ -397,6 +407,9 @@ export default function Game() {
   const [historyFocusTurn, setHistoryFocusTurn] = useState<number | null>(null)
   const [historyError, setHistoryError] = useState('')
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [viewingTurn, setViewingTurn] = useState<number | null>(null)
+  const [timelineCache, setTimelineCache] = useState<HistoryTurn[]>([])
+  const [timelineLoading, setTimelineLoading] = useState(false)
   const [storyLength, setStoryLength] = useState(1000)
   const [storyLengthMin, setStoryLengthMin] = useState(300)
   const [storyLengthMax, setStoryLengthMax] = useState(281851)
@@ -513,6 +526,7 @@ export default function Game() {
     options?: string[]
     state: Record<string, unknown>
   }) => {
+    setViewingTurn(null)
     setStory(data.story)
     setOptions(data.options || [])
     if ((data.options?.length ?? 0) > 0) setOpeningPending(false)
@@ -905,6 +919,34 @@ export default function Game() {
     setHistoryFocusTurn(null)
   }, [])
 
+  const viewTimelineTurn = useCallback(async (n: number) => {
+    if (choosing) return
+    if (n >= turn) {
+      setViewingTurn(null)
+      return
+    }
+    setTimelineLoading(true)
+    try {
+      let turns = timelineCache
+      if (!turns.some((t) => t.turn === n)) {
+        const data = await getHistory()
+        if (data.error) {
+          setError(data.error)
+          return
+        }
+        turns = data.turns
+        setTimelineCache(turns)
+      }
+      if (turns.some((t) => t.turn === n)) {
+        setViewingTurn(n)
+      }
+    } catch (e) {
+      setError(formatFetchError(e))
+    } finally {
+      setTimelineLoading(false)
+    }
+  }, [choosing, turn, timelineCache])
+
   const openHistoryReview = useCallback(async (focusTurn?: number) => {
     if (choosing) return
     setHistoryFocusTurn(focusTurn ?? null)
@@ -1007,15 +1049,16 @@ export default function Game() {
         ? 'border-game-danger/40 text-game-danger'
         : 'border-amber-500/40 text-amber-400'
 
-  // 新回合完成后滚回顶部，方便从开头阅读
+  // 新回合或切换历程回顾时滚回顶部
   useEffect(() => {
     const el = storyScrollRef.current
     if (!el) return
     requestAnimationFrame(() => { el.scrollTop = 0 })
-  }, [turn])
+  }, [turn, viewingTurn])
 
-  // 流式生成时跟随滚动到底部（构建提示词阶段仍保留上一轮正文，不滚动）
+  // 流式生成时跟随滚动到底部（回顾旧轮时不滚动）
   useEffect(() => {
+    if (viewingTurn != null) return
     const streaming = choosing || openingPending
     if (!streaming) return
     if (choosing && genProgress === 'building_prompt' && !streamGenerationStartedRef.current) return
@@ -1024,10 +1067,11 @@ export default function Game() {
     requestAnimationFrame(() => {
       end.scrollIntoView({ block: 'end', behavior: 'auto' })
     })
-  }, [story, choosing, openingPending, genProgress])
+  }, [story, choosing, openingPending, genProgress, viewingTurn])
 
   const handleChoice = useCallback(async (choice: string, opts?: { auto?: boolean }) => {
     if (!opts?.auto) setAutoAdvancePaused(true)
+    setViewingTurn(null)
     setChoosing(true)
     streamGenerationStartedRef.current = false
     setGenProgress('building_prompt')
@@ -1066,6 +1110,9 @@ export default function Game() {
       })))
       const factionsData = data.state.factions as FactionInfo[] | undefined
       if (factionsData) setFactions(factionsData)
+      void getHistory().then((hist) => {
+        if (!hist.error) setTimelineCache(hist.turns)
+      })
       if (opts?.auto) {
         setAutoAdvanceRemaining((r) => {
           const next = r - 1
@@ -1111,6 +1158,15 @@ export default function Game() {
     && autoAdvanceRemaining > 0
     && options.length > 0
     && !choosing
+    && viewingTurn == null
+
+  const isViewingPast = viewingTurn != null && viewingTurn < turn
+  const viewingEntry = useMemo(
+    () => (viewingTurn != null ? timelineCache.find((t) => t.turn === viewingTurn) : undefined),
+    [viewingTurn, timelineCache],
+  )
+  const displayStory = isViewingPast && viewingEntry ? viewingEntry.story : story
+  const activeTimelineTurn = viewingTurn ?? turn
 
   useEffect(() => {
     if (!autoAdvanceRunning) {
@@ -1155,28 +1211,30 @@ export default function Game() {
         </h3>
         {Array.from({ length: Math.max(turn, 1) }, (_, i) => {
           const n = i + 1
+          const isLatest = n === turn && viewingTurn == null
+          const isActive = n === activeTimelineTurn
           return (
             <button
               type="button"
               key={n}
-              disabled={choosing}
-              onClick={() => void openHistoryReview(n)}
-              title={`回顾第 ${n} 轮`}
+              disabled={choosing || timelineLoading}
+              onClick={() => void viewTimelineTurn(n)}
+              title={n >= turn ? `返回第 ${n} 轮` : `回顾第 ${n} 轮`}
               className={cn(
                 'w-full text-left text-xs py-1.5 pl-3 border-l-2 transition-colors rounded-r-md',
                 'hover:bg-neural-cyan/5 disabled:opacity-50 disabled:pointer-events-none',
-                n === turn
+                isActive
                   ? 'border-neural-cyan text-neural-cyan bg-neural-cyan/5'
                   : 'border-game-border/50 text-game-muted hover:text-game-text hover:border-neural-cyan/40',
               )}
             >
-              第 {n} 轮 {n === turn ? '◆' : ''}
+              第 {n} 轮{isLatest ? ' ◆' : ''}{viewingTurn === n && n < turn ? ' ·' : ''}
             </button>
           )
         })}
       </div>
     )
-  }, [hasGame, readingMode, turn, lang, adultMode, choosing, openHistoryReview])
+  }, [hasGame, readingMode, turn, lang, adultMode, choosing, timelineLoading, viewingTurn, activeTimelineTurn, viewTimelineTurn])
 
   const gameInspector = useMemo(() => {
     if (!hasGame || !showCharPanel || readingMode) return null
@@ -1246,7 +1304,12 @@ export default function Game() {
             {/* Top status bar */}
             <div className={cn('flex items-center justify-between gap-3 flex-wrap shrink-0', readingMode && 'game-chrome-hidden')}>
               <div className="flex items-center gap-2 text-sm">
-                <Badge variant="primary">📖 第 {turn} 轮</Badge>
+                <Badge variant="primary">📖 第 {isViewingPast && viewingTurn ? viewingTurn : turn} 轮</Badge>
+                {isViewingPast && (
+                  <Badge variant="outline" size="sm" className="text-game-accent border-game-accent/40">
+                    回顾中
+                  </Badge>
+                )}
                 <Badge
                   variant={
                     status === 'TENSION' ? 'warning' :
@@ -1708,14 +1771,25 @@ export default function Game() {
                   )}
               </div>
             )}
+            {isViewingPast && viewingEntry && (
+              <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-game-accent/30 bg-game-accent/5 text-xs">
+                <span className="text-game-muted truncate">
+                  今夜历程 · 第 {viewingEntry.turn} 轮
+                  {viewingEntry.scene ? ` · ${viewingEntry.scene}` : ''}
+                </span>
+                <Button type="button" size="xs" variant="ghost" onClick={() => setViewingTurn(null)}>
+                  回最新轮
+                </Button>
+              </div>
+            )}
             <Card className={cn('border-neural-cyan/15 glass-panel-glow w-full', adultMode && 'theme-card-enter')}>
               <CardContent
                 className={cn('pt-4 pb-6 px-4 md:px-8 w-full mx-auto game-story-focus', readingMode && 'px-6 md:px-12')}
                 style={{ maxWidth: adultMode ? '760px' : 'var(--story-max-width)' }}
               >
                 {appSettings.animations ? (
-                  <motion.div key={turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-                    {story.split('\n').filter(Boolean).map((paragraph, i) => (
+                  <motion.div key={viewingTurn ?? turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+                    {displayStory.split('\n').filter(Boolean).map((paragraph, i) => (
                       <motion.p key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
                         className="text-game-text"
                         style={storyParagraphStyle}
@@ -1726,12 +1800,30 @@ export default function Game() {
                   </motion.div>
                 ) : (
                   <div>
-                    {story.split('\n').filter(Boolean).map((paragraph, i) => (
+                    {displayStory.split('\n').filter(Boolean).map((paragraph, i) => (
                       <p key={i} className="text-game-text" style={storyParagraphStyle}>
                         {paragraph}
                       </p>
                     ))}
                   </div>
+                )}
+                {isViewingPast && viewingEntry?.choice && (() => {
+                  const { text, isCustom } = resolveHistoryChoice(
+                    viewingEntry.choice,
+                    viewingEntry.options || [],
+                  )
+                  return (
+                    <div className={cn(
+                      'mt-4 border rounded-md px-3 py-2 text-sm',
+                      isCustom ? 'bg-game-secret/10 border-game-accent/30' : 'bg-game-surface border-game-border',
+                    )}>
+                      <span className="text-game-accent font-medium">{isCustom ? '✏️ 已选择（自定义）：' : '👉 已选择：'}</span>
+                      <span className="text-game-text">{text}</span>
+                    </div>
+                  )
+                })()}
+                {isViewingPast && viewingEntry && !viewingEntry.choice && (
+                  <p className="mt-4 text-xs text-game-dim">该轮暂无记录的选择</p>
                 )}
                 <div ref={storyEndRef} aria-hidden className="h-px shrink-0" />
               </CardContent>
@@ -1755,7 +1847,16 @@ export default function Game() {
             {/* Choices — fixed at bottom */}
             <div className={cn('shrink-0 border-t border-neural-cyan/15 glass-panel rounded-none border-x-0 pt-3 pb-1', readingMode && 'game-chrome-hidden')}>
             <AnimatePresence>
-              {options.length > 0 ? (
+              {isViewingPast ? (
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="px-4 pb-3">
+                  <p className="text-sm text-game-muted py-2">
+                    正在回顾第 {viewingTurn} 轮，返回最新轮后可继续选择。
+                  </p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setViewingTurn(null)}>
+                    返回第 {turn} 轮继续
+                  </Button>
+                </motion.div>
+              ) : options.length > 0 ? (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="flex flex-col gap-2 min-w-0 flex-1">
