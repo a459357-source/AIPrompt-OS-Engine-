@@ -38,37 +38,43 @@ const defaultState: NeuralShellState = {
   hideShellPanels: false,
 }
 
+function navItemsEqual(a: NavTreeItem[], b: NavTreeItem[]) {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  return a.every((item, i) => item.id === b[i]?.id)
+}
+
 const NeuralShellContext = createContext<NeuralShellContextValue | null>(null)
 
 export function NeuralShellProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<NeuralShellState>(defaultState)
 
   const setNavItems = useCallback((items: NavTreeItem[]) => {
-    setState((s) => ({ ...s, navItems: items }))
+    setState((s) => (navItemsEqual(s.navItems, items) ? s : { ...s, navItems: items }))
   }, [])
 
   const setActiveNavId = useCallback((id: string | null) => {
-    setState((s) => ({ ...s, activeNavId: id }))
+    setState((s) => (s.activeNavId === id ? s : { ...s, activeNavId: id }))
   }, [])
 
   const setInspector = useCallback((content: ReactNode | null) => {
-    setState((s) => ({ ...s, inspector: content }))
+    setState((s) => (Object.is(s.inspector, content) ? s : { ...s, inspector: content }))
   }, [])
 
   const setLeftPanel = useCallback((content: ReactNode | null) => {
-    setState((s) => ({ ...s, leftPanel: content }))
+    setState((s) => (Object.is(s.leftPanel, content) ? s : { ...s, leftPanel: content }))
   }, [])
 
   const setShowLeftPanel = useCallback((show: boolean) => {
-    setState((s) => ({ ...s, showLeftPanel: show }))
+    setState((s) => (s.showLeftPanel === show ? s : { ...s, showLeftPanel: show }))
   }, [])
 
   const setShowRightPanel = useCallback((show: boolean) => {
-    setState((s) => ({ ...s, showRightPanel: show }))
+    setState((s) => (s.showRightPanel === show ? s : { ...s, showRightPanel: show }))
   }, [])
 
   const setHideShellPanels = useCallback((hide: boolean) => {
-    setState((s) => ({ ...s, hideShellPanels: hide }))
+    setState((s) => (s.hideShellPanels === hide ? s : { ...s, hideShellPanels: hide }))
   }, [])
 
   const resetShell = useCallback(() => {

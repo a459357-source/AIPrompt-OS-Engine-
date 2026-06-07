@@ -244,6 +244,74 @@ function AffectionBar({ value, adultMode = false }: { value: number; name?: stri
   )
 }
 
+function GameStatusList({
+  characters,
+  factions,
+  adultMode,
+}: {
+  characters: CharInfo[]
+  factions: FactionInfo[]
+  adultMode: boolean
+}) {
+  return (
+    <div className="space-y-4">
+      {characters.length === 0 && factions.length === 0 && (
+        <p className="text-xs text-game-dim text-center py-4">暂无数据</p>
+      )}
+      {characters.map((c) => (
+        <div key={`c-${c.name}`} className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">
+              {c.name}
+              {c.tier === '主角' && <span className="text-game-accent text-xs ml-1">⭐</span>}
+              {c.tier === '核心' && <span className="text-game-primary text-xs ml-1">◆</span>}
+            </span>
+            <div className="flex items-center gap-1">
+              {c.faction && (
+                <Badge variant="warning" size="sm">🏛️ {c.faction}</Badge>
+              )}
+              <Badge variant="outline" size="sm">{c.role}</Badge>
+            </div>
+          </div>
+          {c.relation && <p className="text-xs text-game-muted">{c.relation}</p>}
+          {c.tier !== '主角' && (
+            <AffectionBar value={c.affection ?? 50} adultMode={adultMode} />
+          )}
+          <Separator />
+        </div>
+      ))}
+
+      {factions.length > 0 && characters.length > 0 && (
+        <p className="text-xs text-game-dim font-bold pt-2">🏛️ 势力</p>
+      )}
+      {factions.map((f) => (
+        <div key={`f-${f.name}`} className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">{f.name}</span>
+            <Badge variant="outline" size="sm" className={f.attitude_label === '敌对' ? 'border-red-500/50 text-red-400' : f.attitude_label === '同盟' ? 'border-green-500/50 text-green-400' : ''}>
+              {f.attitude_label}
+            </Badge>
+          </div>
+          {f.role && <p className="text-xs text-game-muted">{f.role}</p>}
+          <div className="flex items-center gap-2">
+            <AffectionBar value={(f.reputation ?? 0.5) * 100} adultMode={adultMode} />
+            <span className="text-xs text-game-dim tabular-nums">{Math.round((f.reputation ?? 0.5) * 100)}%</span>
+          </div>
+          {(f.attitudes || []).filter(a => Math.abs((a.attitude ?? 0.5) - 0.5) >= 0.15).slice(0, 3).map(a => (
+            <div key={a.target} className="flex items-center gap-1 text-[10px]">
+              <span className="text-game-dim">→ {a.target}</span>
+              <span className={a.label === '敌对' || a.label === '冷淡' ? 'text-red-400' : a.label === '同盟' || a.label === '友好' ? 'text-green-400' : 'text-game-muted'}>
+                {a.label}
+              </span>
+            </div>
+          ))}
+          <Separator />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function GenFieldHint({ children }: { children: React.ReactNode }) {
   return <span className="text-[11px] text-game-dim/90 leading-snug">{children}</span>
 }
@@ -946,71 +1014,9 @@ export default function Game() {
     marginBottom: 'var(--story-paragraph-spacing)',
   } as const
 
-  // Shared character + faction list component
-  const StatusList = () => (
-    <div className="space-y-4">
-      {/* Characters */}
-      {characters.length === 0 && factions.length === 0 && (
-        <p className="text-xs text-game-dim text-center py-4">暂无数据</p>
-      )}
-      {characters.map((c) => (
-        <div key={`c-${c.name}`} className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">
-              {c.name}
-              {c.tier === '主角' && <span className="text-game-accent text-xs ml-1">⭐</span>}
-              {c.tier === '核心' && <span className="text-game-primary text-xs ml-1">◆</span>}
-            </span>
-            <div className="flex items-center gap-1">
-              {c.faction && (
-                <Badge variant="warning" size="sm">🏛️ {c.faction}</Badge>
-              )}
-              <Badge variant="outline" size="sm">{c.role}</Badge>
-            </div>
-          </div>
-          {c.relation && <p className="text-xs text-game-muted">{c.relation}</p>}
-          {/* 主角对自己没有好感度，只显示 NPC 对主角的好感 */}
-          {c.tier !== '主角' && (
-            <AffectionBar value={c.affection ?? 50} adultMode={adultMode} />
-          )}
-          <Separator />
-        </div>
-      ))}
-
-      {/* Factions */}
-      {factions.length > 0 && characters.length > 0 && (
-        <p className="text-xs text-game-dim font-bold pt-2">🏛️ 势力</p>
-      )}
-      {factions.map((f) => (
-        <div key={`f-${f.name}`} className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">{f.name}</span>
-            <Badge variant="outline" size="sm" className={f.attitude_label === '敌对' ? 'border-red-500/50 text-red-400' : f.attitude_label === '同盟' ? 'border-green-500/50 text-green-400' : ''}>
-              {f.attitude_label}
-            </Badge>
-          </div>
-          {f.role && <p className="text-xs text-game-muted">{f.role}</p>}
-          <div className="flex items-center gap-2">
-            <AffectionBar value={(f.reputation ?? 0.5) * 100} adultMode={adultMode} />
-            <span className="text-xs text-game-dim tabular-nums">{Math.round((f.reputation ?? 0.5) * 100)}%</span>
-          </div>
-          {/* Inter-faction attitudes (top 3) — safe guarded against missing data */}
-          {(f.attitudes || []).filter(a => Math.abs((a.attitude ?? 0.5) - 0.5) >= 0.15).slice(0, 3).map(a => (
-            <div key={a.target} className="flex items-center gap-1 text-[10px]">
-              <span className="text-game-dim">→ {a.target}</span>
-              <span className={a.label === '敌对' || a.label === '冷淡' ? 'text-red-400' : a.label === '同盟' || a.label === '友好' ? 'text-green-400' : 'text-game-muted'}>
-                {a.label}
-              </span>
-            </div>
-          ))}
-          <Separator />
-        </div>
-      ))}
-    </div>
-  )
-
-  usePageShell({
-    leftPanel: hasGame && !readingMode ? (
+  const gameLeftPanel = useMemo(() => {
+    if (!hasGame || readingMode) return null
+    return (
       <div className="p-3 space-y-1 overflow-y-auto h-full">
         <h3 className="text-[10px] font-neural-mono text-neural-cyan uppercase tracking-widest mb-3">
           {tTheme('game.timeline', lang, adultMode)}
@@ -1031,15 +1037,24 @@ export default function Game() {
           )
         })}
       </div>
-    ) : null,
-    inspector: hasGame && showCharPanel && !readingMode ? (
+    )
+  }, [hasGame, readingMode, turn, lang, adultMode])
+
+  const gameInspector = useMemo(() => {
+    if (!hasGame || !showCharPanel || readingMode) return null
+    return (
       <InspectorPanel
         title={adultMode ? tTheme('nav.characters', lang, true) : t('game.status', lang)}
         className={adultMode ? 'adult-relation-inspector' : undefined}
       >
-        <StatusList />
+        <GameStatusList characters={characters} factions={factions} adultMode={adultMode} />
       </InspectorPanel>
-    ) : null,
+    )
+  }, [hasGame, showCharPanel, readingMode, adultMode, lang, characters, factions])
+
+  usePageShell({
+    leftPanel: gameLeftPanel,
+    inspector: gameInspector,
     showLeftPanel: !!(hasGame && !readingMode),
     showRightPanel: !!(hasGame && showCharPanel && !readingMode),
     hideShellPanels: !hasGame || readingMode,
@@ -1591,7 +1606,7 @@ export default function Game() {
                   <h3 className="text-sm font-bold text-game-accent">📊 {t('game.status', lang)}</h3>
                   <button type="button" onClick={() => setCharPanelOpen(false)} className="text-game-muted hover:text-game-text">✕</button>
                 </div>
-                <StatusList />
+                <GameStatusList characters={characters} factions={factions} adultMode={adultMode} />
               </div>
             )}
             </div>{/* end scrollable area */}
@@ -1768,7 +1783,7 @@ export default function Game() {
                 <h3 className="text-sm font-bold text-game-accent">📊 {t('game.status', lang)}</h3>
                 <button onClick={() => setCharPanelOpen(false)} className="text-game-muted hover:text-game-text">✕</button>
               </div>
-              <StatusList />
+              <GameStatusList characters={characters} factions={factions} adultMode={adultMode} />
             </div>
           )}
         </div>
