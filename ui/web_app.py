@@ -24,7 +24,7 @@ config.ensure_runtime_files()
 app = FastAPI(
     title="Prompt OS Galgame Runtime",
     description="🎮 Interactive AI Narrative Engine — Web UI",
-    version="1.0.0",
+    version=config.APP_VERSION,
 )
 
 app.add_middleware(
@@ -60,7 +60,7 @@ for _route in REACT_CLIENT_ROUTES:
 @app.get("/health")
 async def health():
     """Lightweight health-check endpoint (polled by frontend JS)."""
-    return {"status": "ok", "engine": "Prompt OS Galgame Runtime v1"}
+    return {"status": "ok", "engine": f"Prompt OS Galgame Runtime v{config.APP_VERSION}"}
 
 
 @app.post("/shutdown")

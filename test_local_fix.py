@@ -1,4 +1,5 @@
 """Tests for local JSON/response repair."""
+import config
 from engine.local_fix import fix_response, salvage_json
 
 
@@ -16,7 +17,7 @@ def test_fix_options_padding():
         "state": {"status": "INVALID", "characters": {}},
         "options": ["仅一个选项"],
     })
-    assert len(data["options"]) == 4
+    assert len(data["options"]) == config.OPTION_COUNT
 
 
 def test_clamp_trust_metrics():

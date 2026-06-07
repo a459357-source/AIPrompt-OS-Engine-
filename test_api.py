@@ -13,6 +13,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import config
+
 _PROJECT_ROOT = Path(__file__).resolve().parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
@@ -196,7 +198,7 @@ def test_game_settings_post():
     data = resp.json()
     assert data.get("ok") is True
     assert data.get("story_length") == 4000
-    assert data.get("max_tokens") == 6320
+    assert data.get("max_tokens") == config.tokens_for_story_length(4000)
 
     resp_slash = client.post("/api/game-settings/", data={"story_length": "3000"})
     assert resp_slash.status_code == 200

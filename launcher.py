@@ -67,7 +67,7 @@ def _ensure_port_free(port: int) -> None:
 
 
 def main() -> None:
-    print("PromptOS — 启动中…")
+    print(f"PromptOS v{config.APP_VERSION} — 启动中…")
     print(f"  数据目录: {config.DATA_DIR}")
     print(f"  访问地址: {config.frontend_url('/')}")
     print(f"  运行日志: {config.LOG_PATH}")

@@ -1,9 +1,11 @@
 """
-Prompt OS Engine Lite v1 — Configuration
+Prompt OS Engine Lite v2 — Configuration
 =========================================
 Central config: paths, API settings, engine constants.
 Set DEEPSEEK_API_KEY in your environment before running.
 """
+
+APP_VERSION = "2.0.0"
 
 import json
 import os
