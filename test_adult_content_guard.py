@@ -9,9 +9,22 @@ def test_adult_system_override_extreme():
     config.save_content_weights({"story": 0, "romance": 0, "adult": 100})
     config.reload_app_behavior()
     assert config.use_adult_extreme_template()
-    assert config.adult_system_override_text() == ""
+    override = config.adult_system_override_text()
+    assert "禁止男男" in override
     text = config.adult_extreme_content_rules_text()
     assert "每轮性内容铁律" in text
+    assert "禁止男男" in text
+
+
+def test_adult_orientation_supreme_all_tiers():
+    config.save_adult_mode(True)
+    config.save_adult_profile("balanced")
+    config.save_content_weights({"story": 40, "romance": 30, "adult": 30})
+    config.reload_app_behavior()
+    assert "禁止男男" in config.adult_system_override_text()
+    assert "禁止男男" in config.content_preference_rules_text()
+    config.save_adult_mode(False)
+    config.reload_app_behavior()
 
 
 def test_merge_adult_options_replaces_mission():

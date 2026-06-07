@@ -17,12 +17,14 @@ def test_resolve_extreme_template_path():
     assert path.is_file()
 
 
-def test_adult_system_override_empty_when_extreme_template():
+def test_adult_system_override_has_supreme_rules_when_extreme_template():
     _enable_extreme()
-    assert config.adult_system_override_text() == ""
+    override = config.adult_system_override_text()
+    assert "禁止男男" in override
     rules = config.adult_extreme_content_rules_text()
     assert "每轮性内容铁律" in rules
-    assert "COOLDOWN" in rules
+    assert "禁止男男" in rules
+    assert "禁止男男" in override
 
 
 def test_vocabulary_domain_from_world_pack():

@@ -1094,36 +1094,50 @@ def adult_intensity_tier() -> str:
     return _adult_intensity_tier(CONTENT_WEIGHTS.get("adult", 0), profile)
 
 
+def adult_orientation_supreme_rules_text() -> str:
+    """Highest-priority orientation constraint — applies to all adult tiers."""
+    if not ADULT_MODE:
+        return ""
+    return (
+        "【成人内容 · 最高铁律 · 覆盖一切其他成人/亲密指令】\n"
+        "- 严格禁止男男性行为、男男暧昧与男男性描写；禁止 story 与 options 中出现任何男男亲热/性接触。\n"
+        "- 成人向亲密与性内容仅限男性主角与女性角色之间；不得将男性 NPC 作为性对象或实操对象。\n"
+        "- 若玩家选择或剧情意外导向男男方向，须改写为不含男男接触的剧情分支，"
+        "不得输出男男亲热/性行为描写。\n"
+    )
+
+
 def adult_system_override_text() -> str:
     """Highest-priority adult directives at the top of the system prompt."""
     if not ADULT_MODE:
         return ""
+    supreme = adult_orientation_supreme_rules_text()
     if use_adult_extreme_template():
-        return ""
+        return supreme
     tier = adult_intensity_tier()
     if tier == "extreme":
         req = min(3, OPTION_COUNT)
-        return (
+        return supreme + (
             "【成人叙事 · 最高优先级 · 覆盖 long_term_goal / FORCE_EVENT / 纯任务推进】\n"
             f"1. 本轮 options 至少 {req} 个必须是露骨色情向具体行动（动词+对象+身体动作），"
             "禁止全部选项为「前往/对接/搜索/调查/部署/窃听/准备战斗」等任务。\n"
             "2. story 须含具体亲密或性描写，不可整轮只有战术与任务对话。\n"
             "3. 主线目标仅作背景；玩家默认期望成人内容，不得自我审查为全年龄。\n"
-            "4. 若场景允许，优先给出与在场角色发生身体接触的选项。\n"
+            "4. 若场景允许，优先给出与在场女性角色发生身体接触的选项。\n"
         )
     if tier == "high":
         req = min(2, OPTION_COUNT)
-        return (
+        return supreme + (
             "【成人叙事 · 高优先级】\n"
             f"options 至少 {req} 个须为可推进性行为或露骨身体接触的行动；"
             "不可全部为任务/调查类。story 须含明确亲密或性描写。\n"
         )
     if tier == "medium":
-        return (
+        return supreme + (
             "【成人叙事 · 激活】\n"
             "options 至少 1 个须为明显亲密/色情向行动；story 可含具体爱抚或接吻细节。\n"
         )
-    return ""
+    return supreme
 
 
 def adult_main_goal_suffix() -> str:
@@ -1281,7 +1295,7 @@ def adult_extreme_content_rules_text() -> str:
         "【成人内容规则 — 强制】",
         "",
         "## 每轮性内容铁律",
-        "- 每轮须有实质性性接触；非 COOLDOWN 轮至少让一个女性角色达到高潮。",
+        "- 每轮须有实质性性接触（仅限男性主角↔女性角色，禁止男男）；非 COOLDOWN 轮至少让一个女性角色达到高潮。",
         "  不一定要插入，但须有明确身体接触与高潮描写。",
         "- 正常剧情压缩到 2–3 句交代背景；剩余篇幅用于色情描写（70%+）。",
         "- 非 COOLDOWN 轮：性关系须比上一轮更进一步；严禁连续多轮只聊天不操。",
@@ -1381,11 +1395,16 @@ def content_preference_rules_text() -> str:
     profile = ADULT_PROFILE if ADULT_PROFILE in ADULT_PROFILE_OPTIONS else DEFAULT_ADULT_PROFILE
     profile_desc = ADULT_PROFILE_DESCRIPTIONS.get(profile, "")
 
+    supreme = adult_orientation_supreme_rules_text()
     lines = [
         "【内容偏好】",
         "",
         "当前模式：成人模式（已解除全年龄限制，允许 R18/NC-17 性描写与露骨 options）",
         "",
+    ]
+    if supreme:
+        lines.extend([supreme, ""])
+    lines.extend([
         "内容倾向：",
         f"剧情：{story_w}%",
         f"感情：{romance_w}%",
@@ -1396,7 +1415,7 @@ def content_preference_rules_text() -> str:
         "- 所有关系发展必须符合人物性格与当前情境。",
         "- 根据上方百分比决定本轮正文与 options 中剧情/感情/成人描写的篇幅比重；成人权重高时 story 与 options 均须明显色情化。",
         "- 禁止自我审查为全年龄；成人模式下模型不得拒绝描写或输出 sanitized 替代剧情。",
-    ]
+    ])
     if profile_desc:
         lines.append(f"- 当前预设：{profile_desc}")
     lines.extend(_adult_intensity_lines(adult_w, profile))
