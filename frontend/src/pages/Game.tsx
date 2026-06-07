@@ -28,6 +28,11 @@ interface FactionInfo {
   attitude_label: string
   flags: string[]
   attitudes: { target: string; attitude: number; label: string; flags: string[] }[]
+  controlledTerritories?: string[]
+  subordinateOrganizations?: string[]
+  keyAssets?: string[]
+  power?: { military: number; economic: number; political: number; technology: number }
+}
 }
 
 function AffectionBar({ value }: { value: number; name?: string }) {

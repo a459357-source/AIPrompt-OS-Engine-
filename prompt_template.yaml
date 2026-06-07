@@ -28,6 +28,13 @@ system: |
   - 负面：疏远→冷漠→对立→敌视→崩坏
   - 关键事件(拯救/牺牲/告白)标记为 FLAG
 
+  【势力行动规则 — 强制】
+  - 势力行动必须在控制区域内执行，由下属机构负责实施。
+  - 势力不能执行超越其实力评分的行动（如军事5的势力不能发动战争）。
+  - 优先让现有势力推进目标，而非引入新角色。
+  - 势力行动应基于关键资产——争夺资产、破坏资产、交易资产。
+  - 敌对势力之间的冲突必须符合双方实力对比。
+
   {{CUSTOM_RULES}}
 
   【{{FORCE_EVENT_NOTICE}}】
@@ -48,6 +55,7 @@ user: |
   {{MEMORY_CONTEXT}}
   {{TIER_CONTEXT}}
   {{FACTION_CONTEXT}}
+  {{FACTION_SCOPE}}
   {{EVENT_CONTEXT}}
   {{WORLD_STATE}}
   ENGINE: {{ENGINE_RULES}}

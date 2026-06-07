@@ -206,6 +206,7 @@ def init_factions(memory: dict) -> None:
             rel = faction.get("relation_to_player", "neutral")
             init_rep = RELATION_TO_PLAYER_MAP.get(rel, 0.50)
             influence = faction.get("influence", 50)
+            power = faction.get("power", {})
             mem_factions[name] = {
                 "reputation": init_rep,
                 "flags": [],
@@ -213,6 +214,15 @@ def init_factions(memory: dict) -> None:
                 "type": faction.get("type", "other"),
                 "goals": faction.get("goals", []),
                 "resources": faction.get("resources", []),
+                "controlledTerritories": faction.get("controlledTerritories", []),
+                "subordinateOrganizations": faction.get("subordinateOrganizations", []),
+                "keyAssets": faction.get("keyAssets", []),
+                "power": {
+                    "military": power.get("military", 0),
+                    "economic": power.get("economic", 0),
+                    "political": power.get("political", 0),
+                    "technology": power.get("technology", 0),
+                },
                 "influence": influence,
                 "leader": faction.get("leader", ""),
                 "relation_to_player": rel,
@@ -399,6 +409,10 @@ def get_faction_stats_for_ui(memory: dict) -> list[dict]:
             "type": data.get("type", "other"),
             "goals": data.get("goals", []),
             "resources": data.get("resources", []),
+            "controlledTerritories": data.get("controlledTerritories", []),
+            "subordinateOrganizations": data.get("subordinateOrganizations", []),
+            "keyAssets": data.get("keyAssets", []),
+            "power": data.get("power", {}),
             "influence": data.get("influence", 50),
             "leader": data.get("leader", ""),
             "relation_to_player": data.get("relation_to_player", "neutral"),
@@ -410,6 +424,79 @@ def get_faction_stats_for_ui(memory: dict) -> list[dict]:
         })
 
     return result
+
+
+def get_faction_context_for_prompt(memory: dict) -> str:
+    """
+    Build a detailed faction scope summary for the AI prompt.
+    Includes controlled territories, subordinate organizations,
+    key assets, and power scores — so AI can generate concrete
+    faction actions instead of vague ones.
+    """
+    factions = memory.get("factions", {})
+    if not factions:
+        return ""
+
+    lines: list[str] = ["【势力掌控范围 — AI必须据此生成具体行动】"]
+    for name, data in factions.items():
+        ftype = data.get("type", "other")
+        goals = data.get("goals", [])
+        territories = data.get("controlledTerritories", [])
+        orgs = data.get("subordinateOrganizations", [])
+        assets = data.get("keyAssets", [])
+        power = data.get("power", {})
+        rel_player = data.get("relation_to_player", "neutral")
+
+        lines.append(f"\n  [{name}] 类型:{ftype} 对主角:{rel_player}")
+        if goals:
+            lines.append(f"    目标: {'; '.join(goals[:3])}")
+        if territories:
+            lines.append(f"    控制区域: {', '.join(territories)}")
+        if orgs:
+            lines.append(f"    下属机构: {', '.join(orgs)}")
+        if assets:
+            lines.append(f"    关键资产: {', '.join(assets)}")
+        if power:
+            pw = power
+            lines.append(f"    实力: 军事{pw.get('military',0)} 经济{pw.get('economic',0)} 政治{pw.get('political',0)} 科技{pw.get('technology',0)}")
+
+        # Allowed action hints per type
+        hints = _faction_action_hints(ftype, territories, orgs, assets)
+        if hints:
+            lines.append(f"    可执行行动: {', '.join(hints[:5])}")
+
+    lines.append("")
+    lines.append("  【AI规则】生成势力行动时必须：1) 行动范围不超过控制区域 2) 执行者来自下属机构 3) 手段基于关键资产 4) 规模匹配实力评分")
+    return "\n".join(lines)
+
+
+def _faction_action_hints(
+    ftype: str, territories: list[str],
+    orgs: list[str], assets: list[str],
+) -> list[str]:
+    """Generate allowed-action hints based on faction scope."""
+    hints: list[str] = []
+
+    if territories:
+        hints.append(f"在{territories[0]}部署力量")
+    if orgs:
+        hints.append(f"通过{orgs[0]}执行任务")
+    if assets:
+        hints.append(f"利用{assets[0]}")
+    if ftype == "government":
+        hints.extend(["颁布法令", "调动国家资源", "外交谈判", "封锁区域"])
+    elif ftype == "corporation":
+        hints.extend(["资本运作", "收购资产", "市场操控", "游说政府"])
+    elif ftype == "family":
+        hints.extend(["暗中布局", "人脉运作", "联姻结盟", "信息交易"])
+    elif ftype in ("organization", "guild", "school"):
+        hints.extend(["成员行动", "资源调配", "情报收集", "同盟协作"])
+    elif ftype in ("religion",):
+        hints.extend(["信徒动员", "教义传播", "朝圣行动", "神谕解读"])
+    elif ftype in ("kingdom",):
+        hints.extend(["出兵讨伐", "王室联姻", "册封领地", "发布诏令"])
+
+    return hints
 
 
 def guess_trust_delta_from_story(story: str) -> list[tuple[str, float, str | None]]:

@@ -50,6 +50,9 @@ def generate_plot_hooks(memory: dict, turn: int) -> list[str]:
     for name, data in ranked[:3]:  # top 3 most influential
         goals = data.get("goals", [])
         resources = data.get("resources", [])
+        territories = data.get("controlledTerritories", [])
+        orgs = data.get("subordinateOrganizations", [])
+        assets = data.get("keyAssets", [])
         rel_player = data.get("relation_to_player", "neutral")
         ftype = data.get("type", "other")
 
@@ -67,8 +70,9 @@ def generate_plot_hooks(memory: dict, turn: int) -> list[str]:
             if abs(d.get("attitude", 0.5) - 0.5) >= 0.2
         ]
 
-        # Build the hook
-        hook = _build_hook(name, ftype, goal, resources, rel_player, strong_targets)
+        # Build the hook — now uses territories/orgs/assets for specificity
+        hook = _build_hook(name, ftype, goal, resources, territories, orgs, assets,
+                           rel_player, strong_targets)
         if hook:
             hooks.append(hook)
 
@@ -127,38 +131,53 @@ def _build_hook(
     ftype: str,
     goal: str,
     resources: list[str],
+    territories: list[str],
+    orgs: list[str],
+    assets: list[str],
     rel_player: str,
     targets: list[tuple[str, float]],
 ) -> str | None:
-    """Build a single plot hook string from faction data."""
+    """Build a single plot hook string from faction data.
 
-    # Templates vary by faction type and relation
+    Now uses controlledTerritories, subordinateOrganizations, and keyAssets
+    to generate concrete, specific actions instead of vague ones.
+    """
+    loc = _pick(territories, None) or ""
+    org = _pick(orgs, None) or ""
+    asset = _pick(assets, None) or ""
+
     templates: list[str] = []
 
-    if ftype in ("corporation", "kingdom"):
-        templates = [
-            f"{name} 正在推进「{goal}」，动用了{_pick(resources, '资源')}。",
-            f"{name} 向市场释放信号，意图达成「{goal}」。",
-        ]
-    elif ftype in ("government", "organization"):
-        templates = [
-            f"{name} 召开秘密会议讨论「{goal}」。",
-            f"{name} 派遣特使推进「{goal}」。",
-        ]
-    elif ftype in ("guild", "school", "religion"):
-        templates = [
-            f"{name} 内部正在为「{goal}」而行动。",
-            f"{name} 的信徒/成员开始推进「{goal}」。",
-        ]
+    if ftype in ("corporation",):
+        if org:
+            templates.append(f"{name} 通过{org}在{loc or '市场'}推进「{goal}」。")
+        if asset:
+            templates.append(f"{name} 动用{asset}，意图达成「{goal}」。")
+        templates.append(f"{name} 正在推进「{goal}」，动用了{_pick(resources, '资源')}。")
+    elif ftype in ("government",):
+        if org and loc:
+            templates.append(f"{org}在{loc}执行{name}的「{goal}」计划。")
+        if loc:
+            templates.append(f"{name} 在{loc}部署力量推进「{goal}」。")
+        templates.append(f"{name} 召开秘密会议讨论「{goal}」。")
+    elif ftype in ("kingdom",):
+        if loc and org:
+            templates.append(f"{org}在{loc}为{name}的「{goal}」而行动。")
+        templates.append(f"{name} 为达成「{goal}」调动了{_pick(resources, '全国之力')}。")
     elif ftype in ("family",):
-        templates = [
-            f"{name} 为达成「{goal}」暗中布局。",
-            f"{name} 的当家正为「{goal}」而奔走。",
-        ]
+        if org:
+            templates.append(f"{name} 通过{org}暗中推进「{goal}」。")
+        if asset:
+            templates.append(f"{name} 以{asset}为筹码，谋取「{goal}」。")
+        templates.append(f"{name} 为达成「{goal}」暗中布局。")
+    elif ftype in ("guild", "school", "religion"):
+        if org:
+            templates.append(f"{org}开始为{name}的「{goal}」而行动。")
+        templates.append(f"{name} 内部正在为「{goal}」而行动。")
     else:
-        templates = [
-            f"{name} 正在推进「{goal}」。",
-        ]
+        templates = [f"{name} 正在推进「{goal}」。"]
+        if org:
+            templates.insert(0, f"{name} 通过{org}推进「{goal}」。")
 
     # If there are strong targets, add interaction hooks
     if targets:
@@ -174,9 +193,9 @@ def _build_hook(
 
     # Player-relevant hook
     if rel_player == "enemy":
-        templates.append(
-            f"{name} 正在策划对主角不利的行动：{goal}"
-        )
+        if org and loc:
+            templates.append(f"{name} 的{org}在{loc}策划对主角不利的行动。")
+        templates.append(f"{name} 正在策划对主角不利的行动：{goal}")
     elif rel_player == "ally":
         templates.append(
             f"{name} 为主角的「{goal}」提供了{_pick(resources, '支援')}。"

@@ -491,6 +491,7 @@ a{{color:#58a6ff;text-decoration:none}}
 <button class="toggle-btn" onclick="t('nodes')">📋 节点详情</button>
 <button class="toggle-btn" onclick="t('factions')">🏛️ 世界势力</button>
 <button class="toggle-btn" onclick="t('factionGraph')">🕸️ 势力关系</button>
+<button class="toggle-btn" onclick="t('factionPower')">⚔️ 势力实力</button>
 <button class="toggle-btn" onclick="t('branch')">🔀 分支统计</button>
 </div>
 
@@ -522,6 +523,11 @@ a{{color:#58a6ff;text-decoration:none}}
 <h2>🏛️ 世界势力</h2>
 <div id="factionCards">{faction_cards}</div>
 <div id="factionCharts"></div>
+</div>
+
+<div id="sec-factionPower" class="section">
+<h2>⚔️ 势力实力对比（军事/经济/政治/科技）</h2>
+<div class="chart-wrap wide"><canvas id="factionPowerChart"></canvas></div>
 </div>
 
 <div id="sec-factionGraph" class="section">
@@ -642,6 +648,37 @@ if(A.character_frequency&&A.character_frequency.labels){{makeChart('charFreqChar
     wrap.appendChild(h3);wrap.appendChild(canvas);
     chartContainer.appendChild(wrap);
     new Chart(canvas,{{type:'line',data:{{labels:f.labels,datasets:[{{label:key,data:f.datasets[0].data,borderColor:c,backgroundColor:c+'22',tension:0.3,fill:false,pointRadius:4}}]}},options:{{responsive:true,maintainAspectRatio:true,plugins:{{legend:{{labels:{{color:'#8b949e'}}}}}},scales:{{x:{{ticks:{{color:'#8b949e'}},grid:{{color:'#21262d'}}}},y:{{ticks:{{color:'#8b949e'}},grid:{{color:'#21262d'}},min:0,max:100}}}}}}}});
+  }});
+}})();
+
+// Faction power chart (horizontal bar)
+(function(){{
+  var fp=A.faction_power;if(!fp||!fp.datasets||!fp.datasets.length)return;
+  var canvas=document.getElementById('factionPowerChart');
+  if(!canvas)return;
+  var colors=['#58a6ff','#3fb950','#d29922','#da3633','#bc8cff','#79c0ff','#f0883e','#56d364'];
+  new Chart(canvas,{{
+    type:'bar',
+    data:{{
+      labels:fp.labels,
+      datasets:fp.datasets.map(function(ds,i){{return{{
+        label:ds.name,
+        data:ds.data,
+        backgroundColor:colors[i%8]+'88',
+        borderColor:colors[i%8],
+        borderWidth:1
+      }}};}})
+    }},
+    options:{{
+      indexAxis:'y',
+      responsive:true,
+      maintainAspectRatio:true,
+      plugins:{{legend:{{labels:{{color:'#8b949e',font:{{size:11}}}}}}}},
+      scales:{{
+        x:{{ticks:{{color:'#8b949e',font:{{size:10}}}},grid:{{color:'#21262d'}},max:100}},
+        y:{{ticks:{{color:'#8b949e',font:{{size:10}}}},grid:{{color:'#21262d'}}}}
+      }}
+    }}
   }});
 }})();
 </script>

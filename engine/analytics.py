@@ -36,6 +36,7 @@ def compute_all() -> dict:
         "metrics_curves": metrics_curves(),  # dynamic: detects all character metrics
         "trust_curve": trust_curve(),        # backward compat alias
         "faction_curves": faction_curves(),  # faction reputation curves
+        "faction_power": faction_power_stats(),  # faction power scores
         "faction_attitude_curves": faction_attitude_curves(),  # inter-faction attitude curves
         "status_timeline": status_timeline(),
         "word_counts": word_counts(),
@@ -151,6 +152,33 @@ def faction_curves() -> dict:
         }
 
     return result
+
+
+def faction_power_stats() -> dict:
+    """
+    Faction power radar data: military, economic, political, technology.
+    Returns {labels: [...], datasets: [{name, data:[m,e,p,t]}, ...]}
+    """
+    memory = io_utils.read_json(config.MEMORY_PATH)
+    factions = memory.get("factions", {})
+
+    datasets = []
+    for name, data in factions.items():
+        power = data.get("power", {})
+        datasets.append({
+            "name": name,
+            "data": [
+                power.get("military", 0),
+                power.get("economic", 0),
+                power.get("political", 0),
+                power.get("technology", 0),
+            ],
+        })
+
+    return {
+        "labels": ["军事", "经济", "政治", "科技"],
+        "datasets": datasets,
+    }
 
 
 def faction_attitude_curves() -> dict:

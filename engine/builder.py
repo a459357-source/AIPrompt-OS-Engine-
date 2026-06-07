@@ -14,6 +14,7 @@ from engine import io_utils
 from engine.memory import (
     load_memory, get_context_for_prompt,
     build_character_tier_context, get_faction_attitude_context,
+    get_faction_context_for_prompt,
 )
 from engine.events import get_event_context
 from engine.world_driver import get_world_state_context
@@ -143,6 +144,9 @@ def build_prompt() -> tuple[str, str]:
     # ── Faction attitude context ──────────────────────────────
     faction_attitude_context = get_faction_attitude_context(memory)
 
+    # ── Faction scope (control territories, orgs, assets, power) ─
+    faction_scope_context = get_faction_context_for_prompt(memory)
+
     # ── World events context ──────────────────────────────────
     event_context = get_event_context(memory)
 
@@ -189,7 +193,7 @@ def build_prompt() -> tuple[str, str]:
     _warn_if_approaching_limit(system_prompt, user_prompt,
                                 state_for_prompt, world_pack,
                                 memory_context, tier_context, faction_attitude_context,
-                                event_context, world_state_context)
+                                faction_scope_context, event_context, world_state_context)
 
     # ── Interpolate user prompt ────────────────────────────────
     user_raw = template.get("user", "")
@@ -205,6 +209,7 @@ def build_prompt() -> tuple[str, str]:
         .replace("{{MEMORY_CONTEXT}}", memory_context)
         .replace("{{TIER_CONTEXT}}", tier_context)
         .replace("{{FACTION_CONTEXT}}", faction_attitude_context)
+        .replace("{{FACTION_SCOPE}}", faction_scope_context)
         .replace("{{EVENT_CONTEXT}}", event_context)
         .replace("{{WORLD_STATE}}", world_state_context)
     )
@@ -286,7 +291,7 @@ def _warn_if_approaching_limit(
     system_prompt: str, user_prompt: str,
     state: dict, world_pack: dict,
     memory_context: str, tier_context: str, faction_context: str,
-    event_context: str, world_state_context: str,
+    faction_scope_context: str, event_context: str, world_state_context: str,
 ) -> None:
     """Estimate total prompt tokens and warn if approaching 128K limit.
 
@@ -298,7 +303,7 @@ def _warn_if_approaching_limit(
     total_chars = (
         len(system_prompt) + len(user_prompt) +
         len(memory_context) + len(tier_context) + len(faction_context) +
-        len(event_context) + len(world_state_context)
+        len(faction_scope_context) + len(event_context) + len(world_state_context)
     )
     estimated_tokens = int(total_chars * 0.6)
 
