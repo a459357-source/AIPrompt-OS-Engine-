@@ -192,11 +192,28 @@ def sanitize_exe_dir(exe_dir: Path) -> None:
 def make_zip(exe_dir: Path, version: str) -> Path:
     print("\n=== 5. 生成发布 zip ===")
     RELEASE.mkdir(parents=True, exist_ok=True)
+    staging = RELEASE / "_staging"
+    if staging.is_dir():
+        shutil.rmtree(staging, ignore_errors=True)
+    staging.mkdir(parents=True)
+    shutil.copytree(exe_dir, staging / exe_dir.name)
+    ship_files = (
+        "启动 PromptOS.bat",
+        "停止 PromptOS.bat",
+        "PromptOS-用户手册.html",
+        "使用说明.txt",
+    )
+    for name in ship_files:
+        src = RELEASE / name
+        if src.is_file():
+            shutil.copy2(src, staging / name)
+            print(f"  bundled {name}")
     zip_base = RELEASE / config.release_zip_basename(version)
     zip_path = zip_base.with_suffix(".zip")
     if zip_path.exists():
         zip_path.unlink()
-    archive = shutil.make_archive(str(zip_base), "zip", root_dir=exe_dir.parent, base_dir=exe_dir.name)
+    archive = shutil.make_archive(str(zip_base), "zip", root_dir=staging)
+    shutil.rmtree(staging, ignore_errors=True)
     print(f"  {archive}")
     return Path(archive)
 

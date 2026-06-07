@@ -7,8 +7,9 @@ PromptOS 发布包使用说明
 【给别人用】
 1. 只发送 release\PromptOS-win64-v{版本}.zip（不要附带 data 文件夹）
    例：PromptOS-win64-v2.0.1.zip
-2. 对方解压后双击 PromptOS.exe
-3. 首次打开会弹出窗口，请填写各自的 DeepSeek API Key
+2. 解压后运行「启动 PromptOS.bat」，或进入 PromptOS\ 双击 PromptOS.exe
+3. 端口占用时运行「停止 PromptOS.bat」（发布包专用；根目录 停止.bat 仅开发者源码用）
+4. 首次打开会弹出窗口，请填写各自的 DeepSeek API Key
    （也可在「设置」页填写；Key 仅保存在本机 data\apikey.json）
 4. 通过「新故事」开始游戏
 

@@ -300,11 +300,12 @@
       <h3 id="install-exe">Windows 发布包（推荐给普通用户）</h3>
       <ol class="steps">
         <li>解压 <code>PromptOS-win64-v2.x.x.zip</code>（勿附带他人的 <code>data/</code> 文件夹）</li>
-        <li>双击 <code>PromptOS.exe</code>，或运行同目录下的 <code>启动 PromptOS.bat</code></li>
+        <li>双击 <code>启动 PromptOS.bat</code> 或进入 <code>PromptOS/</code> 运行 <code>PromptOS.exe</code></li>
         <li>浏览器会自动打开 <code>http://127.0.0.1:8000</code>（内置前端，单端口）</li>
         <li>首次使用按弹窗填写 DeepSeek API Key（见下一章）</li>
         <li>进入「世界」页创建故事并开始模拟</li>
       </ol>
+      <p style="margin-top:0.75rem;color:var(--dim);font-size:0.88rem">同目录还提供 <code>停止 PromptOS.bat</code>（释放 8000 端口）、<code>PromptOS-用户手册.html</code>。根目录的 <code>停止.bat</code> 仅用于<strong>开发者源码目录</strong>，不在发布 zip 内。</p>
       <div class="callout warn">
         <strong>注意：</strong>发布包不含任何 API Key；exe 不会读取打包者电脑上的 <code>DEEPSEEK_API_KEY</code> 环境变量。在本机测试 zip 前，建议临时删除该环境变量，避免误用他人 Key。
       </div>
@@ -646,7 +647,11 @@ cd frontend && npm install && npm run dev   # → http://localhost:5173</code></
       <h2>12. 常见问题</h2>
       <div class="card">
         <h4>❓ 启动后浏览器空白或无法连接</h4>
-        <p>确认 <code>PromptOS.exe</code> 窗口未关闭；检查 8000 端口是否被占用。可先运行「停止.bat」再重启。</p>
+        <p>确认 <code>PromptOS.exe</code> 黑色控制台窗口未关闭。若提示<strong>端口 8000 已被占用</strong>：</p>
+        <ul>
+          <li><strong>发布版</strong>：先关闭旧的 PromptOS 窗口，或运行同目录的 <code>停止 PromptOS.bat</code>，再重新启动</li>
+          <li><strong>开发者模式</strong>（源码目录）：运行根目录 <code>停止.bat</code>（需已安装 Python）</li>
+        </ul>
       </div>
       <div class="card">
         <h4>❓ API 报错 / 401 / 余额不足</h4>
@@ -666,7 +671,8 @@ cd frontend && npm install && npm run dev   # → http://localhost:5173</code></
       </div>
       <div class="card">
         <h4>❓ 关闭程序</h4>
-        <p>直接关闭 <code>PromptOS.exe</code> 的黑色控制台窗口即可停止服务。开发模式下设置页提供「关闭服务」。</p>
+        <p><strong>发布版</strong>：直接关闭 <code>PromptOS.exe</code> 的黑色控制台窗口即可。端口未释放时可运行 <code>停止 PromptOS.bat</code>。</p>
+        <p style="margin-top:0.5rem"><strong>开发者模式</strong>：关闭后端/前端终端，或在设置页使用「关闭服务」；也可运行根目录 <code>停止.bat</code>。</p>
       </div>
     </section>
 

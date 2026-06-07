@@ -59,7 +59,10 @@ def _ensure_port_free(port: int) -> None:
         s.bind(("127.0.0.1", port))
     except OSError:
         print(f"\n[ERROR] 端口 {port} 已被占用，无法启动。")
-        print("  请先运行「停止.bat」关闭旧进程后重试。\n")
+        if getattr(sys, "frozen", False):
+            print("  请先关闭 PromptOS 窗口，或运行同目录「停止 PromptOS.bat」后重试。\n")
+        else:
+            print("  请先运行「停止.bat」关闭旧进程后重试。\n")
         input("按回车键退出...")
         sys.exit(1)
     finally:
