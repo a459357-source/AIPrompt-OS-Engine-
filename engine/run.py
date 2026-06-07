@@ -355,6 +355,14 @@ def step(
     )
     profiler.mark("continuation_done")
 
+    from engine.adult_content_guard import ensure_adult_turn_content
+
+    response = ensure_adult_turn_content(
+        response,
+        scene=scene,
+        characters=pre_state.get("characters", {}),
+    )
+
     story_chars = count_story_chars(response.get("story", ""))
     if should_retry_story_length(story_chars, target_len):
         logger.warning(

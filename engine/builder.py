@@ -181,6 +181,7 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
     system_raw = template.get("system", "")
     system_prompt = (
         system_raw
+        .replace("{{ADULT_SYSTEM_OVERRIDE}}", config.adult_system_override_text())
         .replace("{{FORCE_EVENT_NOTICE}}", force_notice)
         .replace("{{STORY_LENGTH}}", str(target_len))
         .replace("{{STORY_LENGTH_MIN}}", str(min_len))
@@ -189,7 +190,7 @@ def build_prompt(current_choice: str | None = None) -> tuple[str, str]:
         .replace("{{OPTION_COUNT}}", str(config.OPTION_COUNT))
         .replace("{{ADULT_OPTIONS_HINT}}", config.adult_options_hint_text())
         .replace("{{CUSTOM_RULES}}", custom_rules_text)
-        .replace("{{MAIN_GOAL}}", main_goal)
+        .replace("{{MAIN_GOAL}}", main_goal + config.adult_main_goal_suffix())
     )
 
     # ── Memory layers (V2) ─────────────────────────────────────

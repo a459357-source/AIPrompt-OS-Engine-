@@ -1070,6 +1070,81 @@ def adult_choice_execution_hint(choice_text: str) -> str:
     )
 
 
+def adult_intensity_tier() -> str:
+    """Public helper for adult tier from current settings."""
+    if not ADULT_MODE:
+        return "low"
+    profile = ADULT_PROFILE if ADULT_PROFILE in ADULT_PROFILE_OPTIONS else DEFAULT_ADULT_PROFILE
+    return _adult_intensity_tier(CONTENT_WEIGHTS.get("adult", 0), profile)
+
+
+def adult_system_override_text() -> str:
+    """Highest-priority adult directives at the top of the system prompt."""
+    if not ADULT_MODE:
+        return ""
+    tier = adult_intensity_tier()
+    if tier == "extreme":
+        req = min(3, OPTION_COUNT)
+        return (
+            "【成人叙事 · 最高优先级 · 覆盖 long_term_goal / FORCE_EVENT / 纯任务推进】\n"
+            f"1. 本轮 options 至少 {req} 个必须是露骨色情向具体行动（动词+对象+身体动作），"
+            "禁止全部选项为「前往/对接/搜索/调查/部署/窃听/准备战斗」等任务。\n"
+            "2. story 须含具体亲密或性描写，不可整轮只有战术与任务对话。\n"
+            "3. 主线目标仅作背景；玩家默认期望成人内容，不得自我审查为全年龄。\n"
+            "4. 若场景允许，优先给出与在场角色发生身体接触的选项。\n"
+        )
+    if tier == "high":
+        req = min(2, OPTION_COUNT)
+        return (
+            "【成人叙事 · 高优先级】\n"
+            f"options 至少 {req} 个须为可推进性行为或露骨身体接触的行动；"
+            "不可全部为任务/调查类。story 须含明确亲密或性描写。\n"
+        )
+    if tier == "medium":
+        return (
+            "【成人叙事 · 激活】\n"
+            "options 至少 1 个须为明显亲密/色情向行动；story 可含具体爱抚或接吻细节。\n"
+        )
+    return ""
+
+
+def adult_main_goal_suffix() -> str:
+    """Append to MAIN_GOAL when adult mode is on."""
+    if not ADULT_MODE:
+        return ""
+    tier = adult_intensity_tier()
+    if tier in ("extreme", "high"):
+        return "（成人高强度：主线为背景，每轮须含亲密/性描写与色情 options，不得整轮仅任务推进）"
+    if tier == "medium":
+        return "（成人模式：每轮 options 须含亲密分支）"
+    return ""
+
+
+def adult_required_intimate_options() -> int:
+    tier = adult_intensity_tier()
+    if tier == "extreme":
+        return min(3, OPTION_COUNT)
+    if tier == "high":
+        return min(2, OPTION_COUNT)
+    if tier == "medium":
+        return 1
+    return 0
+
+
+def count_intimate_markers(text: str) -> int:
+    t = str(text or "")
+    return sum(1 for kw in _INTIMATE_CHOICE_KEYWORDS if kw in t)
+
+
+def intimate_option_count(options: list) -> int:
+    return sum(1 for o in options if count_intimate_markers(str(o)) >= 1)
+
+
+def explicit_option_count(options: list) -> int:
+    """Options with 2+ intimate markers = likely explicit."""
+    return sum(1 for o in options if count_intimate_markers(str(o)) >= 2)
+
+
 def content_preference_rules_text() -> str:
     """根据 content_weights 生成倾向化内容偏好指令。"""
     w = CONTENT_WEIGHTS
