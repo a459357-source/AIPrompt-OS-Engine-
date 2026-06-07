@@ -294,7 +294,7 @@ export default function NewStory() {
       {/* AI Status Toast */}
       <StatusToast message={aiStatus} type={aiStatusType} />
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" onKeyDown={(e) => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT' && (e.target as HTMLInputElement).type === 'number') e.preventDefault() }}>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* ═══════════ Sidebar ═══════════ */}
           <div className="lg:col-span-1 space-y-4">
@@ -661,6 +661,7 @@ export default function NewStory() {
                                       type="number"
                                       min={0} max={100} value={val}
                                       onChange={(e) => update(key, Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                                      onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
                                       className="w-10 text-center text-[10px] h-5 bg-game-bg border border-game-border rounded text-game-text"
                                     />
                                     <div className="flex-1 h-2 bg-game-border rounded-full overflow-hidden">
