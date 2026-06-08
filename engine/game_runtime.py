@@ -181,9 +181,16 @@ def _read_cached_visuals_from_node(
 ) -> dict[str, Any]:
     """Read existing visuals for node participants (no generation)."""
     from engine.visual.visual_registry import get_asset, list_assets, load_registry
+    from pathlib import Path
 
     registry = load_registry()
     result: dict[str, Any] = {"characters": [], "scene": None}
+
+    def _file_exists(image_path: str) -> bool:
+        if not image_path:
+            return False
+        rel = str(image_path).replace("\\", "/")
+        return (config.ROOT / rel).is_file()
 
     for name in char_names:
         asset = get_asset(registry, "characters", name)
@@ -193,33 +200,35 @@ def _read_cached_visuals_from_node(
                     asset = record
                     break
         if not asset:
-            # broad scan: match by display_name
             for record in list_assets(registry, "characters").values():
                 if isinstance(record, dict) and str(record.get("display_name") or "").strip() == str(name).strip():
                     asset = record
                     break
-        if asset and isinstance(asset, dict) and asset.get("image_path"):
+        image_path = str((asset or {}).get("image_path") or "")
+        if isinstance(asset, dict) and image_path and _file_exists(image_path):
             result["characters"].append({
                 "name": name,
-                "image_url": public_image_url(asset["image_path"]),
+                "image_url": public_image_url(image_path),
             })
 
     if event_id:
         asset = get_asset(registry, "events", event_id)
-        if asset and isinstance(asset, dict) and asset.get("image_path"):
+        image_path = str((asset or {}).get("image_path") or "")
+        if asset and image_path and _file_exists(image_path):
             result["scene"] = {
                 "scene_id": event_id,
-                "image_url": public_image_url(asset["image_path"]),
+                "image_url": public_image_url(image_path),
             }
         else:
-            # fallback: any cached event visual
             for record in list_assets(registry, "events").values():
                 if isinstance(record, dict) and record.get("image_path"):
-                    result["scene"] = {
-                        "scene_id": str(record.get("entity_id") or record.get("asset_id") or ""),
-                        "image_url": public_image_url(record["image_path"]),
-                    }
-                    break
+                    ip = str(record["image_path"])
+                    if _file_exists(ip):
+                        result["scene"] = {
+                            "scene_id": str(record.get("entity_id") or record.get("asset_id") or ""),
+                            "image_url": public_image_url(ip),
+                        }
+                        break
 
     return result
 
