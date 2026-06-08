@@ -1718,6 +1718,18 @@ export default function Game() {
                     <img src={visuals.scene.image_url} alt={scene} className="w-full max-h-64 object-cover" loading="lazy" />
                   </div>
                 )}
+                {visuals.characters.length > 0 && !isViewingPast && (
+                  <div className="flex flex-wrap justify-center gap-3 mb-4 px-2">
+                    {visuals.characters.map((vc) => (
+                      <div key={vc.name} className="flex flex-col items-center gap-1">
+                        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-game-accent/40 shadow-lg shadow-game-accent/10">
+                          <img src={vc.image_url} alt={vc.name} className="w-full h-full object-cover" loading="lazy" />
+                        </div>
+                        <span className="text-[10px] text-game-muted text-center leading-tight max-w-[72px] truncate">{vc.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {narrativeNode?.context && !isViewingPast && (
                   <p className="text-xs text-game-dim italic mb-4 border-l-2 border-game-border/40 pl-3">{narrativeNode.context}</p>
                 )}
