@@ -12,6 +12,7 @@ VisualIdentity
   → IdentityPromptBuilder (+ Content Template IP层)
   → StyleBible.apply()          ← v1 注入点
   → normalize_prompt → Provider → Image
+  → Style Drift Detector        ← 见 V6_STYLE_DRIFT_DETECTOR.md
 ```
 
 ## 三模块

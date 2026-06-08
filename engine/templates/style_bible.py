@@ -71,6 +71,21 @@ def style_tokens_for_entity(entity_type: str) -> list[str]:
     return _dedupe_preserve_order(tokens)
 
 
+REINFORCEMENT_TOKENS: list[str] = [
+    "strict world visual adherence",
+    "enforce style bible consistency",
+]
+
+
+def reinforce_style_bible(prompt: str, entity_type: str) -> str:
+    """Stronger Style Bible injection for drift-correction retries."""
+    reinforced = apply_style_bible(prompt, entity_type)
+    prefix = ", ".join(REINFORCEMENT_TOKENS)
+    if prefix.lower() in reinforced.lower():
+        return reinforced
+    return f"{prefix}, {reinforced}" if reinforced else prefix
+
+
 def apply_style_bible(prompt: str, entity_type: str) -> str:
     """
     Inject world-wide visual constraints before provider call.

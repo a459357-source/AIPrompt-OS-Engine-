@@ -10,7 +10,9 @@ from typing import Any
 
 import config
 from engine.visual import image_generation
+from engine.templates.style_bible import reinforce_style_bible
 from engine.visual.provider_factory import get_visual_provider
+from engine.visual.style_drift import DriftEvaluation, evaluate_generation
 from engine.visual.visual_cache import (
     exists,
     memory_get,
@@ -101,7 +103,12 @@ def get_visual(
             return record
 
     gen_fn = getattr(provider, obj.provider_method)
-    gen_result = image_generation.write_generated_image(scope, obj, provider, gen_fn)
+    gen_result, drift_eval = _generate_with_drift_policy(scope, obj, provider, gen_fn)
+    meta = {
+        "size": gen_result["size"],
+        "bytes": gen_result["bytes"],
+        "drift": drift_eval.to_dict(),
+    }
     record = make_asset_record(
         asset_id=obj.asset_id,
         display_name=obj.name,
@@ -114,7 +121,7 @@ def get_visual(
         created_turn=turn,
         prompt_hash=obj.prompt_hash,
         seed=obj.seed,
-        meta={"size": gen_result["size"], "bytes": gen_result["bytes"]},
+        meta=meta,
     )
     registry = load_registry()
     registry = set_asset(registry, scope, obj.asset_id, record)
@@ -127,6 +134,70 @@ def get_visual(
         gen_result["provider"],
     )
     return record
+
+
+def _generate_with_drift_policy(
+    scope: str,
+    obj: VisualObject,
+    provider: VisualProvider,
+    gen_fn,
+) -> tuple[dict[str, Any], DriftEvaluation]:
+    """Provider → drift check → accept / retry / fallback."""
+    gen_result = image_generation.write_generated_image(scope, obj, provider, gen_fn)
+    if not getattr(config, "STYLE_DRIFT_DETECTOR_ENABLED", True):
+        drift = evaluate_generation(obj.prompt, obj.entity_type, gen_result)
+        drift.action = "accept_disabled"
+        gen_result["drift"] = drift.to_dict()
+        return gen_result, drift
+
+    drift = evaluate_generation(obj.prompt, obj.entity_type, gen_result)
+    if drift.level == "ok":
+        drift.action = "accept"
+        gen_result["drift"] = drift.to_dict()
+        return gen_result, drift
+
+    if drift.level == "mild":
+        reinforced = reinforce_style_bible(obj.prompt, obj.entity_type)
+        retry_result = image_generation.write_generated_image(
+            scope, obj, provider, gen_fn, prompt_override=reinforced,
+        )
+        retry_drift = evaluate_generation(reinforced, obj.entity_type, retry_result)
+        if retry_drift.score < drift.score:
+            retry_drift.action = "retry_accept"
+            retry_result["drift"] = retry_drift.to_dict()
+            logger.info(
+                "Visual drift mild retry improved score %.3f→%.3f entity=%s",
+                drift.score,
+                retry_drift.score,
+                obj.entity_id,
+            )
+            return retry_result, retry_drift
+        drift.action = "accept_mild"
+        gen_result["drift"] = drift.to_dict()
+        logger.info(
+            "Visual drift mild kept original score=%.3f entity=%s",
+            drift.score,
+            obj.entity_id,
+        )
+        return gen_result, drift
+
+    reinforced = reinforce_style_bible(obj.prompt, obj.entity_type)
+    from engine.visual.visual_provider import StubVisualProvider
+
+    stub = StubVisualProvider()
+    stub_fn = getattr(stub, obj.provider_method)
+    fallback_result = image_generation.write_generated_image(
+        scope, obj, stub, stub_fn, prompt_override=reinforced,
+    )
+    fallback_drift = evaluate_generation(reinforced, obj.entity_type, fallback_result)
+    fallback_drift.action = "fallback_reject"
+    fallback_result["drift"] = fallback_drift.to_dict()
+    logger.warning(
+        "Visual drift severe score=%.3f fallback stub entity=%s",
+        drift.score,
+        obj.entity_id,
+    )
+    return fallback_result, fallback_drift
 
 
 def _path_from_record(record: dict | None) -> Path | None:

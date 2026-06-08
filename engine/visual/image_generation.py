@@ -21,17 +21,20 @@ def invoke_provider_with_retry(
     obj: VisualObject,
     provider: VisualProvider,
     gen_fn: Callable[..., bytes],
+    *,
+    prompt_override: str | None = None,
 ) -> tuple[bytes, VisualProvider]:
     """Retry primary provider; fallback to stub on exhaustion."""
     stub = StubVisualProvider()
     stub_fn = getattr(stub, obj.provider_method)
     max_retries = max(1, int(getattr(config, "VISUAL_MAX_RETRIES", 3) or 3))
     last_err: Exception | None = None
+    prompt = str(prompt_override or obj.prompt or "")
 
     for attempt in range(max_retries):
         try:
             data = gen_fn(
-                prompt=obj.prompt,
+                prompt=prompt,
                 asset_id=obj.asset_id,
                 size=obj.default_size,
             )
@@ -51,7 +54,7 @@ def invoke_provider_with_retry(
 
     logger.warning("Visual provider failed after %s attempts, fallback stub: %s", max_retries, last_err)
     data = stub_fn(
-        prompt=obj.prompt,
+        prompt=prompt,
         asset_id=obj.asset_id,
         size=obj.default_size,
     )
@@ -63,9 +66,13 @@ def write_generated_image(
     obj: VisualObject,
     provider: VisualProvider,
     gen_fn: Callable[..., bytes],
+    *,
+    prompt_override: str | None = None,
 ) -> dict[str, Any]:
     """Generate image bytes and write L2 cache. Does not touch registry."""
-    data, used_provider = invoke_provider_with_retry(obj, provider, gen_fn)
+    data, used_provider = invoke_provider_with_retry(
+        obj, provider, gen_fn, prompt_override=prompt_override,
+    )
     path = write_bytes(scope, obj.asset_id, data)
     return {
         "image_path": uri_for_path(path),
