@@ -110,6 +110,7 @@ interface FactionInfo {
 
 interface GameVisuals {
   characters: { name: string; image_url: string }[]
+  factions: { name: string; image_url: string }[]
   scene: { scene_id?: string; image_url: string } | null
 }
 
@@ -210,6 +211,7 @@ function GameStatusList({
   visuals: GameVisuals
 }) {
   const visualByChar = new Map(visuals.characters.map(v => [v.name, v.image_url]))
+  const visualByFaction = new Map(visuals.factions.map(v => [v.name, v.image_url]))
   return (
     <div className="space-y-4">
       {characters.length === 0 && factions.length === 0 && (
@@ -248,8 +250,15 @@ function GameStatusList({
       {factions.length > 0 && characters.length > 0 && (
         <p className="text-xs text-game-dim font-bold pt-2">🏛️ 势力</p>
       )}
-      {factions.map((f) => (
+      {factions.map((f) => {
+        const factionImageUrl = visualByFaction.get(f.name)
+        return (
         <div key={`f-${f.name}`} className="space-y-1.5">
+          {factionImageUrl && (
+            <div className="w-full rounded-md overflow-hidden border border-game-border/50">
+              <img src={factionImageUrl} alt={f.name} className="w-full h-16 object-cover" loading="lazy" />
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">{f.name}</span>
             <Badge variant="outline" size="sm" className={f.attitude_label === '敌对' ? 'border-red-500/50 text-red-400' : f.attitude_label === '同盟' ? 'border-green-500/50 text-green-400' : ''}>
@@ -329,7 +338,7 @@ export default function Game() {
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [showConsequences, setShowConsequences] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [visuals, setVisuals] = useState<GameVisuals>({ characters: [], scene: null })
+  const [visuals, setVisuals] = useState<GameVisuals>({ characters: [], factions: [], scene: null })
   const [narrativeNode, setNarrativeNode] = useState<NarrativeNode | null>(null)
   const [supplementOpen, setSupplementOpen] = useState(false)
   const [supplementText, setSupplementText] = useState('')
