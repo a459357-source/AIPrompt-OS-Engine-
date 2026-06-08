@@ -52,6 +52,16 @@ def _load_relationship_graph() -> dict:
         pass
     return {"version": 1, "nodes": {}, "edges": {}, "events": [], "pending_events": []}
 
+
+def _load_relationship_memory() -> dict:
+    try:
+        data = io_utils.read_json(config.RELATIONSHIP_MEMORY_PATH)
+        if isinstance(data, dict) and "edges" in data:
+            return data
+    except Exception:
+        pass
+    return {"version": 1, "edges": {}}
+
 # Maximum chapter content to include in a save (avoid giant save files)
 _MAX_CHAPTER_BYTES = MAX_CHAPTER_BYTES_IN_SAVE
 
@@ -73,6 +83,7 @@ def save(slot: str) -> dict | None:
         memory = io_utils.read_json(config.MEMORY_PATH)
         graph = io_utils.read_json(config.STORY_GRAPH_PATH)
         relationship_graph = _load_relationship_graph()
+        relationship_memory = _load_relationship_memory()
         plot_state = _load_plot_state()
 
         chapter = ""
@@ -94,6 +105,7 @@ def save(slot: str) -> dict | None:
             "memory": memory,
             "story_graph": graph,
             "relationship_graph": relationship_graph,
+            "relationship_memory": relationship_memory,
             "candidate_npcs": _load_candidate_pool(),
             "plot_state": plot_state,
             "chapter": chapter,
@@ -155,6 +167,8 @@ def load(slot: str) -> dict | None:
             snapshot.get("memory", {}),
             snapshot.get("story_graph", {}),
             chapter=snapshot.get("chapter", ""),
+            relationship=snapshot.get("relationship_graph"),
+            relationship_memory=snapshot.get("relationship_memory"),
         )
         io_utils.write_json(
             config.CANDIDATE_NPCS_PATH,
@@ -167,6 +181,7 @@ def load(slot: str) -> dict | None:
             world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
             ensure_plot_state(world_pack)
         rel_graph = snapshot.get("relationship_graph")
+        rel_mem = snapshot.get("relationship_memory")
         if isinstance(rel_graph, dict) and rel_graph.get("edges") is not None:
             io_utils.write_json(config.RELATIONSHIP_GRAPH_PATH, rel_graph)
         elif config.RELATIONSHIP_ENGINE_ENABLED:
@@ -175,6 +190,10 @@ def load(slot: str) -> dict | None:
             memory = snapshot.get("memory", {})
             session = snapshot.get("session_state", {})
             init_graph_from_world(world_pack, memory, session, persist=True)
+        if isinstance(rel_mem, dict) and rel_mem.get("edges") is not None:
+            io_utils.write_json(config.RELATIONSHIP_MEMORY_PATH, rel_mem)
+        elif config.RELATIONSHIP_ENGINE_ENABLED:
+            io_utils.write_json(config.RELATIONSHIP_MEMORY_PATH, {"version": 1, "edges": {}})
         if "experience_mode" in snapshot:
             config.save_experience_mode(str(snapshot["experience_mode"]))
         elif "adult_mode" in snapshot:

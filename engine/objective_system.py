@@ -317,6 +317,12 @@ def build_objectives_context(session: dict, world_pack: dict | None = None) -> s
     if extra > 0:
         lines.append(f"（另有 {extra} 条活跃支线未列出）")
 
+    if config.RELATIONSHIP_ENGINE_ENABLED:
+        from engine.relationship_core import read_api_for_objective_text
+        rel_mem = read_api_for_objective_text(session, world_pack)
+        if rel_mem:
+            lines.append(rel_mem)
+
     return "\n".join(lines)
 
 

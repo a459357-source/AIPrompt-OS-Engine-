@@ -192,7 +192,11 @@ def build_character_brain_context(
     if config.CHARACTER_BRAIN_ENABLED and config.RELATIONSHIP_ENGINE_ENABLED:
         from engine.relationship_core import read_api_for_brain
 
-        rel_block = read_api_for_brain(names, world_pack, session_state)
+        from engine.relationship_recall import ensure_memory_store
+        mem_store = ensure_memory_store(None)
+        rel_block = read_api_for_brain(
+            names, world_pack, session_state, memory_store=mem_store,
+        )
         if rel_block:
             if brain_text:
                 return brain_text + "\n" + rel_block

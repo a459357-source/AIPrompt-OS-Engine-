@@ -144,6 +144,7 @@ def build_director_advice(plot_state: dict, session_state: dict) -> str:
             build_relationship_director_hint,
             consume_pending_events_for_director,
             ensure_graph,
+            read_api_for_plot,
             save_graph,
         )
 
@@ -155,6 +156,13 @@ def build_director_advice(plot_state: dict, session_state: dict) -> str:
             lines.append(f"- {rel_hint}")
             consume_pending_events_for_director(rel_graph)
             save_graph(rel_graph, persist=True)
+
+        plot_mem = read_api_for_plot(session_state, world_pack)
+        if plot_mem:
+            triggered = True
+            for line in plot_mem.splitlines():
+                if line.strip():
+                    lines.append(f"- {line.strip()}")
 
     if not triggered:
         return ""

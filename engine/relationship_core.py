@@ -458,14 +458,26 @@ def read_api_for_brain(
     names: set[str],
     world_pack: dict,
     session: dict | None = None,
+    memory_store: dict | None = None,
 ) -> str:
-    """Public Brain Read API."""
+    """Public Brain Read API (graph state + recent memory events)."""
     graph = ensure_graph(world_pack, session=session)
     player = resolve_player_name(world_pack, session)
-    return build_relationship_context_for_brain(names, graph, player, world_pack)
+    parts = [build_relationship_context_for_brain(names, graph, player, world_pack)]
+    if config.RELATIONSHIP_ENGINE_ENABLED:
+        from engine.relationship_recall import ensure_memory_store, format_brain_memory
+        store = ensure_memory_store(memory_store)
+        mem_block = format_brain_memory(names, store, player)
+        if mem_block:
+            parts.append(mem_block)
+    return "\n".join(p for p in parts if p)
 
 
-def read_api_for_objective(session: dict, world_pack: dict) -> dict:
+def read_api_for_objective(
+    session: dict,
+    world_pack: dict,
+    memory_store: dict | None = None,
+) -> dict:
     """Return relationship-derived progress hints per active objective id."""
     graph = ensure_graph(world_pack, session=session)
     player = resolve_player_name(world_pack, session)
@@ -481,6 +493,36 @@ def read_api_for_objective(session: dict, world_pack: dict) -> dict:
             if prog is not None and oid:
                 out[oid] = prog
     return out
+
+
+def read_api_for_objective_text(
+    session: dict,
+    world_pack: dict,
+    memory_store: dict | None = None,
+) -> str:
+    """Objective-facing relationship memory block."""
+    if not config.RELATIONSHIP_ENGINE_ENABLED:
+        return ""
+    from engine.relationship_recall import ensure_memory_store, format_objective_memory
+
+    graph = ensure_graph(world_pack, session=session)
+    store = ensure_memory_store(memory_store)
+    return format_objective_memory(session, store, graph, world_pack)
+
+
+def read_api_for_plot(
+    session: dict,
+    world_pack: dict,
+    memory_store: dict | None = None,
+) -> str:
+    """Plot Director read-only relationship tension from memory."""
+    if not config.RELATIONSHIP_ENGINE_ENABLED:
+        return ""
+    from engine.relationship_recall import ensure_memory_store, read_api_for_plot as _plot_recall
+
+    graph = ensure_graph(world_pack, session=session)
+    store = ensure_memory_store(memory_store)
+    return _plot_recall(store, graph, session, world_pack)
 
 
 def enqueue_relationship_event(

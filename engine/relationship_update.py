@@ -1,5 +1,5 @@
 """
-relationship_update.py — V5.1 per-turn relationship graph updates.
+relationship_update.py — V5.1 per-turn relationship graph + memory updates.
 Runs after apply_turn / memory updater; graph is source of truth.
 """
 
@@ -21,6 +21,11 @@ from engine.relationship_core import (
     set_edge,
     RelationshipEdge,
     _mirror_graph_to_memory,
+)
+from engine.relationship_memory import (
+    empty_store,
+    record_turn_memories,
+    snapshot_player_edges,
 )
 
 logger = logging.getLogger(__name__)
@@ -114,6 +119,14 @@ def _large_delta_event(
         )
 
 
+def _active_npc_targets(memory: dict, player: str) -> set[str]:
+    targets: set[str] = set()
+    for name in memory.get("characters", {}):
+        if name != player and is_memory_active_npc(name, memory):
+            targets.add(name)
+    return targets
+
+
 def apply_turn_relationship_updates(
     response: dict,
     state: dict,
@@ -123,12 +136,15 @@ def apply_turn_relationship_updates(
     *,
     prev_options: list[str] | None = None,
     relationship_graph: dict | None = None,
+    relationship_memory: dict | None = None,
     persist: bool = True,
-) -> dict:
-    """Update relationship_graph from choice deltas, story heuristics, and events."""
+) -> tuple[dict, dict]:
+    """Update relationship_graph and relationship_memory from turn inputs."""
+    mem_store = relationship_memory if isinstance(relationship_memory, dict) else empty_store()
+
     if not config.RELATIONSHIP_ENGINE_ENABLED:
         from engine.relationship_core import load_graph
-        return load_graph()
+        return load_graph(), mem_store
 
     turn = int(state.get("turn", 0) or 0)
     story = response.get("story", "") or ""
@@ -139,6 +155,9 @@ def apply_turn_relationship_updates(
         graph = ensure_graph(world_pack, memory, state, persist=False)
     prev_options = prev_options or []
 
+    targets = _active_npc_targets(memory, player)
+    snapshots = snapshot_player_edges(graph, player, targets)
+
     if choice:
         for opt_text in _resolve_chosen_option(choice, prev_options):
             for char_name, metric, delta in parse_option_metric_deltas([opt_text]):
@@ -147,6 +166,11 @@ def apply_turn_relationship_updates(
                     continue
                 if not is_memory_active_npc(resolved, memory):
                     continue
+                targets.add(resolved)
+                if resolved not in snapshots:
+                    snapshots[resolved] = snapshot_player_edges(
+                        graph, player, {resolved},
+                    )[resolved]
                 edge = apply_metric_delta(graph, player, resolved, metric, float(delta), turn)
                 if edge:
                     d100 = float(delta) * 100.0 if abs(float(delta)) <= 1.0 else float(delta)
@@ -156,14 +180,17 @@ def apply_turn_relationship_updates(
         if char_name == "__all_present__":
             for name in list(memory.get("characters", {}).keys()):
                 if name in story and name != player:
+                    targets.add(name)
                     apply_metric_delta(graph, player, name, "trust", delta * 100, turn)
         elif char_name != player and is_memory_active_npc(char_name, memory):
+            targets.add(char_name)
             apply_metric_delta(graph, player, char_name, "trust", delta * 100, turn)
 
     for name in memory.get("characters", {}):
         if name == player or name not in story or player not in story:
             continue
         if is_memory_active_npc(name, memory):
+            targets.add(name)
             apply_metric_delta(graph, player, name, "affection", 1.0, turn)
 
     _detect_relationship_events(story, player, graph, turn)
@@ -174,10 +201,19 @@ def apply_turn_relationship_updates(
             edge.relation_type = infer_relation_type(edge)
             set_edge(graph, edge)
 
+    record_turn_memories(
+        mem_store,
+        turn=turn,
+        player=player,
+        snapshots=snapshots,
+        graph=graph,
+        story=story,
+    )
+
     _mirror_graph_to_memory(graph, player, memory, persist=False)
     if persist:
         save_graph(graph, persist=True)
-    return graph
+    return graph, mem_store
 
 
 def sync_session_objectives(state: dict, graph: dict, world_pack: dict) -> dict:
