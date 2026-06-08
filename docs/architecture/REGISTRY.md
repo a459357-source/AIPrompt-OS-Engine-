@@ -14,7 +14,7 @@
 | EventDirector | `event_director` + `director_state` + `director_runtime` — **V5.2 Stable**（Final Review APPROVED，见 `V5.2_FINAL_REVIEW_REPORT.md`）；`engine/events.py` 保留回合随机事件 |
 | RelationshipDynamics | `relationship_core` … `relationship_event_resolver` — **V5.1 Stable**（Final Review APPROVED，见 `V5.1_FINAL_REVIEW_REPORT.md`） |
 | FactionSystem | memory factions, world_pack |
-| VisualAssets | **未实现**（V6.0） |
+| VisualAssets | `engine/visual/` — **V6.0 Phase A**（`visual_registry.json` + `VisualProvider`）；Presentation 未实现 |
 | SaveSystem | `engine/save_manager.py` |
 | ContextRouter | `engine/context_router.py` |
 | PlotDirector | `engine/plot_director.py` |

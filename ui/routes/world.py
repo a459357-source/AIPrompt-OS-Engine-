@@ -617,6 +617,9 @@ async def create_new_story(
     save_event_history(empty_event_history())
     reset_director_state()
 
+    from engine.visual.asset_manager import reset_visual_assets
+    reset_visual_assets()
+
     from engine.candidate_npcs import reset_pool
     reset_pool(persist=True)
 

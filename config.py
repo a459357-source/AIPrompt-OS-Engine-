@@ -173,6 +173,9 @@ EVENT_CATALOG_PATH = DATA_DIR / "event_catalog.json"
 EVENT_CATALOG_DEFAULT_PATH = Path(__file__).resolve().parent / "packaging" / "defaults" / "event_catalog.json"
 EVENT_HISTORY_PATH = DATA_DIR / "event_history.json"
 DIRECTOR_STATE_PATH = DATA_DIR / "director_state.json"
+VISUAL_REGISTRY_PATH = DATA_DIR / "visual_registry.json"
+VISUAL_REGISTRY_DEFAULT_PATH = Path(__file__).resolve().parent / "packaging" / "defaults" / "visual_registry.json"
+VISUAL_OUTPUT_DIR = OUTPUT_DIR / "visual"
 LOG_PATH             = DATA_DIR / "app.log"
 ERROR_LOG_PATH       = DATA_DIR / "error.log"
 
@@ -222,6 +225,11 @@ EVENT_DIRECTOR_PLAN_MAX_TOKENS = 300
 DIRECTOR_STATE_MACHINE_ENABLED = True
 DIRECTOR_EVENT_MAX_ACTIVE_TURNS = 3
 DIRECTOR_MAX_PENDING = 2
+
+# ── V6.0 Visual Narrative System (Phase A) ───────────────────────────
+VISUAL_SYSTEM_ENABLED = True
+VISUAL_PROVIDER = "stub"
+VISUAL_CACHE_ENABLED = True
 
 # ── V3.2 Objective System ─────────────────────────────────────────
 OBJECTIVE_SYSTEM_ENABLED = True

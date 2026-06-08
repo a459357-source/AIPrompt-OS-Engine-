@@ -43,6 +43,7 @@ REMOVE_PATHS = (
     config.RELATIONSHIP_DYNAMICS_PATH,
     config.EVENT_HISTORY_PATH,
     config.DIRECTOR_STATE_PATH,
+    config.VISUAL_REGISTRY_PATH,
 )
 
 # Log files including rotation backups (app.log.1, etc.)
@@ -84,6 +85,14 @@ def reset_user_data() -> None:
                 print(f"  removed {path.name}")
             except OSError as exc:
                 print(f"  skip {path.name} ({exc})")
+
+    if config.VISUAL_SYSTEM_ENABLED:
+        try:
+            from engine.visual.asset_manager import reset_visual_assets
+            reset_visual_assets()
+            print("  reset visual assets")
+        except Exception as exc:
+            print(f"  skip visual reset ({exc})")
 
     if config.OUTPUT_DIR.is_dir():
         shutil.rmtree(config.OUTPUT_DIR, ignore_errors=True)

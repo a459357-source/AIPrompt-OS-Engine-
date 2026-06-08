@@ -59,6 +59,14 @@ def _load_director_state() -> dict:
         return {"version": 2, "current_event": None, "pending": [], "lifecycle": []}
 
 
+def _load_visual_registry() -> dict:
+    from engine.visual.visual_registry import load_registry
+    try:
+        return load_registry()
+    except Exception:
+        return {"version": 1, "characters": {}, "locations": {}, "factions": {}, "scenes": {}}
+
+
 def _load_relationship_graph() -> dict:
     try:
         data = io_utils.read_json(config.RELATIONSHIP_GRAPH_PATH)
@@ -114,6 +122,7 @@ def save(slot: str) -> dict | None:
         plot_state = _load_plot_state()
         event_history = _load_event_history()
         director_state = _load_director_state()
+        visual_registry = _load_visual_registry()
 
         chapter = ""
         if config.CHAPTER_PATH.exists():
@@ -140,6 +149,7 @@ def save(slot: str) -> dict | None:
             "plot_state": plot_state,
             "event_history": event_history,
             "director_state": director_state,
+            "visual_registry": visual_registry,
             "chapter": chapter,
             "content_weights": config.CONTENT_WEIGHTS,
             "experience_mode": config.get_experience_mode(),
@@ -226,6 +236,13 @@ def load(slot: str) -> dict | None:
         elif config.DIRECTOR_STATE_MACHINE_ENABLED:
             from engine.director_runtime import reset_director_state
             reset_director_state()
+        visual_registry = snapshot.get("visual_registry")
+        if isinstance(visual_registry, dict):
+            from engine.visual.visual_registry import save_registry, normalize_registry
+            save_registry(normalize_registry(visual_registry))
+        elif config.VISUAL_SYSTEM_ENABLED:
+            from engine.visual.asset_manager import reset_visual_assets
+            reset_visual_assets()
         rel_graph = snapshot.get("relationship_graph")
         rel_mem = snapshot.get("relationship_memory")
         if isinstance(rel_graph, dict) and rel_graph.get("edges") is not None:
