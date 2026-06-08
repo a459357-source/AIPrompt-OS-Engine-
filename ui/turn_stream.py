@@ -56,6 +56,10 @@ def build_turn_payload(result: dict) -> dict[str, Any]:
     except Exception:
         pass
 
+    # ── V6 Game Runtime: visuals ──
+    from engine.game_runtime import ensure_game_visuals
+    visuals = ensure_game_visuals(state, turn=state.get("turn", 0), background=True)
+
     return {
         "story": result.get("story", ""),
         "options": result.get("options", []),
@@ -68,6 +72,7 @@ def build_turn_payload(result: dict) -> dict[str, Any]:
             "force_event_pending": state.get("force_event_pending", False),
             "chapter": state.get("chapter", 1),
         },
+        "visuals": visuals,
     }
 
 

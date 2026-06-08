@@ -108,6 +108,11 @@ interface FactionInfo {
   power?: { military: number; economic: number; political: number; technology: number }
 }
 
+interface GameVisuals {
+  characters: { name: string; image_url: string }[]
+  scene: { scene_id?: string; image_url: string } | null
+}
+
 function OptionEffectsInline({
   effects,
   effectText,
@@ -190,17 +195,22 @@ function GameStatusList({
   characters,
   factions,
   adultMode,
+  visuals,
 }: {
   characters: CharInfo[]
   factions: FactionInfo[]
   adultMode: boolean
+  visuals: GameVisuals
 }) {
+  const visualByChar = new Map(visuals.characters.map(v => [v.name, v.image_url]))
   return (
     <div className="space-y-4">
       {characters.length === 0 && factions.length === 0 && (
         <p className="text-xs text-game-dim text-center py-4">暂无数据</p>
       )}
-      {characters.map((c) => (
+      {characters.map((c) => {
+        const imageUrl = visualByChar.get(c.name)
+        return (
         <div key={`c-${c.name}`} className="space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">
@@ -215,13 +225,18 @@ function GameStatusList({
               <Badge variant="outline" size="sm">{c.role}</Badge>
             </div>
           </div>
+          {imageUrl && (
+            <div className="w-full rounded-md overflow-hidden border border-game-border/50">
+              <img src={imageUrl} alt={c.name} className="w-full h-32 object-cover" loading="lazy" />
+            </div>
+          )}
           {c.relation && <p className="text-xs text-game-muted">{c.relation}</p>}
           {c.tier !== '主角' && (
             <AffectionBar value={c.affection ?? 50} adultMode={adultMode} />
           )}
           <Separator />
         </div>
-      ))}
+      )})}
 
       {factions.length > 0 && characters.length > 0 && (
         <p className="text-xs text-game-dim font-bold pt-2">🏛️ 势力</p>
@@ -307,6 +322,7 @@ export default function Game() {
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [showConsequences, setShowConsequences] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [visuals, setVisuals] = useState<GameVisuals>({ characters: [], scene: null })
   const [supplementOpen, setSupplementOpen] = useState(false)
   const [supplementText, setSupplementText] = useState('')
   const [supplementLoading, setSupplementLoading] = useState(false)
@@ -439,6 +455,7 @@ export default function Game() {
     story: string
     options?: string[]
     state: Record<string, unknown>
+    visuals?: GameVisuals
   }) => {
     setViewingTurn(null)
     setStory(data.story)
@@ -459,6 +476,7 @@ export default function Game() {
     if (factionsData) setFactions(factionsData)
     const objData = st.objectives as ObjectivesGameData | undefined
     if (objData) setObjectives(objData)
+    if (data.visuals) setVisuals(data.visuals)
   }, [])
 
   const loadGame = useCallback(async () => {
@@ -1271,7 +1289,7 @@ export default function Game() {
         onCollapse={() => setRelationPanelOpen(false)}
         collapseLabel="收起关系面板"
       >
-        <GameStatusList characters={characters} factions={factions} adultMode={adultMode} />
+        <GameStatusList characters={characters} factions={factions} adultMode={adultMode} visuals={visuals} />
       </InspectorPanel>
     )
   }, [hasGame, showCharPanel, readingMode, adultMode, relationPanelTitle, characters, factions])
@@ -1685,6 +1703,11 @@ export default function Game() {
                 className={cn('pt-4 pb-6 px-4 md:px-8 w-full mx-auto game-story-focus', readingMode && 'px-6 md:px-12')}
                 style={{ maxWidth: storyContentMaxWidth }}
               >
+                {visuals.scene?.image_url && !isViewingPast && (
+                  <div className="w-full rounded-lg overflow-hidden border border-game-border/30 mb-4">
+                    <img src={visuals.scene.image_url} alt={scene} className="w-full max-h-64 object-cover" loading="lazy" />
+                  </div>
+                )}
                 {appSettings.animations ? (
                   <motion.div key={viewingTurn ?? turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
                     {displayStory.split('\n').filter(Boolean).map((paragraph, i) => (

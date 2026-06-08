@@ -94,6 +94,7 @@ def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
                 "chapter": state.get("chapter", 1),
                 "objectives": _objectives_for_game(state, persist_migrate=True),
             },
+            "visuals": _game_visuals_from_state(state),
         }
         if not_started:
             payload["not_started"] = True
@@ -138,11 +139,21 @@ def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
             "chapter": state.get("chapter", 1),
             "objectives": _objectives_for_game(state, persist_migrate=True),
         },
+        "visuals": _game_visuals_from_state(state),
     }
     if not config.ADULT_MODE:
         payload["suggest_adult_mode"] = config.suggest_adult_mode_for_options(options)
     payload["world_title"] = _read_world_title()
     return payload
+
+
+def _game_visuals_from_state(state: dict) -> dict[str, Any]:
+    """Read cached game visuals from registry (read-only, no generation)."""
+    try:
+        from engine.game_runtime import _read_cached_visuals
+        return _read_cached_visuals(state.get("characters", {}), str(state.get("scene") or ""))
+    except Exception:
+        return {"characters": [], "scene": None}
 
 
 @router.get("/world-meta")
