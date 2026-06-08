@@ -11,7 +11,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
@@ -85,22 +85,28 @@ app.include_router(visual_router)
 app.include_router(narrative_router)
 
 
-if config.has_bundled_frontend():
-    from fastapi import HTTPException
+_SPA_EXCLUDE_PREFIXES = ("api/", "static/", "generate-")
+_SPA_EXCLUDE_EXACT = frozenset({
+    "health", "export", "save", "load", "saves", "reset", "shutdown",
+})
 
-    _dist = config.FRONTEND_DIST
-    _SPA_EXCLUDE_PREFIXES = ("api/", "static/", "generate-")
-    _SPA_EXCLUDE_EXACT = frozenset({
-        "health", "export", "save", "load", "saves", "reset", "shutdown",
-        "new", "game", "npcs", "dashboard", "visual", "settings",
-    })
 
-    @app.get("/{full_path:path}")
-    async def serve_spa_fallback(full_path: str):
-        """Fallback for client-side routes not registered above."""
-        if full_path.startswith(_SPA_EXCLUDE_PREFIXES) or full_path in _SPA_EXCLUDE_EXACT:
-            raise HTTPException(404)
-        fp = _dist / full_path
+@app.get("/{full_path:path}")
+async def serve_spa_fallback(full_path: str):
+    """SPA fallback: bundled dist, or dev redirect to Vite for nested client routes."""
+    if full_path.startswith(_SPA_EXCLUDE_PREFIXES) or full_path in _SPA_EXCLUDE_EXACT:
+        raise HTTPException(404)
+
+    first_segment = full_path.split("/", 1)[0] if full_path else ""
+
+    if config.has_bundled_frontend():
+        fp = config.FRONTEND_DIST / full_path
         if full_path and fp.is_file():
             return FileResponse(fp)
-        return FileResponse(_dist / "index.html")
+        if first_segment in REACT_CLIENT_ROUTES or not full_path:
+            return FileResponse(config.FRONTEND_DIST / "index.html")
+        raise HTTPException(404)
+
+    if first_segment in REACT_CLIENT_ROUTES:
+        return RedirectResponse(url=config.frontend_url(f"/{full_path}"), status_code=302)
+    raise HTTPException(404)

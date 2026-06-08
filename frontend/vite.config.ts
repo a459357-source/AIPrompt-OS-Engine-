@@ -33,6 +33,11 @@ export default defineConfig({
       '/generate-field': API,
       '/generate-rules': API,
       '/new': { target: API, changeOrigin: true, bypass: spaPageBypass },
+      '/visual': { target: API, changeOrigin: true, bypass: spaPageBypass },
+      '/game': { target: API, changeOrigin: true, bypass: spaPageBypass },
+      '/npcs': { target: API, changeOrigin: true, bypass: spaPageBypass },
+      '/dashboard': { target: API, changeOrigin: true, bypass: spaPageBypass },
+      '/settings': { target: API, changeOrigin: true, bypass: spaPageBypass },
 
       // Backend utilities (no React route conflict)
       '/health': API,
