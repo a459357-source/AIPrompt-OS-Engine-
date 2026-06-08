@@ -26,6 +26,12 @@ default_batch_plan:
   events: 8
   factions: 2
 
+bootstrap_plan:
+  characters: 10
+  locations: 5
+  events: 8
+  factions: 2
+
 prompts:
   character: |
     Generate characters for a coherent visual IP world.
@@ -164,3 +170,44 @@ prompts:
     Step 3: {count_events} events referencing characters + locations above
     Step 4: assign relationships via participants and faction fields
     Step 5: validate Style Bible consistency before output
+
+  bootstrap: |
+    Generate a complete V6 world initialization dataset.
+
+    World seed (use as canonical anchor):
+    {world_seed_json}
+
+    Input configuration:
+    - world_name: {world_name}
+    - genre: {genre}
+    - tone: {tone}
+    - scale: {scale}
+
+    Constraints:
+    - Follow V6 Visual Runtime architecture
+    - Follow Style Bible v1 rules
+    - Ensure identity consistency
+    - Ensure all entities are interlinked
+    - No orphan characters, locations, or events
+
+    Required counts:
+    - {count_characters} characters (cover 权力层/执行层/边缘层/反抗层)
+    - {count_locations} locations
+    - {count_factions} factions
+    - {count_events} events
+    - relationship graph connecting characters
+
+    Output structured JSON only (no markdown). Exact top-level shape:
+    {
+      "world": { "name", "core_theme", "visual_bible_anchor", "dominant_material_system", "emotional_signature", "genre", "tone" },
+      "characters": [ character objects with linked_locations, linked_events ],
+      "locations": [ location objects ],
+      "factions": [ faction objects ],
+      "events": [ event objects with linked_location ],
+      "relationships": [ { "from", "to", "type", "strength", "status" } ]
+    }
+
+    Every event must reference existing characters and locations.
+    Every faction must bind at least one character.
+    Every character must have conflict_vector.
+    World must feel like a coherent cinematic IP universe, not random generation.

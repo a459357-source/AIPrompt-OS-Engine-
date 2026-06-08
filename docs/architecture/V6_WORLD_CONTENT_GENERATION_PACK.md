@@ -52,6 +52,10 @@ python scripts/world_content_batch.py import dataset.json
 - 事件：绑定 ≥1 角色 + 1 地点
 - 全局：Style Bible 一致性（无 cyberpunk/neon 等）
 
+## 一键 Bootstrap
+
+完整世界初始化见 `V6_WORLD_BOOTSTRAP.md`（`scripts/world_bootstrap.py run`）。
+
 ## 与 V6 关系
 
 | 层 | 关系 |

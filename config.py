@@ -196,6 +196,8 @@ WORLD_CONTENT_PACK_PATH = (
     Path(__file__).resolve().parent / "packaging" / "defaults" / "world_content_pack.yaml"
 )
 WORLD_CONTENT_PACK_ENABLED = True
+WORLD_BOOTSTRAP_PATH = DATA_DIR / "world_bootstrap.json"
+WORLD_BOOTSTRAP_ENABLED = True
 CONTENT_TEMPLATE_SYSTEM_ENABLED = True
 STYLE_BIBLE_V1_ENABLED = True
 STYLE_DRIFT_DETECTOR_ENABLED = True

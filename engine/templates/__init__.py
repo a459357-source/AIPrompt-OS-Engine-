@@ -9,6 +9,12 @@ from engine.templates.world_content_pack import (
     build_full_dataset_prompt,
     validate_world_dataset,
 )
+from engine.templates.world_bootstrap import (
+    apply_bootstrap_import,
+    build_bootstrap_prompt,
+    generate_bootstrap_dataset,
+    validate_bootstrap_dataset,
+)
 
 __all__ = [
     "resolve_content_template",
@@ -20,4 +26,8 @@ __all__ = [
     "build_full_dataset_prompt",
     "validate_world_dataset",
     "apply_dataset_import",
+    "build_bootstrap_prompt",
+    "validate_bootstrap_dataset",
+    "apply_bootstrap_import",
+    "generate_bootstrap_dataset",
 ]
