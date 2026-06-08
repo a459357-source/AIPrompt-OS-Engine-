@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "events": {
+    "midnight_talk": {
+      "category": "relationship",
+      "label": "深夜谈心",
+      "cooldown": 15,
+      "tags": ["bond", "private"]
+    },
+    "gift_exchange": {
+      "category": "relationship",
+      "label": "赠送信物",
+      "cooldown": 12,
+      "tags": ["bond", "gift"]
+    },
+    "confession": {
+      "category": "relationship",
+      "label": "告白",
+      "cooldown": 20,
+      "tags": ["bond", "romance"]
+    },
+    "jealousy": {
+      "category": "relationship",
+      "label": "情敌冲突",
+      "cooldown": 18,
+      "tags": ["conflict", "triangle"]
+    },
+    "reconciliation": {
+      "category": "relationship",
+      "label": "修复关系",
+      "cooldown": 15,
+      "tags": ["bond", "repair"]
+    },
+    "romance_triangle": {
+      "category": "relationship",
+      "label": "情感三角",
+      "cooldown": 25,
+      "tags": ["triangle", "tension"]
+    },
+    "clue_found": {
+      "category": "objective",
+      "label": "关键线索",
+      "cooldown": 10,
+      "tags": ["investigation", "progress"]
+    },
+    "breakthrough": {
+      "category": "objective",
+      "label": "调查突破",
+      "cooldown": 15,
+      "tags": ["progress", "milestone"]
+    },
+    "reveal_truth": {
+      "category": "objective",
+      "label": "真相揭露",
+      "cooldown": 30,
+      "tags": ["climax", "reveal"]
+    },
+    "rebellion": {
+      "category": "world",
+      "label": "叛乱爆发",
+      "cooldown": 25,
+      "tags": ["world", "conflict"]
+    },
+    "war": {
+      "category": "world",
+      "label": "战争爆发",
+      "cooldown": 30,
+      "tags": ["world", "war"]
+    },
+    "assassination": {
+      "category": "world",
+      "label": "刺杀阴谋",
+      "cooldown": 20,
+      "tags": ["world", "danger"]
+    },
+    "political_pressure": {
+      "category": "world",
+      "label": "政治施压",
+      "cooldown": 12,
+      "tags": ["world", "political"]
+    },
+    "act_transition": {
+      "category": "plot",
+      "label": "幕次转折",
+      "cooldown": 40,
+      "tags": ["plot", "structure"]
+    },
+    "boss_intro": {
+      "category": "plot",
+      "label": "强敌登场",
+      "cooldown": 25,
+      "tags": ["plot", "antagonist"]
+    },
+    "major_twist": {
+      "category": "plot",
+      "label": "重大转折",
+      "cooldown": 35,
+      "tags": ["plot", "twist"]
+    }
+  }
+}

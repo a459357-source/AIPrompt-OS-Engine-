@@ -165,13 +165,7 @@ def _build_prompt_unified(current_choice: str | None) -> tuple[str, str]:
     relationship_context = _relationship_context(world_pack)
     rel_memory_context = _relationship_memory_context(session_state, world_pack, brain_names)
     rel_dynamics_context = _relationship_dynamics_context(session_state, world_pack, brain_names)
-    rel_event_candidates = _relationship_event_candidates(session_state, world_pack)
-    if rel_event_candidates:
-        force_prompt = (
-            f"{force_prompt}\n{rel_event_candidates}".strip()
-            if force_prompt
-            else rel_event_candidates
-        )
+    director_plan = _director_plan_context(session_state, world_pack, memory)
 
     user_raw = template.get("user", "")
     user_prompt = (
@@ -182,6 +176,7 @@ def _build_prompt_unified(current_choice: str | None) -> tuple[str, str]:
         .replace("{{HOT_CONTEXT}}", hot_context)
         .replace("{{OBJECTIVES_CONTEXT}}", objectives_context)
         .replace("{{DIRECTOR_ADVICE}}", director_advice)
+        .replace("{{DIRECTOR_PLAN}}", director_plan)
         .replace("{{MODE_CONTEXT_USER}}", mode_ctx.user_block)
         .replace("{{ENGINE_RULES}}", compact_engine_rules(engine_config))
         .replace("{{FORCE_EVENT_PROMPT}}", force_prompt)
@@ -282,13 +277,7 @@ def _build_prompt_legacy_extreme(current_choice: str | None) -> tuple[str, str]:
 
     rel_memory_context = _relationship_memory_context(session_state, world_pack, brain_names)
     rel_dynamics_context = _relationship_dynamics_context(session_state, world_pack, brain_names)
-    rel_event_candidates = _relationship_event_candidates(session_state, world_pack)
-    if rel_event_candidates:
-        force_prompt = (
-            f"{force_prompt}\n{rel_event_candidates}".strip()
-            if force_prompt
-            else rel_event_candidates
-        )
+    director_plan = _director_plan_context(session_state, world_pack, memory)
 
     user_raw = template.get("user", "")
     user_prompt = (
@@ -298,6 +287,7 @@ def _build_prompt_legacy_extreme(current_choice: str | None) -> tuple[str, str]:
         .replace("{{RECENT_SUMMARIES}}", recent_summaries)
         .replace("{{HOT_CONTEXT}}", hot_context)
         .replace("{{DIRECTOR_ADVICE}}", director_advice)
+        .replace("{{DIRECTOR_PLAN}}", director_plan)
         .replace("{{INTIMACY_ESCALATION_HINT}}", config.intimacy_escalation_hint(session_state))
         .replace("{{ENGINE_RULES}}", compact_engine_rules(engine_config))
         .replace("{{FORCE_EVENT_PROMPT}}", force_prompt)
@@ -452,18 +442,23 @@ def _relationship_dynamics_context(
     )
 
 
-def _relationship_event_candidates(session_state: dict, world_pack: dict) -> str:
-    if not config.RELATIONSHIP_ENGINE_ENABLED:
+def _director_plan_context(session_state: dict, world_pack: dict, memory: dict) -> str:
+    if not config.EVENT_DIRECTOR_ENABLED:
         return ""
+    from engine.event_director import build_and_record_director_plan
+    from engine.plot_director import ensure_plot_state
     from engine.relationship_core import ensure_graph
-    from engine.relationship_event_builder import format_event_candidates_for_director
     from engine.relationship_recall import ensure_dynamics_store, ensure_memory_store
 
-    store = ensure_memory_store(None)
-    dyn = ensure_dynamics_store(None)
-    graph = ensure_graph(world_pack, session=session_state)
-    return format_event_candidates_for_director(
-        store, graph, session_state, world_pack, dynamics_store=dyn,
+    plot_state = ensure_plot_state(world_pack) if config.PLOT_DIRECTOR_ENABLED else None
+    return build_and_record_director_plan(
+        session_state,
+        world_pack,
+        memory=memory,
+        graph=ensure_graph(world_pack, session=session_state),
+        relationship_memory=ensure_memory_store(None),
+        relationship_dynamics=ensure_dynamics_store(None),
+        plot_state=plot_state,
     )
 
 

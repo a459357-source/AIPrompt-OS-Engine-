@@ -43,6 +43,14 @@ def _load_plot_state() -> dict:
         return {}
 
 
+def _load_event_history() -> dict:
+    from engine.event_director import load_event_history
+    try:
+        return load_event_history()
+    except Exception:
+        return {"version": 1, "records": []}
+
+
 def _load_relationship_graph() -> dict:
     try:
         data = io_utils.read_json(config.RELATIONSHIP_GRAPH_PATH)
@@ -96,6 +104,7 @@ def save(slot: str) -> dict | None:
         relationship_memory = _load_relationship_memory()
         relationship_dynamics = _load_relationship_dynamics()
         plot_state = _load_plot_state()
+        event_history = _load_event_history()
 
         chapter = ""
         if config.CHAPTER_PATH.exists():
@@ -120,6 +129,7 @@ def save(slot: str) -> dict | None:
             "relationship_dynamics": relationship_dynamics,
             "candidate_npcs": _load_candidate_pool(),
             "plot_state": plot_state,
+            "event_history": event_history,
             "chapter": chapter,
             "content_weights": config.CONTENT_WEIGHTS,
             "experience_mode": config.get_experience_mode(),
@@ -193,6 +203,12 @@ def load(slot: str) -> dict | None:
             from engine.plot_director import ensure_plot_state
             world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
             ensure_plot_state(world_pack)
+        event_history = snapshot.get("event_history")
+        if isinstance(event_history, dict) and isinstance(event_history.get("records"), list):
+            io_utils.write_json(config.EVENT_HISTORY_PATH, event_history)
+        elif config.EVENT_DIRECTOR_ENABLED:
+            from engine.event_director import empty_event_history, save_event_history
+            save_event_history(empty_event_history())
         rel_graph = snapshot.get("relationship_graph")
         rel_mem = snapshot.get("relationship_memory")
         if isinstance(rel_graph, dict) and rel_graph.get("edges") is not None:

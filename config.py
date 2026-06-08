@@ -169,6 +169,9 @@ PLOT_STATE_PATH      = DATA_DIR / "plot_state.json"
 RELATIONSHIP_GRAPH_PATH = DATA_DIR / "relationship_graph.json"
 RELATIONSHIP_MEMORY_PATH = DATA_DIR / "relationship_memory.json"
 RELATIONSHIP_DYNAMICS_PATH = DATA_DIR / "relationship_dynamics.json"
+EVENT_CATALOG_PATH = DATA_DIR / "event_catalog.json"
+EVENT_CATALOG_DEFAULT_PATH = Path(__file__).resolve().parent / "packaging" / "defaults" / "event_catalog.json"
+EVENT_HISTORY_PATH = DATA_DIR / "event_history.json"
 LOG_PATH             = DATA_DIR / "app.log"
 ERROR_LOG_PATH       = DATA_DIR / "error.log"
 
@@ -209,6 +212,12 @@ RELATIONSHIP_DYNAMICS_MAX_CHARS = 500
 RELATIONSHIP_DECAY_INACTIVE_TURNS = 20
 RELATIONSHIP_INFLUENCE_COEFF = 0.2
 RELATIONSHIP_MOMENTUM_CAP = 30.0
+
+# ── V5.2 Event Director (Phase A) ───────────────────────────────────
+EVENT_DIRECTOR_ENABLED = True
+EVENT_DIRECTOR_MAX_PLANS = 3
+EVENT_DIRECTOR_PLAN_MAX_CHARS = 500
+EVENT_DIRECTOR_PLAN_MAX_TOKENS = 300
 
 # ── V3.2 Objective System ─────────────────────────────────────────
 OBJECTIVE_SYSTEM_ENABLED = True

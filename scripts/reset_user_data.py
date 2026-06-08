@@ -41,6 +41,7 @@ REMOVE_PATHS = (
     config.RELATIONSHIP_GRAPH_PATH,
     config.RELATIONSHIP_MEMORY_PATH,
     config.RELATIONSHIP_DYNAMICS_PATH,
+    config.EVENT_HISTORY_PATH,
 )
 
 # Log files including rotation backups (app.log.1, etc.)
