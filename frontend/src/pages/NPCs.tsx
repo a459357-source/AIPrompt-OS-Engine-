@@ -223,6 +223,7 @@ export default function NPCs() {
             secret: selected.secret,
             background: selected.background,
             special_ability: selected.special_ability,
+            image_url: selected.image_url,
           }}
           index={0}
           isMain={selected.isMain}
@@ -323,6 +324,7 @@ export default function NPCs() {
                   secret: c.secret,
                   background: c.background,
                   special_ability: c.special_ability,
+                  image_url: c.image_url,
                 }}
                 index={i}
                 isMain={c.isMain}

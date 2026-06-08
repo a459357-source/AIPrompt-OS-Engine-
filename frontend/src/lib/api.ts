@@ -257,6 +257,7 @@ export interface NpcData {
   trust_pct: number
   flags: string[]
   personality?: import('@/lib/types').PersonalityBrain
+  image_url?: string
 }
 
 export type PersonalityBrain = import('@/lib/types').PersonalityBrain
@@ -401,7 +402,8 @@ export interface DashboardData {
   node_count: number
   api_calls: number
   total_tokens: number
-  characters: { name: string; trust_pct: number; relation: string; flags: string[] }[]
+  characters: { name: string; trust_pct: number; relation: string; flags: string[]; image_url?: string }[]
+  faction_images?: Record<string, string>
   history: unknown[]
   analytics?: {
     metrics_curves?: Record<string, { labels: number[]; datasets: { name: string; data: number[] }[]; label: string }>

@@ -28,6 +28,12 @@ export function CharacterCard({ character, index, isMain, onRemove, className, t
       transition={{ duration: 0.2 }}
     >
       <Card className={`overflow-hidden border-neural-cyan/20 ${isMain ? 'border-neural-magenta/40 bg-neural-magenta/5 glass-panel-glow' : 'glass-panel'} ${className || ''}`}>
+        {/* ── V6: Character portrait ── */}
+        {c.image_url && (
+          <div className="w-full h-40 overflow-hidden bg-neural-void/60 border-b border-game-border/30">
+            <img src={c.image_url} alt={c.name || ''} className="w-full h-full object-cover" loading="lazy" />
+          </div>
+        )}
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 flex-wrap">

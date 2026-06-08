@@ -251,6 +251,15 @@ async def api_npcs():
     mem_chars = memory.get("characters", {})
     ensure_personalities(memory, world_pack)
 
+    # ── V6: inject image_url from visual_registry ──
+    char_image_map: dict[str, str] = {}
+    try:
+        from engine.game_runtime import read_all_character_visuals
+        for v in read_all_character_visuals():
+            char_image_map[v["name"]] = v["image_url"]
+    except Exception:
+        pass
+
     result = []
     for ch in chars:
         name = ch.get("name", "")
@@ -273,6 +282,7 @@ async def api_npcs():
             "trust_pct": round(trust_val * 100),
             "flags": mem.get("flags", []),
             "personality": personality,
+            "image_url": char_image_map.get(name, ""),
         })
 
     stats = {
@@ -488,6 +498,17 @@ async def api_dashboard():
     branch_count = len(edges)
 
     # Character trust
+    # ── V6: inject image_url from visual_registry ──
+    char_image_map: dict[str, str] = {}
+    faction_image_map: dict[str, str] = {}
+    try:
+        from engine.game_runtime import read_all_character_visuals, read_all_faction_visuals
+        for v in read_all_character_visuals():
+            char_image_map[v["name"]] = v["image_url"]
+        for v in read_all_faction_visuals():
+            faction_image_map[v["name"]] = v["image_url"]
+    except Exception:
+        pass
     char_trust = []
     for ch in chars:
         name = ch.get("name", "")
@@ -497,6 +518,7 @@ async def api_dashboard():
             "trust_pct": int(mem.get("trust", 0.5) * 100),
             "relation": ch.get("relationship", [""])[0] if ch.get("relationship") else "",
             "flags": mem.get("flags", []),
+            "image_url": char_image_map.get(name, ""),
         })
 
     # API usage
@@ -541,6 +563,7 @@ async def api_dashboard():
         "api_calls": api_calls,
         "total_tokens": total_tokens,
         "characters": char_trust,
+        "faction_images": faction_image_map,
         "history": state.get("history", [])[-5:],
         "analytics": analytics,
         "story_graph": {

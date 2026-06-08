@@ -477,8 +477,13 @@ export default function Dashboard() {
                 ) : (
                   data.characters.map((c) => (
                     <div key={c.name} className="space-y-1.5">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-game-text font-medium">{c.name}</span>
+                      <div className="flex items-center gap-3 text-xs">
+                        {c.image_url && (
+                          <div className="w-8 h-8 rounded-full overflow-hidden border border-game-border/50 shrink-0 bg-neural-void/60">
+                            <img src={c.image_url} alt={c.name} className="w-full h-full object-cover" loading="lazy" />
+                          </div>
+                        )}
+                        <span className="text-game-text font-medium flex-1">{c.name}</span>
                         <span className="text-game-dim">{c.trust_pct}%</span>
                       </div>
                       <div className="h-2.5 bg-game-border rounded-full overflow-hidden">
@@ -822,9 +827,18 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {ws.factions.map((f) => (
                     <div key={f.name} className="text-sm border border-game-border/40 rounded-lg p-4 space-y-2">
-                      <div className="flex justify-between gap-2">
-                        <span className="font-bold">{f.name}</span>
-                        <Badge variant="outline" size="sm">{f.reputation_pct > 0 ? '+' : ''}{f.reputation_pct}%</Badge>
+                      <div className="flex items-center gap-3">
+                        {data?.faction_images?.[f.name] && (
+                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-game-border/50 shrink-0 bg-neural-void/60">
+                            <img src={data.faction_images[f.name]} alt={f.name} className="w-full h-full object-cover" loading="lazy" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between gap-2">
+                            <span className="font-bold">{f.name}</span>
+                            <Badge variant="outline" size="sm">{f.reputation_pct > 0 ? '+' : ''}{f.reputation_pct}%</Badge>
+                          </div>
+                        </div>
                       </div>
                       <p className="text-xs text-game-dim">{f.relation_to_player} · 影响力 {f.influence} · 首领 {f.leader || '—'}</p>
                       {f.goals.length > 0 && <p className="text-xs text-game-muted">目标：{f.goals.join('；')}</p>}

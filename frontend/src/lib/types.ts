@@ -16,6 +16,7 @@ export interface Character {
   personality?: PersonalityBrain
   notes?: string
   trust_pct?: number   // 实际信任度 0-100，来自 memory.json（NPC 页面展示用）
+  image_url?: string   // V6: 角色立绘
 }
 
 export interface PersonalityBrain {

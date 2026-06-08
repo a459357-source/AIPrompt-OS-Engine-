@@ -1921,16 +1921,33 @@ export default function Game() {
                     const { action, attitude, effectText } = parsed
                     const effects = showConsequences && effectText ? parseOptionEffects(effectText) : null
                     const letter = String.fromCharCode(65 + i)
+                    // ── V6: Option character avatars ──
+                    const hintedChars = effects?.hints
+                      ?.filter((h) => h.kind === 'character' && h.name)
+                      .map((h) => h.name) ?? []
+                    const visualByChar = new Map(visuals.characters.map((v) => [v.name, v.image_url]))
+                    const optionAvatars = [...new Set(hintedChars)]
+                      .map((n) => visualByChar.get(n))
+                      .filter(Boolean) as string[]
                     return (
                       <Button key={`${turn}-${i}`} variant="neural" disabled={choosing}
                         onClick={() => handleChoice(letter)}
                         className="w-full flex flex-col items-center justify-center text-center h-auto py-2 px-3 transition-all"
                       >
                         <div className="flex w-full flex-col gap-0.5 min-w-0 items-center">
-                          <div className="flex gap-2 min-w-0 justify-center text-center w-full">
+                          <div className="flex gap-2 min-w-0 justify-center text-center w-full items-center">
                             <span className="text-game-accent font-bold shrink-0 text-sm leading-snug">{letter}.</span>
                             <span className="text-sm font-medium text-game-text leading-snug text-center">{action}</span>
                           </div>
+                          {optionAvatars.length > 0 && (
+                            <div className="flex flex-wrap justify-center gap-1.5 mt-1">
+                              {optionAvatars.map((url, j) => (
+                                <div key={j} className="w-7 h-7 rounded-full overflow-hidden border border-game-border/40 bg-neural-void/40">
+                                  <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                </div>
+                              ))}
+                            </div>
+                          )}
                           {showConsequences && (
                             <OptionEffectsInline
                               effects={effects}
