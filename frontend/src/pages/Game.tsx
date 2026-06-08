@@ -218,7 +218,7 @@ function GameStatusList({
         <p className="text-xs text-game-dim text-center py-4">暂无数据</p>
       )}
       {characters.map((c) => {
-        const imageUrl = visualByChar.get(c.name)
+        const img = visualByChar.get(c.name)
         return (
         <div key={`c-${c.name}`} className="space-y-1.5">
           <div className="flex items-center justify-between">
@@ -234,9 +234,9 @@ function GameStatusList({
               <Badge variant="outline" size="sm">{c.role}</Badge>
             </div>
           </div>
-          {imageUrl && (
+          {img && (
             <div className="w-full rounded-md overflow-hidden border border-game-border/50">
-              <img src={imageUrl} alt={c.name} className="w-full h-32 object-cover" loading="lazy" />
+              <img src={img} alt={c.name} className="w-full h-32 object-cover" loading="lazy" />
             </div>
           )}
           {c.relation && <p className="text-xs text-game-muted">{c.relation}</p>}
@@ -245,18 +245,22 @@ function GameStatusList({
           )}
           <Separator />
         </div>
-      )})}
+        )
+      })}
 
       {factions.length > 0 && characters.length > 0 && (
         <p className="text-xs text-game-dim font-bold pt-2">🏛️ 势力</p>
       )}
       {factions.map((f) => {
-        const factionImageUrl = visualByFaction.get(f.name)
+        const fImg = visualByFaction.get(f.name)
+        const attitudes = (f.attitudes || [])
+          .filter(a => Math.abs((a.attitude ?? 0.5) - 0.5) >= 0.15)
+          .slice(0, 3)
         return (
         <div key={`f-${f.name}`} className="space-y-1.5">
-          {factionImageUrl && (
+          {fImg && (
             <div className="w-full rounded-md overflow-hidden border border-game-border/50">
-              <img src={factionImageUrl} alt={f.name} className="w-full h-16 object-cover" loading="lazy" />
+              <img src={fImg} alt={f.name} className="w-full h-16 object-cover" loading="lazy" />
             </div>
           )}
           <div className="flex items-center justify-between">
@@ -270,17 +274,23 @@ function GameStatusList({
             <AffectionBar value={(f.reputation ?? 0.5) * 100} adultMode={adultMode} />
             <span className="text-xs text-game-dim tabular-nums">{Math.round((f.reputation ?? 0.5) * 100)}%</span>
           </div>
-          {(f.attitudes || []).filter(a => Math.abs((a.attitude ?? 0.5) - 0.5) >= 0.15).slice(0, 3).map(a => (
-            <div key={a.target} className="flex items-center gap-1 text-[10px]">
-              <span className="text-game-dim">→ {a.target}</span>
-              <span className={a.label === '敌对' || a.label === '冷淡' ? 'text-red-400' : a.label === '同盟' || a.label === '友好' ? 'text-green-400' : 'text-game-muted'}>
-                {a.label}
-              </span>
-            </div>
-          ))}
+          {attitudes.map(a => {
+            const labelColor = a.label === '敌对' || a.label === '冷淡'
+              ? 'text-red-400'
+              : a.label === '同盟' || a.label === '友好'
+                ? 'text-green-400'
+                : 'text-game-muted'
+            return (
+              <div key={a.target} className="flex items-center gap-1 text-[10px]">
+                <span className="text-game-dim">→ {a.target}</span>
+                <span className={labelColor}>{a.label}</span>
+              </div>
+            )
+          })}
           <Separator />
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
