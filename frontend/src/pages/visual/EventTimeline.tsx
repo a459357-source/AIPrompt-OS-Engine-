@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronDown, ChevronRight, Image } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ChevronDown, ChevronRight, Image, Play } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { enterNarrativeFromEvent } from '@/lib/api'
 import { Card, CardContent } from '@/components/ui/card'
 import { getEventTimeline, type VisualEventView } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 
 function EventRow({ event }: { event: VisualEventView }) {
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const thumb = event.scene_images[0] || event.linked_assets[0]?.image_url
 
@@ -60,6 +64,18 @@ function EventRow({ event }: { event: VisualEventView }) {
             <div>prompt_hash: {event.prompt_hash?.slice(0, 16) || '—'}</div>
             <div>timestamp: {event.timestamp || '—'}</div>
           </div>
+          <Button
+            size="sm"
+            className="gap-1"
+            onClick={async (e) => {
+              e.stopPropagation()
+              const res = await enterNarrativeFromEvent(event.event_id)
+              navigate(`/visual/narrative/node/${encodeURIComponent(res.narrative_event_id)}`)
+            }}
+          >
+            <Play className="w-3.5 h-3.5" />
+            进入该事件剧情
+          </Button>
         </CardContent>
       )}
     </Card>

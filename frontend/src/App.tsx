@@ -17,6 +17,8 @@ import CharacterGallery from './pages/visual/CharacterGallery'
 import WorldExplorer from './pages/visual/WorldExplorer'
 import EventTimeline from './pages/visual/EventTimeline'
 import VisualDebug from './pages/visual/VisualDebug'
+import NarrativeHub from './pages/visual/NarrativeHub'
+import NarrativeNodePage from './pages/visual/NarrativeNode'
 
 function AppRoutes() {
   const location = useLocation()
@@ -33,6 +35,8 @@ function AppRoutes() {
         <Route path="world" element={<WorldExplorer />} />
         <Route path="events" element={<EventTimeline />} />
         <Route path="debug" element={<VisualDebug />} />
+        <Route path="narrative" element={<NarrativeHub />} />
+        <Route path="narrative/node/:eventId" element={<NarrativeNodePage />} />
       </Route>
       <Route path="/settings" element={<Settings />} />
       <Route path="/" element={<NewStory />} />

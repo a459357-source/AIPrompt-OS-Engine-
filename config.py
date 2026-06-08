@@ -180,6 +180,14 @@ VISUAL_IDENTITY_REGISTRY_DEFAULT_PATH = (
     Path(__file__).resolve().parent / "packaging" / "defaults" / "visual_identity_registry.json"
 )
 VISUAL_OUTPUT_DIR = OUTPUT_DIR / "visual"
+NARRATIVE_STATE_PATH = DATA_DIR / "narrative_state.json"
+NARRATIVE_STATE_DEFAULT_PATH = (
+    Path(__file__).resolve().parent / "packaging" / "defaults" / "narrative_state.json"
+)
+NARRATIVE_ROUTES_PATH = DATA_DIR / "narrative_routes.json"
+NARRATIVE_ROUTES_DEFAULT_PATH = (
+    Path(__file__).resolve().parent / "packaging" / "defaults" / "narrative_routes.json"
+)
 LOG_PATH             = DATA_DIR / "app.log"
 ERROR_LOG_PATH       = DATA_DIR / "error.log"
 

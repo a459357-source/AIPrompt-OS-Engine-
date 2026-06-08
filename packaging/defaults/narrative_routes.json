@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "visual_asset_map": {},
+  "character_entry": {},
+  "location_entry": {},
+  "nodes": {
+    "midnight_talk": {
+      "context": "深夜宫廷密谈，气氛紧绷，你必须做出抉择。",
+      "choices": [
+        {
+          "choice_id": "c1",
+          "text": "追问长公主的真实意图",
+          "target_event_id": "confession",
+          "tone": "aggressive"
+        },
+        {
+          "choice_id": "c2",
+          "text": "先观察局势",
+          "target_event_id": "political_pressure",
+          "tone": "cautious"
+        },
+        {
+          "choice_id": "c3",
+          "text": "离开现场",
+          "target_event_id": "act_transition",
+          "tone": "neutral"
+        }
+      ]
+    },
+    "confession": {
+      "context": "告白时刻临近，情感与政治交织。",
+      "choices": [
+        {
+          "choice_id": "c1",
+          "text": "接受并深入对话",
+          "target_event_id": "reconciliation",
+          "tone": "warm"
+        },
+        {
+          "choice_id": "c2",
+          "text": "保持距离",
+          "target_event_id": "jealousy",
+          "tone": "cautious"
+        }
+      ]
+    },
+    "political_pressure": {
+      "context": "各方势力施压，局势一触即发。",
+      "choices": [
+        {
+          "choice_id": "c1",
+          "text": "公开表态",
+          "target_event_id": "rebellion",
+          "tone": "bold"
+        },
+        {
+          "choice_id": "c2",
+          "text": "暗中调查",
+          "target_event_id": "clue_found",
+          "tone": "cautious"
+        }
+      ]
+    },
+    "clue_found": {
+      "context": "关键线索浮现，真相近在咫尺。",
+      "choices": [
+        {
+          "choice_id": "c1",
+          "text": "追查到底",
+          "target_event_id": "breakthrough",
+          "tone": "aggressive"
+        },
+        {
+          "choice_id": "c2",
+          "text": "暂缓行动",
+          "target_event_id": "act_transition",
+          "tone": "neutral"
+        }
+      ]
+    },
+    "act_transition": {
+      "context": "幕次转折，故事进入新阶段。",
+      "choices": [
+        {
+          "choice_id": "c1",
+          "text": "继续主线",
+          "target_event_id": "major_twist",
+          "tone": "neutral"
+        },
+        {
+          "choice_id": "c2",
+          "text": "关注关系线",
+          "target_event_id": "midnight_talk",
+          "tone": "warm"
+        }
+      ]
+    }
+  }
+}

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Image, Link2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Image, Link2, Play } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { enterNarrativeFromLocation } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { getWorldExplorer, type VisualAssetItem, type VisualIdentityView, type VisualWorldView } from '@/lib/api'
 import { logger } from '@/lib/logger'
 
-function PreviewCard({ item }: { item: VisualAssetItem }) {
+function PreviewCard({ item, onEnter }: { item: VisualAssetItem; onEnter?: () => void }) {
   return (
     <div className="rounded-lg border border-neural-cyan/15 bg-neural-glass/30 overflow-hidden">
       <div className="aspect-video bg-neural-void/80">
@@ -17,9 +20,15 @@ function PreviewCard({ item }: { item: VisualAssetItem }) {
           </div>
         )}
       </div>
-      <div className="p-2">
+      <div className="p-2 space-y-2">
         <div className="text-sm font-medium truncate">{item.display_name || item.entity_id}</div>
         <div className="text-[10px] text-game-dim font-neural-mono truncate">{item.identity_id || '—'}</div>
+        {onEnter && (
+          <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1" onClick={onEnter}>
+            <Play className="w-3 h-3" />
+            进入区域剧情
+          </Button>
+        )}
       </div>
     </div>
   )
@@ -42,6 +51,7 @@ function CharacterChip({ item }: { item: VisualIdentityView }) {
 }
 
 export default function WorldExplorer() {
+  const navigate = useNavigate()
   const [world, setWorld] = useState<VisualWorldView | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -76,7 +86,16 @@ export default function WorldExplorer() {
       <section>
         <h3 className="text-xs text-game-dim mb-2 uppercase tracking-wide">地点</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-          {world.locations.map((l) => <PreviewCard key={l.asset_id} item={l} />)}
+          {world.locations.map((l) => (
+            <PreviewCard
+              key={l.asset_id}
+              item={l}
+              onEnter={async () => {
+                const res = await enterNarrativeFromLocation(l.display_name || l.entity_id)
+                navigate(`/visual/narrative/node/${encodeURIComponent(res.narrative_event_id)}`)
+              }}
+            />
+          ))}
           {!world.locations.length && <p className="text-sm text-game-dim col-span-full">暂无地点图</p>}
         </div>
       </section>

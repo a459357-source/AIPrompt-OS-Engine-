@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Image } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ChevronLeft, ChevronRight, Image, Play } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { enterNarrativeFromCharacter } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { getCharacterGallery, type VisualIdentityView } from '@/lib/api'
@@ -7,6 +10,7 @@ import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 
 export default function CharacterGallery() {
+  const navigate = useNavigate()
   const [items, setItems] = useState<VisualIdentityView[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [assetIndex, setAssetIndex] = useState(0)
@@ -124,6 +128,17 @@ export default function CharacterGallery() {
                   <Badge key={k} variant="outline" className="text-[10px]">{k}: {String(v)}</Badge>
                 ))}
               </div>
+              <Button
+                size="sm"
+                className="gap-1"
+                onClick={async () => {
+                  const res = await enterNarrativeFromCharacter(selected.entity_name)
+                  navigate(`/visual/narrative/node/${encodeURIComponent(res.narrative_event_id)}`)
+                }}
+              >
+                <Play className="w-3.5 h-3.5" />
+                进入该角色剧情
+              </Button>
             </CardContent>
           </Card>
 

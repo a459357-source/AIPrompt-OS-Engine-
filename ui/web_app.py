@@ -75,12 +75,14 @@ from ui.routes.game import router as game_router
 from ui.routes.world import router as world_router
 from ui.routes.settings import router as settings_router
 from ui.routes.visual import router as visual_router
+from ui.routes.narrative import router as narrative_router
 
 app.include_router(api_router)
 app.include_router(game_router)
 app.include_router(world_router)
 app.include_router(settings_router)
 app.include_router(visual_router)
+app.include_router(narrative_router)
 
 
 if config.has_bundled_frontend():

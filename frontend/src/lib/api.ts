@@ -1059,6 +1059,85 @@ export async function getVisualDebug(): Promise<{
   return getJson('/api/visual/debug')
 }
 
+export interface NarrativeChoice {
+  choice_id: string
+  text: string
+  target_event_id: string
+  target_event_hint?: string
+  tone: string
+}
+
+export interface NarrativeNode {
+  event_id: string
+  visual_event_id?: string
+  label: string
+  scene_image: string
+  context: string
+  characters: { name: string; identity_id: string; traits: Record<string, unknown> }[]
+  current_state: { turn: number; scene: string; status: string; director_state: string }
+  choices: NarrativeChoice[]
+  next_events: string[]
+  continuity: {
+    identity_ids: string[]
+    style_anchors: Record<string, Record<string, unknown>>
+    prompt_hint: string
+    visual_constraints: string[]
+  }
+}
+
+export interface NarrativeState {
+  mode: 'explore' | 'narrative'
+  current_event_id: string
+  entry_type: string
+  choice_history: { event_id: string; choice_id: string; next_event_id: string; at: number }[]
+}
+
+async function postForm<T>(url: string, fields: Record<string, string>): Promise<T> {
+  const body = new URLSearchParams(fields)
+  const res = await apiFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<T>
+}
+
+export async function getNarrativeState(): Promise<NarrativeState> {
+  return getJson<NarrativeState>('/api/narrative/state')
+}
+
+export async function setNarrativeMode(mode: 'explore' | 'narrative'): Promise<NarrativeState> {
+  return postForm<NarrativeState>('/api/narrative/mode', { mode })
+}
+
+export async function getNarrativeNode(eventId: string): Promise<NarrativeNode> {
+  return getJson<NarrativeNode>(`/api/narrative/node/${encodeURIComponent(eventId)}`)
+}
+
+export async function routeNarrativeChoice(
+  eventId: string,
+  choiceId: string,
+): Promise<{ ok: boolean; next_event_id?: string; node?: NarrativeNode; error?: string }> {
+  return postForm('/api/narrative/route', { event_id: eventId, choice_id: choiceId })
+}
+
+export async function enterNarrativeFromEvent(eventId: string): Promise<{ narrative_event_id: string; node: NarrativeNode }> {
+  return postForm('/api/narrative/enter/event', { event_id: eventId })
+}
+
+export async function enterNarrativeFromCharacter(
+  characterName: string,
+): Promise<{ narrative_event_id: string; node: NarrativeNode }> {
+  return postForm('/api/narrative/enter/character', { character_name: characterName })
+}
+
+export async function enterNarrativeFromLocation(
+  locationName: string,
+): Promise<{ narrative_event_id: string; node: NarrativeNode }> {
+  return postForm('/api/narrative/enter/location', { location_name: locationName })
+}
+
 export async function supplementLore(text: string): Promise<SupplementLoreResult> {
   const fd = new FormData()
   fd.append('text', text.trim())
