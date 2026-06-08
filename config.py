@@ -259,7 +259,7 @@ DIRECTOR_MAX_PENDING = 2
 
 # ── V6.0 Visual Narrative System (Phase A/B) ─────────────────────────
 VISUAL_SYSTEM_ENABLED = True
-VISUAL_PROVIDER = "stub"
+VISUAL_PROVIDER = "agnes"
 VISUAL_CACHE_ENABLED = True
 VISUAL_MAX_RETRIES = 3
 AGNES_API_BASE_DEFAULT = "https://api.agnes-ai.com/v1"
