@@ -11,6 +11,9 @@ Design contract:
   - UI = pure render (never triggers generation)
 """
 
+# NARRATIVE SYSTEM IS PASSIVE ONLY — read-only metadata for UI/visuals.
+# It must NEVER control story, options, or game flow.
+
 from __future__ import annotations
 
 import logging

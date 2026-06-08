@@ -2,6 +2,9 @@
 visual_continuity.py — V6.6 visual continuity hints (read-only constraints)
 """
 
+# NARRATIVE SYSTEM IS PASSIVE ONLY — read-only metadata for UI/visuals.
+# It must NEVER control story, options, or game flow.
+
 from __future__ import annotations
 
 from typing import Any

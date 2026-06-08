@@ -1,5 +1,8 @@
 """V6.6 Narrative Entry Layer — routing and display only (no generation)."""
 
+# NARRATIVE SYSTEM IS PASSIVE ONLY — read-only metadata for UI/visuals.
+# It must NEVER control story, options, or game flow.
+
 from engine.narrative.narrative_entry import build_narrative_node, get_narrative_hub
 from engine.narrative.narrative_router import (
     resolve_character_entry,

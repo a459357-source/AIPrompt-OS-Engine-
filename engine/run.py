@@ -17,6 +17,13 @@ Each turn:
   6. (CLI/Web) Show options and wait for player choice
 """
 
+# NARRATIVE SYSTEM IS PASSIVE ONLY — read-only metadata for UI/visuals.
+# It must NEVER control story, options, or game flow.
+
+# ONLY SOURCE OF TRUTH FOR GAME FLOW:
+#   response = call_deepseek(...)   # AI generates story + options
+#   DO NOT replace options from any other source (e.g. narrative_routes).
+
 import argparse
 import json
 import logging

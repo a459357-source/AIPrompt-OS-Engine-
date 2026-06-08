@@ -2,6 +2,9 @@
 narrative_entry.py — V6.6 Narrative Node builder (read-only assembly)
 """
 
+# NARRATIVE SYSTEM IS PASSIVE ONLY — read-only metadata for UI/visuals.
+# It must NEVER control story, options, or game flow.
+
 from __future__ import annotations
 
 from typing import Any

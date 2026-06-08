@@ -9,6 +9,9 @@ Design contract:
   - choices is always [] — AI options remain the single source of truth.
 """
 
+# NARRATIVE SYSTEM IS PASSIVE ONLY — read-only metadata for UI/visuals.
+# It must NEVER control story, options, or game flow.
+
 from __future__ import annotations
 
 import logging

@@ -2,6 +2,9 @@
 narrative_state.py — V6.6 narrative session state (separate from explore mode)
 """
 
+# NARRATIVE SYSTEM IS PASSIVE ONLY — read-only metadata for UI/visuals.
+# It must NEVER control story, options, or game flow.
+
 from __future__ import annotations
 
 import copy

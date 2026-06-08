@@ -2,6 +2,9 @@
 narrative_router.py — V6.6 choice → next_event mapping (no generation)
 """
 
+# NARRATIVE SYSTEM IS PASSIVE ONLY — read-only metadata for UI/visuals.
+# It must NEVER control story, options, or game flow.
+
 from __future__ import annotations
 
 import copy
