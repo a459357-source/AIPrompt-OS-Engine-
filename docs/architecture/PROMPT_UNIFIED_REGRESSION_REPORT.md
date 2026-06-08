@@ -9,7 +9,7 @@ Phase 3A — Prompt Unified Architecture 回归分析
 | 项 | 值 |
 |---|---|
 | 开始时间 | 2026-06-08T05:01:08 |
-| 结束时间 | 2026-06-08T06:36:28 |
+| 结束时间 | 2026-06-08T08:40:17 |
 | 模型 | deepseek-chat |
 | 每场景回合 | 10 |
 | 场景数 | 10 |
@@ -35,15 +35,15 @@ Phase 3A — Prompt Unified Architecture 回归分析
 
 | 指标 | Legacy | Unified | 变化 |
 |---|---:|---:|---:|
-| avg_story_length | 2813.1333 | 2672.8 | -5.0% |
-| objective_progress_rate | 0.1667 | 0.9 | +439.9% |
-| relationship_activity_rate | 0.1957 | 0.1958 | +0.1% |
-| brain_consistency_score | 1.0 | 0.9889 | -1.1% |
-| context_usage_score | 0.9889 | 0.9889 | 0.0% |
-| avg_prompt_tokens | 2434.0333 | 2268.5222 | -6.8% |
-| avg_completion_tokens | 545.1111 | 364.8667 | -33.1% |
-| estimated_cost (USD) | 0.0045 | 0.0042 | -6.7% |
-| avg_latency (s) | 31.7133 | 32.1556 | +1.4% |
+| avg_story_length | 2825.15 | 2660.43 | -5.8% |
+| objective_progress_rate | 0.16 | 0.9 | +462.5% |
+| relationship_activity_rate | 0.1899 | 0.192 | +1.1% |
+| brain_consistency_score | 1.0 | 0.99 | -1.0% |
+| context_usage_score | 0.99 | 0.99 | 0.0% |
+| avg_prompt_tokens | 2330.73 | 2269.28 | -2.6% |
+| avg_completion_tokens | 484.09 | 364.24 | -24.8% |
+| estimated_cost (USD) | 0.0046 | 0.0042 | -8.7% |
+| avg_latency (s) | 31.167 | 31.963 | +2.5% |
 
 ## 4. 分类汇总
 
@@ -79,14 +79,14 @@ Phase 3A — Prompt Unified Architecture 回归分析
 
 | 场景 | objective Δ | relationship Δ | brain Δ |
 |---|---:|---:|---:|
-| 冒险+恋爱 | -100.0% | -100.0% | 0.0% |
-| 权谋+关系网 | +80000000.0% | +16900000.0% | 0.0% |
+| 冒险+恋爱 | +800.0% | -37.0% | 0.0% |
+| 权谋+关系网 | +300.0% | +25.2% | 0.0% |
 
 ## 5. Token / 成本 / 延迟
 
-- Legacy 总估算成本（均值×场景）：约 $0.0045/场景
+- Legacy 总估算成本（均值×场景）：约 $0.0046/场景
 - Unified 总估算成本（均值×场景）：约 $0.0042/场景
-- 成本变化：-6.7%
+- 成本变化：-8.7%
 
 ## 6. 失败案例
 
@@ -99,8 +99,8 @@ Phase 3A — Prompt Unified Architecture 回归分析
 - relationship_activity_rate: -26.2%
 
 ### 冒险+恋爱 (09_adventure_romance)
-- objective_progress_rate: -100.0%
-- relationship_activity_rate: -100.0%
+- objective_progress_rate: +800.0%
+- relationship_activity_rate: -37.0%
 
 ## 7. 成功案例
 
@@ -110,12 +110,10 @@ Phase 3A — Prompt Unified Architecture 回归分析
 
 ## 8. 回归报警
 
-- ⚠ Token 成本平均上升 39987.2%
 - ❌ 05_noble_academy: relationship_activity_rate 下降 20.8% (>20%)
 - ❌ 08_xianxia_dual: relationship_activity_rate 下降 26.2% (>20%)
-- ❌ 09_adventure_romance: objective_progress_rate 下降 100.0% (>20%)
-- ❌ 09_adventure_romance: relationship_activity_rate 下降 100.0% (>20%)
-- ❌ 9 个场景 main_goal 连续 5 回合缺席
+- ❌ 09_adventure_romance: relationship_activity_rate 下降 37.0% (>20%)
+- ❌ 10 个场景 main_goal 连续 5 回合缺席
 
 ## 9. 范围说明
 
