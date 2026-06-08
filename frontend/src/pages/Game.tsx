@@ -405,6 +405,7 @@ export default function Game() {
   const [optionsRegenerated, setOptionsRegenerated] = useState(false)
   const storyScrollRef = useRef<HTMLDivElement>(null)
   const storyEndRef = useRef<HTMLDivElement>(null)
+  const skipScrollTopRef = useRef(false)
   const genSettingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const genSettingsSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const optionsRegenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -526,6 +527,7 @@ export default function Game() {
           try {
             const ready = await waitForGameReady()
             if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
+            skipScrollTopRef.current = true
             applyTurnData(ready)
             setOpeningPending(false)
           } catch (e) {
@@ -540,6 +542,7 @@ export default function Game() {
           if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
           const recheck = await getGameState()
           if (!recheck.not_started && recheck.story) {
+            skipScrollTopRef.current = true
             applyTurnData({
               story: recheck.story,
               options: recheck.options,
@@ -575,6 +578,7 @@ export default function Game() {
           setLoading(false)
           return
         }
+        skipScrollTopRef.current = true
         applyTurnData({
           story: started.story,
           options: started.options,
@@ -1026,6 +1030,7 @@ export default function Game() {
     try {
       const result = await supplementLore(text)
       if (result.state) {
+        skipScrollTopRef.current = true
         applyTurnData({
           story: result.story ?? story,
           options: result.options,
@@ -1115,8 +1120,12 @@ export default function Game() {
         ? 'border-game-danger/40 text-game-danger'
         : 'border-amber-500/40 text-amber-400'
 
-  // 新回合或切换历程回顾时滚回顶部
+  // 新回合或切换历程回顾时滚回顶部（流式刚结束时跳过，避免闪跳）
   useEffect(() => {
+    if (skipScrollTopRef.current) {
+      skipScrollTopRef.current = false
+      return
+    }
     const el = storyScrollRef.current
     if (!el) return
     requestAnimationFrame(() => { el.scrollTop = 0 })
@@ -1166,6 +1175,7 @@ export default function Game() {
       setError('')
       setStory(data.story)
       setOptions(data.options || [])
+      skipScrollTopRef.current = true  // 流式输出刚完成，不滚回顶部
       setTurn(data.state.turn)
       setStatus(data.state.status)
       setScene(data.state.scene)
