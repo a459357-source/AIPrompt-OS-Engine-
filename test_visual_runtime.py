@@ -58,10 +58,12 @@ def test_normalize_prompt_stable_hash():
     assert canonical_prompt_hash(a) == canonical_prompt_hash(b)
 
 
-def test_visual_object_fields(world_pack):
+def test_visual_object_fields(visual_env, world_pack):
     obj = build_visual_object("character", "长公主", {"world_pack": world_pack})
     assert obj.entity_type == "character"
     assert obj.entity_id == "长公主"
+    assert obj.identity_id.startswith("vid_")
+    assert obj.seed > 0
     assert obj.prompt
     assert obj.prompt_hash
     assert obj.idempotency_key.startswith("character:")

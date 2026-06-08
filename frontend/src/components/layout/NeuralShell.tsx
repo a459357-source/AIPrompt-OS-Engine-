@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import {
-  Globe, Gamepad2, Users, Activity, Settings, Menu, PanelLeft, PanelRight,
+  Globe, Gamepad2, Users, Activity, Image, Settings, Menu, PanelLeft, PanelRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -20,6 +20,7 @@ const ROUTE_NAV = [
   { to: '/game', icon: Gamepad2, labelKey: 'nav.game', themeKey: true },
   { to: '/npcs', icon: Users, labelKey: 'nav.characters', themeKey: true },
   { to: '/dashboard', icon: Activity, labelKey: 'nav.worldState', themeKey: true },
+  { to: '/visual', icon: Image, labelKey: 'nav.visualWorld', themeKey: false },
   { to: '/settings', icon: Settings, labelKey: 'nav.settings', themeKey: false },
 ]
 

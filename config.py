@@ -175,6 +175,10 @@ EVENT_HISTORY_PATH = DATA_DIR / "event_history.json"
 DIRECTOR_STATE_PATH = DATA_DIR / "director_state.json"
 VISUAL_REGISTRY_PATH = DATA_DIR / "visual_registry.json"
 VISUAL_REGISTRY_DEFAULT_PATH = Path(__file__).resolve().parent / "packaging" / "defaults" / "visual_registry.json"
+VISUAL_IDENTITY_REGISTRY_PATH = DATA_DIR / "visual_identity_registry.json"
+VISUAL_IDENTITY_REGISTRY_DEFAULT_PATH = (
+    Path(__file__).resolve().parent / "packaging" / "defaults" / "visual_identity_registry.json"
+)
 VISUAL_OUTPUT_DIR = OUTPUT_DIR / "visual"
 LOG_PATH             = DATA_DIR / "app.log"
 ERROR_LOG_PATH       = DATA_DIR / "error.log"

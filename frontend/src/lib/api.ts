@@ -955,6 +955,66 @@ export interface SupplementLoreResult {
   error?: string
 }
 
+export interface VisualAssetItem {
+  asset_id: string
+  entity_type: string
+  entity_id: string
+  identity_id: string
+  display_name: string
+  prompt_hash: string
+  image_path: string
+  image_url: string
+  provider: string
+  kind: string
+  created_turn: number
+  created_at: number
+  seed: number
+  cache_status: string
+  identity?: Record<string, unknown>
+  scope?: string
+  canonical_traits?: Record<string, unknown>
+  style_anchor?: Record<string, unknown>
+  locked_descriptors?: string[]
+}
+
+export interface VisualWorldData {
+  status: { enabled: boolean; provider: string; cache_enabled: boolean }
+  characters: VisualAssetItem[]
+  locations: VisualAssetItem[]
+  factions: VisualAssetItem[]
+  events: VisualAssetItem[]
+  debug: {
+    identities: Record<string, unknown>[]
+    assets: VisualAssetItem[]
+  }
+}
+
+async function getJson<T>(url: string): Promise<T> {
+  const res = await apiFetch(url)
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<T>
+}
+
+export async function getVisualWorldData(): Promise<VisualWorldData> {
+  const [status, gallery, world, events, debug] = await Promise.all([
+    getJson<{ enabled: boolean; provider: string; cache_enabled: boolean }>('/api/visual/status'),
+    getJson<{ characters: VisualAssetItem[] }>('/api/visual/gallery/characters'),
+    getJson<{ locations: VisualAssetItem[]; factions: VisualAssetItem[] }>('/api/visual/world'),
+    getJson<{ events: VisualAssetItem[] }>('/api/visual/events'),
+    getJson<{ status: VisualWorldData['status']; identities: Record<string, unknown>[]; assets: VisualAssetItem[] }>(
+      '/api/visual/debug',
+    ),
+  ])
+  return {
+    status,
+    characters: gallery.characters,
+    locations: world.locations,
+    factions: world.factions,
+    events: events.events,
+    debug: { identities: debug.identities, assets: debug.assets },
+  }
+}
+
 export async function supplementLore(text: string): Promise<SupplementLoreResult> {
   const fd = new FormData()
   fd.append('text', text.trim())

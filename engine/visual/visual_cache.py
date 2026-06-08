@@ -46,6 +46,11 @@ def idempotency_key(entity_type: str, entity_id: str, prompt_hash_value: str) ->
     return f"{entity_type}:{entity_id}:{prompt_hash_value}"
 
 
+def identity_idempotency_key(identity_id: str, entity_type: str) -> str:
+    """V6.1 character lock — one asset per visual identity."""
+    return f"{entity_type}:{identity_id}"
+
+
 def memory_get(key: str) -> dict[str, Any] | None:
     item = _MEMORY_CACHE.get(key)
     return item if isinstance(item, dict) else None

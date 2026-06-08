@@ -160,6 +160,17 @@ def image_path_from_record(record: dict | None) -> str:
     return str(record.get("image_path") or record.get("uri") or "").strip()
 
 
+def find_by_identity_id(registry: dict, scope: str, identity_id: str) -> dict | None:
+    if not identity_id:
+        return None
+    for record in list_assets(registry, scope).values():
+        if not isinstance(record, dict):
+            continue
+        if str(record.get("identity_id", "")) == identity_id:
+            return record
+    return None
+
+
 def find_by_prompt_hash(registry: dict, scope: str, prompt_hash: str) -> dict | None:
     """Find an existing registry entry in scope with the same prompt hash."""
     if not prompt_hash:
@@ -180,18 +191,24 @@ def make_asset_record(
     provider: str,
     kind: str,
     entity_type: str = "",
+    identity_id: str = "",
     created_turn: int = 0,
     prompt_hash: str = "",
     entity_id: str = "",
+    seed: int = 0,
     meta: dict | None = None,
 ) -> dict[str, Any]:
     now = int(time.time())
     path = str(image_path or "").strip()
     et = str(entity_type or "").strip().lower()
+    record_meta = dict(meta or {})
+    if seed:
+        record_meta.setdefault("seed", seed)
     return {
         "asset_id": asset_id,
         "entity_type": et,
         "entity_id": entity_id or display_name,
+        "identity_id": str(identity_id or "").strip(),
         "display_name": display_name,
         "prompt_hash": prompt_hash,
         "image_path": path,
@@ -201,5 +218,5 @@ def make_asset_record(
         "created_turn": created_turn,
         "created_at": now,
         "updated_at": now,
-        "meta": meta or {},
+        "meta": record_meta,
     }

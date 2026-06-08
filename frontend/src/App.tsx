@@ -12,6 +12,7 @@ import Game from './pages/Game'
 import NPCs from './pages/NPCs'
 import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
+import VisualWorld from './pages/VisualWorld'
 
 function AppRoutes() {
   const location = useLocation()
@@ -23,6 +24,7 @@ function AppRoutes() {
       <Route path="/game" element={<Game />} />
       <Route path="/npcs" element={<NPCs />} />
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/visual" element={<VisualWorld />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/" element={<NewStory />} />
     </Routes>

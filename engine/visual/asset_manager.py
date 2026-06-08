@@ -93,12 +93,16 @@ def get_or_request_faction_map(
 
 
 def reset_visual_assets(*, persist: bool = True) -> None:
-    """Clear registry and visual output cache."""
+    """Clear registry, identity registry, and visual output cache."""
+    from engine.visual.identity_registry import empty_identity_registry, save_identity_registry
+
     clear_visual_output()
     save_registry(empty_registry(), persist=persist)
-    if config.VISUAL_REGISTRY_PATH.exists() and not persist:
-        try:
-            config.VISUAL_REGISTRY_PATH.unlink()
-        except OSError:
-            pass
+    save_identity_registry(empty_identity_registry(), persist=persist)
+    for path in (config.VISUAL_REGISTRY_PATH, config.VISUAL_IDENTITY_REGISTRY_PATH):
+        if path.exists() and not persist:
+            try:
+                path.unlink()
+            except OSError:
+                pass
     logger.info("Visual assets reset")

@@ -43,7 +43,7 @@ _static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 # React client routes — explicit GET handlers before SPA fallback
-REACT_CLIENT_ROUTES = ("new", "game", "npcs", "dashboard", "settings")
+REACT_CLIENT_ROUTES = ("new", "game", "npcs", "dashboard", "visual", "settings")
 
 
 async def _serve_react_spa(request: Request):
@@ -74,11 +74,13 @@ from ui.routes.api import router as api_router
 from ui.routes.game import router as game_router
 from ui.routes.world import router as world_router
 from ui.routes.settings import router as settings_router
+from ui.routes.visual import router as visual_router
 
 app.include_router(api_router)
 app.include_router(game_router)
 app.include_router(world_router)
 app.include_router(settings_router)
+app.include_router(visual_router)
 
 
 if config.has_bundled_frontend():
@@ -88,7 +90,7 @@ if config.has_bundled_frontend():
     _SPA_EXCLUDE_PREFIXES = ("api/", "static/", "generate-")
     _SPA_EXCLUDE_EXACT = frozenset({
         "health", "export", "save", "load", "saves", "reset", "shutdown",
-        "new", "game", "npcs", "dashboard", "settings",
+        "new", "game", "npcs", "dashboard", "visual", "settings",
     })
 
     @app.get("/{full_path:path}")

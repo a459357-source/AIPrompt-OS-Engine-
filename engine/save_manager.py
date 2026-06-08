@@ -64,7 +64,15 @@ def _load_visual_registry() -> dict:
     try:
         return load_registry()
     except Exception:
-        return {"version": 1, "characters": {}, "locations": {}, "factions": {}, "scenes": {}}
+        return {"version": 1, "characters": {}, "locations": {}, "factions": {}, "events": {}}
+
+
+def _load_visual_identity_registry() -> dict:
+    from engine.visual.identity_registry import load_identity_registry
+    try:
+        return load_identity_registry()
+    except Exception:
+        return {"version": 1, "identities": {}, "entity_index": {}}
 
 
 def _load_relationship_graph() -> dict:
@@ -123,6 +131,7 @@ def save(slot: str) -> dict | None:
         event_history = _load_event_history()
         director_state = _load_director_state()
         visual_registry = _load_visual_registry()
+        visual_identity_registry = _load_visual_identity_registry()
 
         chapter = ""
         if config.CHAPTER_PATH.exists():
@@ -150,6 +159,7 @@ def save(slot: str) -> dict | None:
             "event_history": event_history,
             "director_state": director_state,
             "visual_registry": visual_registry,
+            "visual_identity_registry": visual_identity_registry,
             "chapter": chapter,
             "content_weights": config.CONTENT_WEIGHTS,
             "experience_mode": config.get_experience_mode(),
@@ -243,6 +253,10 @@ def load(slot: str) -> dict | None:
         elif config.VISUAL_SYSTEM_ENABLED:
             from engine.visual.asset_manager import reset_visual_assets
             reset_visual_assets()
+        visual_identity_registry = snapshot.get("visual_identity_registry")
+        if isinstance(visual_identity_registry, dict):
+            from engine.visual.identity_registry import save_identity_registry, normalize_identity_registry
+            save_identity_registry(normalize_identity_registry(visual_identity_registry))
         rel_graph = snapshot.get("relationship_graph")
         rel_mem = snapshot.get("relationship_memory")
         if isinstance(rel_graph, dict) and rel_graph.get("edges") is not None:

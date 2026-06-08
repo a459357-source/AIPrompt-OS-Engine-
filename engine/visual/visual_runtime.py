@@ -21,6 +21,7 @@ from engine.visual.visual_object import VisualObject, build_visual_object
 from engine.visual.visual_provider import VisualProvider
 from engine.visual.visual_registry import (
     entity_type_to_scope,
+    find_by_identity_id,
     find_by_prompt_hash,
     get_asset,
     image_path_from_record,
@@ -62,9 +63,22 @@ def get_visual(
 
         registry = load_registry()
         existing = get_asset(registry, scope, obj.asset_id)
-        if _record_valid(existing) and str(existing.get("prompt_hash", "")) == obj.prompt_hash:
-            memory_put(obj.idempotency_key, existing)
-            return existing
+        if _record_valid(existing) and _record_matches_object(existing, obj):
+            enriched = _ensure_identity_on_record(existing, obj)
+            if enriched is not existing:
+                registry = set_asset(registry, scope, obj.asset_id, enriched)
+                save_registry(registry)
+            memory_put(obj.idempotency_key, enriched)
+            return enriched
+
+        if obj.entity_type == "character" and obj.identity_id:
+            identity_match = find_by_identity_id(registry, scope, obj.identity_id)
+            if identity_match and _record_valid(identity_match):
+                record = _bind_existing(obj, identity_match, provider.provider_name, turn)
+                registry = set_asset(registry, scope, obj.asset_id, record)
+                save_registry(registry)
+                memory_put(obj.idempotency_key, record)
+                return record
 
         prompt_match = find_by_prompt_hash(registry, scope, obj.prompt_hash)
         if prompt_match and _record_valid(prompt_match):
@@ -94,10 +108,12 @@ def get_visual(
         image_path=gen_result["image_path"],
         entity_id=obj.entity_id,
         entity_type=obj.entity_type,
+        identity_id=obj.identity_id,
         provider=gen_result["provider"],
         kind=kind_for_entity_type(obj.entity_type),
         created_turn=turn,
         prompt_hash=obj.prompt_hash,
+        seed=obj.seed,
         meta={"size": gen_result["size"], "bytes": gen_result["bytes"]},
     )
     registry = load_registry()
@@ -127,6 +143,27 @@ def _record_valid(record: dict | None) -> bool:
     return _path_from_record(record) is not None
 
 
+def _record_matches_object(record: dict, obj: VisualObject) -> bool:
+    if obj.entity_type == "character" and obj.identity_id:
+        rid = str(record.get("identity_id") or "")
+        if rid:
+            return rid == obj.identity_id
+        return str(record.get("entity_id") or "") == obj.entity_id
+    return str(record.get("prompt_hash", "")) == obj.prompt_hash
+
+
+def _ensure_identity_on_record(record: dict, obj: VisualObject) -> dict:
+    if str(record.get("identity_id") or "") == obj.identity_id:
+        return record
+    updated = dict(record)
+    updated["identity_id"] = obj.identity_id
+    if obj.seed and not (updated.get("meta") or {}).get("seed"):
+        meta = dict(updated.get("meta") or {})
+        meta["seed"] = obj.seed
+        updated["meta"] = meta
+    return updated
+
+
 def _bind_existing(
     obj: VisualObject,
     source: dict,
@@ -142,10 +179,12 @@ def _bind_existing(
         image_path=image_path,
         entity_id=obj.entity_id,
         entity_type=obj.entity_type,
+        identity_id=obj.identity_id,
         provider=str(source.get("provider") or provider_name),
         kind=kind_for_entity_type(obj.entity_type),
         created_turn=turn,
         prompt_hash=obj.prompt_hash,
+        seed=obj.seed,
         meta=dict(source.get("meta") or {}),
     )
 
@@ -165,8 +204,10 @@ def _record_from_filesystem(
         image_path=uri_for_path(path),
         entity_id=obj.entity_id,
         entity_type=obj.entity_type,
+        identity_id=obj.identity_id,
         provider=str((existing or {}).get("provider") or provider_name),
         kind=kind_for_entity_type(obj.entity_type),
         created_turn=int((existing or {}).get("created_turn", turn) or turn),
         prompt_hash=obj.prompt_hash,
+        seed=obj.seed,
     )

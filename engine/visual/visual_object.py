@@ -1,5 +1,5 @@
 """
-visual_object.py — V6 VisualObject standard model
+visual_object.py — V6.1 VisualObject (identity-aware)
 """
 
 from __future__ import annotations
@@ -7,14 +7,11 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from engine.visual.identity_prompt_builder import build_identity_prompt
+from engine.visual.identity_registry import resolve_identity
 from engine.visual.prompt_canonical import normalize_prompt
-from engine.visual.visual_cache import canonical_prompt_hash, idempotency_key
-from engine.visual.visual_context import (
-    build_character_prompt,
-    build_faction_map_prompt,
-    build_event_prompt,
-    build_location_prompt,
-)
+from engine.visual.visual_cache import canonical_prompt_hash, idempotency_key, identity_idempotency_key
+from engine.visual.visual_identity import VisualIdentity
 from engine.visual.visual_registry import ENTITY_TYPES, normalize_asset_id
 
 _PROVIDER_METHOD = {
@@ -36,6 +33,8 @@ _DEFAULT_SIZE = {
 class VisualObject:
     entity_type: str
     entity_id: str
+    identity_id: str
+    seed: int
     name: str
     description: str
     context_tags: list[str] = field(default_factory=list)
@@ -61,26 +60,29 @@ def build_visual_object(
     entity_id: str,
     context: dict | None = None,
 ) -> VisualObject:
-    """Normalize narrative input into a VisualObject. All providers must receive this."""
+    """entity_id → identity → prompt → VisualObject."""
     et = str(entity_type or "").strip().lower()
     if et not in ENTITY_TYPES:
         raise ValueError(f"invalid entity_type: {entity_type!r}; allowed: {sorted(ENTITY_TYPES)}")
 
     ctx = context if isinstance(context, dict) else {}
     eid = str(entity_id or "").strip() or "unknown"
+    identity = resolve_identity(et, eid, ctx)
     name = str(ctx.get("name") or eid).strip()
     description = str(ctx.get("description") or "").strip()
     tags = [str(t) for t in (ctx.get("context_tags") or ctx.get("tags") or []) if str(t).strip()]
 
-    raw_prompt = _build_raw_prompt(et, eid, ctx)
+    raw_prompt = build_identity_prompt(identity, ctx)
     canonical = normalize_prompt(raw_prompt)
     phash = canonical_prompt_hash(canonical)
     asset_id = str(ctx.get("asset_id") or "").strip() or _default_asset_id(et, eid, ctx)
-    ikey = idempotency_key(et, eid, phash)
+    ikey = _idempotency_for(identity, et, eid, phash)
 
     return VisualObject(
         entity_type=et,
         entity_id=eid,
+        identity_id=identity.identity_id,
+        seed=identity.seed,
         name=name,
         description=description,
         context_tags=tags,
@@ -89,6 +91,12 @@ def build_visual_object(
         asset_id=asset_id,
         idempotency_key=ikey,
     )
+
+
+def _idempotency_for(identity: VisualIdentity, entity_type: str, entity_id: str, prompt_hash: str) -> str:
+    if entity_type == "character":
+        return identity_idempotency_key(identity.identity_id, entity_type)
+    return idempotency_key(entity_type, entity_id, prompt_hash)
 
 
 def _default_asset_id(entity_type: str, entity_id: str, ctx: dict) -> str:
@@ -100,15 +108,3 @@ def _default_asset_id(entity_type: str, entity_id: str, ctx: dict) -> str:
     if entity_type == "faction":
         return normalize_asset_id(entity_id) + "_territory"
     return normalize_asset_id(entity_id)
-
-
-def _build_raw_prompt(entity_type: str, entity_id: str, ctx: dict) -> str:
-    if entity_type == "character":
-        return build_character_prompt(entity_id, ctx.get("world_pack") or {})
-    if entity_type == "location":
-        return build_location_prompt(ctx.get("world_pack") or {})
-    if entity_type == "faction":
-        return build_faction_map_prompt(entity_id, ctx.get("memory") or {})
-    if entity_type == "event":
-        return build_event_prompt(entity_id, ctx)
-    return ""
