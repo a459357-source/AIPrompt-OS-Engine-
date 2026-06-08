@@ -10,9 +10,11 @@ from scripts.prompt_regression.metrics import (
     detect_brain_conflict,
     evaluate_pass_fail,
     event_progress_delta,
+    goal_missing_turn_analysis,
     objective_progress_delta,
     option_repeat_rate,
     relationship_activity_delta,
+    relationship_recovery_score,
     snapshot_runtime,
 )
 
@@ -147,6 +149,18 @@ def test_evaluate_pass_fail():
     fail_comp["delta_pct"]["objective_progress_rate"] = -25
     ev2 = evaluate_pass_fail([fail_comp])
     assert ev2["verdict"] == "FAIL"
+
+
+def test_relationship_recovery_score():
+    assert relationship_recovery_score(0.19, 0.241) == 0.7884
+    assert relationship_recovery_score(0.25, 0.241) == 1.0373
+
+
+def test_goal_missing_heuristic_paraphrase():
+    sc = _scenario()
+    story = "林澈在试炼峰面对苏清雪，努力通过宗门试炼"
+    diag = goal_missing_turn_analysis(story, sc)
+    assert diag["prefix_hit"] is False or diag["top3_keyword_hit"] is True
 
 
 def test_snapshot_runtime():

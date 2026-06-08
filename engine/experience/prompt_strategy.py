@@ -8,6 +8,8 @@ Centralizes experience-mode prompt decisions. Builder imports this module only.
 
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -54,6 +56,27 @@ def _pct(weight: float) -> int:
     return int(round(max(0.0, min(1.0, weight)) * 100))
 
 
+def _parse_calibration_weights() -> PromptWeights | None:
+    """
+    Phase 3B weight calibration override (env only, not persisted).
+    PROMPTOS_CALIBRATION_WEIGHTS='{"world":45,"plot":35,"relationship":20}'
+    """
+    raw = os.getenv("PROMPTOS_CALIBRATION_WEIGHTS", "").strip()
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+        w = float(data.get("world", 0)) / 100.0
+        p = float(data.get("plot", 0)) / 100.0
+        r = float(data.get("relationship", 0)) / 100.0
+        total = w + p + r
+        if total <= 0:
+            return None
+        return PromptWeights(world=w / total, plot=p / total, relationship=r / total)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
 def _build_weight_block(weights: PromptWeights) -> str:
     w, p, r = _pct(weights.world), _pct(weights.plot), _pct(weights.relationship)
     if is_story():
@@ -74,6 +97,9 @@ class PromptStrategy:
     """Central prompt mode decisions for Base Prompt + Mode Context architecture."""
 
     def get_prompt_weights(self) -> PromptWeights:
+        override = _parse_calibration_weights()
+        if override is not None:
+            return override
         if is_adult():
             return _DEFAULT_ADULT_WEIGHTS
         return _DEFAULT_STORY_WEIGHTS

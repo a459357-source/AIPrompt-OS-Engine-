@@ -278,6 +278,7 @@ def isolated_run(
     architecture: str,
     *,
     base_dir: Path | None = None,
+    run_suffix: str | None = None,
 ) -> Iterator[IsolatedRun]:
     """
     Context manager: isolate DATA_DIR, bootstrap scenario, set prompt architecture.
@@ -285,7 +286,7 @@ def isolated_run(
     architecture: ``legacy`` | ``unified``
     """
     root = base_dir or (config.ROOT / "output" / "prompt_regression" / "runs")
-    run_dir = root / f"{scenario.id}_{architecture}"
+    run_dir = root / (run_suffix or f"{scenario.id}_{architecture}")
     data_dir = run_dir / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
 

@@ -378,3 +378,38 @@ def count_api_usage_lines(path: Path) -> int:
     if not path.exists():
         return 0
     return sum(1 for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip())
+
+
+def relationship_recovery_score(
+    candidate_rate: float,
+    legacy_rate: float,
+    *,
+    epsilon: float = 1e-6,
+) -> float:
+    """
+    Recovery ratio vs Legacy baseline (Phase 3B).
+    1.0 = matched Legacy; >1.0 = exceeded Legacy.
+    """
+    denom = max(float(legacy_rate), epsilon)
+    return round(float(candidate_rate) / denom, 4)
+
+
+def goal_missing_turn_analysis(story: str, scenario: dict) -> dict:
+    """Per-turn breakdown for main_goal missing heuristic (diagnostic only)."""
+    main_goal = str(scenario.get("main_goal", "")).strip()
+    kws = _world_keywords(scenario)
+    prefix_hit = bool(main_goal and main_goal[:8] in (story or ""))
+    kw_hits = [kw for kw in kws if kw and kw in (story or "")]
+    top3_hit = any(kw in (story or "") for kw in kws[:3])
+    flagged = bool(
+        main_goal
+        and not prefix_hit
+        and not top3_hit
+    )
+    return {
+        "main_goal_prefix8": main_goal[:8] if main_goal else "",
+        "prefix_hit": prefix_hit,
+        "top3_keyword_hit": top3_hit,
+        "any_keyword_hits": kw_hits[:5],
+        "heuristic_flagged_missing": flagged,
+    }
