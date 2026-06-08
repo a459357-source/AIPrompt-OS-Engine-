@@ -17,6 +17,7 @@ from engine.templates.template_registry import load_content_templates, save_cont
 from engine.templates.world_content_pack import (
     _format_prompt,
     apply_dataset_import,
+    build_narrative_nodes_from_bootstrap,
     load_world_content_pack,
     normalize_character,
     normalize_event,
@@ -378,7 +379,39 @@ def apply_bootstrap_import(
         graph = apply_relationship_graph(dataset.get("relationships") or [], persist=True)
         result["relationship_edges"] = len(graph.get("edges") or {})
 
+        write_narrative_routes_patch(dataset)
+
     return result
+
+
+def write_narrative_routes_patch(dataset: dict[str, Any]) -> None:
+    """P0: 将 bootstrap events 写入 narrative_routes.json."""
+    events = dataset.get("events") or []
+    if not events:
+        return
+
+    generated = build_narrative_nodes_from_bootstrap(events)
+
+    # 合并到现有 narrative_routes.json，保留已有节点
+    from engine.narrative.narrative_router import empty_narrative_routes
+
+    existing: dict[str, Any] = empty_narrative_routes()
+    if config.NARRATIVE_ROUTES_PATH.exists():
+        try:
+            existing = io_utils.read_json(config.NARRATIVE_ROUTES_PATH)
+            if not isinstance(existing, dict):
+                existing = empty_narrative_routes()
+        except Exception:
+            existing = empty_narrative_routes()
+
+    if isinstance(existing.get("nodes"), dict):
+        existing["nodes"].update(generated.get("nodes") or {})
+    else:
+        existing["nodes"] = generated.get("nodes") or {}
+
+    config.DATA_DIR.mkdir(parents=True, exist_ok=True)
+    io_utils.write_json(config.NARRATIVE_ROUTES_PATH, existing)
+    logger.info("narrative_routes.json patched with %d bootstrap nodes", len(generated.get("nodes") or {}))
 
 
 def generate_bootstrap_dataset(

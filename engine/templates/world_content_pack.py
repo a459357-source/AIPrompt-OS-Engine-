@@ -575,3 +575,71 @@ def parse_dataset_json(text: str) -> dict:
     if isinstance(data, list):
         return {"characters": data}
     return data if isinstance(data, dict) else {}
+
+
+# ── P0 Patch: bootstrap events → narrative_routes nodes ──────────────
+
+def _slugify_event_id(title: str) -> str:
+    """将 event title 转换为 narrative node id."""
+    return re.sub(r"[^a-zA-Z0-9_]", "_", title.strip().lower())
+
+
+def build_narrative_nodes_from_bootstrap(events: list[dict[str, Any]]) -> dict[str, Any]:
+    """P0: 将 bootstrap events 转换为 narrative_routes.json 的 nodes 块."""
+
+    nodes: dict[str, Any] = {}
+
+    for e in events:
+        event_id = str(e.get("id") or _slugify_event_id(e.get("title", "unknown_event"))).strip()
+        if not event_id:
+            continue
+
+        context_parts: list[str] = []
+        tone = str(e.get("emotion_tone") or "").strip()
+        conflict = str(e.get("conflict") or "").strip()
+        description = str(e.get("description") or "").strip()
+        if tone:
+            context_parts.append(f"情绪基调：{tone}")
+        if conflict:
+            context_parts.append(f"冲突：{conflict}")
+        if description:
+            context_parts.append(description)
+        context = "；".join(context_parts) if context_parts else f"叙事节点：{event_id}"
+
+        participants_raw = e.get("participants")
+        participants: list[str] = []
+        if isinstance(participants_raw, list):
+            participants = [str(p).strip() for p in participants_raw if str(p).strip()]
+
+        choices = [
+            {
+                "choice_id": f"{event_id}_a",
+                "text": "接受并深入对话",
+                "target_event_id": event_id,
+                "tone": "neutral",
+            },
+            {
+                "choice_id": f"{event_id}_b",
+                "text": "保持距离观察局势",
+                "target_event_id": event_id,
+                "tone": "cold",
+            },
+            {
+                "choice_id": f"{event_id}_c",
+                "text": "尝试改变事件走向",
+                "target_event_id": event_id,
+                "tone": "active",
+            },
+        ]
+
+        nodes[event_id] = {
+            "context": context,
+            "choices": choices,
+            "participants": participants,
+            "source": "bootstrap_p0_patch",
+        }
+
+    return {
+        "version": "p0_patch_v1",
+        "nodes": nodes,
+    }
