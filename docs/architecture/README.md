@@ -29,13 +29,16 @@
 - [ ] 模式差异是否应进入 `engine/experience/` Strategy 而非业务模块？
 - [ ] 模式切换是否保证 World / Memory / Timeline 数据不变？
 
-## 版本状态（V4.x 已关闭）
+## 版本状态
 
 | 版本 | 文档 | Status |
 |------|------|--------|
 | V4.0 | [`PROMPT_UNIFIED_DESIGN.md`](PROMPT_UNIFIED_DESIGN.md) | **Stable** |
 | V4.1 | [`PROMPT_WEIGHT_CALIBRATION_REPORT.md`](PROMPT_WEIGHT_CALIBRATION_REPORT.md) | **Closed** |
-| V5.1 | （待设计）Relationship Dynamics | **Design Approved** |
+| V5.1 | Relationship Dynamics 系列报告 | **Stable** |
+| V5.2 | Phase A/B 完成报告 | **Stable** |
+| **V6** | [`V6_FREEZE_DECISION.md`](V6_FREEZE_DECISION.md) | **❄️ FROZEN**（80/100） |
+| V6 验收 | [`V6_FREEZE_CHECKLIST.md`](V6_FREEZE_CHECKLIST.md) | PR/发布自检 |
 
 评审结论：[`V4_CLOSURE_DECISION.md`](V4_CLOSURE_DECISION.md)
 
