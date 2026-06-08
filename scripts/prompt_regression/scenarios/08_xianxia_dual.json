@@ -1,0 +1,40 @@
+{
+  "id": "08_xianxia_dual",
+  "category": "D",
+  "label": "修仙双修线",
+  "seed": 10008,
+  "scene": "玄冰洞 — 双修台",
+  "main_goal": "与道侣完成双修突破，共抗魔劫",
+  "world_pack": {
+    "world": {
+      "title": "玄冰双修",
+      "genre": "修仙成人",
+      "era": "故事开端",
+      "setting": "魔劫将至，唯有阴阳双修可破瓶颈。玄冰洞双修台已开启，道心与情欲同样考验道侣。",
+      "main_goal": "与道侣完成双修突破，共抗魔劫",
+      "factions": [{"name": "玄冰宗", "type": "organization", "description": "双修秘法传承宗门"}],
+      "locations": [{"name": "玄冰洞 — 双修台", "desc": "秘法修炼圣地"}],
+      "characters": [
+        {
+          "name": "楚寒", "is_main": true, "role_tags": ["剑修弟子"],
+          "personality_tags": ["克制", "执着", "纯阳之体"],
+          "appearance": "玄衣束冠，气息凌厉", "relationship": [], "goal": "突破金丹",
+          "secret": "对道侣动情",
+          "personality": {"desire": "证道与守护", "fear": "道心破碎", "taboo": "强迫道侣", "secret": "动情", "values": ["道心", "守护"]}
+        },
+        {
+          "name": "白璃", "is_main": false, "role_tags": ["冰灵根师姐"],
+          "personality_tags": ["冷艳", "敏感", "外冷内热"],
+          "appearance": "冰蓝纱衣，肌肤胜雪", "relationship": ["指定道侣"], "goal": "共渡魔劫",
+          "secret": "曾拒双修安排",
+          "personality": {"desire": "自由与突破", "fear": "被当作工具", "taboo": "无愿双修", "secret": "曾拒安排", "values": ["自愿", "大道"]}
+        }
+      ],
+      "relationship_system": {"stages": ["陌生", "试探", "双修", "道侣", "共劫"], "affection": 25}
+    }
+  },
+  "character_relations": {
+    "白璃": {"affection": 30, "trust": 40, "attraction": 50, "respect": 45}
+  },
+  "adult_settings": {"adult_mode": true, "adult_profile": "adult_first", "content_weights": {"story": 0, "romance": 0, "adult": 100}, "expression_style": "direct"}
+}

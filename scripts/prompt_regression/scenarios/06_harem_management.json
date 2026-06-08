@@ -1,0 +1,40 @@
+{
+  "id": "06_harem_management",
+  "category": "C",
+  "label": "后宫经营",
+  "seed": 10006,
+  "scene": "王府 — 栖云阁",
+  "main_goal": "平衡后院势力，巩固自身地位",
+  "world_pack": {
+    "world": {
+      "title": "栖云阁记",
+      "genre": "后宫",
+      "era": "故事开端",
+      "setting": "新帝登基，诸王分封。你的封地王府后院暗流涌动，宠幸与权柄交织。",
+      "main_goal": "平衡后院势力，巩固自身地位",
+      "factions": [{"name": "王妃党", "type": "family", "description": "正妃势力"}],
+      "locations": [{"name": "王府 — 栖云阁", "desc": "侧妃所居"}],
+      "characters": [
+        {
+          "name": "慕容嫣", "is_main": true, "role_tags": ["侧妃"],
+          "personality_tags": ["柔媚", "心机", "韧性"],
+          "appearance": "罗裙曳地，眼波流转", "relationship": [], "goal": "晋位并自保",
+          "secret": "与旧部仍有联系",
+          "personality": {"desire": "安全感与宠爱", "fear": "被废黜", "taboo": "公开抗命", "secret": "旧部暗线", "values": ["生存", "尊严"]}
+        },
+        {
+          "name": "秦婉", "is_main": false, "role_tags": ["王妃", "嫡妻"],
+          "personality_tags": ["端庄", "控制欲", "善妒"],
+          "appearance": "凤钗锦服，仪态万方", "relationship": ["正妃"], "goal": "独占王府权柄",
+          "secret": "无子嗣焦虑",
+          "personality": {"desire": "子嗣与权柄", "fear": "失宠", "taboo": "失仪", "secret": "无子焦虑", "values": ["礼法", "地位"]}
+        }
+      ],
+      "relationship_system": {"stages": ["陌生", "试探", "争宠", "制衡", "同盟"], "affection": 15}
+    }
+  },
+  "character_relations": {
+    "秦婉": {"affection": 10, "trust": 20, "hostility": 35, "dependence": 5}
+  },
+  "adult_settings": {"adult_mode": true, "adult_profile": "adult_first", "content_weights": {"story": 0, "romance": 0, "adult": 100}, "expression_style": "direct"}
+}

@@ -1,0 +1,43 @@
+{
+  "id": "10_intrigue_network",
+  "category": "E",
+  "label": "权谋+关系网",
+  "seed": 10010,
+  "scene": "宰相府 — 密议厅",
+  "main_goal": "在权谋棋局中织就关系网并扳倒政敌",
+  "world_pack": {
+    "world": {
+      "title": "密议棋局",
+      "genre": "权谋",
+      "era": "故事开端",
+      "setting": "宰相府密议厅夜灯长明。每张关系网都是刀，每次结盟都可能反噬。",
+      "main_goal": "在权谋棋局中织就关系网并扳倒政敌",
+      "factions": [
+        {"name": "宰相党", "type": "organization", "description": "当朝宰辅势力"},
+        {"name": "御史台", "type": "organization", "description": "监察百官"}
+      ],
+      "locations": [{"name": "宰相府 — 密议厅", "desc": "夜间密谋场所"}],
+      "characters": [
+        {
+          "name": "谢珩", "is_main": true, "role_tags": ["门客谋士"],
+          "personality_tags": ["算无遗策", "冷峻", "重情"],
+          "appearance": "青衫折扇，眼神如刃", "relationship": [], "goal": "助主公登顶并自保",
+          "secret": "与御史台有私交",
+          "personality": {"desire": "棋局全胜", "fear": "累及亲友", "taboo": "背主", "secret": "御史私交", "values": ["智谋", "忠义"]}
+        },
+        {
+          "name": "裴霜", "is_main": false, "role_tags": ["御史之女", "情报枢纽"],
+          "personality_tags": ["冷静", "危险", "双面"],
+          "appearance": "素衣银簪，笑不达眼", "relationship": ["潜在盟友"], "goal": "借棋局改命运",
+          "secret": "握宰相把柄",
+          "personality": {"desire": "改命", "fear": "成为弃子", "taboo": "轻信", "secret": "把柄", "values": ["生存", "公平"]}
+        }
+      ],
+      "relationship_system": {"stages": ["陌生", "交易", "互信", "共谋", "生死"], "affection": 10}
+    }
+  },
+  "character_relations": {
+    "裴霜": {"trust": 35, "affection": 20, "respect": 40, "dependence": 15}
+  },
+  "adult_settings": {"adult_mode": true, "adult_profile": "adult_first", "content_weights": {"story": 0, "romance": 0, "adult": 100}, "expression_style": "direct"}
+}

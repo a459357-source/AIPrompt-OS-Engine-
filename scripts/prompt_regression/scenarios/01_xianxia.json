@@ -1,0 +1,41 @@
+{
+  "id": "01_xianxia",
+  "category": "A",
+  "label": "修仙宗门试炼",
+  "seed": 10001,
+  "scene": "青云宗 — 试炼峰",
+  "main_goal": "通过宗门试炼，成功筑基",
+  "world_pack": {
+    "world": {
+      "title": "青云试炼",
+      "genre": "修仙",
+      "era": "故事开端",
+      "setting": "青云宗每十年开启试炼峰，外门弟子需闯过灵兽阵、心魔关与同门竞逐，方有资格筑基。",
+      "main_goal": "通过宗门试炼，成功筑基",
+      "factions": [{"name": "青云宗", "type": "organization", "description": "东域大宗，以剑道与丹术闻名"}],
+      "locations": [{"name": "青云宗 — 试炼峰", "desc": "试炼主阵"}],
+      "tone": "聚焦人物情感与选择",
+      "characters": [
+        {
+          "name": "林澈", "is_main": true, "role_tags": ["外门弟子"],
+          "personality_tags": ["坚韧", "谨慎", "重诺"],
+          "appearance": "青衫束发，目光沉静", "relationship": [], "goal": "筑基成功，不负师门",
+          "secret": "身怀残缺上古功法",
+          "personality": {"desire": "筑基成仙，守护师门", "fear": "试炼失败被逐", "taboo": "背叛宗门", "secret": "残缺功法", "values": ["重诺", "自强"]}
+        },
+        {
+          "name": "苏清雪", "is_main": false, "role_tags": ["内门师姐", "剑修"],
+          "personality_tags": ["清冷", "严厉", "外冷内热"],
+          "appearance": "白衣佩剑，气质出尘", "relationship": ["试炼监督"], "goal": "选出合格弟子",
+          "secret": "曾失试炼同伴",
+          "personality": {"desire": "宗门兴盛", "fear": "再失同伴", "taboo": "徇私放水", "secret": "心结未解", "values": ["公正", "剑心"]}
+        }
+      ],
+      "relationship_system": {"stages": ["陌生", "认识", "信赖", "盟友", "羁绊"], "affection": 10}
+    }
+  },
+  "character_relations": {
+    "苏清雪": {"affection": 15, "trust": 40, "respect": 50, "relationshipType": "师姐"}
+  },
+  "adult_settings": {"adult_mode": true, "adult_profile": "adult_first", "content_weights": {"story": 0, "romance": 0, "adult": 100}, "expression_style": "direct"}
+}

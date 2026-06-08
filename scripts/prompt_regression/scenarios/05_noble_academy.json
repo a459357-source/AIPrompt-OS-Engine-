@@ -1,0 +1,40 @@
+{
+  "id": "05_noble_academy",
+  "category": "C",
+  "label": "贵族学院",
+  "seed": 10005,
+  "scene": "圣罗兰学院 — 礼仪厅",
+  "main_goal": "在学院社交季赢得地位并解开身世之谜",
+  "world_pack": {
+    "world": {
+      "title": "圣罗兰之春",
+      "genre": "贵族学院",
+      "era": "故事开端",
+      "setting": "帝国最高贵族学院迎来社交季。礼仪、决斗与舞会是阶级跃迁的战场。",
+      "main_goal": "在学院社交季赢得地位并解开身世之谜",
+      "factions": [{"name": "学生会", "type": "school", "description": "学院学生自治机构"}],
+      "locations": [{"name": "圣罗兰学院 — 礼仪厅", "desc": "社交季主会场"}],
+      "characters": [
+        {
+          "name": "艾德里安", "is_main": true, "role_tags": ["没落贵族嗣子"],
+          "personality_tags": ["优雅", "骄傲", "敏感"],
+          "appearance": "金发蓝眼，礼服笔挺", "relationship": [], "goal": "恢复家族荣誉",
+          "secret": "母亲出身被隐瞒",
+          "personality": {"desire": "尊严与真相", "fear": "被当众羞辱", "taboo": "卑躬屈膝", "secret": "身世之谜", "values": ["荣誉", "真相"]}
+        },
+        {
+          "name": "伊莎贝拉", "is_main": false, "role_tags": ["公爵千金", "学生会副会长"],
+          "personality_tags": ["高傲", "完美主义", "孤独"],
+          "appearance": "银发紫眸，珍珠项链", "relationship": ["竞争对手"], "goal": "维护家族声望",
+          "secret": "厌恶政治联姻",
+          "personality": {"desire": "自主婚姻", "fear": "沦为棋子", "taboo": "公开失态", "secret": "拒婚心意", "values": ["体面", "自由"]}
+        }
+      ],
+      "relationship_system": {"stages": ["陌生", "对手", "理解", "盟友", "恋人"], "affection": 20}
+    }
+  },
+  "character_relations": {
+    "伊莎贝拉": {"affection": 25, "trust": 35, "respect": 45, "attraction": 20}
+  },
+  "adult_settings": {"adult_mode": true, "adult_profile": "adult_first", "content_weights": {"story": 0, "romance": 0, "adult": 100}, "expression_style": "direct"}
+}

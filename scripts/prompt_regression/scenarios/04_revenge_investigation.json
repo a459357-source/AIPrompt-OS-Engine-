@@ -1,0 +1,40 @@
+{
+  "id": "04_revenge_investigation",
+  "category": "B",
+  "label": "复仇调查",
+  "seed": 10004,
+  "scene": "雾港 — 旧货栈",
+  "main_goal": "追踪灭门惨案真凶，完成复仇",
+  "world_pack": {
+    "world": {
+      "title": "雾港迷案",
+      "genre": "悬疑",
+      "era": "故事开端",
+      "setting": "沿海雾港走私猖獗。旧货栈堆满来路不明的箱笼，是调查灭门案的起点。",
+      "main_goal": "追踪灭门惨案真凶，完成复仇",
+      "factions": [{"name": "海关缉私队", "type": "organization", "description": "官方缉私力量"}],
+      "locations": [{"name": "雾港 — 旧货栈", "desc": "走私货物集散地"}],
+      "characters": [
+        {
+          "name": "陆沉舟", "is_main": true, "role_tags": ["私家侦探"],
+          "personality_tags": ["冷静", "偏执", "敏锐"],
+          "appearance": "风衣礼帽，指间烟未点", "relationship": [], "goal": "找出灭门真凶",
+          "secret": "曾是警方卧底",
+          "personality": {"desire": "真相与复仇", "fear": "再次被利用", "taboo": "伪造证据", "secret": "卧底身份", "values": ["真相", "血债"]}
+        },
+        {
+          "name": "方晓", "is_main": false, "role_tags": ["货栈管事"],
+          "personality_tags": ["油滑", "怕死", "知情"],
+          "appearance": "短打布衫，眼神游移", "relationship": ["线人"], "goal": "活命并捞一笔",
+          "secret": "见过凶案当晚的货单",
+          "personality": {"desire": "发财保命", "fear": "被灭口", "taboo": "免费开口", "secret": "货单线索", "values": ["金钱", "生存"]}
+        }
+      ],
+      "relationship_system": {"stages": ["陌生", "交易", "互信", "共犯", "决裂"], "affection": 0}
+    }
+  },
+  "character_relations": {
+    "方晓": {"trust": 25, "dependence": 30}
+  },
+  "adult_settings": {"adult_mode": true, "adult_profile": "adult_first", "content_weights": {"story": 0, "romance": 0, "adult": 100}, "expression_style": "direct"}
+}

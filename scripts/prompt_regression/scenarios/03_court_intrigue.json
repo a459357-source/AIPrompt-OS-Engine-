@@ -1,0 +1,43 @@
+{
+  "id": "03_court_intrigue",
+  "category": "B",
+  "label": "宫廷权谋",
+  "seed": 10003,
+  "scene": "皇城 — 崇政殿",
+  "main_goal": "在储位之争中保全家族并揭露阴谋",
+  "world_pack": {
+    "world": {
+      "title": "崇政风云",
+      "genre": "宫廷",
+      "era": "故事开端",
+      "setting": "皇帝病重，诸皇子争储。崇政殿夜议不断，奏章与密信决定生死。",
+      "main_goal": "在储位之争中保全家族并揭露阴谋",
+      "factions": [
+        {"name": "太子党", "type": "organization", "description": "支持太子继位"},
+        {"name": "肃王党", "type": "organization", "description": "支持肃王继位"}
+      ],
+      "locations": [{"name": "皇城 — 崇政殿", "desc": "议政中枢"}],
+      "characters": [
+        {
+          "name": "顾明微", "is_main": true, "role_tags": ["翰林编修"],
+          "personality_tags": ["聪慧", "隐忍", "果决"],
+          "appearance": "青袍玉带，眉目清峻", "relationship": [], "goal": "保全顾氏一族",
+          "secret": "握有太子亲笔罪证",
+          "personality": {"desire": "家族存续", "fear": "被灭门", "taboo": "卖主求荣", "secret": "太子罪证", "values": ["忠恕", "家族"]}
+        },
+        {
+          "name": "萧贵妃", "is_main": false, "role_tags": ["贵妃", "肃王生母"],
+          "personality_tags": ["艳丽", "狠辣", "善谋"],
+          "appearance": "凤冠霞帔，眼含锋芒", "relationship": ["后宫实权者"], "goal": "扶肃王登基",
+          "secret": "与边将暗通",
+          "personality": {"desire": "子嗣登基", "fear": "失宠", "taboo": "公开忤逆", "secret": "边将暗线", "values": ["权力", "母性"]}
+        }
+      ],
+      "relationship_system": {"stages": ["陌生", "利用", "制衡", "同盟", "覆灭"], "affection": 0}
+    }
+  },
+  "character_relations": {
+    "萧贵妃": {"trust": 20, "respect": 35, "hostility": 25}
+  },
+  "adult_settings": {"adult_mode": true, "adult_profile": "adult_first", "content_weights": {"story": 0, "romance": 0, "adult": 100}, "expression_style": "direct"}
+}

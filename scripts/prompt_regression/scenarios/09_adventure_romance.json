@@ -1,0 +1,40 @@
+{
+  "id": "09_adventure_romance",
+  "category": "E",
+  "label": "冒险+恋爱",
+  "seed": 10009,
+  "scene": "遗忘群岛 — 灯塔",
+  "main_goal": "找到失落古文明并确认与同伴的感情",
+  "world_pack": {
+    "world": {
+      "title": "灯塔之约",
+      "genre": "冒险恋爱",
+      "era": "故事开端",
+      "setting": "遗忘群岛风暴不断，古老灯塔指向失落的文明。你与同伴的冒险与情愫同步生长。",
+      "main_goal": "找到失落古文明并确认与同伴的感情",
+      "factions": [{"name": "探险协会", "type": "organization", "description": "资助远洋探险"}],
+      "locations": [{"name": "遗忘群岛 — 灯塔", "desc": "风暴中的导航点"}],
+      "characters": [
+        {
+          "name": "凯尔", "is_main": true, "role_tags": ["探险家"],
+          "personality_tags": ["勇敢", "浪漫", "冲动"],
+          "appearance": "皮甲风镜，笑容明亮", "relationship": [], "goal": "发现古文明",
+          "secret": "害怕失去同伴",
+          "personality": {"desire": "冒险与爱情", "fear": "孤独", "taboo": "抛弃同伴", "secret": "怕失去", "values": ["自由", "羁绊"]}
+        },
+        {
+          "name": "莉娜", "is_main": false, "role_tags": ["领航员"],
+          "personality_tags": ["理性", "嘴硬", "温柔"],
+          "appearance": "短发海员装，地图不离手", "relationship": ["同伴"], "goal": "安全返航",
+          "secret": "早已心动",
+          "personality": {"desire": "安全与确认", "fear": "表白失败", "taboo": "擅离岗位", "secret": "心动", "values": ["责任", "真心"]}
+        }
+      ],
+      "relationship_system": {"stages": ["同伴", "暧昧", "恋人", "生死", "永恒"], "affection": 35}
+    }
+  },
+  "character_relations": {
+    "莉娜": {"affection": 40, "trust": 50, "attraction": 45}
+  },
+  "adult_settings": {"adult_mode": true, "adult_profile": "adult_first", "content_weights": {"story": 0, "romance": 0, "adult": 100}, "expression_style": "direct"}
+}

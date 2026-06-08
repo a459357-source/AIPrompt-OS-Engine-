@@ -1,0 +1,40 @@
+{
+  "id": "07_court_adult",
+  "category": "D",
+  "label": "宫廷成人线",
+  "seed": 10007,
+  "scene": "深宫 — 瑶光殿",
+  "main_goal": "在禁宫中获得皇帝专宠并掌控内廷",
+  "world_pack": {
+    "world": {
+      "title": "瑶光秘事",
+      "genre": "宫廷成人",
+      "era": "故事开端",
+      "setting": "皇帝独宠难久，瑶光殿新入宫的才人需在情欲与权谋间求生。",
+      "main_goal": "在禁宫中获得皇帝专宠并掌控内廷",
+      "factions": [{"name": "内廷女官", "type": "organization", "description": "掌管后宫事务"}],
+      "locations": [{"name": "深宫 — 瑶光殿", "desc": "才人寝殿"}],
+      "characters": [
+        {
+          "name": "阮轻罗", "is_main": true, "role_tags": ["才人"],
+          "personality_tags": ["妩媚", "聪慧", "野心"],
+          "appearance": "薄纱轻挽，肤若凝脂", "relationship": [], "goal": "专宠并掌权",
+          "secret": "曾为教坊出身",
+          "personality": {"desire": "权力与宠爱", "fear": "被弃如敝履", "taboo": "公开失德", "secret": "教坊过往", "values": ["上位", "自保"]}
+        },
+        {
+          "name": "皇帝", "is_main": false, "role_tags": ["君主"],
+          "personality_tags": ["多疑", "占有欲", "倦怠"],
+          "appearance": "龙袍微敞，目光深沉", "relationship": ["君主"], "goal": "平衡前朝后宫",
+          "secret": "对旧爱仍有执念",
+          "personality": {"desire": "绝对掌控", "fear": "被背叛", "taboo": "失威", "secret": "旧爱执念", "values": ["威权", "享乐"]}
+        }
+      ],
+      "relationship_system": {"stages": ["陌生", "宠幸", "专宠", "制衡", "废立"], "affection": 30}
+    }
+  },
+  "character_relations": {
+    "皇帝": {"affection": 35, "trust": 30, "attraction": 45, "dependence": 20}
+  },
+  "adult_settings": {"adult_mode": true, "adult_profile": "adult_first", "content_weights": {"story": 0, "romance": 0, "adult": 100}, "expression_style": "direct"}
+}

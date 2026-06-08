@@ -1,0 +1,43 @@
+{
+  "id": "02_wuxia",
+  "category": "A",
+  "label": "武侠江湖恩怨",
+  "seed": 10002,
+  "scene": "洛阳城 — 醉仙楼",
+  "main_goal": "查明师父遇害真相，手刃仇人",
+  "world_pack": {
+    "world": {
+      "title": "醉仙恩仇",
+      "genre": "武侠",
+      "era": "故事开端",
+      "setting": "江湖暗涌，各大门派于洛阳博弈。醉仙楼是消息与血债交汇之处。",
+      "main_goal": "查明师父遇害真相，手刃仇人",
+      "factions": [
+        {"name": "天剑门", "type": "organization", "description": "正道剑派"},
+        {"name": "血影帮", "type": "organization", "description": "神秘杀手组织"}
+      ],
+      "locations": [{"name": "洛阳城 — 醉仙楼", "desc": "江湖情报枢纽"}],
+      "characters": [
+        {
+          "name": "沈长风", "is_main": true, "role_tags": ["游侠"],
+          "personality_tags": ["侠义", "执拗", "藏锋"],
+          "appearance": "长刀在背，斗笠遮面", "relationship": [], "goal": "为师父复仇",
+          "secret": "师父临终托付半幅藏宝图",
+          "personality": {"desire": "复仇与正义", "fear": "误杀无辜", "taboo": "出卖同门", "secret": "藏宝图", "values": ["侠义", "师恩"]}
+        },
+        {
+          "name": "柳如烟", "is_main": false, "role_tags": ["醉仙楼掌柜"],
+          "personality_tags": ["玲珑", "谨慎", "重利"],
+          "appearance": "红衣挽髻，笑里藏刀", "relationship": ["情报贩子"], "goal": "在乱局中自保并获利",
+          "secret": "与血影帮有旧约",
+          "personality": {"desire": "掌控情报网", "fear": "站错队", "taboo": "免费赠情报", "secret": "血影旧约", "values": ["生存", "利益"]}
+        }
+      ],
+      "relationship_system": {"stages": ["陌生", "相识", "互信", "同盟", "生死"], "affection": 0}
+    }
+  },
+  "character_relations": {
+    "柳如烟": {"trust": 30, "affection": 10, "hostility": 5}
+  },
+  "adult_settings": {"adult_mode": true, "adult_profile": "adult_first", "content_weights": {"story": 0, "romance": 0, "adult": 100}, "expression_style": "direct"}
+}
