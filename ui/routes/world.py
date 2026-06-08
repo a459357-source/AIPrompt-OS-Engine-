@@ -22,13 +22,15 @@ def _is_brain_personality(raw) -> bool:
 
 def _normalize_character_personality(ch: dict) -> dict:
     """Ensure character has normalized personality brain (from AI or form)."""
-    from engine.character_brain import normalize_personality, seed_personality_from_world
+    from engine.character_brain import infer_taboo_fallback, normalize_personality, seed_personality_from_world
 
     ch = ch if isinstance(ch, dict) else {}
     if _is_brain_personality(ch.get("personality")):
         ch["personality"] = normalize_personality(ch["personality"])
     else:
         ch["personality"] = seed_personality_from_world(ch)
+    if not ch.get("isMain") and not ch["personality"].get("taboo"):
+        ch["personality"]["taboo"] = infer_taboo_fallback(ch, ch["personality"])
     return ch
 
 

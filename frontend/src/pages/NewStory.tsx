@@ -755,7 +755,11 @@ export default function NewStory() {
       }
 
       if (warnings.length) {
-        showStatus(`⚠️ ${warnings.join('；')}。可在设置中提高 Token 后重试`, 'error')
+        const needsMoreTokens = warnings.some((w) => w.includes('截断'))
+        const hint = needsMoreTokens
+          ? '。可在设置中提高 Token 后重试'
+          : '。可在下方角色卡片或开局后「角色」页补全'
+        showStatus(`⚠️ ${warnings.join('；')}${hint}`, 'error')
       } else {
         showStatus(
           adultMode ? '✅ 成人向设定生成完成，可继续修改' : '✅ 生成完成，可继续修改',

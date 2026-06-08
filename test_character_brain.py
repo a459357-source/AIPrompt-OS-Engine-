@@ -5,10 +5,38 @@ import config
 from engine.character_brain import (
     build_character_brain_context,
     ensure_personalities,
+    infer_taboo_fallback,
     normalize_personality,
     resolve_brain_character_names,
     seed_personality_from_world,
 )
+
+
+def test_infer_taboo_fallback_from_fear():
+    taboo = infer_taboo_fallback(
+        {"isMain": False, "personality": {"fear": "被抛弃"}},
+    )
+    assert "被抛弃" in taboo
+
+
+def test_infer_taboo_fallback_preserves_explicit():
+    taboo = infer_taboo_fallback(
+        {"isMain": False, "personality": {"taboo": "背主"}},
+    )
+    assert taboo == "背主"
+
+
+def test_normalize_character_personality_backfills_npc_taboo():
+    from ui.routes.world import _normalize_character_personality
+
+    out = _normalize_character_personality({
+        "name": "侍女",
+        "isMain": False,
+        "goal": "活下去",
+        "personality": {"desire": "活下去", "fear": "被灭口", "taboo": "", "secret": "", "values": []},
+    })
+    assert out["personality"]["taboo"]
+    assert "被灭口" in out["personality"]["taboo"]
 
 
 def test_seed_personality_from_world_maps_fields():

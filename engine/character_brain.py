@@ -45,6 +45,31 @@ def personality_has_content(personality: dict) -> bool:
     return bool(p["desire"] or p["fear"] or p["taboo"] or p["secret"] or p["values"])
 
 
+def infer_taboo_fallback(ch: dict, personality: dict | None = None) -> str:
+    """Derive a short behavior taboo when AI omitted it (NPC world-gen backfill)."""
+    ch = ch if isinstance(ch, dict) else {}
+    p = normalize_personality(personality if personality is not None else ch.get("personality"))
+    if p["taboo"]:
+        return p["taboo"]
+    fear = p["fear"]
+    if fear:
+        return f"被迫直面或利用其恐惧：{fear}"
+    values = p["values"]
+    if values:
+        return f"违背其{values[0]}底线"
+    desire = p["desire"] or str(ch.get("goal", "") or "").strip()
+    if desire:
+        return f"阻其达成：{desire}"
+    tags = ch.get("personality_tags", [])
+    if isinstance(tags, str):
+        tags = [t.strip() for t in tags.split("/") if t.strip()]
+    elif isinstance(tags, list):
+        tags = [str(t).strip() for t in tags if str(t).strip()]
+    if tags:
+        return f"做出与其「{tags[0]}」本性相悖的羞辱之事"
+    return "被强迫违背本人意愿"
+
+
 def seed_personality_from_world(ch: dict) -> dict:
     """Map world_pack character fields to personality core."""
     ch = ch if isinstance(ch, dict) else {}
