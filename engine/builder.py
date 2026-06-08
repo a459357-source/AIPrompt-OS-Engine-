@@ -445,13 +445,13 @@ def _relationship_dynamics_context(
 def _director_plan_context(session_state: dict, world_pack: dict, memory: dict) -> str:
     if not config.EVENT_DIRECTOR_ENABLED:
         return ""
-    from engine.event_director import build_and_record_director_plan
+    from engine.director_runtime import prepare_director_prompt
     from engine.plot_director import ensure_plot_state
     from engine.relationship_core import ensure_graph
     from engine.relationship_recall import ensure_dynamics_store, ensure_memory_store
 
     plot_state = ensure_plot_state(world_pack) if config.PLOT_DIRECTOR_ENABLED else None
-    return build_and_record_director_plan(
+    return prepare_director_prompt(
         session_state,
         world_pack,
         memory=memory,

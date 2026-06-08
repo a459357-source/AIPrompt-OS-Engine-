@@ -402,6 +402,8 @@ def step(
                response, new_state, choice, runtime.memory)
     _safe_call(_update_relationship_graph, "relationship graph update",
                response, new_state, choice, runtime)
+    _safe_call(_advance_director_runtime, "director state machine",
+               new_state, response.get("story", ""))
 
     try:
         commit_runtime(runtime)
@@ -764,6 +766,12 @@ def _apply_objectives(response: dict, old_status: str, runtime) -> None:
 
     world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
     process_turn_objectives(runtime.session, response, old_status, world_pack)
+
+
+def _advance_director_runtime(state: dict, story: str) -> None:
+    from engine.director_runtime import advance_director_after_turn
+
+    advance_director_after_turn(state, story, persist=True)
 
 
 def _maybe_plot_director(state: dict, memory: dict) -> None:

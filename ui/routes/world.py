@@ -611,6 +611,12 @@ async def create_new_story(
     from engine.plot_director import init_plot_state
     plot_state = init_plot_state(world_pack)
 
+    from engine.director_runtime import reset_director_state
+    from engine.event_director import empty_event_history, save_event_history
+
+    save_event_history(empty_event_history())
+    reset_director_state()
+
     from engine.candidate_npcs import reset_pool
     reset_pool(persist=True)
 
