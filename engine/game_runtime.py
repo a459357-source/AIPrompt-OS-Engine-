@@ -192,6 +192,12 @@ def _read_cached_visuals_from_node(
                 if isinstance(record, dict) and str(record.get("entity_id") or "") == name:
                     asset = record
                     break
+        if not asset:
+            # broad scan: match by display_name
+            for record in list_assets(registry, "characters").values():
+                if isinstance(record, dict) and str(record.get("display_name") or "").strip() == str(name).strip():
+                    asset = record
+                    break
         if asset and isinstance(asset, dict) and asset.get("image_path"):
             result["characters"].append({
                 "name": name,
@@ -205,6 +211,15 @@ def _read_cached_visuals_from_node(
                 "scene_id": event_id,
                 "image_url": public_image_url(asset["image_path"]),
             }
+        else:
+            # fallback: any cached event visual
+            for record in list_assets(registry, "events").values():
+                if isinstance(record, dict) and record.get("image_path"):
+                    result["scene"] = {
+                        "scene_id": str(record.get("entity_id") or record.get("asset_id") or ""),
+                        "image_url": public_image_url(record["image_path"]),
+                    }
+                    break
 
     return result
 
