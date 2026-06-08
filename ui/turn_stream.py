@@ -57,11 +57,12 @@ def build_turn_payload(result: dict) -> dict[str, Any]:
         pass
 
     # ── V6 Game Runtime: narrative node → visuals ──
-    from engine.game_runtime import resolve_game_narrative_node, ensure_game_visuals_from_node
+    from engine.game_runtime import resolve_game_narrative_node, ensure_game_visuals_from_node, bootstrap_game_visuals
 
     scene_id = str(state.get("scene") or "").strip()
     node = resolve_game_narrative_node(scene_id)
     visuals = ensure_game_visuals_from_node(node, turn=state.get("turn", 0), background=True)
+    visuals = bootstrap_game_visuals(visuals)
 
     return {
         "story": result.get("story", ""),

@@ -622,6 +622,39 @@ async def create_new_story(
     from engine.visual.asset_manager import reset_visual_assets
     reset_visual_assets()
 
+    # ── V6: Background generation of all visual assets ──
+    import threading
+    def _bg_gen_all_visuals(wp: dict):
+        from engine.visual.asset_manager import (
+            get_or_request_character_portrait,
+            get_or_request_faction_map,
+            get_or_request_world_map,
+        )
+        characters = wp.get("world", wp).get("characters", [])
+        for ch in characters:
+            try:
+                name = str(ch.get("name") or "").strip()
+                if name:
+                    get_or_request_character_portrait(name, wp, turn=1, force=True)
+            except Exception:
+                pass
+        factions = wp.get("world", wp).get("factions", [])
+        for f in factions:
+            try:
+                fname = str(f.get("name") or "").strip()
+                if fname:
+                    get_or_request_faction_map(fname, {}, turn=1, force=True)
+            except Exception:
+                pass
+        locs = wp.get("world", wp).get("locations", [])
+        for loc in locs:
+            try:
+                get_or_request_world_map(wp, turn=1, force=True)
+            except Exception:
+                pass
+    _world_pack_copy = dict(world_pack)
+    threading.Thread(target=_bg_gen_all_visuals, args=(_world_pack_copy,), daemon=True).start()
+
     from engine.candidate_npcs import reset_pool
     reset_pool(persist=True)
 

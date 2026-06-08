@@ -251,6 +251,57 @@ def _trigger_background_visuals_from_node(
 
 # ── Legacy helpers (keep backward compat) ───────────────────────────
 
+def read_all_character_visuals() -> list[dict[str, str]]:
+    """Read ALL character visuals from registry — for Game right-panel HUB.
+
+    Returns a list of {name, image_url} for every character that has a
+    generated portrait on disk.  Unlike ensure_game_visuals_from_node(),
+    this is NOT tied to a narrative node — it serves the always-visible
+    character roster in the game sidebar.
+    """
+    if not config.VISUAL_SYSTEM_ENABLED:
+        return []
+    from engine.visual.visual_registry import list_assets, load_registry
+
+    registry = load_registry()
+    seen: set[str] = set()
+    result: list[dict[str, str]] = []
+
+    for asset_id, record in list_assets(registry, "characters").items():
+        if not isinstance(record, dict):
+            continue
+        image_path = str(record.get("image_path") or "").strip()
+        name = str(record.get("entity_id") or record.get("display_name") or asset_id).strip()
+        if not image_path or not name or name in seen:
+            continue
+        rel = image_path.replace("\\", "/")
+        if not (config.ROOT / rel).is_file():
+            continue
+        seen.add(name)
+        result.append({"name": name, "image_url": public_image_url(image_path)})
+    return result
+
+
+def bootstrap_game_visuals(node_visuals: dict[str, Any]) -> dict[str, Any]:
+    """Merge node-visuals with **all** character visuals for the game sidebar HUB.
+
+    node_visuals = output of ensure_game_visuals_from_node()  {characters, scene}
+    Returns the same shape, but ``characters`` now includes every character
+    that has a portrait on disk (not just node participants).  Node
+    participants always take precedence when a character appears in both.
+    """
+    all_chars = read_all_character_visuals()
+    char_map: dict[str, dict[str, str]] = {}
+    for c in all_chars:
+        char_map[c["name"]] = c
+    for c in node_visuals.get("characters", []):
+        char_map[c["name"]] = c
+    return {
+        "characters": list(char_map.values()),
+        "scene": node_visuals.get("scene"),
+    }
+
+
 def _ranked_characters(characters_raw: dict) -> list[dict[str, str]]:
     entries = []
     for key, ch in characters_raw.items():

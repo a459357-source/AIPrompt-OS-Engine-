@@ -74,12 +74,13 @@ def _objectives_for_game(state: dict, *, persist_migrate: bool = False) -> dict:
 
 def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
     """Build JSON payload for GET /api/game-state and idempotent POST /api/start."""
-    from engine.game_runtime import resolve_game_narrative_node, ensure_game_visuals_from_node
+    from engine.game_runtime import resolve_game_narrative_node, ensure_game_visuals_from_node, bootstrap_game_visuals
 
     scene_id = str(state.get("scene") or "").strip()
     node = resolve_game_narrative_node(scene_id)
     turn = state.get("turn", 0)
     visuals = ensure_game_visuals_from_node(node, turn=turn, background=True)
+    visuals = bootstrap_game_visuals(visuals)
 
     if not_started or not state.get("history"):
         from engine.character_registry import dedupe_characters_by_name
