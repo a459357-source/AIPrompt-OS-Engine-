@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import config
 from engine.visual.visual_identity import VisualIdentity
 
 # Context keys allowed to modify non-appearance aspects (characters only).
@@ -72,7 +73,14 @@ def build_identity_prompt(identity: VisualIdentity, context: dict | None = None)
         if names:
             parts.append("regions: " + ", ".join(n for n in names if n))
 
-    return ", ".join(parts)
+    core = ", ".join(parts)
+    if not getattr(config, "CONTENT_TEMPLATE_SYSTEM_ENABLED", True):
+        return core
+    from engine.templates.template_prompt import augment_identity_prompt
+    from engine.templates.template_resolver import resolve_content_template
+
+    template = resolve_content_template(identity.entity_type, identity.entity_id, ctx)
+    return augment_identity_prompt(core, template, identity)
 
 
 def extract_character_traits(entity_id: str, context: dict) -> tuple[dict[str, Any], dict[str, Any], list[str]]:

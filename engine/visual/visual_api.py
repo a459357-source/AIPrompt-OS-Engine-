@@ -188,6 +188,12 @@ def get_character_gallery() -> list[dict[str, Any]]:
             key=lambda x: (int(x.get("created_at") or 0), str(x.get("asset_id") or "")),
         )
         latest = assets[-1] if assets else None
+        content_template: dict = {}
+        try:
+            from engine.templates.template_registry import get_entity_template
+            content_template = get_entity_template("character", str(raw.get("entity_id") or "")) or {}
+        except Exception:
+            pass
         views.append({
             "identity_id": iid,
             "entity_name": str(raw.get("entity_id") or ""),
@@ -196,6 +202,7 @@ def get_character_gallery() -> list[dict[str, Any]]:
             "all_assets": assets,
             "traits": identity.canonical_traits if identity else {},
             "style_anchor": identity.style_anchor if identity else {},
+            "content_template": content_template,
             "seed": identity.seed if identity else 0,
         })
         seen.add(iid)

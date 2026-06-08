@@ -125,6 +125,13 @@ def build_narrative_node(event_id: str, *, visual_event_id: str = "") -> dict[st
         previous_event_id="",
     )
 
+    content_template: dict = {}
+    try:
+        from engine.templates.template_resolver import resolve_content_template
+        content_template = resolve_content_template("event", canonical, context={"scene": node_def.get("context")})
+    except Exception:
+        pass
+
     return {
         "event_id": canonical,
         "visual_event_id": visual_event_id or event_id,
@@ -138,6 +145,7 @@ def build_narrative_node(event_id: str, *, visual_event_id: str = "") -> dict[st
         "choices": choices,
         "next_events": next_events,
         "continuity": continuity,
+        "content_template": content_template,
     }
 
 

@@ -994,6 +994,7 @@ export interface VisualIdentityView {
   all_assets: VisualAssetItem[]
   traits: Record<string, unknown>
   style_anchor: Record<string, unknown>
+  content_template?: Record<string, unknown>
   seed: number
 }
 

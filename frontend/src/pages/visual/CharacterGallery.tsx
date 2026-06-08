@@ -124,6 +124,16 @@ export default function CharacterGallery() {
               )}
 
               <div className="flex flex-wrap gap-1">
+                {String(selected.content_template?.archetype || '').trim() ? (
+                  <Badge variant="outline" className="text-[10px] border-neural-violet/40">
+                    原型: {String(selected.content_template?.archetype)}
+                  </Badge>
+                ) : null}
+                {String(selected.content_template?.conflict_vector || '').trim() ? (
+                  <Badge variant="outline" className="text-[10px]">
+                    {String(selected.content_template?.conflict_vector)}
+                  </Badge>
+                ) : null}
                 {Object.entries(selected.traits).map(([k, v]) => (
                   <Badge key={k} variant="outline" className="text-[10px]">{k}: {String(v)}</Badge>
                 ))}

@@ -95,12 +95,20 @@ def get_or_request_faction_map(
 def reset_visual_assets(*, persist: bool = True) -> None:
     """Clear registry, identity registry, narrative state, and visual output cache."""
     from engine.narrative.narrative_state import empty_narrative_state, save_narrative_state
+    from engine.templates.template_registry import empty_content_templates, save_content_templates
     from engine.visual.identity_registry import empty_identity_registry, save_identity_registry
 
     clear_visual_output()
     save_registry(empty_registry(), persist=persist)
     save_identity_registry(empty_identity_registry(), persist=persist)
     save_narrative_state(empty_narrative_state(), persist=persist)
+    if getattr(config, "CONTENT_TEMPLATE_SYSTEM_ENABLED", True):
+        defaults = empty_content_templates()
+        if config.CONTENT_TEMPLATES_DEFAULT_PATH.exists():
+            from engine.templates.template_registry import normalize_content_templates
+            from engine import io_utils
+            defaults = normalize_content_templates(io_utils.read_json(config.CONTENT_TEMPLATES_DEFAULT_PATH))
+        save_content_templates(defaults, persist=persist)
     for path in (config.VISUAL_REGISTRY_PATH, config.VISUAL_IDENTITY_REGISTRY_PATH):
         if path.exists() and not persist:
             try:

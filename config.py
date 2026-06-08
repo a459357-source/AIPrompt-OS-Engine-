@@ -188,6 +188,11 @@ NARRATIVE_ROUTES_PATH = DATA_DIR / "narrative_routes.json"
 NARRATIVE_ROUTES_DEFAULT_PATH = (
     Path(__file__).resolve().parent / "packaging" / "defaults" / "narrative_routes.json"
 )
+CONTENT_TEMPLATES_PATH = DATA_DIR / "content_templates.json"
+CONTENT_TEMPLATES_DEFAULT_PATH = (
+    Path(__file__).resolve().parent / "packaging" / "defaults" / "content_templates.json"
+)
+CONTENT_TEMPLATE_SYSTEM_ENABLED = True
 LOG_PATH             = DATA_DIR / "app.log"
 ERROR_LOG_PATH       = DATA_DIR / "error.log"
 
