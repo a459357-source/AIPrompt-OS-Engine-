@@ -20,7 +20,7 @@ const ROUTE_NAV = [
   { to: '/game', icon: Gamepad2, labelKey: 'nav.game', themeKey: true },
   { to: '/npcs', icon: Users, labelKey: 'nav.characters', themeKey: true },
   { to: '/dashboard', icon: Activity, labelKey: 'nav.worldState', themeKey: true },
-  { to: '/visual', icon: Image, labelKey: 'nav.visualWorld', themeKey: false },
+  { to: '/visual/characters', icon: Image, labelKey: 'nav.visualWorld', themeKey: false },
   { to: '/settings', icon: Settings, labelKey: 'nav.settings', themeKey: false },
 ]
 
@@ -45,7 +45,9 @@ function NeuralTopBar() {
         <AdultContentControls />
         <nav className="hidden lg:flex items-center gap-1">
           {ROUTE_NAV.map(({ to, icon: Icon, labelKey, themeKey }) => {
-            const active = location.pathname === to || (to === '/new' && location.pathname === '/')
+            const active = location.pathname === to
+            || (to === '/new' && location.pathname === '/')
+            || (to === '/visual/characters' && location.pathname.startsWith('/visual'))
             return (
               <Link
                 key={to}
@@ -78,7 +80,9 @@ function NeuralDock() {
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-panel border-x-0 border-b-0 rounded-none safe-area-bottom transition-colors duration-[800ms]">
       <div className="flex items-center justify-around px-1 py-2">
         {ROUTE_NAV.map(({ to, icon: Icon, labelKey, themeKey }) => {
-          const active = location.pathname === to || (to === '/new' && location.pathname === '/')
+          const active = location.pathname === to
+            || (to === '/new' && location.pathname === '/')
+            || (to === '/visual/characters' && location.pathname.startsWith('/visual'))
           return (
             <Link
               key={to}

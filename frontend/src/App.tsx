@@ -12,7 +12,11 @@ import Game from './pages/Game'
 import NPCs from './pages/NPCs'
 import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
-import VisualWorld from './pages/VisualWorld'
+import VisualLayout from './pages/visual/VisualLayout'
+import CharacterGallery from './pages/visual/CharacterGallery'
+import WorldExplorer from './pages/visual/WorldExplorer'
+import EventTimeline from './pages/visual/EventTimeline'
+import VisualDebug from './pages/visual/VisualDebug'
 
 function AppRoutes() {
   const location = useLocation()
@@ -24,7 +28,12 @@ function AppRoutes() {
       <Route path="/game" element={<Game />} />
       <Route path="/npcs" element={<NPCs />} />
       <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/visual" element={<VisualWorld />} />
+      <Route path="/visual" element={<VisualLayout />}>
+        <Route path="characters" element={<CharacterGallery />} />
+        <Route path="world" element={<WorldExplorer />} />
+        <Route path="events" element={<EventTimeline />} />
+        <Route path="debug" element={<VisualDebug />} />
+      </Route>
       <Route path="/settings" element={<Settings />} />
       <Route path="/" element={<NewStory />} />
     </Routes>

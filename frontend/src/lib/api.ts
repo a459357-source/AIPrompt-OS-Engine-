@@ -955,7 +955,15 @@ export interface SupplementLoreResult {
   error?: string
 }
 
+export interface VisualStatus {
+  enabled: boolean
+  provider: string
+  cache_enabled: boolean
+  read_only?: boolean
+}
+
 export interface VisualAssetItem {
+  registry_id?: string
   asset_id: string
   entity_type: string
   entity_id: string
@@ -970,6 +978,7 @@ export interface VisualAssetItem {
   created_at: number
   seed: number
   cache_status: string
+  cache_hit?: boolean
   identity?: Record<string, unknown>
   scope?: string
   canonical_traits?: Record<string, unknown>
@@ -977,16 +986,45 @@ export interface VisualAssetItem {
   locked_descriptors?: string[]
 }
 
-export interface VisualWorldData {
-  status: { enabled: boolean; provider: string; cache_enabled: boolean }
-  characters: VisualAssetItem[]
+export interface VisualIdentityView {
+  identity_id: string
+  entity_name: string
+  latest_image: string
+  latest_image_path: string
+  all_assets: VisualAssetItem[]
+  traits: Record<string, unknown>
+  style_anchor: Record<string, unknown>
+  seed: number
+}
+
+export interface VisualCharacterLink {
+  from: string
+  to: string
+  label?: string
+}
+
+export interface VisualWorldView {
   locations: VisualAssetItem[]
   factions: VisualAssetItem[]
-  events: VisualAssetItem[]
-  debug: {
-    identities: Record<string, unknown>[]
-    assets: VisualAssetItem[]
-  }
+  characters: VisualIdentityView[]
+  character_links: VisualCharacterLink[]
+}
+
+export interface VisualEventView {
+  event_id: string
+  display_name: string
+  linked_assets: VisualAssetItem[]
+  scene_images: string[]
+  characters: string[]
+  timestamp: number
+  created_turn: number
+  identity_id: string
+  prompt_hash: string
+}
+
+export interface VisualDebugAsset extends VisualAssetItem {
+  registry_id: string
+  cache_hit: boolean
 }
 
 async function getJson<T>(url: string): Promise<T> {
@@ -995,24 +1033,30 @@ async function getJson<T>(url: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function getVisualWorldData(): Promise<VisualWorldData> {
-  const [status, gallery, world, events, debug] = await Promise.all([
-    getJson<{ enabled: boolean; provider: string; cache_enabled: boolean }>('/api/visual/status'),
-    getJson<{ characters: VisualAssetItem[] }>('/api/visual/gallery/characters'),
-    getJson<{ locations: VisualAssetItem[]; factions: VisualAssetItem[] }>('/api/visual/world'),
-    getJson<{ events: VisualAssetItem[] }>('/api/visual/events'),
-    getJson<{ status: VisualWorldData['status']; identities: Record<string, unknown>[]; assets: VisualAssetItem[] }>(
-      '/api/visual/debug',
-    ),
-  ])
-  return {
-    status,
-    characters: gallery.characters,
-    locations: world.locations,
-    factions: world.factions,
-    events: events.events,
-    debug: { identities: debug.identities, assets: debug.assets },
-  }
+export async function getVisualStatus(): Promise<VisualStatus> {
+  return getJson<VisualStatus>('/api/visual/status')
+}
+
+export async function getCharacterGallery(): Promise<VisualIdentityView[]> {
+  const data = await getJson<{ characters: VisualIdentityView[] }>('/api/visual/gallery/characters')
+  return data.characters
+}
+
+export async function getWorldExplorer(): Promise<VisualWorldView> {
+  return getJson<VisualWorldView>('/api/visual/world')
+}
+
+export async function getEventTimeline(): Promise<VisualEventView[]> {
+  const data = await getJson<{ events: VisualEventView[] }>('/api/visual/events')
+  return data.events
+}
+
+export async function getVisualDebug(): Promise<{
+  status: VisualStatus
+  identities: Record<string, unknown>[]
+  assets: VisualDebugAsset[]
+}> {
+  return getJson('/api/visual/debug')
 }
 
 export async function supplementLore(text: string): Promise<SupplementLoreResult> {
