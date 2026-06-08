@@ -29,7 +29,19 @@
 - [ ] 模式差异是否应进入 `engine/experience/` Strategy 而非业务模块？
 - [ ] 模式切换是否保证 World / Memory / Timeline 数据不变？
 
-## Phase 1 交付
+## 版本状态（V4.x 已关闭）
+
+| 版本 | 文档 | Status |
+|------|------|--------|
+| V4.0 | [`PROMPT_UNIFIED_DESIGN.md`](PROMPT_UNIFIED_DESIGN.md) | **Stable** |
+| V4.1 | [`PROMPT_WEIGHT_CALIBRATION_REPORT.md`](PROMPT_WEIGHT_CALIBRATION_REPORT.md) | **Closed** |
+| V5.1 | （待设计）Relationship Dynamics | **Design Approved** |
+
+评审结论：[`V4_CLOSURE_DECISION.md`](V4_CLOSURE_DECISION.md)
+
+## 交付归档
 
 - [`ADR_FOUNDATION_REPORT.md`](ADR_FOUNDATION_REPORT.md) — Phase 1 experience_mode 兼容层
-- [`PROMPT_UNIFIED_DESIGN.md`](PROMPT_UNIFIED_DESIGN.md) — Phase 2 统一 Prompt 架构（已实现）
+- [`PROMPT_UNIFIED_DESIGN.md`](PROMPT_UNIFIED_DESIGN.md) — V4.0 统一 Prompt 架构（Stable）
+- [`PROMPT_UNIFIED_REGRESSION_REPORT.md`](PROMPT_UNIFIED_REGRESSION_REPORT.md) — Phase 3A
+- [`PROMPT_WEIGHT_CALIBRATION_REPORT.md`](PROMPT_WEIGHT_CALIBRATION_REPORT.md) — Phase 3B
