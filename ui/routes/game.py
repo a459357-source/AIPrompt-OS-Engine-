@@ -87,6 +87,14 @@ async def reset():
             graph = init["graph"]
             commit_bundle(state, memory, graph, chapter="")
 
+            rel_graph = init.get("relationship_graph")
+            if isinstance(rel_graph, dict) and rel_graph.get("edges") is not None:
+                io_utils.write_json(config.RELATIONSHIP_GRAPH_PATH, rel_graph)
+            else:
+                from engine.relationship_core import init_graph_from_world
+                world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+                init_graph_from_world(world_pack, memory, state, persist=True)
+
             plot_state = init.get("plot_state")
             if isinstance(plot_state, dict) and plot_state.get("main_plot"):
                 save_plot_state(plot_state, persist=True)

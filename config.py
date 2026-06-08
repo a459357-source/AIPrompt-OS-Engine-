@@ -166,6 +166,7 @@ CHAPTER_SUMMARIES_PATH = DATA_DIR / "chapter_summaries.json"
 TURN_PROFILE_PATH    = DATA_DIR / "turn_profile.jsonl"
 RUNTIME_MEMORY_PATH  = DATA_DIR / "runtime_memory.json"
 PLOT_STATE_PATH      = DATA_DIR / "plot_state.json"
+RELATIONSHIP_GRAPH_PATH = DATA_DIR / "relationship_graph.json"
 LOG_PATH             = DATA_DIR / "app.log"
 ERROR_LOG_PATH       = DATA_DIR / "error.log"
 
@@ -194,6 +195,9 @@ PLOT_DIRECTOR_ANALYSIS_INTERVAL = 5
 PLOT_DIRECTOR_STALL_THRESHOLD = 10
 PLOT_DIRECTOR_MAX_OPEN_HOOKS = 8
 PLOT_DIRECTOR_OLD_HOOK_TURNS = 15
+
+# ── V5.1 Relationship Dynamics (Phase A) ───────────────────────────
+RELATIONSHIP_ENGINE_ENABLED = True
 
 # ── V3.2 Objective System ─────────────────────────────────────────
 OBJECTIVE_SYSTEM_ENABLED = True

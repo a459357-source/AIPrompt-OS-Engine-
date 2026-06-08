@@ -145,6 +145,7 @@ def build_character_brain_context(
     names: set[str],
     memory: dict,
     world_pack: dict,
+    session_state: dict | None = None,
 ) -> str:
     """Format personality blocks for prompt injection."""
     if not names:
@@ -184,8 +185,20 @@ def build_character_brain_context(
             rendered += 1
 
     if rendered == 0:
-        return ""
-    return "\n".join(lines)
+        brain_text = ""
+    else:
+        brain_text = "\n".join(lines)
+
+    if config.CHARACTER_BRAIN_ENABLED and config.RELATIONSHIP_ENGINE_ENABLED:
+        from engine.relationship_core import read_api_for_brain
+
+        rel_block = read_api_for_brain(names, world_pack, session_state)
+        if rel_block:
+            if brain_text:
+                return brain_text + "\n" + rel_block
+            return rel_block
+
+    return brain_text
 
 
 def sync_personality_to_world_pack(world_pack: dict, name: str, personality: dict) -> None:

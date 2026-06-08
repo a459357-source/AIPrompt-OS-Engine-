@@ -138,6 +138,24 @@ def build_director_advice(plot_state: dict, session_state: dict) -> str:
             "向长期目标靠近。"
         )
 
+    if config.RELATIONSHIP_ENGINE_ENABLED:
+        from engine import io_utils
+        from engine.relationship_core import (
+            build_relationship_director_hint,
+            consume_pending_events_for_director,
+            ensure_graph,
+            save_graph,
+        )
+
+        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        rel_graph = ensure_graph(world_pack, session=session_state)
+        rel_hint = build_relationship_director_hint(rel_graph)
+        if rel_hint:
+            triggered = True
+            lines.append(f"- {rel_hint}")
+            consume_pending_events_for_director(rel_graph)
+            save_graph(rel_graph, persist=True)
+
     if not triggered:
         return ""
 

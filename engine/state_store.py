@@ -38,6 +38,7 @@ class RuntimeState:
     memory: dict
     graph: dict
     chapter: str = ""
+    relationship: dict | None = None
 
 
 def _in_transaction() -> bool:
@@ -68,11 +69,25 @@ def load_runtime(*, clear_cache: bool = False) -> RuntimeState:
             chapter = config.CHAPTER_PATH.read_text(encoding="utf-8")
         except OSError:
             chapter = ""
+    relationship: dict | None = None
+    if config.RELATIONSHIP_GRAPH_PATH.exists():
+        try:
+            relationship = io_utils.read_json(
+                config.RELATIONSHIP_GRAPH_PATH, use_cache=not clear_cache,
+            )
+        except Exception:
+            relationship = None
+    if not isinstance(relationship, dict) or "edges" not in relationship:
+        relationship = {
+            "version": 1, "nodes": {}, "edges": {}, "events": [], "pending_events": [],
+        }
+
     return RuntimeState(
         session=io_utils.read_yaml(config.SESSION_STATE_PATH, use_cache=not clear_cache),
         memory=io_utils.read_json(config.MEMORY_PATH, use_cache=not clear_cache),
         graph=io_utils.read_json(config.STORY_GRAPH_PATH, use_cache=not clear_cache),
         chapter=chapter,
+        relationship=relationship,
     )
 
 
@@ -127,6 +142,14 @@ def commit_runtime(state: RuntimeState, *, chapter: str | None = None) -> None:
         staged_paths[2]: graph_json,
     }
 
+    if state.relationship is not None:
+        relationship_json = json.dumps(state.relationship, ensure_ascii=False, indent=2)
+        _validate_json(relationship_json)
+        rel_staged = _staging_path(config.RELATIONSHIP_GRAPH_PATH)
+        targets.append(config.RELATIONSHIP_GRAPH_PATH)
+        staged_paths.append(rel_staged)
+        payloads[rel_staged] = relationship_json
+
     chapter_staging: Path | None = None
     if chapter_text is not None:
         chapter_staging = _staging_path(config.CHAPTER_PATH)
@@ -164,6 +187,13 @@ def commit_bundle(
     graph: dict,
     *,
     chapter: str = "",
+    relationship: dict | None = None,
 ) -> None:
     """Convenience wrapper for one-shot commits from save/load/reset/new."""
-    commit_runtime(RuntimeState(session=session, memory=memory, graph=graph, chapter=chapter))
+    commit_runtime(RuntimeState(
+        session=session,
+        memory=memory,
+        graph=graph,
+        chapter=chapter,
+        relationship=relationship,
+    ))

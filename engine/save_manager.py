@@ -42,6 +42,16 @@ def _load_plot_state() -> dict:
     except Exception:
         return {}
 
+
+def _load_relationship_graph() -> dict:
+    try:
+        data = io_utils.read_json(config.RELATIONSHIP_GRAPH_PATH)
+        if isinstance(data, dict) and "edges" in data:
+            return data
+    except Exception:
+        pass
+    return {"version": 1, "nodes": {}, "edges": {}, "events": [], "pending_events": []}
+
 # Maximum chapter content to include in a save (avoid giant save files)
 _MAX_CHAPTER_BYTES = MAX_CHAPTER_BYTES_IN_SAVE
 
@@ -62,6 +72,7 @@ def save(slot: str) -> dict | None:
         state = io_utils.read_yaml(config.SESSION_STATE_PATH)
         memory = io_utils.read_json(config.MEMORY_PATH)
         graph = io_utils.read_json(config.STORY_GRAPH_PATH)
+        relationship_graph = _load_relationship_graph()
         plot_state = _load_plot_state()
 
         chapter = ""
@@ -82,6 +93,7 @@ def save(slot: str) -> dict | None:
             "session_state": state,
             "memory": memory,
             "story_graph": graph,
+            "relationship_graph": relationship_graph,
             "candidate_npcs": _load_candidate_pool(),
             "plot_state": plot_state,
             "chapter": chapter,
@@ -154,6 +166,15 @@ def load(slot: str) -> dict | None:
             from engine.plot_director import ensure_plot_state
             world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
             ensure_plot_state(world_pack)
+        rel_graph = snapshot.get("relationship_graph")
+        if isinstance(rel_graph, dict) and rel_graph.get("edges") is not None:
+            io_utils.write_json(config.RELATIONSHIP_GRAPH_PATH, rel_graph)
+        elif config.RELATIONSHIP_ENGINE_ENABLED:
+            from engine.relationship_core import init_graph_from_world
+            world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+            memory = snapshot.get("memory", {})
+            session = snapshot.get("session_state", {})
+            init_graph_from_world(world_pack, memory, session, persist=True)
         if "experience_mode" in snapshot:
             config.save_experience_mode(str(snapshot["experience_mode"]))
         elif "adult_mode" in snapshot:

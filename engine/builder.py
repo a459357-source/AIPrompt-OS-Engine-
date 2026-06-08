@@ -136,7 +136,9 @@ def _build_prompt_unified(current_choice: str | None) -> tuple[str, str]:
     brain_names = resolve_brain_character_names(session_state, memory, world_pack)
     character_brain = ""
     if config.CHARACTER_BRAIN_ENABLED:
-        character_brain = build_character_brain_context(brain_names, memory, world_pack)
+        character_brain = build_character_brain_context(
+            brain_names, memory, world_pack, session_state,
+        )
 
     long_term = build_long_term_memory(memory, session_state)
     recent_summaries = build_recent_summaries(count=2)
@@ -155,7 +157,7 @@ def _build_prompt_unified(current_choice: str | None) -> tuple[str, str]:
     objectives_context = ""
     if config.OBJECTIVE_SYSTEM_ENABLED:
         ensure_objectives(session_state, world_pack)
-        objectives_context = build_objectives_context(session_state)
+        objectives_context = build_objectives_context(session_state, world_pack)
         if objectives_context:
             objectives_context = objectives_context + "\n"
 
@@ -249,7 +251,9 @@ def _build_prompt_legacy_extreme(current_choice: str | None) -> tuple[str, str]:
     brain_names = resolve_brain_character_names(session_state, memory, world_pack)
     character_brain = ""
     if config.CHARACTER_BRAIN_ENABLED:
-        character_brain = build_character_brain_context(brain_names, memory, world_pack)
+        character_brain = build_character_brain_context(
+            brain_names, memory, world_pack, session_state,
+        )
 
     long_term = build_long_term_memory(memory, session_state)
     recent_summaries = build_recent_summaries(count=2)

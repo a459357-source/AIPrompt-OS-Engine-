@@ -589,7 +589,18 @@ async def create_new_story(
         "global_trust": 0.5,
         "relationship_system": rel_config,
     }
-    commit_bundle(initial_state, initial_memory, initial_graph, chapter="")
+    from engine.relationship_core import init_graph_from_world
+
+    relationship_graph = init_graph_from_world(
+        world_pack, initial_memory, initial_state, persist=False,
+    )
+    commit_bundle(
+        initial_state,
+        initial_memory,
+        initial_graph,
+        chapter="",
+        relationship=relationship_graph,
+    )
 
     from engine.plot_director import init_plot_state
     plot_state = init_plot_state(world_pack)
@@ -603,6 +614,7 @@ async def create_new_story(
         "graph": initial_graph,
         "memory": initial_memory,
         "plot_state": plot_state,
+        "relationship_graph": relationship_graph,
     })
 
     # Redirect to main page

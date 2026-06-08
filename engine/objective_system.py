@@ -272,7 +272,7 @@ def _active_items(objectives: dict) -> tuple[list[dict], list[dict]]:
     return main_active, side_active
 
 
-def build_objectives_context(session: dict) -> str:
+def build_objectives_context(session: dict, world_pack: dict | None = None) -> str:
     """Prompt block for active objectives only."""
     if not config.OBJECTIVE_SYSTEM_ENABLED:
         return ""
@@ -286,16 +286,31 @@ def build_objectives_context(session: dict) -> str:
     if not main_active and not side_active:
         return ""
 
+    rel_hints: dict[str, int] = {}
+    if config.RELATIONSHIP_ENGINE_ENABLED:
+        from engine import io_utils
+        from engine.relationship_core import read_api_for_objective
+
+        if world_pack is None:
+            world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        rel_hints = read_api_for_objective(session, world_pack)
+
     lines = ["【当前目标】（每轮须让玩家感受到朝目标前进；可输出 objective_updates 更新进度）"]
     for obj in main_active[:1]:
         title = str(obj.get("title", "")).strip()
+        oid = str(obj.get("id", "")).strip()
         progress = int(obj.get("progress", 0) or 0)
+        if oid in rel_hints:
+            progress = max(progress, rel_hints[oid])
         lines.append(f"主线：{title}（进度 {progress}%）")
 
     side_limit = config.OBJECTIVE_MAX_SIDE_ACTIVE
     for obj in side_active[:side_limit]:
         title = str(obj.get("title", "")).strip()
+        oid = str(obj.get("id", "")).strip()
         progress = int(obj.get("progress", 0) or 0)
+        if oid in rel_hints:
+            progress = max(progress, rel_hints[oid])
         lines.append(f"支线：{title}（进度 {progress}%）")
 
     extra = len(side_active) - side_limit
@@ -416,4 +431,11 @@ def process_turn_objectives(
 
     plot_state = ensure_plot_state(world_pack)
     sync_main_objective_progress(session, plot_state)
+
+    if config.RELATIONSHIP_ENGINE_ENABLED:
+        from engine.relationship_core import ensure_graph, sync_objectives_from_graph
+
+        graph = ensure_graph(world_pack, session=session)
+        sync_objectives_from_graph(session, graph, world_pack)
+
     return session

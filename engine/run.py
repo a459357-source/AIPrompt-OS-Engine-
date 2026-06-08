@@ -400,6 +400,8 @@ def step(
                response, new_state, choice, runtime.graph)
     _safe_call(_update_memory, "character memory update",
                response, new_state, choice, runtime.memory)
+    _safe_call(_update_relationship_graph, "relationship graph update",
+               response, new_state, choice, runtime)
 
     try:
         commit_runtime(runtime)
@@ -813,6 +815,40 @@ def _update_graph(
         logger.info("Graph: node %s added (parent=%s, choice=%s)", new_id, current_node, effective_choice)
     except Exception:
         logger.error("Failed to update story graph:\n%s", traceback.format_exc())
+
+
+def _update_relationship_graph(
+    response: dict,
+    state: dict,
+    choice: str | None,
+    runtime,
+) -> None:
+    """Update directed relationship graph; persisted via commit_runtime()."""
+    try:
+        from engine.relationship_update import (
+            apply_turn_relationship_updates,
+            sync_session_objectives,
+        )
+        from engine.state_store import is_transactional
+
+        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        prev_options = _get_prev_options(state)
+        graph = apply_turn_relationship_updates(
+            response,
+            state,
+            choice,
+            runtime.memory,
+            world_pack,
+            prev_options=prev_options,
+            relationship_graph=runtime.relationship,
+            persist=not is_transactional(),
+        )
+        runtime.relationship = graph
+        runtime.session = sync_session_objectives(
+            runtime.session, graph, world_pack,
+        )
+    except Exception:
+        logger.error("Failed to update relationship graph:\n%s", traceback.format_exc())
 
 
 def _update_memory(
