@@ -11,7 +11,7 @@
 | Memory | `engine/memory.py`, `engine/memory_layers.py` |
 | StoryGraph | `engine/router.py`, `data/story_graph.json` |
 | ObjectiveSystem | `engine/objective_system.py` |
-| EventDirector | `engine/event_director.py` + `director_state.py` + `director_runtime.py` — **V5.2 Phase B**（状态机 + `current_event`）；`engine/events.py` 保留回合随机事件 |
+| EventDirector | `event_director` + `director_state` + `director_runtime` — **V5.2 Stable**（Final Review APPROVED，见 `V5.2_FINAL_REVIEW_REPORT.md`）；`engine/events.py` 保留回合随机事件 |
 | RelationshipDynamics | `relationship_core` … `relationship_event_resolver` — **V5.1 Stable**（Final Review APPROVED，见 `V5.1_FINAL_REVIEW_REPORT.md`） |
 | FactionSystem | memory factions, world_pack |
 | VisualAssets | **未实现**（V6.0） |
