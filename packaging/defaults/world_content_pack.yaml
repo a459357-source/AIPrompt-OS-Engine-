@@ -1,0 +1,166 @@
+version: 1
+name: V6 World Content Generation Template Pack
+
+style_constraints:
+  visual:
+    - cinematic lighting
+    - high consistency world design
+    - coherent visual identity
+    - controlled color palette
+    - subtle dramatic tone
+  material:
+    - stone
+    - metal
+    - cloth
+    - wood
+  forbidden:
+    - cyberpunk
+    - neon
+    - cartoon
+    - high saturation
+    - synthwave
+
+default_batch_plan:
+  characters: 10
+  locations: 5
+  events: 8
+  factions: 2
+
+prompts:
+  character: |
+    Generate characters for a coherent visual IP world.
+
+    World Style:
+    - cinematic lighting
+    - consistent visual identity
+    - low saturation, controlled palette
+    - architectural realism, grounded fantasy tone
+
+    Character must fit into the same world as other entities.
+    All entities must follow Style Bible v1 and be identity-ready.
+
+    Return structured JSON array only. Each item must match this schema:
+    {
+      "entity_type": "character",
+      "name": "",
+      "archetype": "",
+      "role": "",
+      "faction": "",
+      "visual_identity_hint": "",
+      "personality_axis": ["", ""],
+      "conflict_vector": "",
+      "signature_trait": "",
+      "visual_keywords": [],
+      "scene_usage": "intro / conflict / aftermath"
+    }
+
+    Batch rules:
+    - Generate {count} characters
+    - archetype must not repeat
+    - faction must be assigned
+    - conflict_vector must differ across characters
+
+  location: |
+    Generate locations in the same visual IP world.
+
+    World Style constraints:
+    - consistent architectural language
+    - cinematic realism
+    - unified material system (stone / metal / cloth / wood)
+    - controlled lighting atmosphere per region
+
+    Return structured JSON array only. Each item:
+    {
+      "entity_type": "location",
+      "name": "",
+      "type": "city / palace / military base / ruins / border zone",
+      "function_in_world": "",
+      "dominant_materials": [],
+      "atmosphere": "",
+      "visual_keywords": [],
+      "story_role": ""
+    }
+
+    Batch rules:
+    - Generate {count} locations
+    - same region style must stay consistent
+    - no cross-style drift (no cyberpunk / neon)
+    - each location must have a clear function
+
+  event: |
+    Generate narrative events for a structured visual IP world.
+
+    Existing characters: {character_names}
+    Existing locations: {location_names}
+    Existing factions: {faction_names}
+
+    World rules:
+    - consistent characters and locations
+    - cinematic composition
+    - emotional tone coherence
+    - events must fit existing world logic
+
+    Return structured JSON array only. Each item:
+    {
+      "entity_type": "event",
+      "title": "",
+      "type": "political / conflict / discovery / betrayal / aftermath",
+      "trigger": "",
+      "participants": [],
+      "location": "",
+      "conflict": "",
+      "outcome_state": "",
+      "visual_focus": "",
+      "emotion_tone": "cold / tense / tragic / calm / explosive",
+      "scene_prompt_hint": ""
+    }
+
+    Batch rules:
+    - Generate {count} events
+    - each event binds >=1 character and 1 location
+    - emotion_tone must match world temperament
+    - conflict type must not repeat
+
+  faction: |
+    Generate factions for the same visual IP world.
+
+    Return structured JSON array only. Each item:
+    {
+      "entity_type": "faction",
+      "name": "",
+      "ideology": "",
+      "structure": "",
+      "public_face": "",
+      "hidden_goal": "",
+      "visual_identity": "",
+      "key_symbols": []
+    }
+
+    Batch rules:
+    - Generate {count} factions
+    - ideology must differ
+    - visual_identity must be emblem/banner consistent
+
+  full_dataset: |
+    Generate a V6-compliant IP dataset for one coherent visual world.
+
+    Style Bible constraints:
+    {style_constraints}
+
+    Required output (structured JSON only, no prose):
+    {
+      "characters": [ ... {count_characters} character objects ... ],
+      "locations": [ ... {count_locations} location objects ... ],
+      "events": [ ... {count_events} event objects ... ],
+      "factions": [ ... {count_factions} faction objects ... ]
+    }
+
+    Use the exact schemas from the V6 World Content Generation Pack.
+    All entities must follow Style Bible v1, identity compatibility, and visual consistency rules.
+
+    Batch plan:
+    Step 1: {count_characters} characters (unique archetype, conflict_vector, faction)
+    Step 2: {count_locations} locations (consistent regional style)
+    Step 3: {count_events} events referencing characters + locations above
+    Step 4: assign relationships via participants and faction fields
+    Step 5: validate Style Bible consistency before output

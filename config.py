@@ -192,6 +192,10 @@ CONTENT_TEMPLATES_PATH = DATA_DIR / "content_templates.json"
 CONTENT_TEMPLATES_DEFAULT_PATH = (
     Path(__file__).resolve().parent / "packaging" / "defaults" / "content_templates.json"
 )
+WORLD_CONTENT_PACK_PATH = (
+    Path(__file__).resolve().parent / "packaging" / "defaults" / "world_content_pack.yaml"
+)
+WORLD_CONTENT_PACK_ENABLED = True
 CONTENT_TEMPLATE_SYSTEM_ENABLED = True
 STYLE_BIBLE_V1_ENABLED = True
 STYLE_DRIFT_DETECTOR_ENABLED = True
