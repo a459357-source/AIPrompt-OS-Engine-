@@ -1,109 +1,125 @@
-# V6 Freeze Checklist（冻结验收清单）
+# V6 Freeze Checklist + Architecture Lock Rules
 
-**用途**：PR / 发布前自检，防止冻结后架构 drift into complexity。  
-**原则**：改内容 ✅ · 改结构 ❌
-
----
-
-## A. 架构边界（必过）
-
-- [ ] 视觉生成仍只经 `get_visual()`（`visual_runtime.py`）
-- [ ] 无新代码直接写 `visual_registry.json`（须经 `make_asset_record` + `save_registry`）
-- [ ] Provider 仍只经 `get_visual_provider()`，业务层不直引 Agnes
-- [ ] `/api/visual/*` 仍为只读，无 POST 触发生成
-- [ ] `run.py` `step()` 未嵌入全回合自动生图（预热钩子除外，须独立模块）
+**用途**：PR / CI / Cursor 交付前自检  
+**原则**：❄️ 冻结架构层，只允许内容层增长  
+**自动化**：`python scripts/v6_freeze_check.py` · GitHub Actions `V6_Freeze_Check`
 
 ---
 
-## B. 冻结文件（结构变更需 ADR）
+## Freeze Definition
 
-以下文件 **禁止** 行为性修改（注释/文档除外）：
+V6 冻结完成 = 系统可稳定生成视觉资产 + 保持一致性 + **无需新增架构模块**。
 
-| 文件 | 冻结内容 |
-|------|----------|
-| `engine/visual/visual_runtime.py` | `get_visual` 主流程、缓存层级顺序 |
-| `engine/visual/visual_object.py` | idempotency 规则、四类 entity |
-| `engine/visual/visual_registry.py` | scope 名、record schema |
-| `engine/visual/style_drift.py` | 评分公式、三级策略 |
-| `engine/visual/quality_governance.py` | 三层权重 0.4/0.3/0.3、阈值 |
-| `engine/templates/style_bible.py` | `STYLE_BIBLE_V1` 桶结构 |
-| `engine/visual/identity_prompt_builder.py` | pipeline 顺序（IP→Style Bible） |
+**判断标准**：这个改动是在增强**内容**，还是在增加**系统层**？
 
-**允许**：config 开关、阈值常量、日志文案。
+| 类型 | 冻结期 |
+|------|--------|
+| 内容（角色/地点/事件/模板） | ✅ |
+| 系统层（新 pipeline / governance / memory） | ❌ |
 
 ---
 
-## C. 冗余收敛（技术债，非阻塞）
+## 1. Architecture Lock
 
-- [ ] 无新 import `visual_context.py`（grep 为零新增）
-- [ ] Style Bible：新语义只写 `content_templates.style_bible`，不扩 ENGINE 常量桶
-- [ ] Bootstrap 输出只走 `apply_bootstrap_import`，不直写 registry
+- [ ] 唯一入口：`get_visual()` 仅在 `visual_runtime.py` 定义一次
+- [ ] 无新 visual pipeline 层
+- [ ] 唯一 prompt builder 运行路径：`identity_prompt_builder.py`
+- [ ] Provider 接口不变（stub / mock / agnes）
+- [ ] Registry schema 稳定（仅可加 optional 字段）
+- [ ] Cache 仍为 L1 内存 + L2 文件
+
+**禁止**：新 generation framework · 新 AI evaluation 层 · world simulation · memory graph · 重复 Style Bible 系统
 
 ---
 
-## D. 自检命令（交付前）
+## 2. Data Flow Integrity
+
+```text
+entity → identity → prompt → provider → drift → governance → cache → registry → UI
+```
+
+**禁止**：绕过 Drift / Governance · UI 直接生图 · Provider 写 registry · cache 绕过 registry
+
+---
+
+## 3. Identity Stability
+
+- [ ] 同 `entity_id` → 同 `identity_id`
+- [ ] `identity_id` 创建后不变
+- [ ] `visual_identity_registry` 追加式锁定
+
+**禁止**：运行时重建 identity · 修改 `canonical_traits` · prompt 反向覆盖 identity
+
+---
+
+## 4. Style Bible Lock
+
+- [ ] 单一 Style Bible v1（ENGINE）
+- [ ] WORLD `content_templates.style_bible` 可扩展语义，不替换 ENGINE 桶结构
+- [ ] 无 per-request 风格切换
+
+---
+
+## 5. Quality System Lock
+
+- [ ] Drift 保持 prompt-proxy（无 CV）
+- [ ] Governance 保持启发式（无 ML）
+- [ ] `accept_weak` 仍写入 registry（带 `meta.quality_weak`）
+
+---
+
+## 6. Registry / Cache Immutability
+
+- [ ] `make_asset_record` 必填字段不变（见 `freeze_check.py`）
+- [ ] `prompt_hash` / `asset_id` 规则不变
+- [ ] `scenes` → `events` 迁移逻辑保留
+
+---
+
+## 7. UI Freeze Rules
+
+- [ ] `/api/visual/*` 仅 GET
+- [ ] UI 不触发 `get_visual`（预热 API 除外，须 `feat(visual-prefetch)`）
+- [ ] Narrative 层与 Visual Runtime 分离
+
+---
+
+## CI 命令（本地 = CI）
 
 ```bash
 cd prompt-os-engine
-
-# 视觉 + 质量 + 模板 + bootstrap
-python -m pytest test_visual_api.py test_visual_runtime.py test_visual_identity.py \
-  test_visual_provider.py test_style_bible.py test_style_drift.py test_quality_governance.py \
-  test_content_templates.py test_world_content_pack.py test_world_bootstrap.py \
-  test_narrative_entry.py -q
-
-# import 冒烟
-python -c "from engine.visual.visual_runtime import get_visual; from engine.templates.world_bootstrap import validate_bootstrap_dataset; print('ok')"
-
-# 前端（动 UI 时）
-cd frontend && npm run build
+python scripts/v6_freeze_check.py
+python -m pytest test_v6_freeze.py test_visual_runtime.py test_visual_identity.py \
+  test_style_drift.py test_quality_governance.py -q
 ```
 
-**通过标准**：上述 pytest 全绿；无新增 `visual_context` 运行路径引用。
+GitHub Actions：`.github/workflows/v6_freeze_check.yml`
 
 ---
 
-## E. Config 冻结默认值（参考）
+## Runtime Guard
 
-| 开关 | 冻结默认 | 说明 |
-|------|----------|------|
-| `VISUAL_SYSTEM_ENABLED` | True | |
-| `VISUAL_PROVIDER` | stub | 生产切 agnes |
-| `STYLE_BIBLE_V1_ENABLED` | True | |
-| `STYLE_DRIFT_DETECTOR_ENABLED` | True | |
-| `VISUAL_QUALITY_GOVERNANCE_ENABLED` | True | |
-| `CONTENT_TEMPLATE_SYSTEM_ENABLED` | True | |
+```python
+from engine.visual.freeze_guard import assert_no_arch_change
 
----
+assert_no_arch_change("memory_graph layer")  # raises if V6_ARCHITECTURE_FROZEN=True
+```
 
-## F. PR 标题规则（建议 CI / 人工审查）
-
-| 前缀 | 冻结期 |
-|------|--------|
-| `feat(visual-runtime):` | ❌ 需 ADR + 架构评审 |
-| `feat(visual-ui):` | ✅ UI polish |
-| `feat(visual-prefetch):` | ✅ 唯一允许的 runtime 接线 |
-| `feat(content):` / `feat(bootstrap):` | ✅ 内容/IP |
-| `fix(visual):` | ✅ bug，不改 schema |
-| `docs(architecture):` | ✅ |
+配置：`config.V6_ARCHITECTURE_FROZEN = True`
 
 ---
 
-## G. 显式禁止项（审查打回）
+## 冻结后允许
 
-- 新 governance / drift / memory / evolution 层
-- ML/CV 图像分析接入 pipeline
-- Registry schema 破坏性变更
-- UI「一键生图」按钮调用 provider
-- 删除或绕过 Drift / Quality 阶段
+新角色/地点/事件 · Content Template · Bootstrap · prompt 文案微调 · UI 美化 · `feat(visual-prefetch)`
+
+## 永久禁止（审查打回）
+
+新系统层 · 新 runtime pipeline · CV/ML 质量层 · memory/evolution · UI 一键生图
 
 ---
 
-## H. 冻结解除条件（未来）
+## 相关文档
 
-仅当以下 **全部** 满足才可讨论 V7：
-
-1. Visual Prefetch 已接且画廊默认可用
-2. `VISUAL_PROVIDER=agnes` 生产验证通过
-3. 图像级 QA 有明确 ADR（非冻结期内实现）
-4. 主游戏与 Visual 集成方案经单独评审
+- [V6_FREEZE_DECISION.md](./V6_FREEZE_DECISION.md)
+- 实现：`engine/visual/freeze_check.py`, `engine/visual/freeze_guard.py`

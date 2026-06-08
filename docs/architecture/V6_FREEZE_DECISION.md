@@ -149,8 +149,19 @@ Visual Runtime          →  get_visual()（execution）
 
 ---
 
+## CI / 自动化锁
+
+```bash
+python scripts/v6_freeze_check.py   # 架构锁自检
+python -m pytest test_v6_freeze.py -q
+```
+
+GitHub Actions：`.github/workflows/v6_freeze_check.yml`（`V6_Freeze_Check`）
+
+实现：`engine/visual/freeze_check.py` · `engine/visual/freeze_guard.py` · `config.V6_ARCHITECTURE_FROZEN`
+
 ## 相关文档
 
-- 审计底稿：本对话 V6 系统报告（2026-06-08）
+- 审计底稿：V6 系统报告（2026-06-08）
 - 验收清单：[V6_FREEZE_CHECKLIST.md](./V6_FREEZE_CHECKLIST.md)
 - 各层实现：`V6_VISUAL_RUNTIME_*`, `V6_STYLE_*`, `V6_VISUAL_QUALITY_*`, `V6_WORLD_*`

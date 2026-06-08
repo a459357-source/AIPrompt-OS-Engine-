@@ -1,0 +1,32 @@
+name: V6_Freeze_Check
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  architecture_lock_check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: V6 architecture lock
+        run: python scripts/v6_freeze_check.py
+
+      - name: V6 freeze pytest
+        run: python -m pytest test_v6_freeze.py -q
+
+      - name: Visual regression (frozen stack)
+        run: |
+          python -m pytest test_visual_runtime.py test_visual_identity.py \
+            test_style_drift.py test_quality_governance.py -q

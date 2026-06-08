@@ -1,5 +1,9 @@
 """
 visual_context.py — V6.0 visual prompt builder (world facts only)
+
+.. deprecated:: V6 Freeze
+    Superseded by ``identity_prompt_builder.py``. Do not import in runtime paths.
+    Kept for debug/compat only. See ``docs/architecture/V6_FREEZE_CHECKLIST.md``.
 """
 
 from __future__ import annotations
