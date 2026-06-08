@@ -459,17 +459,27 @@ def read_api_for_brain(
     world_pack: dict,
     session: dict | None = None,
     memory_store: dict | None = None,
+    dynamics_store: dict | None = None,
 ) -> str:
-    """Public Brain Read API (graph state + recent memory events)."""
+    """Public Brain Read API (graph + memory + dynamics)."""
     graph = ensure_graph(world_pack, session=session)
     player = resolve_player_name(world_pack, session)
     parts = [build_relationship_context_for_brain(names, graph, player, world_pack)]
     if config.RELATIONSHIP_ENGINE_ENABLED:
-        from engine.relationship_recall import ensure_memory_store, format_brain_memory
+        from engine.relationship_recall import (
+            ensure_dynamics_store,
+            ensure_memory_store,
+            format_brain_dynamics,
+            format_brain_memory,
+        )
         store = ensure_memory_store(memory_store)
         mem_block = format_brain_memory(names, store, player)
         if mem_block:
             parts.append(mem_block)
+        dyn = ensure_dynamics_store(dynamics_store)
+        dyn_block = format_brain_dynamics(names, dyn, graph, player)
+        if dyn_block:
+            parts.append(dyn_block)
     return "\n".join(p for p in parts if p)
 
 
@@ -499,30 +509,48 @@ def read_api_for_objective_text(
     session: dict,
     world_pack: dict,
     memory_store: dict | None = None,
+    dynamics_store: dict | None = None,
 ) -> str:
-    """Objective-facing relationship memory block."""
+    """Objective-facing relationship memory + dynamics block."""
     if not config.RELATIONSHIP_ENGINE_ENABLED:
         return ""
-    from engine.relationship_recall import ensure_memory_store, format_objective_memory
+    from engine.relationship_recall import (
+        ensure_dynamics_store,
+        ensure_memory_store,
+        format_objective_dynamics,
+        format_objective_memory,
+    )
 
     graph = ensure_graph(world_pack, session=session)
     store = ensure_memory_store(memory_store)
-    return format_objective_memory(session, store, graph, world_pack)
+    parts = [format_objective_memory(session, store, graph, world_pack)]
+    dyn = ensure_dynamics_store(dynamics_store)
+    dyn_part = format_objective_dynamics(session, dyn, graph, world_pack)
+    if dyn_part:
+        parts.append(dyn_part)
+    return "\n".join(p for p in parts if p)
 
 
 def read_api_for_plot(
     session: dict,
     world_pack: dict,
     memory_store: dict | None = None,
+    dynamics_store: dict | None = None,
 ) -> str:
-    """Plot Director read-only relationship tension from memory."""
+    """Plot Director read-only tension from memory + dynamics triangles."""
     if not config.RELATIONSHIP_ENGINE_ENABLED:
         return ""
-    from engine.relationship_recall import ensure_memory_store, read_api_for_plot as _plot_recall
+    from engine.relationship_event_resolver import build_relationship_tension_context
+    from engine.relationship_recall import ensure_dynamics_store, ensure_memory_store, read_api_for_plot as _plot_recall
 
     graph = ensure_graph(world_pack, session=session)
     store = ensure_memory_store(memory_store)
-    return _plot_recall(store, graph, session, world_pack)
+    dyn = ensure_dynamics_store(dynamics_store)
+    parts = [_plot_recall(store, graph, session, world_pack)]
+    tension = build_relationship_tension_context(dyn)
+    if tension:
+        parts.append(tension)
+    return "\n".join(p for p in parts if p)
 
 
 def enqueue_relationship_event(

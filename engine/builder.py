@@ -164,6 +164,7 @@ def _build_prompt_unified(current_choice: str | None) -> tuple[str, str]:
     characters_context = _characters_context(world_pack, session_state, force_triggered)
     relationship_context = _relationship_context(world_pack)
     rel_memory_context = _relationship_memory_context(session_state, world_pack, brain_names)
+    rel_dynamics_context = _relationship_dynamics_context(session_state, world_pack, brain_names)
     rel_event_candidates = _relationship_event_candidates(session_state, world_pack)
     if rel_event_candidates:
         force_prompt = (
@@ -185,6 +186,7 @@ def _build_prompt_unified(current_choice: str | None) -> tuple[str, str]:
         .replace("{{ENGINE_RULES}}", compact_engine_rules(engine_config))
         .replace("{{FORCE_EVENT_PROMPT}}", force_prompt)
         .replace("{{RELATIONSHIP_MEMORY_CONTEXT}}", rel_memory_context)
+        .replace("{{RELATIONSHIP_DYNAMICS_CONTEXT}}", rel_dynamics_context)
         .replace("{{LAST_CHOICE}}", last_choice_text)
         .replace("{{CHARACTERS_CONTEXT}}", characters_context)
         .replace("{{CHARACTER_BRAIN}}", character_brain)
@@ -279,6 +281,7 @@ def _build_prompt_legacy_extreme(current_choice: str | None) -> tuple[str, str]:
         director_advice = build_director_advice(plot_state, session_state)
 
     rel_memory_context = _relationship_memory_context(session_state, world_pack, brain_names)
+    rel_dynamics_context = _relationship_dynamics_context(session_state, world_pack, brain_names)
     rel_event_candidates = _relationship_event_candidates(session_state, world_pack)
     if rel_event_candidates:
         force_prompt = (
@@ -299,6 +302,7 @@ def _build_prompt_legacy_extreme(current_choice: str | None) -> tuple[str, str]:
         .replace("{{ENGINE_RULES}}", compact_engine_rules(engine_config))
         .replace("{{FORCE_EVENT_PROMPT}}", force_prompt)
         .replace("{{RELATIONSHIP_MEMORY_CONTEXT}}", rel_memory_context)
+        .replace("{{RELATIONSHIP_DYNAMICS_CONTEXT}}", rel_dynamics_context)
         .replace("{{LAST_CHOICE}}", last_choice_text)
         .replace("{{CHARACTERS_CONTEXT}}", _characters_context(world_pack, session_state, force_triggered))
         .replace("{{CHARACTER_BRAIN}}", character_brain)
@@ -431,16 +435,36 @@ def _relationship_memory_context(
     )
 
 
+def _relationship_dynamics_context(
+    session_state: dict,
+    world_pack: dict,
+    brain_names: set[str],
+) -> str:
+    if not config.RELATIONSHIP_ENGINE_ENABLED:
+        return ""
+    from engine.relationship_core import ensure_graph
+    from engine.relationship_recall import build_dynamics_prompt_context, ensure_dynamics_store
+
+    dyn = ensure_dynamics_store(None)
+    graph = ensure_graph(world_pack, session=session_state)
+    return build_dynamics_prompt_context(
+        dyn, graph, session_state, world_pack, names=brain_names,
+    )
+
+
 def _relationship_event_candidates(session_state: dict, world_pack: dict) -> str:
     if not config.RELATIONSHIP_ENGINE_ENABLED:
         return ""
     from engine.relationship_core import ensure_graph
     from engine.relationship_event_builder import format_event_candidates_for_director
-    from engine.relationship_recall import ensure_memory_store
+    from engine.relationship_recall import ensure_dynamics_store, ensure_memory_store
 
     store = ensure_memory_store(None)
+    dyn = ensure_dynamics_store(None)
     graph = ensure_graph(world_pack, session=session_state)
-    return format_event_candidates_for_director(store, graph, session_state, world_pack)
+    return format_event_candidates_for_director(
+        store, graph, session_state, world_pack, dynamics_store=dyn,
+    )
 
 
 def _relationship_context(world_pack: dict) -> str:

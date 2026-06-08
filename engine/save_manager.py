@@ -62,6 +62,16 @@ def _load_relationship_memory() -> dict:
         pass
     return {"version": 1, "edges": {}}
 
+
+def _load_relationship_dynamics() -> dict:
+    try:
+        data = io_utils.read_json(config.RELATIONSHIP_DYNAMICS_PATH)
+        if isinstance(data, dict) and "edges" in data:
+            return data
+    except Exception:
+        pass
+    return {"version": 1, "edges": {}, "triangles": []}
+
 # Maximum chapter content to include in a save (avoid giant save files)
 _MAX_CHAPTER_BYTES = MAX_CHAPTER_BYTES_IN_SAVE
 
@@ -84,6 +94,7 @@ def save(slot: str) -> dict | None:
         graph = io_utils.read_json(config.STORY_GRAPH_PATH)
         relationship_graph = _load_relationship_graph()
         relationship_memory = _load_relationship_memory()
+        relationship_dynamics = _load_relationship_dynamics()
         plot_state = _load_plot_state()
 
         chapter = ""
@@ -106,6 +117,7 @@ def save(slot: str) -> dict | None:
             "story_graph": graph,
             "relationship_graph": relationship_graph,
             "relationship_memory": relationship_memory,
+            "relationship_dynamics": relationship_dynamics,
             "candidate_npcs": _load_candidate_pool(),
             "plot_state": plot_state,
             "chapter": chapter,
@@ -169,6 +181,7 @@ def load(slot: str) -> dict | None:
             chapter=snapshot.get("chapter", ""),
             relationship=snapshot.get("relationship_graph"),
             relationship_memory=snapshot.get("relationship_memory"),
+            relationship_dynamics=snapshot.get("relationship_dynamics"),
         )
         io_utils.write_json(
             config.CANDIDATE_NPCS_PATH,
@@ -194,6 +207,14 @@ def load(slot: str) -> dict | None:
             io_utils.write_json(config.RELATIONSHIP_MEMORY_PATH, rel_mem)
         elif config.RELATIONSHIP_ENGINE_ENABLED:
             io_utils.write_json(config.RELATIONSHIP_MEMORY_PATH, {"version": 1, "edges": {}})
+        rel_dyn = snapshot.get("relationship_dynamics")
+        if isinstance(rel_dyn, dict) and rel_dyn.get("edges") is not None:
+            io_utils.write_json(config.RELATIONSHIP_DYNAMICS_PATH, rel_dyn)
+        elif config.RELATIONSHIP_ENGINE_ENABLED:
+            io_utils.write_json(
+                config.RELATIONSHIP_DYNAMICS_PATH,
+                {"version": 1, "edges": {}, "triangles": []},
+            )
         if "experience_mode" in snapshot:
             config.save_experience_mode(str(snapshot["experience_mode"]))
         elif "adult_mode" in snapshot:

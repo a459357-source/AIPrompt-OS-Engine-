@@ -12,7 +12,7 @@
 | StoryGraph | `engine/router.py`, `data/story_graph.json` |
 | ObjectiveSystem | `engine/objective_system.py` |
 | EventDirector | `engine/events.py`, `engine/world_driver.py`（部分） |
-| RelationshipDynamics | `relationship_core.py` + `relationship_update.py` + `relationship_memory.py` + `relationship_recall.py` — **V5.1 Phase A/B**（`relationship_graph.json` + `relationship_memory.json`） |
+| RelationshipDynamics | `relationship_core` + `relationship_update` + `relationship_memory` + `relationship_recall` + `relationship_dynamics` + `relationship_decay` + `relationship_influence` + `relationship_event_resolver` — **V5.1 Phase A/B/C** |
 | FactionSystem | memory factions, world_pack |
 | VisualAssets | **未实现**（V6.0） |
 | SaveSystem | `engine/save_manager.py` |

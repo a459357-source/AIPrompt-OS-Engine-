@@ -120,7 +120,7 @@ def test_apply_turn_relationship_updates_from_choice(world_pack, memory, tmp_pat
     response = {"story": "长公主向主角微笑，两人关系更近了一步。"}
     state = {"turn": 2}
     prev_options = ["与长公主深谈|长公主好感+5"]
-    graph, _mem = apply_turn_relationship_updates(
+    graph, _mem, _dyn = apply_turn_relationship_updates(
         response, state, "A", memory, world_pack,
         prev_options=prev_options,
         relationship_graph=graph,
@@ -143,7 +143,7 @@ def test_relationship_event_on_keyword(world_pack, memory, tmp_path, monkeypatch
     monkeypatch.setattr(config, "RELATIONSHIP_GRAPH_PATH", tmp_path / "relationship_graph.json")
     graph = init_graph_from_world(world_pack, memory, {"turn": 3}, persist=False)
     response = {"story": "长公主向主角告白，场面一度尴尬。"}
-    graph, _mem = apply_turn_relationship_updates(
+    graph, _mem, _dyn = apply_turn_relationship_updates(
         response, {"turn": 4}, None, memory, world_pack,
         relationship_graph=graph,
         persist=False,

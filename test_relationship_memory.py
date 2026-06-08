@@ -90,7 +90,7 @@ def test_apply_turn_writes_memory(world_pack, memory, tmp_path, monkeypatch):
     response = {"story": "主角公开维护长公主，朝堂震动。"}
     state = {"turn": 2}
     prev_options = ["公开维护|长公主信任+12"]
-    graph, mem_store = apply_turn_relationship_updates(
+    graph, mem_store, _dyn = apply_turn_relationship_updates(
         response, state, "A", memory, world_pack,
         prev_options=prev_options,
         relationship_graph=graph,

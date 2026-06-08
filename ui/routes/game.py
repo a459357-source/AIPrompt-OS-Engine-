@@ -86,20 +86,25 @@ async def reset():
             memory = init["memory"]
             graph = init["graph"]
             from engine.relationship_core import init_graph_from_world
+            from engine.relationship_dynamics import empty_dynamics_store
             from engine.relationship_memory import empty_store
 
             rel_graph = init.get("relationship_graph")
             rel_mem = init.get("relationship_memory")
+            rel_dyn = init.get("relationship_dynamics")
             if not (isinstance(rel_graph, dict) and rel_graph.get("edges") is not None):
                 world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
                 rel_graph = init_graph_from_world(world_pack, memory, state, persist=False)
             if not (isinstance(rel_mem, dict) and rel_mem.get("edges") is not None):
                 rel_mem = empty_store()
+            if not (isinstance(rel_dyn, dict) and rel_dyn.get("edges") is not None):
+                rel_dyn = empty_dynamics_store()
 
             commit_bundle(
                 state, memory, graph, chapter="",
                 relationship=rel_graph,
                 relationship_memory=rel_mem,
+                relationship_dynamics=rel_dyn,
             )
 
             plot_state = init.get("plot_state")

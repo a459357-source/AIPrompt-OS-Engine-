@@ -833,7 +833,7 @@ def _update_relationship_graph(
 
         world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
         prev_options = _get_prev_options(state)
-        graph, mem_store = apply_turn_relationship_updates(
+        graph, mem_store, dyn_store = apply_turn_relationship_updates(
             response,
             state,
             choice,
@@ -842,10 +842,12 @@ def _update_relationship_graph(
             prev_options=prev_options,
             relationship_graph=runtime.relationship,
             relationship_memory=runtime.relationship_memory,
+            relationship_dynamics=runtime.relationship_dynamics,
             persist=not is_transactional(),
         )
         runtime.relationship = graph
         runtime.relationship_memory = mem_store
+        runtime.relationship_dynamics = dyn_store
         runtime.session = sync_session_objectives(
             runtime.session, graph, world_pack,
         )

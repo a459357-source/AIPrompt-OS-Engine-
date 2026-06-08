@@ -40,6 +40,7 @@ class RuntimeState:
     chapter: str = ""
     relationship: dict | None = None
     relationship_memory: dict | None = None
+    relationship_dynamics: dict | None = None
 
 
 def _in_transaction() -> bool:
@@ -94,6 +95,17 @@ def load_runtime(*, clear_cache: bool = False) -> RuntimeState:
     if not isinstance(rel_memory, dict) or "edges" not in rel_memory:
         rel_memory = {"version": 1, "edges": {}}
 
+    rel_dynamics: dict | None = None
+    if config.RELATIONSHIP_DYNAMICS_PATH.exists():
+        try:
+            rel_dynamics = io_utils.read_json(
+                config.RELATIONSHIP_DYNAMICS_PATH, use_cache=not clear_cache,
+            )
+        except Exception:
+            rel_dynamics = None
+    if not isinstance(rel_dynamics, dict) or "edges" not in rel_dynamics:
+        rel_dynamics = {"version": 1, "edges": {}, "triangles": []}
+
     return RuntimeState(
         session=io_utils.read_yaml(config.SESSION_STATE_PATH, use_cache=not clear_cache),
         memory=io_utils.read_json(config.MEMORY_PATH, use_cache=not clear_cache),
@@ -101,6 +113,7 @@ def load_runtime(*, clear_cache: bool = False) -> RuntimeState:
         chapter=chapter,
         relationship=relationship,
         relationship_memory=rel_memory,
+        relationship_dynamics=rel_dynamics,
     )
 
 
@@ -171,6 +184,14 @@ def commit_runtime(state: RuntimeState, *, chapter: str | None = None) -> None:
         staged_paths.append(rel_mem_staged)
         payloads[rel_mem_staged] = rel_mem_json
 
+    if state.relationship_dynamics is not None:
+        rel_dyn_json = json.dumps(state.relationship_dynamics, ensure_ascii=False, indent=2)
+        _validate_json(rel_dyn_json)
+        rel_dyn_staged = _staging_path(config.RELATIONSHIP_DYNAMICS_PATH)
+        targets.append(config.RELATIONSHIP_DYNAMICS_PATH)
+        staged_paths.append(rel_dyn_staged)
+        payloads[rel_dyn_staged] = rel_dyn_json
+
     chapter_staging: Path | None = None
     if chapter_text is not None:
         chapter_staging = _staging_path(config.CHAPTER_PATH)
@@ -210,6 +231,7 @@ def commit_bundle(
     chapter: str = "",
     relationship: dict | None = None,
     relationship_memory: dict | None = None,
+    relationship_dynamics: dict | None = None,
 ) -> None:
     """Convenience wrapper for one-shot commits from save/load/reset/new."""
     commit_runtime(RuntimeState(
@@ -219,4 +241,5 @@ def commit_bundle(
         chapter=chapter,
         relationship=relationship,
         relationship_memory=relationship_memory,
+        relationship_dynamics=relationship_dynamics,
     ))

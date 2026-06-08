@@ -1,5 +1,5 @@
 """
-relationship_update.py — V5.1 per-turn relationship graph + memory updates.
+relationship_update.py — V5.1 per-turn relationship graph + memory + dynamics updates.
 Runs after apply_turn / memory updater; graph is source of truth.
 """
 
@@ -21,6 +21,12 @@ from engine.relationship_core import (
     set_edge,
     RelationshipEdge,
     _mirror_graph_to_memory,
+)
+from engine.relationship_dynamics import (
+    apply_turn_dynamics,
+    empty_dynamics_store,
+    get_dynamics,
+    momentum_multiplier,
 )
 from engine.relationship_memory import (
     empty_store,
@@ -127,6 +133,36 @@ def _active_npc_targets(memory: dict, player: str) -> set[str]:
     return targets
 
 
+def _apply_delta_with_momentum(
+    graph: dict,
+    dynamics_store: dict,
+    player: str,
+    target: str,
+    metric: str,
+    delta: float,
+    turn: int,
+    positive_deltas: dict[str, float],
+) -> RelationshipEdge | None:
+    dyn = get_dynamics(dynamics_store, player, target)
+    scaled = float(delta)
+    d100 = scaled * 100.0 if abs(scaled) <= 1.0 else scaled
+    if d100 > 0 and metric in ("trust", "affection", "respect", "attraction"):
+        d100 *= momentum_multiplier(dyn.momentum)
+        scaled = d100 / 100.0 if abs(float(delta)) <= 1.0 else d100
+    edge = apply_metric_delta(graph, player, target, metric, scaled, turn)
+    if edge and d100 > 0 and metric in ("trust", "affection"):
+        positive_deltas[target] = positive_deltas.get(target, 0.0) + d100
+    return edge
+
+
+def _reinfer_player_edges(graph: dict, player: str) -> None:
+    for raw in list((graph.get("edges") or {}).values()):
+        if isinstance(raw, dict) and raw.get("source") == player:
+            edge = RelationshipEdge.from_dict(raw)
+            edge.relation_type = infer_relation_type(edge)
+            set_edge(graph, edge)
+
+
 def apply_turn_relationship_updates(
     response: dict,
     state: dict,
@@ -137,26 +173,29 @@ def apply_turn_relationship_updates(
     prev_options: list[str] | None = None,
     relationship_graph: dict | None = None,
     relationship_memory: dict | None = None,
+    relationship_dynamics: dict | None = None,
     persist: bool = True,
-) -> tuple[dict, dict]:
-    """Update relationship_graph and relationship_memory from turn inputs."""
+) -> tuple[dict, dict, dict]:
+    """Update graph, memory, and dynamics from turn inputs."""
     mem_store = relationship_memory if isinstance(relationship_memory, dict) else empty_store()
+    dyn_store = relationship_dynamics if isinstance(relationship_dynamics, dict) else empty_dynamics_store()
 
     if not config.RELATIONSHIP_ENGINE_ENABLED:
         from engine.relationship_core import load_graph
-        return load_graph(), mem_store
+        return load_graph(), mem_store, dyn_store
 
     turn = int(state.get("turn", 0) or 0)
     story = response.get("story", "") or ""
     player = resolve_player_name(world_pack, state)
-    if relationship_graph is not None:
-        graph = relationship_graph
-    else:
-        graph = ensure_graph(world_pack, memory, state, persist=False)
+    graph = relationship_graph if relationship_graph is not None else ensure_graph(
+        world_pack, memory, state, persist=False,
+    )
     prev_options = prev_options or []
 
     targets = _active_npc_targets(memory, player)
     snapshots = snapshot_player_edges(graph, player, targets)
+    interacted: set[str] = set()
+    positive_deltas: dict[str, float] = {}
 
     if choice:
         for opt_text in _resolve_chosen_option(choice, prev_options):
@@ -167,11 +206,15 @@ def apply_turn_relationship_updates(
                 if not is_memory_active_npc(resolved, memory):
                     continue
                 targets.add(resolved)
+                interacted.add(resolved)
                 if resolved not in snapshots:
                     snapshots[resolved] = snapshot_player_edges(
                         graph, player, {resolved},
                     )[resolved]
-                edge = apply_metric_delta(graph, player, resolved, metric, float(delta), turn)
+                edge = _apply_delta_with_momentum(
+                    graph, dyn_store, player, resolved, metric, float(delta),
+                    turn, positive_deltas,
+                )
                 if edge:
                     d100 = float(delta) * 100.0 if abs(float(delta)) <= 1.0 else float(delta)
                     _large_delta_event(edge, metric, d100, player, turn, graph)
@@ -181,25 +224,32 @@ def apply_turn_relationship_updates(
             for name in list(memory.get("characters", {}).keys()):
                 if name in story and name != player:
                     targets.add(name)
-                    apply_metric_delta(graph, player, name, "trust", delta * 100, turn)
+                    interacted.add(name)
+                    _apply_delta_with_momentum(
+                        graph, dyn_store, player, name, "trust", delta * 100,
+                        turn, positive_deltas,
+                    )
         elif char_name != player and is_memory_active_npc(char_name, memory):
             targets.add(char_name)
-            apply_metric_delta(graph, player, char_name, "trust", delta * 100, turn)
+            interacted.add(char_name)
+            _apply_delta_with_momentum(
+                graph, dyn_store, player, char_name, "trust", delta * 100,
+                turn, positive_deltas,
+            )
 
     for name in memory.get("characters", {}):
         if name == player or name not in story or player not in story:
             continue
         if is_memory_active_npc(name, memory):
             targets.add(name)
-            apply_metric_delta(graph, player, name, "affection", 1.0, turn)
+            interacted.add(name)
+            _apply_delta_with_momentum(
+                graph, dyn_store, player, name, "affection", 1.0,
+                turn, positive_deltas,
+            )
 
     _detect_relationship_events(story, player, graph, turn)
-
-    for raw in list((graph.get("edges") or {}).values()):
-        if isinstance(raw, dict) and raw.get("source") == player:
-            edge = RelationshipEdge.from_dict(raw)
-            edge.relation_type = infer_relation_type(edge)
-            set_edge(graph, edge)
+    _reinfer_player_edges(graph, player)
 
     record_turn_memories(
         mem_store,
@@ -210,10 +260,21 @@ def apply_turn_relationship_updates(
         story=story,
     )
 
+    apply_turn_dynamics(
+        graph,
+        dyn_store,
+        mem_store,
+        turn=turn,
+        player=player,
+        interacted_targets=interacted,
+        turn_positive_deltas=positive_deltas,
+    )
+    _reinfer_player_edges(graph, player)
+
     _mirror_graph_to_memory(graph, player, memory, persist=False)
     if persist:
         save_graph(graph, persist=True)
-    return graph, mem_store
+    return graph, mem_store, dyn_store
 
 
 def sync_session_objectives(state: dict, graph: dict, world_pack: dict) -> dict:

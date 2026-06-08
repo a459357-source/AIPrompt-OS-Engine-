@@ -219,3 +219,126 @@ def ensure_memory_store(store: dict | None = None) -> dict:
     if isinstance(store, dict) and "edges" in store:
         return store
     return load_relationship_memory_store()
+
+
+def ensure_dynamics_store(store: dict | None = None) -> dict:
+    from engine.relationship_dynamics import empty_dynamics_store, load_dynamics_store
+    if isinstance(store, dict) and "edges" in store:
+        return store
+    return load_dynamics_store()
+
+
+def format_brain_dynamics(
+    names: set[str],
+    dynamics_store: dict,
+    graph: dict,
+    player: str,
+) -> str:
+    """Bond / momentum / conflict for Character Brain."""
+    if not names or not dynamics_store.get("edges"):
+        return ""
+
+    from engine.relationship_dynamics import BOND_LABELS, CONFLICT_LABELS, get_dynamics, trend_label
+
+    lines = ["【关系动力学 — 引擎维护】"]
+    count = 0
+    for name in sorted(names):
+        if name == player:
+            continue
+        dyn = get_dynamics(dynamics_store, player, name)
+        if dyn.bond_level == 0 and dyn.momentum == 0 and dyn.conflict_level == 0:
+            continue
+        lines.append(f"  {name}:")
+        lines.append(f"    Bond: {dyn.bond_level} ({BOND_LABELS[min(dyn.bond_level, 5)]})")
+        lines.append(f"    Momentum: {dyn.momentum:.0f}")
+        lines.append(f"    Conflict: {dyn.conflict_level} ({CONFLICT_LABELS[min(dyn.conflict_level, 5)]})")
+        lines.append(f"    趋势: {trend_label(dyn)}")
+        count += 1
+
+    return "\n".join(lines) if count else ""
+
+
+def format_objective_dynamics(
+    session: dict,
+    dynamics_store: dict,
+    graph: dict,
+    world_pack: dict,
+) -> str:
+    """Bond progress for relationship objectives."""
+    from engine.relationship_core import get_edge
+    from engine.relationship_dynamics import BOND_LABELS, bond_progress_to_next, get_dynamics
+
+    player = resolve_player_name(world_pack, session)
+    objectives = session.get("objectives") or {}
+    lines: list[str] = []
+
+    for scope in ("main", "side"):
+        for item in objectives.get(scope) or []:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("status", "")).lower() != "active":
+                continue
+            title = str(item.get("title", "")).strip()
+            npc = _npc_in_title(title, world_pack)
+            if not npc:
+                continue
+            edge = get_edge(graph, player, npc)
+            dyn = get_dynamics(dynamics_store, player, npc)
+            if not edge:
+                continue
+            bond = dyn.bond_level
+            if bond >= 5:
+                lines.append(f"  「{title}」Bond Level {bond}（已满）")
+            else:
+                pct = bond_progress_to_next(edge, bond)
+                lines.append(
+                    f"  「{title}」Bond Level {bond}（{BOND_LABELS[bond]}）"
+                    f" → Level {bond + 1}: {pct}%"
+                )
+
+    if not lines:
+        return ""
+    return "【关系目标进度 — 动力学】\n" + "\n".join(lines)
+
+
+def build_dynamics_prompt_context(
+    dynamics_store: dict,
+    graph: dict,
+    session: dict,
+    world_pack: dict,
+    *,
+    names: set[str] | None = None,
+) -> str:
+    """RELATIONSHIP_DYNAMICS_CONTEXT for prompt (≤500 chars, ≤5 chars)."""
+    from engine.relationship_dynamics import CONFLICT_LABELS, get_dynamics, trend_label
+
+    player = resolve_player_name(world_pack, session)
+    if names is None:
+        from engine.character_brain import resolve_brain_character_names
+        from engine.memory import load_memory
+
+        memory = load_memory()
+        names = resolve_brain_character_names(session, memory, world_pack)
+
+    lines: list[str] = ["【关系动力学】"]
+    count = 0
+    for name in sorted(names or []):
+        if name == player or count >= config.RELATIONSHIP_DYNAMICS_MAX_CHARACTERS:
+            continue
+        dyn = get_dynamics(dynamics_store, player, name)
+        if dyn.bond_level == 0 and dyn.momentum < 3:
+            continue
+        lines.append(
+            f"{name}\n"
+            f"  Bond:{dyn.bond_level} Momentum:{dyn.momentum:.0f} "
+            f"Conflict:{dyn.conflict_level}\n"
+            f"  趋势:{trend_label(dyn)}"
+        )
+        count += 1
+
+    if len(lines) <= 1:
+        return ""
+    text = "\n".join(lines)
+    if len(text) > config.RELATIONSHIP_DYNAMICS_MAX_CHARS:
+        text = text[: config.RELATIONSHIP_DYNAMICS_MAX_CHARS - 3].rstrip() + "..."
+    return text
