@@ -1,5 +1,5 @@
 """
-agnes_visual_provider.py — V6.0 Agnes VisualProvider (Phase B)
+agnes_visual_provider.py — V6 Agnes VisualProvider
 """
 
 from __future__ import annotations
@@ -40,25 +40,25 @@ class AgnesVisualProvider(VisualProvider):
     def provider_name(self) -> str:
         return "agnes"
 
-    def generate_character_portrait(
+    def generate_character(
         self, *, prompt: str, asset_id: str, size: str = "1024x1024",
     ) -> bytes:
-        return self._generate_image(prompt, size, kind="character_portrait")
+        return self._generate_image(prompt, size, kind="character")
 
-    def generate_scene_image(
+    def generate_location(
+        self, *, prompt: str, asset_id: str, size: str = "1536x1024",
+    ) -> bytes:
+        return self._generate_image(prompt, size, kind="location")
+
+    def generate_faction(
+        self, *, prompt: str, asset_id: str, size: str = "1536x1024",
+    ) -> bytes:
+        return self._generate_image(prompt, size, kind="faction")
+
+    def generate_event(
         self, *, prompt: str, asset_id: str, size: str = "1024x1024",
     ) -> bytes:
-        return self._generate_image(prompt, size, kind="scene_image")
-
-    def generate_world_map(
-        self, *, prompt: str, asset_id: str, size: str = "1536x1024",
-    ) -> bytes:
-        return self._generate_image(prompt, size, kind="world_map")
-
-    def generate_faction_map(
-        self, *, prompt: str, asset_id: str, size: str = "1536x1024",
-    ) -> bytes:
-        return self._generate_image(prompt, size, kind="faction_map")
+        return self._generate_image(prompt, size, kind="event")
 
     def _generate_image(self, prompt: str, size: str, *, kind: str) -> bytes:
         return self._call_agnes_api(prompt=prompt, size=size, kind=kind)

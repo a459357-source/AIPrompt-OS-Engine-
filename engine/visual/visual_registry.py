@@ -1,7 +1,5 @@
 """
-visual_registry.py — V6.0 Visual Asset Registry (Shared System)
-================================================================
-Single source of truth for visual asset metadata. User runtime data.
+visual_registry.py — V6 Visual Asset Registry (Shared System)
 """
 
 from __future__ import annotations
@@ -19,7 +17,35 @@ from engine import io_utils
 
 logger = logging.getLogger(__name__)
 
-VISUAL_SCOPES = frozenset({"characters", "locations", "factions", "scenes"})
+ENTITY_TYPES = frozenset({"character", "location", "faction", "event"})
+VISUAL_SCOPES = frozenset({"characters", "locations", "factions", "events", "scenes"})
+
+ENTITY_TYPE_TO_SCOPE = {
+    "character": "characters",
+    "location": "locations",
+    "faction": "factions",
+    "event": "events",
+}
+
+SCOPE_TO_ENTITY_TYPE = {v: k for k, v in ENTITY_TYPE_TO_SCOPE.items()}
+
+_KIND_BY_ENTITY = {
+    "character": "portrait",
+    "location": "world_map",
+    "faction": "faction_map",
+    "event": "scene",
+}
+
+
+def entity_type_to_scope(entity_type: str) -> str:
+    scope = ENTITY_TYPE_TO_SCOPE.get(str(entity_type or "").strip().lower())
+    if not scope:
+        raise ValueError(f"invalid entity_type: {entity_type!r}")
+    return scope
+
+
+def kind_for_entity_type(entity_type: str) -> str:
+    return _KIND_BY_ENTITY.get(str(entity_type or "").strip().lower(), "visual")
 
 
 def empty_registry() -> dict:
@@ -28,7 +54,7 @@ def empty_registry() -> dict:
         "characters": {},
         "locations": {},
         "factions": {},
-        "scenes": {},
+        "events": {},
     }
 
 
@@ -76,36 +102,55 @@ def normalize_registry(raw: dict | None) -> dict:
     if not isinstance(raw, dict):
         return base
     base["version"] = int(raw.get("version", 1) or 1)
-    for scope in VISUAL_SCOPES:
+    for scope in ("characters", "locations", "factions", "events"):
         bucket = raw.get(scope)
         if isinstance(bucket, dict):
             base[scope] = {
                 str(k): v for k, v in bucket.items()
                 if isinstance(v, dict) and str(k).strip()
             }
+    # migrate legacy scenes → events
+    scenes = raw.get("scenes")
+    if isinstance(scenes, dict):
+        for k, v in scenes.items():
+            if isinstance(v, dict) and str(k).strip() and k not in base["events"]:
+                rec = copy.deepcopy(v)
+                rec.setdefault("entity_type", "event")
+                base["events"][str(k)] = rec
     return base
 
 
+def _resolve_scope(scope: str) -> str:
+    if scope == "scenes":
+        return "events"
+    if scope in ENTITY_TYPE_TO_SCOPE.values():
+        return scope
+    raise ValueError(f"invalid visual scope: {scope}")
+
+
 def get_asset(registry: dict, scope: str, asset_id: str) -> dict | None:
-    if scope not in VISUAL_SCOPES:
+    try:
+        resolved = _resolve_scope(scope)
+    except ValueError:
         return None
-    item = (registry.get(scope) or {}).get(asset_id)
+    item = (registry.get(resolved) or {}).get(asset_id)
     return item if isinstance(item, dict) else None
 
 
 def set_asset(registry: dict, scope: str, asset_id: str, record: dict) -> dict:
     registry = copy.deepcopy(registry) if registry else empty_registry()
-    if scope not in VISUAL_SCOPES:
-        raise ValueError(f"invalid visual scope: {scope}")
-    bucket = registry.setdefault(scope, {})
+    resolved = _resolve_scope(scope)
+    bucket = registry.setdefault(resolved, {})
     bucket[str(asset_id)] = record
     return registry
 
 
 def list_assets(registry: dict, scope: str) -> dict:
-    if scope not in VISUAL_SCOPES:
+    try:
+        resolved = _resolve_scope(scope)
+    except ValueError:
         return {}
-    data = registry.get(scope) or {}
+    data = registry.get(resolved) or {}
     return data if isinstance(data, dict) else {}
 
 
@@ -134,6 +179,7 @@ def make_asset_record(
     image_path: str,
     provider: str,
     kind: str,
+    entity_type: str = "",
     created_turn: int = 0,
     prompt_hash: str = "",
     entity_id: str = "",
@@ -141,8 +187,10 @@ def make_asset_record(
 ) -> dict[str, Any]:
     now = int(time.time())
     path = str(image_path or "").strip()
+    et = str(entity_type or "").strip().lower()
     return {
         "asset_id": asset_id,
+        "entity_type": et,
         "entity_id": entity_id or display_name,
         "display_name": display_name,
         "prompt_hash": prompt_hash,

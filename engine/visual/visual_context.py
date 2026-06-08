@@ -87,6 +87,16 @@ def build_world_map_prompt(world_pack: dict) -> str:
     return ", ".join(parts)
 
 
+def build_location_prompt(world_pack: dict) -> str:
+    """Location / world map prompt."""
+    return build_world_map_prompt(world_pack)
+
+
+def build_event_prompt(event_key: str, context: dict) -> str:
+    """Event scene illustration prompt."""
+    return build_scene_prompt(event_key, context)
+
+
 def build_faction_map_prompt(faction_name: str, memory: dict) -> str:
     factions = memory.get("factions") or {}
     data = factions.get(faction_name) if isinstance(factions, dict) else None

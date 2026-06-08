@@ -77,14 +77,14 @@ def test_cache_miss_then_hit(visual_env, world_pack):
     assert exists("characters", r1["asset_id"])
 
     calls = 0
-    original = mock.generate_character_portrait
+    original = mock.generate_character
 
     def counting(*args, **kwargs):
         nonlocal calls
         calls += 1
         return original(*args, **kwargs)
 
-    mock.generate_character_portrait = counting  # type: ignore[method-assign]
+    mock.generate_character = counting  # type: ignore[method-assign]
     r2 = get_or_request_character_portrait("长公主", world_pack, provider=mock)
     assert r2["asset_id"] == r1["asset_id"]
     assert calls == 0
@@ -103,14 +103,14 @@ def test_prompt_hash_cache_reuse(visual_env, world_pack):
         },
     }
     calls = 0
-    original = mock.generate_character_portrait
+    original = mock.generate_character
 
     def counting(*args, **kwargs):
         nonlocal calls
         calls += 1
         return original(*args, **kwargs)
 
-    mock.generate_character_portrait = counting  # type: ignore[method-assign]
+    mock.generate_character = counting  # type: ignore[method-assign]
     r2 = get_or_request_character_portrait("长公主", wp2, provider=mock)
     assert r2["prompt_hash"] == r1["prompt_hash"]
     assert calls == 0
@@ -131,7 +131,7 @@ def test_agnes_mock_api(visual_env):
     fake_resp = type("R", (), {"status_code": 200, "text": "{}", "json": lambda self: {"data": [{"b64_json": b64}]}})()
 
     with patch("engine.visual.agnes_visual_provider.requests.post", return_value=fake_resp):
-        data = provider.generate_character_portrait(prompt="test", asset_id="hero")
+        data = provider.generate_character(prompt="test", asset_id="hero")
     assert len(data) > 0
     assert data[:8] == STUB_PNG_BYTES[:8]
 
@@ -141,7 +141,7 @@ def test_agnes_api_error(visual_env):
     bad = type("R", (), {"status_code": 500, "text": "err", "json": lambda self: {}})()
     with patch("engine.visual.agnes_visual_provider.requests.post", return_value=bad):
         with pytest.raises(AgnesAPIError):
-            provider.generate_scene_image(prompt="x", asset_id="y")
+            provider.generate_event(prompt="x", asset_id="y")
 
 
 def test_no_mode_layer_in_factory_and_agnes():

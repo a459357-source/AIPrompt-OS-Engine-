@@ -1,5 +1,5 @@
 """
-visual_cache.py — V6.0 visual file cache (rebuildable, not save-slot payload)
+visual_cache.py — V6 visual cache (L1 memory + L2 filesystem)
 """
 
 from __future__ import annotations
@@ -7,8 +7,10 @@ from __future__ import annotations
 import hashlib
 import logging
 from pathlib import Path
+from typing import Any
 
 import config
+from engine.visual.prompt_canonical import normalize_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +18,12 @@ _SCOPE_SUBDIR = {
     "characters": "characters",
     "locations": "locations",
     "factions": "factions",
-    "scenes": "scenes",
+    "events": "events",
+    "scenes": "events",  # legacy alias
 }
+
+# L1 optional memory cache (idempotency_key → registry record)
+_MEMORY_CACHE: dict[str, dict[str, Any]] = {}
 
 # 1x1 PNG (valid minimal image for stub provider)
 STUB_PNG_BYTES = (
@@ -28,7 +34,30 @@ STUB_PNG_BYTES = (
 
 
 def prompt_hash(prompt: str) -> str:
-    return hashlib.sha256((prompt or "").encode("utf-8")).hexdigest()[:16]
+    """Hash canonical prompt text."""
+    return canonical_prompt_hash(normalize_prompt(prompt))
+
+
+def canonical_prompt_hash(canonical_prompt: str) -> str:
+    return hashlib.sha256((canonical_prompt or "").encode("utf-8")).hexdigest()[:16]
+
+
+def idempotency_key(entity_type: str, entity_id: str, prompt_hash_value: str) -> str:
+    return f"{entity_type}:{entity_id}:{prompt_hash_value}"
+
+
+def memory_get(key: str) -> dict[str, Any] | None:
+    item = _MEMORY_CACHE.get(key)
+    return item if isinstance(item, dict) else None
+
+
+def memory_put(key: str, record: dict[str, Any]) -> None:
+    if key and isinstance(record, dict):
+        _MEMORY_CACHE[key] = record
+
+
+def clear_memory_cache() -> None:
+    _MEMORY_CACHE.clear()
 
 
 def _scope_dir(scope: str) -> str:
@@ -71,3 +100,4 @@ def clear_visual_output() -> None:
         import shutil
         shutil.rmtree(root, ignore_errors=True)
     root.mkdir(parents=True, exist_ok=True)
+    clear_memory_cache()

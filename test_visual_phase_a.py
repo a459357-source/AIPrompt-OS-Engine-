@@ -89,10 +89,10 @@ def test_visual_registry_module_exists():
 def test_visual_provider_interface():
     stub = StubVisualProvider()
     assert stub.provider_name == "stub"
-    assert len(stub.generate_character_portrait(prompt="p", asset_id="a")) > 0
-    assert len(stub.generate_scene_image(prompt="p", asset_id="a")) > 0
-    assert len(stub.generate_world_map(prompt="p", asset_id="a")) > 0
-    assert len(stub.generate_faction_map(prompt="p", asset_id="a")) > 0
+    assert len(stub.generate_character(prompt="p", asset_id="a")) > 0
+    assert len(stub.generate_location(prompt="p", asset_id="a")) > 0
+    assert len(stub.generate_faction(prompt="p", asset_id="a")) > 0
+    assert len(stub.generate_event(prompt="p", asset_id="a")) > 0
 
 
 def test_character_portrait(visual_env, world_pack):
@@ -115,7 +115,7 @@ def test_scene_image(visual_env, world_pack):
         provider=mock,
     )
     assert r["kind"] == "scene"
-    assert exists("scenes", r["asset_id"])
+    assert exists("events", r["asset_id"])
 
 
 def test_world_map(visual_env, world_pack):

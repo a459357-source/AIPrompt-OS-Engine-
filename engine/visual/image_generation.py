@@ -1,50 +1,75 @@
 """
-image_generation.py — V6.0 generate orchestration (Provider → Cache → Registry)
+image_generation.py — V6 provider bytes → filesystem cache (no registry writes)
 """
 
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from typing import Any
 
-from engine.visual.visual_cache import prompt_hash, uri_for_path, write_bytes
-from engine.visual.visual_provider import VisualProvider
-from engine.visual.visual_registry import make_asset_record
+import config
+from engine.visual.visual_cache import uri_for_path, write_bytes
+from engine.visual.visual_object import VisualObject
+from engine.visual.visual_provider import StubVisualProvider, VisualProvider
 
 logger = logging.getLogger(__name__)
 
 
-def generate_and_register(
-    scope: str,
-    asset_id: str,
-    display_name: str,
-    prompt: str,
-    kind: str,
+def invoke_provider_with_retry(
+    obj: VisualObject,
     provider: VisualProvider,
     gen_fn: Callable[..., bytes],
-    *,
-    turn: int = 0,
-    size: str = "1024x1024",
+) -> tuple[bytes, VisualProvider]:
+    """Retry primary provider; fallback to stub on exhaustion."""
+    stub = StubVisualProvider()
+    stub_fn = getattr(stub, obj.provider_method)
+    max_retries = max(1, int(getattr(config, "VISUAL_MAX_RETRIES", 3) or 3))
+    last_err: Exception | None = None
+
+    for attempt in range(max_retries):
+        try:
+            data = gen_fn(
+                prompt=obj.prompt,
+                asset_id=obj.asset_id,
+                size=obj.default_size,
+            )
+            return data, provider
+        except Exception as exc:
+            last_err = exc
+            if attempt < max_retries - 1:
+                delay = 0.1 * (2 ** attempt)
+                logger.warning(
+                    "Visual provider attempt %s/%s failed: %s; retry in %.1fs",
+                    attempt + 1,
+                    max_retries,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
+
+    logger.warning("Visual provider failed after %s attempts, fallback stub: %s", max_retries, last_err)
+    data = stub_fn(
+        prompt=obj.prompt,
+        asset_id=obj.asset_id,
+        size=obj.default_size,
+    )
+    return data, stub
+
+
+def write_generated_image(
+    scope: str,
+    obj: VisualObject,
+    provider: VisualProvider,
+    gen_fn: Callable[..., bytes],
 ) -> dict[str, Any]:
-    """Generate image bytes, write cache, return registry record metadata."""
-    phash = prompt_hash(prompt)
-    data = gen_fn(prompt=prompt, asset_id=asset_id, size=size)
-    path = write_bytes(scope, asset_id, data)
-    image_path = uri_for_path(path)
-    record = make_asset_record(
-        asset_id=asset_id,
-        display_name=display_name,
-        image_path=image_path,
-        entity_id=display_name,
-        provider=provider.provider_name,
-        kind=kind,
-        created_turn=turn,
-        prompt_hash=phash,
-        meta={"size": size, "bytes": len(data)},
-    )
-    logger.info(
-        "Visual generated scope=%s asset_id=%s provider=%s",
-        scope, asset_id, provider.provider_name,
-    )
-    return record
+    """Generate image bytes and write L2 cache. Does not touch registry."""
+    data, used_provider = invoke_provider_with_retry(obj, provider, gen_fn)
+    path = write_bytes(scope, obj.asset_id, data)
+    return {
+        "image_path": uri_for_path(path),
+        "provider": used_provider.provider_name,
+        "bytes": len(data),
+        "size": obj.default_size,
+    }
