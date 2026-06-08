@@ -381,6 +381,20 @@ def apply_bootstrap_import(
 
         write_narrative_routes_patch(dataset)
 
+        # P0: game_intro node for /game scene context + visual mapping
+        try:
+            from engine.narrative.bootstrap_generator import init_narrative_for_game, merge_game_intro
+
+            world_seed = dataset.get("world") or {}
+            first_loc = (dataset.get("locations") or [{}])[0] if dataset.get("locations") else {}
+            minimal_state: dict[str, Any] = {
+                "scene": first_loc.get("name") or str(world_seed.get("name") or "bootstrap world"),
+            }
+            patch = init_narrative_for_game(dataset, minimal_state)
+            merge_game_intro(patch)
+        except Exception:
+            logger.exception("game_intro bootstrap failed")
+
     return result
 
 
