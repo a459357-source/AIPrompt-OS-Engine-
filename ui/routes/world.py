@@ -622,6 +622,13 @@ async def create_new_story(
     from engine.visual.asset_manager import reset_visual_assets
     reset_visual_assets()
 
+    # ── V6.6: Bootstrap narrative_routes from world_pack ──
+    try:
+        from engine.narrative.bootstrap_generator import bootstrap_narrative_routes
+        bootstrap_narrative_routes(world_pack)
+    except Exception:
+        pass
+
     # ── V6: Background generation of all visual assets ──
     import threading
     def _bg_gen_all_visuals(wp: dict):
