@@ -23,8 +23,12 @@ logger = logging.getLogger("api")
 _active_workers = 0
 
 
-def build_turn_payload(result: dict) -> dict[str, Any]:
-    """Merge step() result with session/memory for frontend."""
+def build_turn_payload(result: dict, *, force_sync_visuals: bool = False) -> dict[str, Any]:
+    """Merge step() result with session/memory for frontend.
+
+    When *force_sync_visuals* is True (opening turn), visual generation runs
+    synchronously so the first response already carries portraits/emblems/scene.
+    """
     from ui.routes.api import _merge_characters_with_memory
     try:
         state = io_utils.read_yaml(config.SESSION_STATE_PATH)
@@ -61,7 +65,7 @@ def build_turn_payload(result: dict) -> dict[str, Any]:
 
     scene_id = str(state.get("scene") or "").strip()
     node = resolve_game_narrative_node(scene_id)
-    visuals = ensure_game_visuals_from_node(node, turn=state.get("turn", 0), background=True)
+    visuals = ensure_game_visuals_from_node(node, turn=state.get("turn", 0), background=not force_sync_visuals)
     visuals = bootstrap_game_visuals(visuals)
 
     return {
@@ -170,10 +174,11 @@ async def stream_turn_events(
     choice: str | None,
     *,
     build_payload: Callable[[dict], dict[str, Any]] | None = None,
+    force_sync_visuals: bool = False,
 ) -> AsyncIterator[str]:
     """Async generator yielding SSE frames for one game turn."""
     event_queue: queue.Queue = queue.Queue()
-    payload_fn = build_payload or build_turn_payload
+    payload_fn = build_payload or (lambda r: build_turn_payload(r, force_sync_visuals=force_sync_visuals))
 
     worker = threading.Thread(
         target=run_step_sync,
@@ -224,7 +229,7 @@ def turn_response(choice: str | None, *, opening: bool = False):
 
     if config.STREAM:
         async def generate():
-            async for frame in stream_turn_events(choice):
+            async for frame in stream_turn_events(choice, force_sync_visuals=opening):
                 yield frame
 
         return StreamingResponse(
@@ -242,7 +247,7 @@ def turn_response(choice: str | None, *, opening: bool = False):
         err = get_last_step_error() or "AI 生成失败，请重试"
         return JSONResponse({"error": err}, status_code=500)
 
-    payload = build_turn_payload(result)
+    payload = build_turn_payload(result, force_sync_visuals=opening)
     if opening and payload["state"].get("turn") in (0, None):
         payload["state"]["turn"] = result.get("turn", 1)
         payload["state"]["force_event_pending"] = False

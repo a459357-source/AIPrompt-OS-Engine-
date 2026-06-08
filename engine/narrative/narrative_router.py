@@ -22,6 +22,7 @@ def empty_narrative_routes() -> dict:
         "visual_asset_map": {},
         "character_entry": {},
         "location_entry": {},
+        "faction_entry": {},
         "nodes": {},
     }
 
@@ -46,7 +47,7 @@ def _normalize_routes(raw: dict) -> dict:
     if not isinstance(raw, dict):
         return base
     base["version"] = int(raw.get("version", 1) or 1)
-    for key in ("visual_asset_map", "character_entry", "location_entry"):
+    for key in ("visual_asset_map", "character_entry", "location_entry", "faction_entry"):
         block = raw.get(key)
         if isinstance(block, dict):
             base[key] = {str(k): str(v) for k, v in block.items() if str(k).strip()}
@@ -172,6 +173,15 @@ def resolve_location_entry(location_name: str) -> str:
     name = str(location_name or "").strip()
     routes = ensure_narrative_routes()
     entry = (routes.get("location_entry") or {}).get(name)
+    if entry:
+        return resolve_canonical_event_id(entry)
+    return resolve_canonical_event_id("political_pressure")
+
+
+def resolve_faction_entry(faction_name: str) -> str:
+    name = str(faction_name or "").strip()
+    routes = ensure_narrative_routes()
+    entry = (routes.get("faction_entry") or {}).get(name)
     if entry:
         return resolve_canonical_event_id(entry)
     return resolve_canonical_event_id("political_pressure")

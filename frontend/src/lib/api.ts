@@ -1009,6 +1009,16 @@ export interface VisualWorldView {
   factions: VisualAssetItem[]
   characters: VisualIdentityView[]
   character_links: VisualCharacterLink[]
+  world_summary?: {
+    title: string
+    genre: string
+    era: string
+    turn: number
+    status: string
+  }
+  generation_progress?: {
+    [scope: string]: { ready: number; total: number }
+  }
 }
 
 export interface VisualEventView {
@@ -1137,6 +1147,12 @@ export async function enterNarrativeFromLocation(
   locationName: string,
 ): Promise<{ narrative_event_id: string; node: NarrativeNode }> {
   return postForm('/api/narrative/enter/location', { location_name: locationName })
+}
+
+export async function enterNarrativeFromFaction(
+  factionName: string,
+): Promise<{ narrative_event_id: string; node: NarrativeNode }> {
+  return postForm('/api/narrative/enter/faction', { faction_name: factionName })
 }
 
 export async function supplementLore(text: string): Promise<SupplementLoreResult> {

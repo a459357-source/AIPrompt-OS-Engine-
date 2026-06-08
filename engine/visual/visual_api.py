@@ -229,6 +229,42 @@ def get_character_gallery() -> list[dict[str, Any]]:
     return views
 
 
+def _read_world_summary() -> dict[str, Any]:
+    """Read world metadata from world_pack and session_state."""
+    summary: dict[str, Any] = {"title": "", "genre": "", "era": "", "turn": 0, "status": "SETUP"}
+    try:
+        wp = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        world = wp.get("world", wp) if isinstance(wp, dict) else {}
+        summary["title"] = str(world.get("title") or "")
+        summary["genre"] = str(world.get("genre") or "")
+        summary["era"] = str(world.get("era") or "")
+    except Exception:
+        pass
+    try:
+        state = io_utils.read_yaml(config.SESSION_STATE_PATH)
+        summary["turn"] = state.get("turn", 0)
+        summary["status"] = str(state.get("status") or "SETUP")
+    except Exception:
+        pass
+    return summary
+
+
+def _generation_progress(registry: dict) -> dict[str, Any]:
+    """Count generated vs. expected assets per scope."""
+    progress: dict[str, dict[str, int]] = {}
+    for scope in ("characters", "factions", "locations", "events"):
+        assets = list_assets(registry, scope)
+        total = len(assets)
+        ready = 0
+        for record in assets.values():
+            if isinstance(record, dict):
+                ip = str(record.get("image_path") or "")
+                if ip and (config.ROOT / ip.replace("\\", "/")).is_file():
+                    ready += 1
+        progress[scope] = {"ready": ready, "total": total}
+    return progress
+
+
 def get_world_explorer() -> dict[str, Any]:
     """World View — locations, factions, character identity summaries, links."""
     registry = load_registry()
@@ -261,11 +297,17 @@ def get_world_explorer() -> dict[str, Any]:
     locations.sort(key=lambda x: str(x.get("display_name") or ""))
     factions.sort(key=lambda x: str(x.get("display_name") or ""))
 
+    # ── World summary & generation progress ──
+    world_summary = _read_world_summary()
+    progress = _generation_progress(registry)
+
     return {
         "locations": locations,
         "factions": factions,
         "characters": get_character_gallery(),
         "character_links": _character_links_readonly(),
+        "world_summary": world_summary,
+        "generation_progress": progress,
     }
 
 

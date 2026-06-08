@@ -2,13 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Image, Link2, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { enterNarrativeFromLocation } from '@/lib/api'
+import { enterNarrativeFromFaction, enterNarrativeFromLocation } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { getWorldExplorer, type VisualAssetItem, type VisualIdentityView, type VisualWorldView } from '@/lib/api'
 import { logger } from '@/lib/logger'
 
-function PreviewCard({ item, onEnter }: { item: VisualAssetItem; onEnter?: () => void }) {
+function PreviewCard({ item, onEnter, enterLabel }: { item: VisualAssetItem; onEnter?: () => void; enterLabel?: string }) {
   return (
     <div className="rounded-lg border border-neural-cyan/15 bg-neural-glass/30 overflow-hidden">
       <div className="aspect-video bg-neural-void/80">
@@ -26,7 +26,7 @@ function PreviewCard({ item, onEnter }: { item: VisualAssetItem; onEnter?: () =>
         {onEnter && (
           <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1" onClick={onEnter}>
             <Play className="w-3 h-3" />
-            进入区域剧情
+            {enterLabel || '进入区域剧情'}
           </Button>
         )}
       </div>
@@ -79,6 +79,48 @@ export default function WorldExplorer() {
 
   return (
     <div className="h-full overflow-auto space-y-6 pr-1">
+      {/* ── World Summary Header ── */}
+      {world.world_summary && (
+        <div className="rounded-lg border border-neural-cyan/15 bg-neural-glass/30 p-4 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h2 className="text-lg font-bold text-game-accent">{world.world_summary.title}</h2>
+              <p className="text-xs text-game-muted">{world.world_summary.genre} · {world.world_summary.era}</p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-game-dim">
+              <span>第 {world.world_summary.turn} 回合</span>
+              <span>·</span>
+              <span>{world.world_summary.status}</span>
+            </div>
+          </div>
+          {world.generation_progress && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {(['characters', 'factions', 'locations', 'events'] as const).map((scope) => {
+                const p = world.generation_progress![scope]
+                const pct = p?.total ? Math.round((p.ready / p.total) * 100) : 0
+                const labelMap: Record<string, string> = {
+                  characters: '角色', factions: '势力', locations: '地点', events: '事件',
+                }
+                return (
+                  <div key={scope} className="space-y-1">
+                    <div className="flex justify-between text-[10px] text-game-dim">
+                      <span>{labelMap[scope]}</span>
+                      <span>{p?.ready ?? 0}/{p?.total ?? 0}</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-neural-void/80 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-game-accent transition-all duration-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {empty && (
         <p className="text-sm text-game-dim">尚无世界视觉资产。</p>
       )}
@@ -103,7 +145,17 @@ export default function WorldExplorer() {
       <section>
         <h3 className="text-xs text-game-dim mb-2 uppercase tracking-wide">势力</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-          {world.factions.map((f) => <PreviewCard key={f.asset_id} item={f} />)}
+          {world.factions.map((f) => (
+            <PreviewCard
+              key={f.asset_id}
+              item={f}
+              enterLabel="进入势力剧情"
+              onEnter={async () => {
+                const res = await enterNarrativeFromFaction(f.display_name || f.entity_id)
+                navigate(`/visual/narrative/node/${encodeURIComponent(res.narrative_event_id)}`)
+              }}
+            />
+          ))}
           {!world.factions.length && <p className="text-sm text-game-dim col-span-full">暂无势力图</p>}
         </div>
       </section>

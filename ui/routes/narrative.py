@@ -5,6 +5,7 @@ from fastapi import APIRouter, Form
 from engine.narrative.narrative_entry import build_narrative_node, get_narrative_hub
 from engine.narrative.narrative_router import (
     resolve_character_entry,
+    resolve_faction_entry,
     resolve_location_entry,
     resolve_visual_event_entry,
 )
@@ -96,4 +97,12 @@ async def enter_from_location(location_name: str = Form(...)):
     narrative_id = resolve_location_entry(location_name)
     node = build_narrative_node(narrative_id)
     enter_narrative_node(narrative_id, entry_type="location", continuity=node.get("continuity") or {})
+    return {"narrative_event_id": narrative_id, "node": node}
+
+
+@router.post("/enter/faction")
+async def enter_from_faction(faction_name: str = Form(...)):
+    narrative_id = resolve_faction_entry(faction_name)
+    node = build_narrative_node(narrative_id)
+    enter_narrative_node(narrative_id, entry_type="faction", continuity=node.get("continuity") or {})
     return {"narrative_event_id": narrative_id, "node": node}
