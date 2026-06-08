@@ -8,9 +8,11 @@
 世界内容的**标准化造型规则层**——不改 V6 运行时架构，只约束生成内容的 IP 风格分布。
 
 ```text
-Template Layer（风格统一）
+Content Template Layer（IP 造型）
     ↓
 Visual Identity（V6.1 一致性）
+    ↓
+Style Bible v1（全局视觉 token 约束）→ 见 V6_STYLE_BIBLE_V1.md
     ↓
 Prompt Builder → Image
 ```

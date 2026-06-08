@@ -74,13 +74,19 @@ def build_identity_prompt(identity: VisualIdentity, context: dict | None = None)
             parts.append("regions: " + ", ".join(n for n in names if n))
 
     core = ", ".join(parts)
-    if not getattr(config, "CONTENT_TEMPLATE_SYSTEM_ENABLED", True):
-        return core
-    from engine.templates.template_prompt import augment_identity_prompt
-    from engine.templates.template_resolver import resolve_content_template
+    merged = core
+    if getattr(config, "CONTENT_TEMPLATE_SYSTEM_ENABLED", True):
+        from engine.templates.template_prompt import augment_identity_prompt
+        from engine.templates.template_resolver import resolve_content_template
 
-    template = resolve_content_template(identity.entity_type, identity.entity_id, ctx)
-    return augment_identity_prompt(core, template, identity)
+        template = resolve_content_template(identity.entity_type, identity.entity_id, ctx)
+        merged = augment_identity_prompt(core, template, identity)
+
+    if getattr(config, "STYLE_BIBLE_V1_ENABLED", True):
+        from engine.templates.style_bible import apply_style_bible
+
+        return apply_style_bible(merged, identity.entity_type)
+    return merged
 
 
 def extract_character_traits(entity_id: str, context: dict) -> tuple[dict[str, Any], dict[str, Any], list[str]]:

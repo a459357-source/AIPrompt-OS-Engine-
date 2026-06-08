@@ -193,6 +193,7 @@ CONTENT_TEMPLATES_DEFAULT_PATH = (
     Path(__file__).resolve().parent / "packaging" / "defaults" / "content_templates.json"
 )
 CONTENT_TEMPLATE_SYSTEM_ENABLED = True
+STYLE_BIBLE_V1_ENABLED = True
 LOG_PATH             = DATA_DIR / "app.log"
 ERROR_LOG_PATH       = DATA_DIR / "error.log"
 
