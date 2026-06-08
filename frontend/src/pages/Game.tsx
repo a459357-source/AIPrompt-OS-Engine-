@@ -382,7 +382,14 @@ export default function Game() {
   const [presetWeights, setPresetWeights] = useState<Record<string, ContentWeights>>({})
   const [readingMode, setReadingMode] = useState(false)
   const [relationPanelOpen, setRelationPanelOpen] = useState(true)
-  const [genSettingsOpen, setGenSettingsOpen] = useState(false)
+  const [genSettingsOpen, setGenSettingsOpen] = useState(() => {
+    const saved = localStorage.getItem('promptos_gen_settings_open')
+    return saved === 'true'
+  })
+  // persist quick settings toggle
+  useEffect(() => {
+    localStorage.setItem('promptos_gen_settings_open', String(genSettingsOpen))
+  }, [genSettingsOpen])
   const [genSettingsSaved, setGenSettingsSaved] = useState(false)
   const [genSettingsSaving, setGenSettingsSaving] = useState(false)
   const [genSettingsSaveError, setGenSettingsSaveError] = useState('')
