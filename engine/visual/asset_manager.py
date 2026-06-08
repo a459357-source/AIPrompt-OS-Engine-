@@ -5,21 +5,29 @@ asset_manager.py — V6.0 Visual Asset Manager (public API)
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Any
 
 import config
 from engine.visual import image_generation
-from engine.visual.visual_cache import exists, uri_for_path, cache_path, clear_visual_output
+from engine.visual.provider_factory import get_visual_provider
+from engine.visual.visual_cache import (
+    cache_path,
+    clear_visual_output,
+    exists,
+    prompt_hash,
+    uri_for_path,
+)
 from engine.visual.visual_context import (
     build_character_prompt,
     build_faction_map_prompt,
     build_scene_prompt,
     build_world_map_prompt,
 )
-from engine.visual.visual_provider import VisualProvider, get_visual_provider
+from engine.visual.visual_provider import VisualProvider
 from engine.visual.visual_registry import (
+    find_by_prompt_hash,
     get_asset,
+    image_path_from_record,
     load_registry,
     make_asset_record,
     normalize_asset_id,
@@ -30,14 +38,45 @@ from engine.visual.visual_registry import (
 logger = logging.getLogger(__name__)
 
 
+def _path_from_record(record: dict | None) -> Path | None:
+    rel = image_path_from_record(record)
+    if not rel:
+        return None
+    path = config.ROOT / rel.replace("\\", "/")
+    if path.is_file() and path.stat().st_size > 0:
+        return path
+    return None
+
+
 def _registry_record_valid(record: dict | None) -> bool:
-    if not isinstance(record, dict):
-        return False
-    uri = str(record.get("uri", "")).strip()
-    if not uri:
-        return False
-    path = config.ROOT / uri.replace("\\", "/")
-    return path.is_file() and path.stat().st_size > 0
+    return _path_from_record(record) is not None
+
+
+def _record_from_existing(
+    *,
+    asset_id: str,
+    display_name: str,
+    kind: str,
+    turn: int,
+    prompt: str,
+    source: dict,
+    provider_name: str,
+) -> dict[str, Any]:
+    src_path = _path_from_record(source)
+    image_path = image_path_from_record(source)
+    if src_path is None:
+        return {}
+    return make_asset_record(
+        asset_id=asset_id,
+        display_name=display_name,
+        image_path=image_path,
+        entity_id=str(source.get("entity_id") or display_name),
+        provider=str(source.get("provider") or provider_name),
+        kind=kind,
+        created_turn=turn,
+        prompt_hash=prompt_hash(prompt),
+        meta=dict(source.get("meta") or {}),
+    )
 
 
 def _resolve_or_generate(
@@ -58,21 +97,44 @@ def _resolve_or_generate(
 
     provider = provider or get_visual_provider()
     registry = load_registry()
+    phash = prompt_hash(prompt)
 
     if not force:
         existing = get_asset(registry, scope, asset_id)
         if _registry_record_valid(existing):
-            return existing
+            if str(existing.get("prompt_hash", "")) == phash or not phash:
+                return existing
+
+        prompt_match = find_by_prompt_hash(registry, scope, phash)
+        if prompt_match and _registry_record_valid(prompt_match):
+            record = _record_from_existing(
+                asset_id=asset_id,
+                display_name=display_name,
+                kind=kind,
+                turn=turn,
+                prompt=prompt,
+                source=prompt_match,
+                provider_name=provider.provider_name,
+            )
+            if record:
+                registry = set_asset(registry, scope, asset_id, record)
+                save_registry(registry)
+                logger.debug("Visual prompt cache hit scope=%s asset_id=%s", scope, asset_id)
+                return record
+
         if exists(scope, asset_id):
             path = cache_path(scope, asset_id)
             record = make_asset_record(
                 asset_id=asset_id,
                 display_name=display_name,
-                uri=uri_for_path(path),
-                provider=existing.get("provider", provider.provider_name) if existing else provider.provider_name,
+                image_path=uri_for_path(path),
+                entity_id=display_name,
+                provider=(
+                    str((existing or {}).get("provider") or provider.provider_name)
+                ),
                 kind=kind,
                 created_turn=int((existing or {}).get("created_turn", turn) or turn),
-                prompt_hash=str((existing or {}).get("prompt_hash", "")),
+                prompt_hash=phash,
             )
             registry = set_asset(registry, scope, asset_id, record)
             save_registry(registry)
@@ -111,7 +173,7 @@ def get_or_request_character_portrait(
         name,
         prompt,
         "portrait",
-        "generate_character",
+        "generate_character_portrait",
         turn=turn,
         provider=provider,
         force=force,
@@ -135,7 +197,7 @@ def get_or_request_scene_image(
         display,
         prompt,
         "scene",
-        "generate_scene",
+        "generate_scene_image",
         turn=turn,
         provider=provider,
         force=force,

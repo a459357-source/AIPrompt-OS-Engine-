@@ -109,26 +109,49 @@ def list_assets(registry: dict, scope: str) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def image_path_from_record(record: dict | None) -> str:
+    if not isinstance(record, dict):
+        return ""
+    return str(record.get("image_path") or record.get("uri") or "").strip()
+
+
+def find_by_prompt_hash(registry: dict, scope: str, prompt_hash: str) -> dict | None:
+    """Find an existing registry entry in scope with the same prompt hash."""
+    if not prompt_hash:
+        return None
+    for record in list_assets(registry, scope).values():
+        if not isinstance(record, dict):
+            continue
+        if str(record.get("prompt_hash", "")) == prompt_hash:
+            return record
+    return None
+
+
 def make_asset_record(
     *,
     asset_id: str,
     display_name: str,
-    uri: str,
+    image_path: str,
     provider: str,
     kind: str,
     created_turn: int = 0,
     prompt_hash: str = "",
+    entity_id: str = "",
     meta: dict | None = None,
 ) -> dict[str, Any]:
     now = int(time.time())
+    path = str(image_path or "").strip()
     return {
         "asset_id": asset_id,
+        "entity_id": entity_id or display_name,
         "display_name": display_name,
-        "uri": uri,
+        "prompt_hash": prompt_hash,
+        "image_path": path,
+        "uri": path,
         "provider": provider,
         "kind": kind,
         "created_turn": created_turn,
+        "created_at": now,
         "updated_at": now,
-        "prompt_hash": prompt_hash,
         "meta": meta or {},
     }

@@ -31,10 +31,12 @@ def generate_and_register(
     phash = prompt_hash(prompt)
     data = gen_fn(prompt=prompt, asset_id=asset_id, size=size)
     path = write_bytes(scope, asset_id, data)
+    image_path = uri_for_path(path)
     record = make_asset_record(
         asset_id=asset_id,
         display_name=display_name,
-        uri=uri_for_path(path),
+        image_path=image_path,
+        entity_id=display_name,
         provider=provider.provider_name,
         kind=kind,
         created_turn=turn,

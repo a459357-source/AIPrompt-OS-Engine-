@@ -226,10 +226,12 @@ DIRECTOR_STATE_MACHINE_ENABLED = True
 DIRECTOR_EVENT_MAX_ACTIVE_TURNS = 3
 DIRECTOR_MAX_PENDING = 2
 
-# ── V6.0 Visual Narrative System (Phase A) ───────────────────────────
+# ── V6.0 Visual Narrative System (Phase A/B) ─────────────────────────
 VISUAL_SYSTEM_ENABLED = True
 VISUAL_PROVIDER = "stub"
 VISUAL_CACHE_ENABLED = True
+AGNES_API_BASE_DEFAULT = "https://api.agnes-ai.com/v1"
+AGNES_IMAGE_TIMEOUT_SEC = 120
 
 # ── V3.2 Objective System ─────────────────────────────────────────
 OBJECTIVE_SYSTEM_ENABLED = True
@@ -384,6 +386,17 @@ def clear_api_key() -> None:
     """Remove the stored API key file."""
     if APIKEY_PATH.exists():
         APIKEY_PATH.unlink()
+
+
+def get_agnes_api_key() -> str:
+    """Agnes image API key from apikey.json (never env fallback)."""
+    return str(_read_settings().get("agnes_api_key", "") or "").strip()
+
+
+def get_agnes_api_base() -> str:
+    """Agnes API base URL from apikey.json or default."""
+    base = str(_read_settings().get("agnes_api_base", "") or "").strip()
+    return (base or AGNES_API_BASE_DEFAULT).rstrip("/")
 
 
 def reload_api_key() -> str:

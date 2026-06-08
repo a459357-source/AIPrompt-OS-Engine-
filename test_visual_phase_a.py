@@ -17,7 +17,8 @@ from engine.visual.asset_manager import (
 )
 from engine.visual.agnes_visual_provider import AgnesNotConfiguredError, AgnesVisualProvider
 from engine.visual.visual_cache import exists, prompt_hash
-from engine.visual.visual_provider import MockVisualProvider, StubVisualProvider, get_visual_provider
+from engine.visual.provider_factory import get_visual_provider
+from engine.visual.visual_provider import MockVisualProvider, StubVisualProvider
 from engine.visual.visual_registry import load_registry, normalize_asset_id, save_registry, set_asset
 
 
@@ -88,8 +89,8 @@ def test_visual_registry_module_exists():
 def test_visual_provider_interface():
     stub = StubVisualProvider()
     assert stub.provider_name == "stub"
-    assert len(stub.generate_character(prompt="p", asset_id="a")) > 0
-    assert len(stub.generate_scene(prompt="p", asset_id="a")) > 0
+    assert len(stub.generate_character_portrait(prompt="p", asset_id="a")) > 0
+    assert len(stub.generate_scene_image(prompt="p", asset_id="a")) > 0
     assert len(stub.generate_world_map(prompt="p", asset_id="a")) > 0
     assert len(stub.generate_faction_map(prompt="p", asset_id="a")) > 0
 
@@ -138,10 +139,9 @@ def test_registry_persistence(visual_env, world_pack):
     assert reg["characters"]
 
 
-def test_agnes_not_available_phase_a():
-    provider = AgnesVisualProvider()
+def test_agnes_not_available_without_api_key():
     with pytest.raises(AgnesNotConfiguredError):
-        provider.generate_character(prompt="x", asset_id="y")
+        AgnesVisualProvider(api_key="")
 
 
 def test_save_slot_metadata_only_no_image_bytes(visual_env, world_pack):
