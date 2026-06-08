@@ -56,9 +56,12 @@ def build_turn_payload(result: dict) -> dict[str, Any]:
     except Exception:
         pass
 
-    # ── V6 Game Runtime: visuals ──
-    from engine.game_runtime import ensure_game_visuals
-    visuals = ensure_game_visuals(state, turn=state.get("turn", 0), background=True)
+    # ── V6 Game Runtime: narrative node → visuals ──
+    from engine.game_runtime import resolve_game_narrative_node, ensure_game_visuals_from_node
+
+    scene_id = str(state.get("scene") or "").strip()
+    node = resolve_game_narrative_node(scene_id)
+    visuals = ensure_game_visuals_from_node(node, turn=state.get("turn", 0), background=True)
 
     return {
         "story": result.get("story", ""),
@@ -73,6 +76,7 @@ def build_turn_payload(result: dict) -> dict[str, Any]:
             "chapter": state.get("chapter", 1),
         },
         "visuals": visuals,
+        "narrative_node": node,
     }
 
 

@@ -113,6 +113,13 @@ interface GameVisuals {
   scene: { scene_id?: string; image_url: string } | null
 }
 
+interface NarrativeNode {
+  event_id: string
+  context: string
+  characters: { name: string }[]
+  choices: { choice_id: string; text: string; target_event_id: string; tone: string }[]
+}
+
 function OptionEffectsInline({
   effects,
   effectText,
@@ -323,6 +330,7 @@ export default function Game() {
   const [showConsequences, setShowConsequences] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [visuals, setVisuals] = useState<GameVisuals>({ characters: [], scene: null })
+  const [narrativeNode, setNarrativeNode] = useState<NarrativeNode | null>(null)
   const [supplementOpen, setSupplementOpen] = useState(false)
   const [supplementText, setSupplementText] = useState('')
   const [supplementLoading, setSupplementLoading] = useState(false)
@@ -456,6 +464,7 @@ export default function Game() {
     options?: string[]
     state: Record<string, unknown>
     visuals?: GameVisuals
+    narrative_node?: NarrativeNode
   }) => {
     setViewingTurn(null)
     setStory(data.story)
@@ -477,6 +486,7 @@ export default function Game() {
     const objData = st.objectives as ObjectivesGameData | undefined
     if (objData) setObjectives(objData)
     if (data.visuals) setVisuals(data.visuals)
+    if (data.narrative_node) setNarrativeNode(data.narrative_node)
   }, [])
 
   const loadGame = useCallback(async () => {
@@ -1707,6 +1717,9 @@ export default function Game() {
                   <div className="w-full rounded-lg overflow-hidden border border-game-border/30 mb-4">
                     <img src={visuals.scene.image_url} alt={scene} className="w-full max-h-64 object-cover" loading="lazy" />
                   </div>
+                )}
+                {narrativeNode?.context && !isViewingPast && (
+                  <p className="text-xs text-game-dim italic mb-4 border-l-2 border-game-border/40 pl-3">{narrativeNode.context}</p>
                 )}
                 {appSettings.animations ? (
                   <motion.div key={viewingTurn ?? turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>

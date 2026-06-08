@@ -74,6 +74,13 @@ def _objectives_for_game(state: dict, *, persist_migrate: bool = False) -> dict:
 
 def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
     """Build JSON payload for GET /api/game-state and idempotent POST /api/start."""
+    from engine.game_runtime import resolve_game_narrative_node, ensure_game_visuals_from_node
+
+    scene_id = str(state.get("scene") or "").strip()
+    node = resolve_game_narrative_node(scene_id)
+    turn = state.get("turn", 0)
+    visuals = ensure_game_visuals_from_node(node, turn=turn, background=True)
+
     if not_started or not state.get("history"):
         from engine.character_registry import dedupe_characters_by_name
 
@@ -94,7 +101,8 @@ def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
                 "chapter": state.get("chapter", 1),
                 "objectives": _objectives_for_game(state, persist_migrate=True),
             },
-            "visuals": _game_visuals_from_state(state),
+            "visuals": visuals,
+            "narrative_node": node,
         }
         if not_started:
             payload["not_started"] = True
@@ -139,21 +147,14 @@ def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
             "chapter": state.get("chapter", 1),
             "objectives": _objectives_for_game(state, persist_migrate=True),
         },
-        "visuals": _game_visuals_from_state(state),
+        "visuals": visuals,
+        "narrative_node": node,
     }
     if not config.ADULT_MODE:
         payload["suggest_adult_mode"] = config.suggest_adult_mode_for_options(options)
     payload["world_title"] = _read_world_title()
     return payload
 
-
-def _game_visuals_from_state(state: dict) -> dict[str, Any]:
-    """Read cached game visuals from registry (read-only, no generation)."""
-    try:
-        from engine.game_runtime import _read_cached_visuals
-        return _read_cached_visuals(state.get("characters", {}), str(state.get("scene") or ""))
-    except Exception:
-        return {"characters": [], "scene": None}
 
 
 @router.get("/world-meta")
