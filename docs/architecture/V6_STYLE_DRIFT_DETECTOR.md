@@ -9,8 +9,10 @@
 
 ```text
 VisualIdentity → Prompt Builder → Style Bible → Provider
-  → Drift Detector → Cache / Registry
+  → Drift Detector → Quality Governance → Cache / Registry
 ```
+
+质量裁决见 `V6_VISUAL_QUALITY_GOVERNANCE.md`。
 
 ## 三模块（v1 无 CV/ML）
 

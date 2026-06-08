@@ -12,6 +12,7 @@ import config
 from engine.visual import image_generation
 from engine.templates.style_bible import reinforce_style_bible
 from engine.visual.provider_factory import get_visual_provider
+from engine.visual.quality_governance import QualityEvaluation, evaluate_quality
 from engine.visual.style_drift import DriftEvaluation, evaluate_generation
 from engine.visual.visual_cache import (
     exists,
@@ -103,12 +104,20 @@ def get_visual(
             return record
 
     gen_fn = getattr(provider, obj.provider_method)
-    gen_result, drift_eval = _generate_with_drift_policy(scope, obj, provider, gen_fn)
+    gen_result, drift_eval, effective_prompt = _generate_with_drift_policy(
+        scope, obj, provider, gen_fn,
+    )
+    gen_result, drift_eval, quality_eval = _apply_quality_governance(
+        scope, obj, provider, gen_fn, gen_result, drift_eval, effective_prompt,
+    )
     meta = {
         "size": gen_result["size"],
         "bytes": gen_result["bytes"],
         "drift": drift_eval.to_dict(),
+        "quality": quality_eval.to_dict(),
     }
+    if quality_eval.decision == "accept_weak":
+        meta["quality_weak"] = True
     record = make_asset_record(
         asset_id=obj.asset_id,
         display_name=obj.name,
@@ -141,20 +150,21 @@ def _generate_with_drift_policy(
     obj: VisualObject,
     provider: VisualProvider,
     gen_fn,
-) -> tuple[dict[str, Any], DriftEvaluation]:
+) -> tuple[dict[str, Any], DriftEvaluation, str]:
     """Provider → drift check → accept / retry / fallback."""
+    effective_prompt = obj.prompt
     gen_result = image_generation.write_generated_image(scope, obj, provider, gen_fn)
     if not getattr(config, "STYLE_DRIFT_DETECTOR_ENABLED", True):
         drift = evaluate_generation(obj.prompt, obj.entity_type, gen_result)
         drift.action = "accept_disabled"
         gen_result["drift"] = drift.to_dict()
-        return gen_result, drift
+        return gen_result, drift, effective_prompt
 
     drift = evaluate_generation(obj.prompt, obj.entity_type, gen_result)
     if drift.level == "ok":
         drift.action = "accept"
         gen_result["drift"] = drift.to_dict()
-        return gen_result, drift
+        return gen_result, drift, effective_prompt
 
     if drift.level == "mild":
         reinforced = reinforce_style_bible(obj.prompt, obj.entity_type)
@@ -171,7 +181,7 @@ def _generate_with_drift_policy(
                 retry_drift.score,
                 obj.entity_id,
             )
-            return retry_result, retry_drift
+            return retry_result, retry_drift, reinforced
         drift.action = "accept_mild"
         gen_result["drift"] = drift.to_dict()
         logger.info(
@@ -179,7 +189,7 @@ def _generate_with_drift_policy(
             drift.score,
             obj.entity_id,
         )
-        return gen_result, drift
+        return gen_result, drift, effective_prompt
 
     reinforced = reinforce_style_bible(obj.prompt, obj.entity_type)
     from engine.visual.visual_provider import StubVisualProvider
@@ -197,7 +207,54 @@ def _generate_with_drift_policy(
         drift.score,
         obj.entity_id,
     )
-    return fallback_result, fallback_drift
+    return fallback_result, fallback_drift, reinforced
+
+
+def _apply_quality_governance(
+    scope: str,
+    obj: VisualObject,
+    provider: VisualProvider,
+    gen_fn,
+    gen_result: dict[str, Any],
+    drift_eval: DriftEvaluation,
+    effective_prompt: str,
+) -> tuple[dict[str, Any], DriftEvaluation, QualityEvaluation]:
+    """Drift Detector → quality gate → accept / mark weak / reject regenerate."""
+    quality = evaluate_quality(obj, effective_prompt, gen_result, drift_eval)
+    if not getattr(config, "VISUAL_QUALITY_GOVERNANCE_ENABLED", True):
+        quality.action = "accept_disabled"
+        return gen_result, drift_eval, quality
+
+    if quality.decision in ("accept", "accept_weak"):
+        quality.action = quality.decision
+        if quality.decision == "accept_weak":
+            logger.info(
+                "Visual quality weak final=%.3f entity=%s",
+                quality.final_score,
+                obj.entity_id,
+            )
+        return gen_result, drift_eval, quality
+
+    reinforced = reinforce_style_bible(effective_prompt, obj.entity_type)
+    from engine.visual.visual_provider import StubVisualProvider
+
+    stub = StubVisualProvider()
+    stub_fn = getattr(stub, obj.provider_method)
+    regen_result = image_generation.write_generated_image(
+        scope, obj, stub, stub_fn, prompt_override=reinforced,
+    )
+    regen_drift = evaluate_generation(reinforced, obj.entity_type, regen_result)
+    regen_drift.action = "governance_regen"
+    regen_quality = evaluate_quality(obj, reinforced, regen_result, regen_drift)
+    regen_quality.action = "reject_regenerate"
+    regen_result["drift"] = regen_drift.to_dict()
+    logger.warning(
+        "Visual quality reject final=%.3f→regen=%.3f entity=%s",
+        quality.final_score,
+        regen_quality.final_score,
+        obj.entity_id,
+    )
+    return regen_result, regen_drift, regen_quality
 
 
 def _path_from_record(record: dict | None) -> Path | None:

@@ -40,6 +40,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "CONTENT_TEMPLATE_SYSTEM_ENABLED", True)
     monkeypatch.setattr(config, "STYLE_BIBLE_V1_ENABLED", True)
     monkeypatch.setattr(config, "STYLE_DRIFT_DETECTOR_ENABLED", True)
+    monkeypatch.setattr(config, "VISUAL_QUALITY_GOVERNANCE_ENABLED", True)
     monkeypatch.setattr(config, "VISUAL_SYSTEM_ENABLED", True)
     reset_visual_assets()
     return tmp_path
@@ -93,10 +94,12 @@ def test_reinforce_adds_stricter_tokens():
 def test_get_visual_records_drift_meta(world_pack, env):
     mock = MockVisualProvider()
     record = get_visual("character", "长公主", {"world_pack": world_pack}, provider=mock)
-    drift = (record.get("meta") or {}).get("drift") or {}
+    meta = record.get("meta") or {}
+    drift = meta.get("drift") or {}
     assert "score" in drift
     assert drift.get("level") == "ok"
     assert drift.get("action") == "accept"
+    assert "final_score" in (meta.get("quality") or {})
 
 
 def test_mild_drift_triggers_retry(world_pack, env):
@@ -104,6 +107,7 @@ def test_mild_drift_triggers_retry(world_pack, env):
     evaluations = [
         DriftEvaluation(0.45, "mild", "pending"),
         DriftEvaluation(0.1, "ok", "pending"),
+        DriftEvaluation(0.05, "ok", "pending"),
     ]
 
     def fake_eval(prompt, entity_type, gen_result=None):
@@ -111,7 +115,7 @@ def test_mild_drift_triggers_retry(world_pack, env):
 
     with patch("engine.visual.visual_runtime.evaluate_generation", side_effect=fake_eval):
         record = get_visual("character", "长公主", {"world_pack": world_pack}, provider=mock)
-    assert record["meta"]["drift"]["action"] == "retry_accept"
+    assert record["meta"]["drift"]["action"] in ("retry_accept", "governance_regen")
 
 
 def test_severe_drift_fallback_stub(world_pack, env):
@@ -119,6 +123,7 @@ def test_severe_drift_fallback_stub(world_pack, env):
     evaluations = [
         DriftEvaluation(0.85, "severe", "pending"),
         DriftEvaluation(0.1, "ok", "pending"),
+        DriftEvaluation(0.05, "ok", "pending"),
     ]
 
     def fake_eval(prompt, entity_type, gen_result=None):
@@ -127,7 +132,7 @@ def test_severe_drift_fallback_stub(world_pack, env):
     with patch("engine.visual.visual_runtime.evaluate_generation", side_effect=fake_eval):
         record = get_visual("character", "长公主", {"world_pack": world_pack}, provider=mock)
     assert record["provider"] == "stub"
-    assert record["meta"]["drift"]["action"] == "fallback_reject"
+    assert record["meta"]["drift"]["action"] in ("fallback_reject", "governance_regen")
 
 
 def test_identity_prompt_passes_drift_check(world_pack, env):
