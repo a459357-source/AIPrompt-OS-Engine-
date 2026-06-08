@@ -262,7 +262,8 @@ VISUAL_SYSTEM_ENABLED = True
 VISUAL_PROVIDER = "agnes"
 VISUAL_CACHE_ENABLED = True
 VISUAL_MAX_RETRIES = 3
-AGNES_API_BASE_DEFAULT = "https://api.agnes-ai.com/v1"
+AGNES_API_BASE_DEFAULT = "https://apihub.agnes-ai.com/v1"
+AGNES_IMAGE_MODEL = "agnes-image-2.1-flash"
 AGNES_IMAGE_TIMEOUT_SEC = 120
 
 # ── V3.2 Objective System ─────────────────────────────────────────

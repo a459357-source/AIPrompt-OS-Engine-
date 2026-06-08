@@ -1,10 +1,12 @@
 """
 agnes_visual_provider.py — V6 Agnes VisualProvider
+===================================================
+Agnes Image API (apihub.agnes-ai.com) backend.
+Response format: {"data":[{"url":"https://..."}]} — URL download.
 """
 
 from __future__ import annotations
 
-import base64
 import json
 import logging
 from typing import Any
@@ -31,6 +33,7 @@ class AgnesVisualProvider(VisualProvider):
     def __init__(self, *, api_key: str | None = None, api_base: str | None = None) -> None:
         self._api_key = (api_key if api_key is not None else config.get_agnes_api_key()).strip()
         self._api_base = (api_base if api_base is not None else config.get_agnes_api_base()).rstrip("/")
+        self._model = getattr(config, "AGNES_IMAGE_MODEL", "agnes-image-2.1-flash")
         if not self._api_key:
             raise AgnesNotConfiguredError(
                 "Agnes API key missing. Set agnes_api_key in data/apikey.json."
@@ -43,38 +46,37 @@ class AgnesVisualProvider(VisualProvider):
     def generate_character(
         self, *, prompt: str, asset_id: str, size: str = "1024x1024",
     ) -> bytes:
-        return self._generate_image(prompt, size, kind="character")
+        return self._generate_image(prompt, size)
 
     def generate_location(
         self, *, prompt: str, asset_id: str, size: str = "1536x1024",
     ) -> bytes:
-        return self._generate_image(prompt, size, kind="location")
+        return self._generate_image(prompt, size)
 
     def generate_faction(
         self, *, prompt: str, asset_id: str, size: str = "1536x1024",
     ) -> bytes:
-        return self._generate_image(prompt, size, kind="faction")
+        return self._generate_image(prompt, size)
 
     def generate_event(
         self, *, prompt: str, asset_id: str, size: str = "1024x1024",
     ) -> bytes:
-        return self._generate_image(prompt, size, kind="event")
+        return self._generate_image(prompt, size)
 
-    def _generate_image(self, prompt: str, size: str, *, kind: str) -> bytes:
-        return self._call_agnes_api(prompt=prompt, size=size, kind=kind)
+    def _generate_image(self, prompt: str, size: str) -> bytes:
+        return self._call_agnes_api(prompt=prompt, size=size)
 
-    def _call_agnes_api(self, *, prompt: str, size: str, kind: str) -> bytes:
+    def _call_agnes_api(self, *, prompt: str, size: str) -> bytes:
         url = f"{self._api_base}/images/generations"
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
         payload = {
+            "model": self._model,
             "prompt": prompt,
             "size": size,
             "n": 1,
-            "response_format": "b64_json",
-            "metadata": {"kind": kind},
         }
         try:
             resp = requests.post(
@@ -88,7 +90,7 @@ class AgnesVisualProvider(VisualProvider):
             raise AgnesAPIError(f"Agnes request failed: {exc}") from exc
 
         if resp.status_code != 200:
-            logger.error("Agnes API HTTP %s: %s", resp.status_code, resp.text[:300])
+            logger.error("Agnes API HTTP %s: %s", resp.status_code, resp.text[:400])
             raise AgnesAPIError(f"Agnes HTTP {resp.status_code}")
 
         try:
@@ -99,24 +101,20 @@ class AgnesVisualProvider(VisualProvider):
         return self._extract_image_bytes(data)
 
     def _extract_image_bytes(self, data: dict[str, Any]) -> bytes:
+        # Agnes returns {"data": [{"url": "https://..."}]}
         items = data.get("data")
         if isinstance(items, list) and items:
             item = items[0]
             if isinstance(item, dict):
-                b64 = item.get("b64_json") or item.get("image_base64")
-                if b64:
-                    return base64.b64decode(b64)
-                url = item.get("url")
-                if url:
-                    return self._download_url(str(url))
-
-        b64_top = data.get("b64_json") or data.get("image_base64")
-        if b64_top:
-            return base64.b64decode(b64_top)
-
-        url_top = data.get("url")
-        if url_top:
-            return self._download_url(str(url_top))
+                image_url = item.get("url") or item.get("b64_json") or item.get("image_base64")
+                if not image_url:
+                    raise AgnesAPIError("Agnes response item missing url")
+                # b64_json fallback
+                if isinstance(image_url, str) and image_url.startswith("http"):
+                    return self._download_url(image_url)
+                if isinstance(image_url, str) and len(image_url) > 100:
+                    import base64
+                    return base64.b64decode(image_url)
 
         raise AgnesAPIError("Agnes response missing image data")
 
