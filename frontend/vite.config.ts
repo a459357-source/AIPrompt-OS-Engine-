@@ -47,6 +47,9 @@ export default defineConfig({
       '/reset': API,
       '/export': API,
       '/shutdown': API,
+
+      // Static assets (visual images, etc.)
+      '/static': { target: API, changeOrigin: true },
     },
   },
 })
