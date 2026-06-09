@@ -14,10 +14,21 @@ from engine.visual.visual_registry import ENTITY_TYPE_TO_SCOPE, list_assets, loa
 
 
 def public_image_url(image_path: str) -> str:
+    """Build a public static URL with cache-busting via file modification time."""
     rel = str(image_path or "").replace("\\", "/").strip()
+    if not rel:
+        return ""
     if rel.startswith("output/"):
         rel = rel[len("output/"):]
-    return f"/static/{rel}" if rel else ""
+    url = f"/static/{rel}"
+    # Append file mtime as cache-buster so browser picks up regenerated images
+    try:
+        file_path = config.OUTPUT_DIR / rel
+        if file_path.is_file():
+            url += f"?v={int(file_path.stat().st_mtime)}"
+    except Exception:
+        pass
+    return url
 
 
 def _cache_hit(image_path: str) -> bool:
