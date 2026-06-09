@@ -171,13 +171,20 @@ export default function NPCs() {
       const npc = await generateNpc()
       if (npc.error) { setError(npc.error); setGenerating(false); return }
       setError('')
-      setCharacters((prev) => [...prev, npc])
-      setStats((prev) => ({
-        total: prev.total + 1,
-        main: prev.main,
-        npc: prev.npc + 1,
-        avg_trust: Math.round((prev.avg_trust * prev.total + npc.trust_pct) / (prev.total + 1)),
-      }))
+      // Reload all NPCs to pick up newly generated portrait
+      const data = await getNpcs()
+      if (!data.error) {
+        setCharacters(data.characters)
+        setStats(data.stats)
+      } else {
+        setCharacters((prev) => [...prev, npc])
+        setStats((prev) => ({
+          total: prev.total + 1,
+          main: prev.main,
+          npc: prev.npc + 1,
+          avg_trust: Math.round((prev.avg_trust * prev.total + npc.trust_pct) / (prev.total + 1)),
+        }))
+      }
     } catch (e) {
       setError((e as Error).message || String(e))
       logger.error('NPCs', 'Generate failed', { error: String(e) })
@@ -300,16 +307,20 @@ export default function NPCs() {
           </Button>
         </motion.div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+
+
           <AnimatePresence>
             {filtered.map((c, i) => (
-              <div
+              <motion.div
+                layout
                 key={c.name + i}
                 role="button"
                 tabIndex={0}
                 onClick={() => setSelectedIndex(i)}
                 onKeyDown={(e) => { if (e.key === 'Enter') setSelectedIndex(i) }}
-                className={`cursor-pointer transition-transform ${selectedIndex === i ? 'ring-2 ring-neural-cyan rounded-lg scale-[1.02]' : 'hover:scale-[1.01]'}`}
+                className={`cursor-pointer transition-all duration-200 ${selectedIndex === i ? 'ring-2 ring-neural-cyan rounded-lg scale-[1.02] shadow-lg shadow-neural-cyan/10' : 'hover:scale-[1.02] hover:shadow-md'}`}
+                whileHover={{ y: -2 }}
               >
               <CharacterCard
                 key={c.name + i}
@@ -330,7 +341,7 @@ export default function NPCs() {
                 isMain={c.isMain}
                 trustPct={c.trust_pct}
               />
-              </div>
+              </motion.div>
             ))}
           </AnimatePresence>
         </div>

@@ -419,6 +419,21 @@ async def api_generate_npc(role_hint: str = Form("")):
     except Exception:
         pass
 
+    # V6.7: generate portrait for new NPC in background
+    try:
+        from engine.visual.asset_manager import get_or_request_character_portrait
+        import threading
+        _npc_name = name
+        def _gen_npc_portrait():
+            try:
+                _wp = io_utils.read_yaml(config.WORLD_PACK_PATH)
+                get_or_request_character_portrait(_npc_name, _wp, turn=1, force=True)
+            except Exception:
+                pass
+        threading.Thread(target=_gen_npc_portrait, daemon=True).start()
+    except Exception:
+        pass
+
     return JSONResponse({
         "name": name,
         "isMain": False,
