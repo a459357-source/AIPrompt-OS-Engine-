@@ -557,6 +557,8 @@ export default function Game() {
               story: recheck.story,
               options: recheck.options,
               state: recheck.state as Record<string, unknown>,
+              visuals: recheck.visuals,
+              narrative_node: recheck.narrative_node,
             })
             setOpeningPending(false)
             return
@@ -593,6 +595,8 @@ export default function Game() {
           story: started.story,
           options: started.options,
           state: started.state as unknown as Record<string, unknown>,
+          visuals: started.visuals,
+          narrative_node: started.narrative_node,
         })
         setOpeningPending(false)
         logger.info('Game', 'Opening scene ready')
@@ -604,6 +608,8 @@ export default function Game() {
         story: data.story,
         options: data.options,
         state: data.state as Record<string, unknown>,
+        visuals: data.visuals,
+        narrative_node: data.narrative_node,
       })
       logger.info('Game', `Loaded: turn=${(data.state as Record<string, unknown>).turn}`)
     } catch (e) {
@@ -1197,6 +1203,8 @@ export default function Game() {
       const factionsData = data.state.factions as FactionInfo[] | undefined
       if (factionsData) setFactions(factionsData)
       if (data.state.objectives) setObjectives(data.state.objectives)
+      if (data.visuals) setVisuals(data.visuals)
+      if (data.narrative_node) setNarrativeNode(data.narrative_node)
       void getHistory().then((hist) => {
         if (!hist.error) setTimelineCache(hist.turns)
       })

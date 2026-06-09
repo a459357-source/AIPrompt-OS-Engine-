@@ -166,6 +166,8 @@ export interface GameTurnResponse {
   story: string
   state: GameState
   options: string[]
+  visuals?: { characters: { name: string; image_url: string }[]; factions: { name: string; image_url: string }[]; scene: { scene_id?: string; image_url: string } | null }
+  narrative_node?: { event_id: string; context: string; characters: { name: string }[]; choices: { choice_id: string; text: string; target_event_id: string; tone: string }[] }
   error?: string
 }
 
