@@ -102,9 +102,10 @@ def extract_character_traits(entity_id: str, context: dict) -> tuple[dict[str, A
 
     style_anchor = {
         "render_style": "anime character portrait",
-        "pose": "full body standing pose",
+        "pose": "head and shoulders, upper body portrait, face clearly visible",
+        "framing": "close-up shot, face centered",
         "background": "clean background",
-        "detail": "high detail character design",
+        "detail": "high detail character design, facial features prominent",
     }
     canonical: dict[str, Any] = {}
     locked: list[str] = []
