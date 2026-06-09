@@ -64,13 +64,15 @@ def build_prompt_from_template(
     et = identity.entity_type
     parts: list[str] = []
 
-    bible = get_style_bible()
-    tone = str(bible.get("world_tone") or "").strip()
-    if tone:
-        parts.append(f"world_tone: {tone}")
-    for kw in bible.get("visual_language") or []:
-        if kw:
-            parts.append(f"style: {kw}")
+    # World-level visual tone only for scenes/locations/factions — NOT for character portraits
+    if et != "character":
+        bible = get_style_bible()
+        tone = str(bible.get("world_tone") or "").strip()
+        if tone:
+            parts.append(f"world_tone: {tone}")
+        for kw in bible.get("visual_language") or []:
+            if kw:
+                parts.append(f"style: {kw}")
 
     parts.extend(_keywords_from_template(template, et))
 
