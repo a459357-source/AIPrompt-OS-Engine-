@@ -785,8 +785,11 @@ export default function NewStory() {
       showStatus(`❌ ${msg}`, 'error')
       setFieldErrors((prev) => ({ ...prev, world: msg }))
     }
-    // Refresh character portraits after world gen
+    // Refresh character portraits after world gen — immediate + delayed for background gen
     getCharacterVisuals().then(setCharImageMap).catch(() => {})
+    setTimeout(() => {
+      getCharacterVisuals().then(setCharImageMap).catch(() => {})
+    }, 20000)
     setGenerating(null)
   }, [keywords, applyWorldGenResult, getValues, setValue, adultMode])
 

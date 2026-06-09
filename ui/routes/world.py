@@ -637,6 +637,15 @@ async def create_new_story(
             get_or_request_faction_map,
             get_or_request_world_map,
         )
+        # Ensure identity_registry is recreated with fresh world data
+        try:
+            from pathlib import Path
+            import config as _cfg
+            id_path = Path(_cfg.VISUAL_IDENTITY_REGISTRY_PATH)
+            if id_path.exists():
+                id_path.unlink()
+        except Exception:
+            pass
         characters = wp.get("world", wp).get("characters", [])
         for ch in characters:
             try:
@@ -847,6 +856,48 @@ async def generate_world(keywords: str = Form(""), adult_mode: str = Form("")):
                 result.get("characterRelations"), npc_names
             )
         result["adult_mode_applied"] = adult
+
+        # ── V6.7: Background portrait generation for all characters ──
+        chars = result.get("characters") or []
+        if chars:
+            import threading
+            # Build minimal world_pack so identity_prompt_builder can read character profiles
+            _wp = {"world": {"characters": chars, "factions": result.get("factions") or []}}
+            def _gen_world_portraits():
+                from engine.visual.asset_manager import (
+                    get_or_request_character_portrait,
+                    get_or_request_faction_map,
+                    get_or_request_world_map,
+                )
+                from pathlib import Path
+                import config as _cfg
+                # Ensure identity_registry is recreated with fresh data
+                try:
+                    id_path = Path(_cfg.VISUAL_IDENTITY_REGISTRY_PATH)
+                    if id_path.exists():
+                        id_path.unlink()
+                except Exception:
+                    pass
+                for ch in chars:
+                    try:
+                        name = str(ch.get("name") or "").strip()
+                        if name:
+                            get_or_request_character_portrait(name, _wp, turn=1, force=True)
+                    except Exception:
+                        pass
+                for f in (result.get("factions") or []):
+                    try:
+                        fname = str(f.get("name") or "").strip()
+                        if fname:
+                            get_or_request_faction_map(fname, _wp, turn=1, force=True)
+                    except Exception:
+                        pass
+                try:
+                    get_or_request_world_map(_wp, turn=1, force=True)
+                except Exception:
+                    pass
+            threading.Thread(target=_gen_world_portraits, daemon=True).start()
+
         return JSONResponse(result)
     except DeepSeekError as exc:
         import logging
