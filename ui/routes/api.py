@@ -31,6 +31,35 @@ def _read_world_title() -> str:
         return ""
 
 
+def _factions_from_world_pack() -> list[dict]:
+    """Minimal faction data from world_pack.yaml — used when memory is not yet populated."""
+    try:
+        world_pack = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        factions_raw = world_pack.get("world", {}).get("factions", [])
+    except Exception:
+        return []
+    result: list[dict] = []
+    for f in factions_raw:
+        name = f.get("name", "")
+        if not name:
+            continue
+        rel = f.get("relation_to_player", "neutral")
+        rep_map = {"ally": 0.7, "neutral": 0.5, "enemy": 0.3, "rival": 0.35}
+        rep = rep_map.get(rel, 0.5)
+        result.append({
+            "name": name,
+            "role": f.get("role", ""),
+            "type": f.get("type", "other"),
+            "goals": f.get("goals", []),
+            "resources": f.get("resources", []),
+            "controlledTerritories": f.get("controlledTerritories", []),
+            "reputation_pct": round((rep - 0.5) * 200),
+            "attitude_label": {"ally": "友好", "neutral": "中立", "enemy": "敌对", "rival": "竞争"}.get(rel, "中立"),
+            "flags": [],
+        })
+    return result
+
+
 def _merge_characters_with_memory(raw_chars: dict, mem_chars: dict, faction_map: dict) -> dict[str, dict]:
     """Merge session characters with memory metrics for API responses."""
     from engine.character_registry import dedupe_characters_by_name
@@ -97,7 +126,7 @@ def _game_state_payload(state: dict, *, not_started: bool = False) -> dict:
                 "status": state.get("status", "SETUP"),
                 "scene": state.get("scene", ""),
                 "characters": chars_with_trust,
-                "factions": [],
+                "factions": _factions_from_world_pack(),
                 "force_event_pending": state.get("force_event_pending", False),
                 "chapter": state.get("chapter", 1),
                 "objectives": _objectives_for_game(state, persist_migrate=True),

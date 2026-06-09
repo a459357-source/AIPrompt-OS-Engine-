@@ -202,6 +202,20 @@ def _merge_and_enforce(current: dict, proposed: dict) -> dict:
         level_idx_fn=_level_idx,
     )
 
+    # ── Factions — bootstrap from world_pack if never persisted ──
+    if "factions" not in merged:
+        try:
+            from engine import io_utils
+            wp = io_utils.read_yaml(config.WORLD_PACK_PATH)
+            wp_factions = wp.get("world", {}).get("factions", [])
+            merged["factions"] = [
+                {"name": f["name"], "type": f.get("type", "other"),
+                 "relation": f.get("relation_to_player", "neutral")}
+                for f in wp_factions if f.get("name")
+            ]
+        except Exception:
+            merged["factions"] = []
+
     return merged
 
 

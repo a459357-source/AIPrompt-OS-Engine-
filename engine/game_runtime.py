@@ -314,13 +314,64 @@ def read_all_faction_visuals() -> list[dict[str, str]]:
     return result
 
 
+def _generate_faction_visuals_sync(world_pack: dict, turn: int) -> list[dict[str, str]]:
+    """Generate emblems for all factions in world_pack — sync blocking call."""
+    from engine.visual.visual_runtime import get_visual
+
+    result = []
+    factions = world_pack.get("world", {}).get("factions", [])
+    for faction in factions:
+        name = faction.get("name", "")
+        if not name:
+            continue
+        try:
+            visual = get_visual(
+                "faction", name,
+                context={"turn": turn, "name": name,
+                         "type": faction.get("type", ""),
+                         "description": faction.get("description", "")},
+                turn=turn, force=False,
+            )
+            if visual.get("image_path"):
+                result.append({
+                    "name": name,
+                    "image_url": public_image_url(visual["image_path"]),
+                })
+        except Exception:
+            pass
+    return result
+
+
+def _trigger_background_faction_visuals(world_pack: dict, turn: int) -> None:
+    """Fire-and-forget faction emblem generation in daemon thread."""
+
+    def _work():
+        try:
+            _generate_faction_visuals_sync(world_pack, turn)
+        except Exception as exc:
+            logger.warning("Background faction emblem generation failed: %s", exc)
+
+    t = threading.Thread(target=_work, daemon=True)
+    t.start()
+
+
+# Guard: only trigger faction generation once per boot (module cache)
+_faction_visuals_triggered: bool = False
+
+
 def bootstrap_game_visuals(node_visuals: dict[str, Any]) -> dict[str, Any]:
     """Merge node-visuals with ALL character & faction visuals for the game sidebar HUB.
 
     node_visuals = output of ensure_game_visuals_from_node()  {characters, scene}
     Returns the same shape + ``factions``, with every character/faction that
     has a visual on disk.  Node participants always take precedence.
+
+    Side effect: when zero faction visuals exist on disk and world_pack has
+    factions configured, a background thread is spawned once to generate
+    emblems for every faction.
     """
+    global _faction_visuals_triggered
+
     all_chars = read_all_character_visuals()
     char_map: dict[str, dict[str, str]] = {}
     for c in all_chars:
@@ -334,6 +385,17 @@ def bootstrap_game_visuals(node_visuals: dict[str, Any]) -> dict[str, Any]:
         faction_map[f["name"]] = f
     for f in node_visuals.get("factions", []):
         faction_map[f["name"]] = f
+
+    # ── Auto-generate faction emblems in background if missing ──
+    if not faction_map and not _faction_visuals_triggered and config.VISUAL_SYSTEM_ENABLED:
+        _faction_visuals_triggered = True
+        from engine import io_utils
+
+        wp = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        wp_factions = wp.get("world", {}).get("factions", [])
+        if wp_factions:
+            logger.info("Bootstrapping faction emblem generation (%d factions)", len(wp_factions))
+            _trigger_background_faction_visuals(wp, turn=0)
 
     return {
         "characters": list(char_map.values()),
