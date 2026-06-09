@@ -90,6 +90,20 @@ def build_turn_payload(result: dict, *, force_sync_visuals: bool = False) -> dic
             logger.info("[VISUAL] illustration generated — scene=%s image=%s",
                         scene_id, story_ill.get("image_url", "?")[-40:])
 
+    # ── Visual consistency audit ──
+    story_text = result.get("story", "")
+    story_lower = (story_text or "").lower()
+    scene_lower = scene_id.lower()
+    story_match = scene_lower in story_lower or any(w in story_lower for w in scene_lower.split()) if scene_lower else False
+    node_chars = [c.get("name", "") for c in node.get("characters", [])]
+    char_match = all(name.lower() in story_lower for name in node_chars) if node_chars else True
+    logger.info("[VISUAL_AUDIT] scene=%s chapter=%s visual=%s story_match=%s character_match=%s",
+                scene_id,
+                state.get("chapter", "?"),
+                (visuals.get("scene") or {}).get("scene_id", "none"),
+                story_match,
+                char_match)
+
     from ui.routes.api import _objectives_for_game
     return {
         "story": result.get("story", ""),

@@ -459,6 +459,17 @@ export default function Game() {
   const [genSettingsSaving, setGenSettingsSaving] = useState(false)
   const [genSettingsSaveError, setGenSettingsSaveError] = useState('')
   const [optionsRegenerated, setOptionsRegenerated] = useState(false)
+  // ── Phase 5.6: Visual consistency states ──
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+  const prevObjectivesRef = useRef<ObjectivesGameData>({ main: [], side: [] })
+  const [objectiveToast, setObjectiveToast] = useState<{ text: string; visible: boolean }>({ text: '', visible: false })
+  const objectiveToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [shownEventCards, setShownEventCards] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('promptos_shown_event_cards')
+      return new Set<string>(raw ? JSON.parse(raw) : [])
+    } catch { return new Set<string>() }
+  })
   const storyScrollRef = useRef<HTMLDivElement>(null)
   const storyEndRef = useRef<HTMLDivElement>(null)
   const skipScrollTopRef = useRef(false)
@@ -1352,10 +1363,45 @@ export default function Game() {
     marginBottom: 'var(--story-paragraph-spacing)',
   } as const
   const storyContentMaxWidth = storyMaxWidthCSSValue(appSettings.maxWidth)
+  // ── Phase 5.6: Character status badge ──
+  const getCharStatusBadge = useCallback((charInfo: CharInfo | undefined) => {
+    if (!charInfo) return null
+    const aff = charInfo.affection ?? charInfo.trust_pct ?? 50
+    if (charInfo.tier === '主角' || (charInfo.tier && ['重要', '关键', '核心'].some(t => charInfo.tier?.includes(t))))
+      return { emoji: '👑', label: '重要' }
+    const rel = (charInfo.relation || '').toLowerCase()
+    if (['敌对', '敌人', '仇敌', '憎恨', '敌'].some(w => rel.includes(w)) || aff < 25)
+      return { emoji: '😠', label: '敌对' }
+    if (['友', '好', '信', '爱', '亲近', '挚友'].some(w => rel.includes(w)) || aff > 75)
+      return { emoji: '😊', label: '友好' }
+    if (['中立', '陌生'].some(w => rel.includes(w)))
+      return { emoji: '😐', label: '中立' }
+    return null
+  }, [])
+
   const storyCharVisuals = useMemo(() => {
     if (!displayStory) return []
-    return visuals.characters.filter(vc => displayStory.includes(vc.name))
-  }, [displayStory, visuals.characters])
+    const allChars = visuals.characters.filter(vc => displayStory.includes(vc.name))
+    if (allChars.length <= 3) return allChars
+    // Protagonist focus: protagonist + top 1-2 by narrative node priority
+    const protagonist = allChars.find(vc => {
+      const ci = characters.find(c => c.name === vc.name)
+      return ci?.tier === '主角'
+    })
+    const nodeCharNames = new Set((narrativeNode?.characters || []).map(c => c.name))
+    const others = allChars.filter(vc => vc !== protagonist)
+    others.sort((a, b) => {
+      const aInNode = nodeCharNames.has(a.name) ? 1 : 0
+      const bInNode = nodeCharNames.has(b.name) ? 1 : 0
+      if (aInNode !== bInNode) return bInNode - aInNode
+      const aAff = characters.find(c => c.name === a.name)?.affection ?? 50
+      const bAff = characters.find(c => c.name === b.name)?.affection ?? 50
+      return Math.abs(bAff - 50) - Math.abs(aAff - 50)
+    })
+    const top = others.slice(0, 2)
+    const result = protagonist ? [protagonist, ...top] : top.slice(0, 2)
+    return result
+  }, [displayStory, visuals.characters, characters, narrativeNode])
 
   // ── First-appearance detection ──
   const newCharacters = useMemo(() => {
@@ -1382,6 +1428,70 @@ export default function Game() {
       saveIntroducedChars(next)
     }
   }, [newCharacters])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Phase 5.6: Context snippet from narrative_node ──
+  const contextSnippet = useMemo(() => {
+    const ctx = narrativeNode?.context || ''
+    if (!ctx.trim()) return ''
+    const first = ctx.split(/[。！？\n]/).filter(Boolean)[0] || ''
+    return first.length > 80 ? first.slice(0, 80) + '…' : first
+  }, [narrativeNode?.context])
+
+  // ── Phase 5.6: One-time event cards ──
+  const eventCards = useMemo(() => {
+    const cards: { id: string; icon: string; label: string }[] = []
+    if (isViewingPast || !hasGame) return cards
+    for (const nc of newCharacters)
+      cards.push({ id: `new_char_${nc.name}`, icon: '✨', label: `新角色登场 · ${nc.name}` })
+    const prevFactionNames = prevFactionNamesRef.current
+    const currentFactionNames = new Set((factions || []).map(f => f.name))
+    for (const fn of currentFactionNames) {
+      if (!prevFactionNames.has(fn) && prevFactionNames.size > 0)
+        cards.push({ id: `new_faction_${fn}`, icon: '🏛', label: `新势力登场 · ${fn}` })
+    }
+    prevFactionNamesRef.current = currentFactionNames
+    if (chapter > prevChapterRef.current && prevChapterRef.current > 0)
+      cards.push({ id: `chapter_${chapter}`, icon: '📖', label: `主线推进 · 第${chapter}章` })
+    prevChapterRef.current = chapter
+    return cards.filter(c => !shownEventCards.has(c.id))
+  }, [newCharacters, factions, chapter, isViewingPast, hasGame, shownEventCards])
+
+  const prevFactionNamesRef = useRef<Set<string>>(new Set())
+  const prevChapterRef = useRef(1)
+
+  useEffect(() => {
+    if (eventCards.length === 0) return
+    const next = new Set(shownEventCards)
+    let changed = false
+    for (const c of eventCards) {
+      if (!next.has(c.id)) { next.add(c.id); changed = true }
+    }
+    if (changed) {
+      setShownEventCards(next)
+      localStorage.setItem('promptos_shown_event_cards', JSON.stringify([...next]))
+    }
+    const timer = setTimeout(() => setShownEventCards(next), 5000)
+    return () => clearTimeout(timer)
+  }, [eventCards])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Phase 5.6: Objective progress change toast ──
+  useEffect(() => {
+    if (isViewingPast || !hasGame) return
+    const prev = prevObjectivesRef.current
+    for (const obj of objectives.main) {
+      const prevObj = prev.main.find(o => o.id === obj.id)
+      if (prevObj && prevObj.progress < obj.progress) {
+        const text = `🎯 主线推进 · ${obj.title} · ${prevObj.progress}% → ${obj.progress}%`
+        setObjectiveToast({ text, visible: true })
+        if (objectiveToastTimerRef.current) clearTimeout(objectiveToastTimerRef.current)
+        objectiveToastTimerRef.current = setTimeout(() => {
+          setObjectiveToast({ text: '', visible: false })
+        }, 3000)
+        break
+      }
+    }
+    prevObjectivesRef.current = structuredClone(objectives)
+  }, [objectives, isViewingPast, hasGame])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const gameLeftPanel = useMemo(() => {
     if (!hasGame || readingMode) return null
@@ -1997,7 +2107,7 @@ export default function Game() {
                 style={{ maxWidth: storyContentMaxWidth }}
               >
                 {visuals.scene?.image_url && !isViewingPast && (
-                  <div className="w-full rounded-lg overflow-hidden border border-game-border/30 mb-4 relative aspect-[16/9] bg-neural-void/60">
+                  <div className="w-full rounded-lg overflow-hidden border border-game-border/30 mb-4 relative aspect-[16/9] bg-neural-void/60 cursor-pointer group/scene" onClick={() => setLightboxSrc(visuals.scene?.image_url || null)}>
                     <img src={visuals.scene.image_url} alt={scene} className="w-full h-full object-cover" loading="lazy" />
                     {visuals.factions.length > 0 && factions.length > 0 && (
                       <div className="absolute top-2 right-2 flex flex-wrap gap-1.5 max-w-[60%] justify-end">
@@ -2024,6 +2134,15 @@ export default function Game() {
                         })}
                       </div>
                     )}
+                    {(scene || contextSnippet) && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent px-3 py-2.5 pt-5">
+                        {scene && <div className="text-xs text-white/90 font-medium">📍 {scene}</div>}
+                        {contextSnippet && <div className="text-[11px] text-white/70 leading-tight mt-0.5">📖 {contextSnippet}</div>}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/scene:opacity-100 transition-opacity">
+                      <div className="rounded-full bg-black/50 px-3 py-1.5 text-white/80 text-xs">🔍 点击放大</div>
+                    </div>
                   </div>
                 )}
                 {!isViewingPast && visuals.scene?.image_url && (
@@ -2031,20 +2150,53 @@ export default function Game() {
                     Scene: {scene || '—'} · Visual: {visuals.scene.scene_id || '—'}
                   </p>
                 )}
+                {/* ── Phase 5.6: One-time event cards ── */}
+                {eventCards.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-2 mb-4">
+                    {eventCards.map(ev => (
+                      <div key={ev.id} className="rounded-full bg-game-accent/15 border border-game-accent/30 px-3 py-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <span className="text-sm">{ev.icon}</span>
+                        <span className="text-xs text-game-accent font-medium">{ev.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* ── Phase 5.6: Objective progress toast ── */}
+                {objectiveToast.visible && (
+                  <div className="flex justify-center mb-4">
+                    <motion.div
+                      initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      className="rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 px-3 py-2 text-xs text-amber-100 font-medium shadow-lg"
+                    >
+                      {objectiveToast.text}
+                    </motion.div>
+                  </div>
+                )}
                 {storyCharVisuals.length > 0 && !isViewingPast && (
                   <div className="flex flex-wrap justify-center gap-4 mb-5 px-2">
                     {storyCharVisuals.map((vc) => {
                       const isNew = newCharacters.some(nc => nc.name === vc.name)
                       const charInfo = characters.find(c => c.name === vc.name)
+                      const badge = getCharStatusBadge(charInfo)
                       return (
                       <div key={vc.name} className="flex flex-col items-center gap-1.5 relative">
-                        <div className="rounded-md overflow-hidden border border-game-accent/30 bg-neural-void/60 shadow-md shadow-game-accent/5 relative w-[140px] h-56">
+                        <div className="rounded-md overflow-hidden border border-game-accent/30 bg-neural-void/60 shadow-md shadow-game-accent/5 relative w-[140px] h-56 cursor-pointer group/char" onClick={(e) => { e.stopPropagation(); setLightboxSrc(vc.image_url) }}>
                           <img src={vc.image_url} alt={vc.name} className="w-full h-full object-cover object-top" loading="lazy" />
                           {isNew && (
                             <div className="absolute top-1.5 right-1.5 rounded px-1.5 py-0.5 bg-game-accent/90 text-[10px] font-bold text-white shadow-md animate-pulse">
                               NEW
                             </div>
                           )}
+                          {badge && (
+                            <div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 bg-black/70 backdrop-blur-sm border border-white/15 text-[10px] font-medium text-white/90 flex items-center gap-1">
+                              <span>{badge.emoji}</span><span>{badge.label}</span>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/char:opacity-100 transition-opacity">
+                            <div className="rounded-full bg-black/50 px-2 py-1 text-white/70 text-[10px]">🔍</div>
+                          </div>
                         </div>
                         <span className="text-xs text-game-text font-medium text-center leading-tight max-w-[120px] truncate">{vc.name}</span>
                         {charInfo?.role && (
@@ -2566,6 +2718,16 @@ export default function Game() {
         onClose={() => setAdultUnlockOpen(false)}
         onSubmit={submitAdultUnlockFromHint}
       />
+
+      {/* ── Phase 5.6: Lightbox ── */}
+      {lightboxSrc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setLightboxSrc(null)}>
+          <div className="absolute top-4 right-4">
+            <Button variant="ghost" size="sm" className="text-white/70 hover:text-white text-lg" onClick={() => setLightboxSrc(null)}>✕</Button>
+          </div>
+          <img src={lightboxSrc} alt="" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   )
 }
