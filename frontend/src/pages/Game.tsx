@@ -1604,6 +1604,81 @@ export default function Game() {
               )}
             </div>
 
+            {/* ── World Snapshot ── */}
+            {!isViewingPast && !readingMode && hasGame && (
+              <div className="shrink-0 border-b border-game-border/30">
+                <div className="flex items-center gap-4 px-3 py-1.5 text-xs flex-wrap">
+                  {/* Objectives */}
+                  {objectives.main.length > 0 && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[10px] text-game-dim">🎯</span>
+                      <span className="text-game-text font-medium truncate max-w-[200px]">{objectives.main[0].title}</span>
+                      <span className="text-game-accent/80 tabular-nums text-[11px]">{objectives.main[0].progress}%</span>
+                    </div>
+                  )}
+                  {/* Divider */}
+                  {objectives.main.length > 0 && (factions.length > 0 || characters.length > 0) && (
+                    <span className="text-game-border/60">│</span>
+                  )}
+                  {/* Factions */}
+                  {factions.length > 0 && (() => {
+                    const topFactions = [...factions]
+                      .sort((a, b) => {
+                        const pa = (a.power?.military ?? 0) + (a.power?.economic ?? 0) + (a.power?.political ?? 0) + (a.power?.technology ?? 0)
+                        const pb = (b.power?.military ?? 0) + (b.power?.economic ?? 0) + (b.power?.political ?? 0) + (b.power?.technology ?? 0)
+                        return pb - pa
+                      })
+                      .slice(0, 4)
+                    return topFactions.length > 0 ? (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] text-game-dim shrink-0">⚔</span>
+                        {topFactions.map((f) => {
+                          const total = (f.power?.military ?? 0) + (f.power?.economic ?? 0) + (f.power?.political ?? 0) + (f.power?.technology ?? 0)
+                          const labelColor = f.attitude_label === '敌对' ? 'text-red-400' : f.attitude_label === '友好' || f.attitude_label === '同盟' ? 'text-green-400' : 'text-game-muted'
+                          return (
+                            <span key={f.name} className={`whitespace-nowrap ${labelColor}`}>
+                              <span className="font-medium">{f.name}</span>
+                              {total > 0 && <span className="text-game-dim ml-0.5 text-[10px]">{total}</span>}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    ) : null
+                  })()}
+                  {/* Divider */}
+                  {characters.length > 0 && factions.length > 0 && (
+                    <span className="text-game-border/60">│</span>
+                  )}
+                  {/* Characters */}
+                  {characters.length > 0 && (() => {
+                    const getRelIcon = (affection: number) => affection >= 65 ? '❤️' : affection >= 55 ? '🤝' : affection >= 45 ? '😐' : affection >= 35 ? '⚠' : '💀'
+                    const rankChars = [...characters]
+                      .filter(c => c.name && c.tier !== '主角')
+                      .sort((a, b) => {
+                        if (a.tier === '核心' && b.tier !== '核心') return -1
+                        if (b.tier === '核心' && a.tier !== '核心') return 1
+                        return (b.affection ?? 50) - (a.affection ?? 50)
+                      })
+                      .slice(0, 5)
+                    return rankChars.length > 0 ? (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] text-game-dim shrink-0">👥</span>
+                        {rankChars.map((c) => {
+                          const aff = c.affection ?? 50
+                          return (
+                            <span key={c.name} className="whitespace-nowrap text-game-text/90">
+                              <span className="text-[11px]">{getRelIcon(aff)}</span>
+                              <span className="text-[11px] ml-0.5">{c.name}</span>
+                            </span>
+                          )
+                        })}
+                      </div>
+                    ) : null
+                  })()}
+                </div>
+              </div>
+            )}
+
             {/* Story — scrollable */}
             <div ref={storyScrollRef} className="flex-1 overflow-y-auto min-h-0 space-y-3">
             {genSettingsOpen && !readingMode && (
