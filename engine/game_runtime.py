@@ -395,7 +395,8 @@ def generate_story_illustration(
     """Generate an illustration summarising the story chapter just written.
 
     1.  Ask DeepSeek to convert the story passage into a concise English
-        image-generation prompt (300 chars max).
+        image-generation prompt (250 chars max), informed by world character
+        appearances.
     2.  Generate the image via the configured visual provider (e.g. Agnes).
     3.  Save it to the filesystem cache and register it.
 
@@ -405,7 +406,7 @@ def generate_story_illustration(
     if not config.VISUAL_SYSTEM_ENABLED or not story_text.strip():
         return None
 
-    # ── 1. Story → visual prompt (DeepSeek) ─────────────────────────
+    # ── 1. Story → visual prompt (DeepSeek, character-aware) ─────────
     visual_prompt = _story_to_visual_prompt(story_text)
     if not visual_prompt:
         return None
@@ -424,20 +425,47 @@ def _story_to_visual_prompt(story_text: str) -> str:
     Two-phase in one call:
       1. Summarise the full chapter: key scene, characters, mood, turning point
       2. Convert that summary into an English Stable‑Diffusion prompt
+
+    Also injects character appearance descriptions from world_pack so
+    generated artwork stays visually consistent with the world's character
+    designs.
     """
     from engine.deepseek_client import call_deepseek, DeepSeekError
+    from engine import io_utils
 
     # Feed enough of the story for meaningful summarisation
     truncated = story_text[:4000].strip()
     if len(story_text) > 4000:
         truncated += "…"
 
+    # ── Inject character appearance context ──────────────────────────
+    character_notes = ""
+    try:
+        wp = io_utils.read_yaml(config.WORLD_PACK_PATH)
+        chars = wp.get("world", {}).get("characters", [])
+        if isinstance(chars, list):
+            lines = []
+            for ch in chars[:8]:
+                name = str(ch.get("name") or "").strip()
+                appearance = str(ch.get("appearance") or "").strip()
+                if name and appearance:
+                    lines.append(f"- {name}：{appearance}")
+            if lines:
+                character_notes = (
+                    "\n\n【角色外貌设定——绘图prompt必须严格遵循以下外观描述】\n"
+                    + "\n".join(lines)
+                    + "\n生成的prompt中角色外貌必须与上述设定完全一致。"
+                )
+    except Exception:
+        pass
+
     system = (
         "你是一个为小说配图的AI画师。请严格按以下两步工作：\n\n"
         "第一步：仔细阅读下面的小说正文，用中文写一段100字以内的概括，"
         "必须包含：当前场景地点、有哪些角色在场、正在发生什么关键事件、"
         "整体情绪/氛围。\n\n"
-        "第二步：基于你上一步的概括，生成一段适合AI绘图模型的英文prompt。\n\n"
+        "第二步：基于你上一步的概括，生成一段适合AI绘图模型的英文prompt。"
+        + character_notes + "\n\n"
         "只输出一个 JSON 对象：{\"summary\": \"你的中文概括\", \"prompt\": \"英文绘图prompt\"}\n"
         "prompt 必须为英文，控制在250词以内。不要输出任何解释性文字。"
     )
@@ -491,7 +519,7 @@ def _generate_illustration_sync(
             data = provider.generate_event(
                 prompt=visual_prompt,
                 asset_id=asset_id,
-                size="1536x1024",
+                size="680x220",
             )
             break
         except Exception as exc:
