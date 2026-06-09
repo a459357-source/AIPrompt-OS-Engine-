@@ -292,6 +292,14 @@ function GameStatusList({
               {f.leader && <span>领袖：{f.leader}</span>}
             </p>
           )}
+          {f.power && (() => {
+            const total = (f.power.military ?? 0) + (f.power.economic ?? 0) + (f.power.political ?? 0) + (f.power.technology ?? 0)
+            return total > 0 ? (
+              <p className="text-[11px] text-game-accent/80 tabular-nums">
+                实力：{total}
+              </p>
+            ) : null
+          })()}
           <div className="flex items-center gap-2">
             <AffectionBar value={(f.reputation ?? 0.5) * 100} adultMode={adultMode} />
             <span className="text-xs text-game-dim tabular-nums">{Math.round((f.reputation ?? 0.5) * 100)}%</span>
