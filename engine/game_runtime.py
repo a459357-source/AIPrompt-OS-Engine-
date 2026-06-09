@@ -222,16 +222,9 @@ def _read_cached_visuals_from_node(
                 "scene_id": event_id,
                 "image_url": public_image_url(image_path),
             }
+            logger.debug("[VISUAL_CACHE] scene=%s event=%s image=%s", event_id, event_id, Path(image_path).name)
         else:
-            for record in list_assets(registry, "events").values():
-                if isinstance(record, dict) and record.get("image_path"):
-                    ip = str(record["image_path"])
-                    if _file_exists(ip):
-                        result["scene"] = {
-                            "scene_id": str(record.get("entity_id") or record.get("asset_id") or ""),
-                            "image_url": public_image_url(ip),
-                        }
-                        break
+            logger.debug("[VISUAL_CACHE] scene=%s event=%s — no cached visual, will rely on story illustration", event_id, event_id)
 
     return result
 

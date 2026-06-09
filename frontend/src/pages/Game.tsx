@@ -246,7 +246,7 @@ function GameStatusList({
           </div>
           {img && (
             <div className="w-full rounded-md overflow-hidden border border-game-border/50 bg-neural-void/60">
-              <img src={img} alt={c.name} className="w-full max-h-80 object-contain object-top" loading="lazy" />
+              <img src={img} alt={c.name} className="w-full max-h-80 object-cover object-top" loading="lazy" />
             </div>
           )}
           {c.relation && <p className="text-xs text-game-muted">{c.relation}</p>}
@@ -1997,8 +1997,8 @@ export default function Game() {
                 style={{ maxWidth: storyContentMaxWidth }}
               >
                 {visuals.scene?.image_url && !isViewingPast && (
-                  <div className="w-full rounded-lg overflow-hidden border border-game-border/30 mb-4 relative">
-                    <img src={visuals.scene.image_url} alt={scene} className="w-full max-h-64 object-contain" loading="lazy" />
+                  <div className="w-full rounded-lg overflow-hidden border border-game-border/30 mb-4 relative aspect-[16/9] bg-neural-void/60">
+                    <img src={visuals.scene.image_url} alt={scene} className="w-full h-full object-cover" loading="lazy" />
                     {visuals.factions.length > 0 && factions.length > 0 && (
                       <div className="absolute top-2 right-2 flex flex-wrap gap-1.5 max-w-[60%] justify-end">
                         {factions.slice(0, 3).map((f) => {
@@ -2026,6 +2026,11 @@ export default function Game() {
                     )}
                   </div>
                 )}
+                {!isViewingPast && visuals.scene?.image_url && (
+                  <p className="text-[9px] text-game-dim/50 text-right mb-1 -mt-3 px-1">
+                    Scene: {scene || '—'} · Visual: {visuals.scene.scene_id || '—'}
+                  </p>
+                )}
                 {storyCharVisuals.length > 0 && !isViewingPast && (
                   <div className="flex flex-wrap justify-center gap-4 mb-5 px-2">
                     {storyCharVisuals.map((vc) => {
@@ -2033,8 +2038,8 @@ export default function Game() {
                       const charInfo = characters.find(c => c.name === vc.name)
                       return (
                       <div key={vc.name} className="flex flex-col items-center gap-1.5 relative">
-                        <div className="rounded-md overflow-hidden border border-game-accent/30 bg-neural-void/60 shadow-md shadow-game-accent/5 relative">
-                          <img src={vc.image_url} alt={vc.name} className="h-56 max-w-[140px] object-contain object-top" loading="lazy" />
+                        <div className="rounded-md overflow-hidden border border-game-accent/30 bg-neural-void/60 shadow-md shadow-game-accent/5 relative w-[140px] h-56">
+                          <img src={vc.image_url} alt={vc.name} className="w-full h-full object-cover object-top" loading="lazy" />
                           {isNew && (
                             <div className="absolute top-1.5 right-1.5 rounded px-1.5 py-0.5 bg-game-accent/90 text-[10px] font-bold text-white shadow-md animate-pulse">
                               NEW

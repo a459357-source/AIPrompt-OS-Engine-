@@ -68,6 +68,12 @@ def build_turn_payload(result: dict, *, force_sync_visuals: bool = False) -> dic
     visuals = ensure_game_visuals_from_node(node, turn=state.get("turn", 0), background=not force_sync_visuals)
     visuals = bootstrap_game_visuals(visuals)
 
+    logger.info("[VISUAL] scene=%s scene_visual=%s chapter=%s turn=%s",
+                scene_id,
+                (visuals.get("scene") or {}).get("scene_id", "none"),
+                state.get("chapter", "?"),
+                state.get("turn", "?"))
+
     # ── Story-based illustration: replace scene visual with actual chapter art ──
     story_text = result.get("story", "")
     if story_text.strip():
@@ -81,6 +87,8 @@ def build_turn_payload(result: dict, *, force_sync_visuals: bool = False) -> dic
         )
         if story_ill:
             visuals["scene"] = story_ill
+            logger.info("[VISUAL] illustration generated — scene=%s image=%s",
+                        scene_id, story_ill.get("image_url", "?")[-40:])
 
     from ui.routes.api import _objectives_for_game
     return {
