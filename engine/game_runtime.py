@@ -419,33 +419,41 @@ def generate_story_illustration(
 
 
 def _story_to_visual_prompt(story_text: str) -> str:
-    """Use DeepSeek to turn story content into an image-generation prompt."""
+    """Use DeepSeek to first summarise the story, then generate an image prompt.
+
+    Two-phase in one call:
+      1. Summarise the full chapter: key scene, characters, mood, turning point
+      2. Convert that summary into an English Stable‑Diffusion prompt
+    """
     from engine.deepseek_client import call_deepseek, DeepSeekError
 
-    # Keep the payload small — 1500 chars is plenty for visual summarisation
-    truncated = story_text[:1500].strip()
-    if len(story_text) > 1500:
+    # Feed enough of the story for meaningful summarisation
+    truncated = story_text[:4000].strip()
+    if len(story_text) > 4000:
         truncated += "…"
 
     system = (
-        "你是一个为小说配图的AI画师。根据以下小说正文片段，生成一段适合 "
-        "AI绘图模型（如Stable Diffusion）的英文prompt。\n\n"
-        "要求：\n"
-        "- 抓住本章最关键的场景、氛围、角色和视觉元素\n"
-        "- 只输出一个 JSON 对象：{\"prompt\": \"...\"}\n"
-        "- prompt 必须为英文，控制在300词以内\n"
-        "- 不要输出任何解释性文字"
+        "你是一个为小说配图的AI画师。请严格按以下两步工作：\n\n"
+        "第一步：仔细阅读下面的小说正文，用中文写一段100字以内的概括，"
+        "必须包含：当前场景地点、有哪些角色在场、正在发生什么关键事件、"
+        "整体情绪/氛围。\n\n"
+        "第二步：基于你上一步的概括，生成一段适合AI绘图模型的英文prompt。\n\n"
+        "只输出一个 JSON 对象：{\"summary\": \"你的中文概括\", \"prompt\": \"英文绘图prompt\"}\n"
+        "prompt 必须为英文，控制在250词以内。不要输出任何解释性文字。"
     )
 
     try:
         response = call_deepseek(
             system, truncated,
-            max_tokens=400,
-            temperature=0.7,
+            max_tokens=600,
+            temperature=0.6,
             skip_validation=True,
         )
         if isinstance(response, dict):
+            summary = str(response.get("summary") or "").strip()
             prompt_text = str(response.get("prompt") or "").strip()
+            if summary:
+                logger.info("Story illustration summary: %s", summary[:120])
             if prompt_text:
                 return prompt_text[:500]
     except DeepSeekError as exc:
