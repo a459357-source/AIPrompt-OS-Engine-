@@ -104,20 +104,42 @@ def extract_character_traits(entity_id: str, context: dict) -> tuple[dict[str, A
         "render_style": "anime character portrait",
         "pose": "head and shoulders, upper body portrait, face clearly visible",
         "framing": "close-up shot, face centered",
-        "background": "clean background",
         "detail": "high detail character design, facial features prominent",
     }
     canonical: dict[str, Any] = {}
     locked: list[str] = []
-    for key in ("gender", "age", "hair_color", "eye_color", "race", "outfit", "role", "facial_structure"):
-        val = profile.get(key)
-        if not val and key == "facial_structure":
-            note = str(profile.get("note") or profile.get("description") or "").strip()
-            if note:
-                val = note[:80]
+
+    # Use world_pack appearance as the primary visual descriptor
+    appearance = str(profile.get("appearance") or "").strip()
+    if appearance:
+        canonical["appearance"] = appearance[:120]
+        locked.append(f"appearance: {appearance[:120]}")
+
+    # Extract distinct visual traits from appearance text
+    for trait_key in ("hair_color", "eye_color", "outfit", "build"):
+        val = profile.get(trait_key)
         if val:
-            canonical[key] = val
-            locked.append(f"{key}: {val}")
+            canonical[trait_key] = str(val)[:60]
+            locked.append(f"{trait_key}: {val}")
+
+    # Use character background to set scene atmosphere
+    bg_story = str(profile.get("background") or "").strip()
+    if bg_story:
+        canonical["background_context"] = bg_story[:100]
+
+    role_tags = profile.get("role_tags") or []
+    if isinstance(role_tags, list) and role_tags:
+        role_str = ", ".join(str(t) for t in role_tags[:4])
+        canonical["role"] = role_str
+        locked.append(f"role: {role_str}")
+
+    # Build distinct background from character story
+    if bg_story:
+        locked.append(f"background: environment reflecting {bg_story[:80]}")
+    elif appearance:
+        locked.append("background: studio portrait, moody cinematic lighting")
+    else:
+        locked.append("background: clean soft gradient")
 
     tags = profile.get("personality_tags") or profile.get("tags") or []
     if isinstance(tags, list) and tags:
