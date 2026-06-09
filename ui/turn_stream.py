@@ -68,6 +68,20 @@ def build_turn_payload(result: dict, *, force_sync_visuals: bool = False) -> dic
     visuals = ensure_game_visuals_from_node(node, turn=state.get("turn", 0), background=not force_sync_visuals)
     visuals = bootstrap_game_visuals(visuals)
 
+    # ── Story-based illustration: replace scene visual with actual chapter art ──
+    story_text = result.get("story", "")
+    if story_text.strip():
+        from engine.game_runtime import generate_story_illustration
+        turn = state.get("turn", 0) or result.get("turn", 0)
+        story_ill = generate_story_illustration(
+            story_text,
+            scene_id=scene_id,
+            turn=turn,
+            sync=not force_sync_visuals,  # sync on regular turns, async on opening
+        )
+        if story_ill:
+            visuals["scene"] = story_ill
+
     return {
         "story": result.get("story", ""),
         "options": result.get("options", []),

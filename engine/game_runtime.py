@@ -381,3 +381,164 @@ def build_game_frame(
         "visuals": visuals,
         "narrative_node": node,
     }
+
+
+# ── Story-based illustration generation ─────────────────────────────
+
+def generate_story_illustration(
+    story_text: str,
+    scene_id: str | None = None,
+    *,
+    turn: int = 0,
+    sync: bool = True,
+) -> dict[str, Any] | None:
+    """Generate an illustration summarising the story chapter just written.
+
+    1.  Ask DeepSeek to convert the story passage into a concise English
+        image-generation prompt (300 chars max).
+    2.  Generate the image via the configured visual provider (e.g. Agnes).
+    3.  Save it to the filesystem cache and register it.
+
+    Returns ``{scene_id, image_url}`` or ``None`` on any failure so the
+    caller can safely fall back to the pre-existing scene visual.
+    """
+    if not config.VISUAL_SYSTEM_ENABLED or not story_text.strip():
+        return None
+
+    # ── 1. Story → visual prompt (DeepSeek) ─────────────────────────
+    visual_prompt = _story_to_visual_prompt(story_text)
+    if not visual_prompt:
+        return None
+
+    # ── 2. Prompt → image (visual provider) ─────────────────────────
+    if not sync:
+        _trigger_background_illustration(visual_prompt, scene_id, turn)
+        return None  # will appear on next turn via registry cache
+
+    return _generate_illustration_sync(visual_prompt, scene_id, turn)
+
+
+def _story_to_visual_prompt(story_text: str) -> str:
+    """Use DeepSeek to turn story content into an image-generation prompt."""
+    from engine.deepseek_client import call_deepseek, DeepSeekError
+
+    # Keep the payload small — 1500 chars is plenty for visual summarisation
+    truncated = story_text[:1500].strip()
+    if len(story_text) > 1500:
+        truncated += "…"
+
+    system = (
+        "你是一个为小说配图的AI画师。根据以下小说正文片段，生成一段适合 "
+        "AI绘图模型（如Stable Diffusion）的英文prompt。\n\n"
+        "要求：\n"
+        "- 抓住本章最关键的场景、氛围、角色和视觉元素\n"
+        "- 只输出一个 JSON 对象：{\"prompt\": \"...\"}\n"
+        "- prompt 必须为英文，控制在300词以内\n"
+        "- 不要输出任何解释性文字"
+    )
+
+    try:
+        response = call_deepseek(
+            system, truncated,
+            max_tokens=400,
+            temperature=0.7,
+            skip_validation=True,
+        )
+        if isinstance(response, dict):
+            prompt_text = str(response.get("prompt") or "").strip()
+            if prompt_text:
+                return prompt_text[:500]
+    except DeepSeekError as exc:
+        logger.warning("Story→visual prompt generation failed: %s", exc)
+    return ""
+
+
+def _generate_illustration_sync(
+    visual_prompt: str,
+    scene_id: str | None,
+    turn: int,
+) -> dict[str, Any] | None:
+    """Generate the illustration image and register it."""
+    from engine.visual.provider_factory import get_visual_provider
+    from engine.visual.visual_cache import uri_for_path, write_bytes
+    from engine.visual.visual_registry import (
+        entity_type_to_scope,
+        kind_for_entity_type,
+        load_registry,
+        make_asset_record,
+        save_registry,
+        set_asset,
+    )
+
+    sid = str(scene_id or f"turn_{turn}").strip()
+    scope = entity_type_to_scope("event")
+    asset_id = f"story_illustration_{sid}_t{turn}"
+
+    provider = get_visual_provider()
+    max_retries = max(1, int(getattr(config, "VISUAL_MAX_RETRIES", 3) or 3))
+
+    data = None
+    for attempt in range(max_retries):
+        try:
+            data = provider.generate_event(
+                prompt=visual_prompt,
+                asset_id=asset_id,
+                size="1536x1024",
+            )
+            break
+        except Exception as exc:
+            if attempt < max_retries - 1:
+                logger.warning("Illustration gen attempt %d/%d failed: %s",
+                               attempt + 1, max_retries, exc)
+                import time
+                time.sleep(0.2 * (2 ** attempt))
+            else:
+                logger.error("Illustration gen failed after %d attempts", max_retries)
+                return None
+
+    if not data:
+        return None
+
+    try:
+        path = write_bytes(scope, asset_id, data)
+        image_path = uri_for_path(path)
+    except Exception as exc:
+        logger.error("Failed to save illustration: %s", exc)
+        return None
+
+    # Register
+    try:
+        registry = load_registry()
+        record = make_asset_record(
+            asset_id=asset_id,
+            display_name=f"Turn {turn} illustration",
+            image_path=image_path,
+            entity_id=f"story_t{turn}",
+            entity_type="event",
+            provider=provider.provider_name,
+            kind=kind_for_entity_type("event"),
+            created_turn=turn,
+        )
+        registry = set_asset(registry, scope, asset_id, record)
+        save_registry(registry)
+    except Exception as exc:
+        logger.warning("Illustration registry save failed (image still on disk): %s", exc)
+
+    return {
+        "scene_id": f"story_t{turn}",
+        "image_url": public_image_url(image_path),
+    }
+
+
+def _trigger_background_illustration(
+    visual_prompt: str,
+    scene_id: str | None,
+    turn: int,
+) -> None:
+    def _work():
+        try:
+            _generate_illustration_sync(visual_prompt, scene_id, turn)
+        except Exception as exc:
+            logger.warning("Background illustration generation failed: %s", exc)
+    t = threading.Thread(target=_work, daemon=True)
+    t.start()
