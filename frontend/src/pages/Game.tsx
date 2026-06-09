@@ -94,6 +94,13 @@ interface CharInfo {
   faction?: string
 }
 
+const FACTION_TYPE_LABELS: Record<string, string> = {
+  organization: '组织',
+  corporation: '企业联合体',
+  tribe: '部落',
+  kingdom: '王国',
+}
+
 interface FactionInfo {
   name: string
   role: string
@@ -106,6 +113,8 @@ interface FactionInfo {
   subordinateOrganizations?: string[]
   keyAssets?: string[]
   power?: { military: number; economic: number; political: number; technology: number }
+  leader?: string
+  type?: string
 }
 
 interface GameVisuals {
@@ -276,6 +285,13 @@ function GameStatusList({
             </Badge>
           </div>
           {f.role && <p className="text-xs text-game-muted">{f.role}</p>}
+          {(f.type || f.leader) && (
+            <p className="text-[11px] text-game-muted/90">
+              {f.type && <span>{FACTION_TYPE_LABELS[f.type] || f.type}</span>}
+              {f.type && f.leader && <span className="text-game-dim"> · </span>}
+              {f.leader && <span>领袖：{f.leader}</span>}
+            </p>
+          )}
           <div className="flex items-center gap-2">
             <AffectionBar value={(f.reputation ?? 0.5) * 100} adultMode={adultMode} />
             <span className="text-xs text-game-dim tabular-nums">{Math.round((f.reputation ?? 0.5) * 100)}%</span>
