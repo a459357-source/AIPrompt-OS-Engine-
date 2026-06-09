@@ -37,7 +37,7 @@ class VisualProvider(ABC):
 
     @abstractmethod
     def generate_event(
-        self, *, prompt: str, asset_id: str, size: str = "1024x1024",
+        self, *, prompt: str, asset_id: str, size: str = "1536x1024",
     ) -> bytes:
         ...
 
@@ -65,7 +65,7 @@ class StubVisualProvider(VisualProvider):
         return STUB_PNG_BYTES
 
     def generate_event(
-        self, *, prompt: str, asset_id: str, size: str = "1024x1024",
+        self, *, prompt: str, asset_id: str, size: str = "1536x1024",
     ) -> bytes:
         return STUB_PNG_BYTES
 
@@ -96,6 +96,6 @@ class MockVisualProvider(VisualProvider):
         return self._payload(asset_id)
 
     def generate_event(
-        self, *, prompt: str, asset_id: str, size: str = "1024x1024",
+        self, *, prompt: str, asset_id: str, size: str = "1536x1024",
     ) -> bytes:
         return self._payload(asset_id)

@@ -59,7 +59,7 @@ class AgnesVisualProvider(VisualProvider):
         return self._generate_image(prompt, size)
 
     def generate_event(
-        self, *, prompt: str, asset_id: str, size: str = "1024x1024",
+        self, *, prompt: str, asset_id: str, size: str = "1536x1024",
     ) -> bytes:
         return self._generate_image(prompt, size)
 

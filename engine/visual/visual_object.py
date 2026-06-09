@@ -25,7 +25,7 @@ _DEFAULT_SIZE = {
     "character": "1024x1024",
     "location": "1536x1024",
     "faction": "1536x1024",
-    "event": "1024x1024",
+    "event": "1536x1024",
 }
 
 
