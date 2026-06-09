@@ -88,6 +88,7 @@ interface CharInfo {
   role: string
   relation: string
   level: string
+  note?: string
   affection?: number
   trust_pct?: number
   tier?: string
@@ -1844,69 +1845,64 @@ export default function Game() {
                 style={{ maxWidth: storyContentMaxWidth }}
               >
                 {visuals.scene?.image_url && !isViewingPast && (
-                  <div className="w-full rounded-lg overflow-hidden border border-game-border/30 mb-4">
-                    <img src={visuals.scene.image_url} alt={scene} className="w-full max-h-96 object-contain" loading="lazy" />
+                  <div className="w-full rounded-lg overflow-hidden border border-game-border/30 mb-4 relative">
+                    <img src={visuals.scene.image_url} alt={scene} className="w-full max-h-64 object-contain" loading="lazy" />
+                    {visuals.factions.length > 0 && factions.length > 0 && (
+                      <div className="absolute top-2 right-2 flex flex-wrap gap-1.5 max-w-[60%] justify-end">
+                        {factions.slice(0, 3).map((f) => {
+                          const fImg = visuals.factions.find(vf => vf.name === f.name)?.image_url
+                          const total = (f.power?.military ?? 0) + (f.power?.economic ?? 0) + (f.power?.political ?? 0) + (f.power?.technology ?? 0)
+                          return (
+                            <div key={f.name} className="flex items-center gap-1.5 rounded-md bg-black/60 backdrop-blur-sm border border-white/10 px-2 py-1">
+                              {fImg ? (
+                                <div className="w-6 h-6 rounded overflow-hidden border border-white/20 shrink-0">
+                                  <img src={fImg} alt={f.name} className="w-full h-full object-cover" loading="lazy" />
+                                </div>
+                              ) : (
+                                <div className="w-6 h-6 rounded border border-dashed border-white/20 shrink-0 bg-white/5 flex items-center justify-center">
+                                  <span className="text-white/40 text-[10px]">🏛</span>
+                                </div>
+                              )}
+                              <div className="flex flex-col min-w-0 leading-tight">
+                                <span className="text-[11px] font-medium text-white/90 truncate max-w-[100px]">{f.name}</span>
+                                {total > 0 && <span className="text-[10px] text-amber-300/80 tabular-nums">实力 {total}</span>}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
                 {storyCharVisuals.length > 0 && !isViewingPast && (
                   <div className="flex flex-wrap justify-center gap-4 mb-5 px-2">
-                    {storyCharVisuals.map((vc) => (
-                      <div key={vc.name} className="flex flex-col items-center gap-1.5">
-                        <div className="rounded-md overflow-hidden border border-game-accent/30 bg-neural-void/60 shadow-md shadow-game-accent/5">
-                          <img src={vc.image_url} alt={vc.name} className="h-72 max-w-[180px] object-contain object-top" loading="lazy" />
-                        </div>
-                        <span className="text-xs text-game-text font-medium text-center leading-tight max-w-[120px] truncate">{vc.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {visuals.factions.length > 0 && factions.length > 0 && !isViewingPast && (
-                  <div className="flex flex-wrap justify-center gap-3 mb-5 px-2">
-                    {factions.slice(0, 4).map((f) => {
-                      const fImg = visuals.factions.find(vf => vf.name === f.name)?.image_url
-                      const total = (f.power?.military ?? 0) + (f.power?.economic ?? 0) + (f.power?.political ?? 0) + (f.power?.technology ?? 0)
+                    {storyCharVisuals.map((vc) => {
+                      const isNew = newCharacters.some(nc => nc.name === vc.name)
+                      const charInfo = characters.find(c => c.name === vc.name)
                       return (
-                        <div key={f.name} className="flex items-center gap-2 rounded-md border border-game-border/40 px-3 py-2 bg-game-bg/30">
-                          {fImg ? (
-                            <div className="w-9 h-9 rounded-md overflow-hidden border border-game-border/50 shrink-0">
-                              <img src={fImg} alt={f.name} className="w-full h-full object-cover" loading="lazy" />
-                            </div>
-                          ) : (
-                            <div className="w-9 h-9 rounded-md border border-dashed border-game-border/30 shrink-0 bg-neural-void/40 flex items-center justify-center">
-                              <span className="text-game-dim text-xs">🏛</span>
+                      <div key={vc.name} className="flex flex-col items-center gap-1.5 relative">
+                        <div className="rounded-md overflow-hidden border border-game-accent/30 bg-neural-void/60 shadow-md shadow-game-accent/5 relative">
+                          <img src={vc.image_url} alt={vc.name} className="h-56 max-w-[140px] object-contain object-top" loading="lazy" />
+                          {isNew && (
+                            <div className="absolute top-1.5 right-1.5 rounded px-1.5 py-0.5 bg-game-accent/90 text-[10px] font-bold text-white shadow-md animate-pulse">
+                              NEW
                             </div>
                           )}
-                          <div className="flex flex-col min-w-0 leading-tight">
-                            <span className="text-xs font-medium text-game-text truncate">{f.name}</span>
-                            {total > 0 && (
-                              <span className="text-[11px] text-game-accent/80 tabular-nums">实力：{total}</span>
-                            )}
-                            {f.attitude_label && (
-                              <span className="text-[10px] text-game-muted">{f.attitude_label}</span>
-                            )}
-                          </div>
                         </div>
+                        <span className="text-xs text-game-text font-medium text-center leading-tight max-w-[120px] truncate">{vc.name}</span>
+                        {charInfo?.role && (
+                          <span className="text-[10px] text-game-muted text-center leading-tight max-w-[120px] truncate">{charInfo.role}{charInfo.faction ? ` · ${charInfo.faction}` : ''}</span>
+                        )}
+                        {isNew && charInfo?.note && (
+                          <span className="text-[10px] text-game-accent/80 text-center leading-snug max-w-[140px]">{charInfo.note}</span>
+                        )}
+                      </div>
                       )
                     })}
                   </div>
                 )}
                 {narrativeNode?.context && !isViewingPast && (
                   <p className="text-xs text-game-dim italic mb-4 border-l-2 border-game-border/40 pl-3">{narrativeNode.context}</p>
-                )}
-                {!isViewingPast && newCharacters.length > 0 && (
-                  <div className="mb-5 space-y-3">
-                    {newCharacters.map((c) => (
-                      <div key={c.name} className="rounded-lg border border-game-accent/30 bg-game-accent/5 px-4 py-3 text-center">
-                        <p className="text-[10px] text-game-accent/70 font-neural-mono tracking-widest uppercase mb-1">新角色登场</p>
-                        <p className="text-base font-bold text-game-text">{c.name}</p>
-                        <p className="text-xs text-game-muted mt-0.5">
-                          {c.role && <span>{c.role}</span>}
-                          {c.role && c.faction && <span className="text-game-dim mx-1">·</span>}
-                          {c.faction && <span>{c.faction}</span>}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
                 )}
                 {appSettings.animations ? (
                   <motion.div key={viewingTurn ?? turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
