@@ -146,15 +146,32 @@ export default function WorldExplorer() {
         <h3 className="text-xs text-game-dim mb-2 uppercase tracking-wide">势力</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
           {world.factions.map((f) => (
-            <PreviewCard
-              key={f.asset_id}
-              item={f}
-              enterLabel="进入势力剧情"
-              onEnter={async () => {
-                const res = await enterNarrativeFromFaction(f.display_name || f.entity_id)
-                navigate(`/visual/narrative/node/${encodeURIComponent(res.narrative_event_id)}`)
-              }}
-            />
+            <div key={f.asset_id} className="rounded-lg border border-neural-cyan/15 bg-neural-glass/30 overflow-hidden">
+              <div className="p-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-md overflow-hidden border border-game-border/50 shrink-0 bg-neural-void/60">
+                  {f.image_url ? (
+                    <img src={f.image_url} alt={f.display_name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-game-dim">
+                      <span className="text-[10px]">🏛</span>
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium truncate">{f.display_name || f.entity_id}</div>
+                  <div className="text-[10px] text-game-dim font-neural-mono truncate">{f.identity_id || '—'}</div>
+                </div>
+              </div>
+              <div className="px-3 pb-3">
+                <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1" onClick={async () => {
+                  const res = await enterNarrativeFromFaction(f.display_name || f.entity_id)
+                  navigate(`/visual/narrative/node/${encodeURIComponent(res.narrative_event_id)}`)
+                }}>
+                  <Play className="w-3 h-3" />
+                  进入势力剧情
+                </Button>
+              </div>
+            </div>
           ))}
           {!world.factions.length && <p className="text-sm text-game-dim col-span-full">暂无势力图</p>}
         </div>

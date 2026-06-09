@@ -829,7 +829,7 @@ export default function Dashboard() {
                     <div key={f.name} className="text-sm border border-game-border/40 rounded-lg p-4 space-y-2">
                       <div className="flex items-center gap-3">
                         {data?.faction_images?.[f.name] && (
-                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-game-border/50 shrink-0 bg-neural-void/60">
+                          <div className="w-8 h-8 rounded-md overflow-hidden border border-game-border/50 shrink-0 bg-neural-void/60">
                             <img src={data.faction_images[f.name]} alt={f.name} className="w-full h-full object-cover" loading="lazy" />
                           </div>
                         )}

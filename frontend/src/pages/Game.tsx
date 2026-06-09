@@ -258,13 +258,19 @@ function GameStatusList({
           .slice(0, 3)
         return (
         <div key={`f-${f.name}`} className="space-y-1.5">
-          {fImg && (
-            <div className="w-full rounded-md overflow-hidden border border-game-border/50">
-              <img src={fImg} alt={f.name} className="w-full h-16 object-cover" loading="lazy" />
-            </div>
-          )}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">{f.name}</span>
+            <div className="flex items-center gap-2">
+              {fImg ? (
+                <div className="w-8 h-8 rounded-md overflow-hidden border border-game-border/50 shrink-0 bg-neural-void/60">
+                  <img src={fImg} alt={f.name} className="w-full h-full object-cover" loading="lazy" />
+                </div>
+              ) : (
+                <div className="w-8 h-8 rounded-md border border-dashed border-game-border/30 shrink-0 bg-neural-void/40 flex items-center justify-center">
+                  <span className="text-game-dim text-xs">🏛</span>
+                </div>
+              )}
+              <span className="text-sm font-medium">{f.name}</span>
+            </div>
             <Badge variant="outline" size="sm" className={f.attitude_label === '敌对' ? 'border-red-500/50 text-red-400' : f.attitude_label === '同盟' ? 'border-green-500/50 text-green-400' : ''}>
               {f.attitude_label}
             </Badge>
