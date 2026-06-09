@@ -95,6 +95,29 @@ interface CharInfo {
   faction?: string
 }
 
+type WorldChangeEntry = { icon: string; text: string }
+type ConsequenceItem = { id: string; icon: string; text: string; type: string; createdAt: number }
+
+interface TurnSnapshot {
+  characters: CharInfo[]
+  factions: FactionInfo[]
+  objectives: ObjectivesGameData
+  scene: string
+  chapter: number
+  turn: number
+}
+
+function snapshotState(chars: CharInfo[], facs: FactionInfo[], objs: ObjectivesGameData, scn: string, ch: number, t: number): TurnSnapshot {
+  return {
+    characters: chars.map(c => ({ ...c })),
+    factions: facs.map(f => ({ ...f, power: f.power ? { ...f.power } : undefined })),
+    objectives: { main: (objs.main || []).map(o => ({ ...o })), side: (objs.side || []).map(o => ({ ...o })) },
+    scene: scn,
+    chapter: ch,
+    turn: t,
+  }
+}
+
 const FACTION_TYPE_LABELS: Record<string, string> = {
   organization: '组织',
   corporation: '企业联合体',
@@ -459,6 +482,15 @@ export default function Game() {
   const [genSettingsSaving, setGenSettingsSaving] = useState(false)
   const [genSettingsSaveError, setGenSettingsSaveError] = useState('')
   const [optionsRegenerated, setOptionsRegenerated] = useState(false)
+  // ── Phase 5.7: Consequence feedback system ──
+  const [lastChoice, setLastChoice] = useState<string | null>(null)
+  const [lastChoiceText, setLastChoiceText] = useState<string | null>(null)
+  const [consequenceToasts, setConsequenceToasts] = useState<ConsequenceItem[]>([])
+  const [worldChanges, setWorldChanges] = useState<WorldChangeEntry[]>([])
+  const [chapterCompletion, setChapterCompletion] = useState<{ chapter: number; achievements: string[] } | null>(null)
+  const prevSnapshotRef = useRef<TurnSnapshot | null>(null)
+  const consequenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const chapterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // ── Phase 5.6: Visual consistency states ──
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const prevObjectivesRef = useRef<ObjectivesGameData>({ main: [], side: [] })
@@ -1232,6 +1264,12 @@ export default function Game() {
     streamGenerationStartedRef.current = false
     setGenProgress('building_prompt')
     logger.info('Game', `Choice: ${choice}`)
+    // ── Phase 5.7: Capture last choice before generation ──
+    const pickedOption = options.find(o => o.startsWith(choice + '. ') || o.startsWith(choice + '）'))
+    setLastChoice(choice)
+    setLastChoiceText(pickedOption || choice)
+    // ── Phase 5.7: Snapshot current state for diff ──
+    prevSnapshotRef.current = snapshotState(characters, factions, objectives, scene, chapter, turn)
     const streamHandlers = {
       onStoryDelta: (delta: string) => {
         if (!streamGenerationStartedRef.current) {
@@ -1270,6 +1308,96 @@ export default function Game() {
       if (data.state.objectives) setObjectives(data.state.objectives)
       if (data.visuals) setVisuals(data.visuals)
       if (data.narrative_node) setNarrativeNode(data.narrative_node)
+      // ── Phase 5.7: Compute consequences ──
+      const prev = prevSnapshotRef.current
+      if (prev && prev.turn > 0) {
+        const newChars = chars ? dedupeCharactersByName(Object.values(chars).map((c) => ({
+          ...c,
+          affection: (c as CharInfo).affection ?? (c as CharInfo).trust_pct ?? 50,
+        }))) : []
+        const newFactions = factionsData || []
+        const newObjs = (data.state.objectives as ObjectivesGameData | undefined) || { main: [], side: [] }
+        const newScene = (data.state.scene as string) || ''
+        const newChapter = (data.state.chapter as number) || 1
+        const toasts: ConsequenceItem[] = []
+        let toastId = Date.now()
+        // ── Relation changes ──
+        for (const cur of newChars) {
+          const prevC = prev.characters.find(pc => pc.name === cur.name)
+          if (!prevC) continue
+          const curAff = cur.affection ?? 50
+          const prevAff = prevC.affection ?? 50
+          const delta = Math.abs(curAff - prevAff)
+          if (delta >= 3) {
+            const sign = curAff > prevAff ? '+' : ''
+            toasts.push({ id: `rel_${toastId++}`, icon: curAff > prevAff ? '❤️' : '💔', text: `${cur.name} 好感度 ${sign}${curAff - prevAff}`, type: 'relation', createdAt: Date.now() })
+          }
+        }
+        // ── Faction power changes ──
+        const prevRanked = [...prev.factions].sort((a, b) => {
+          const pa = (a.power?.military ?? 0) + (a.power?.economic ?? 0) + (a.power?.political ?? 0) + (a.power?.technology ?? 0)
+          const pb = (b.power?.military ?? 0) + (b.power?.economic ?? 0) + (b.power?.political ?? 0) + (b.power?.technology ?? 0)
+          return pb - pa
+        }).map((f, i) => ({ name: f.name, rank: i + 1, total: (f.power?.military ?? 0) + (f.power?.economic ?? 0) + (f.power?.political ?? 0) + (f.power?.technology ?? 0) }))
+        const curRanked = [...newFactions].sort((a, b) => {
+          const pa = (a.power?.military ?? 0) + (a.power?.economic ?? 0) + (a.power?.political ?? 0) + (a.power?.technology ?? 0)
+          const pb = (b.power?.military ?? 0) + (b.power?.economic ?? 0) + (b.power?.political ?? 0) + (b.power?.technology ?? 0)
+          return pb - pa
+        }).map((f, i) => ({ name: f.name, rank: i + 1, total: (f.power?.military ?? 0) + (f.power?.economic ?? 0) + (f.power?.political ?? 0) + (f.power?.technology ?? 0) }))
+        for (const cur of curRanked) {
+          const prevF = prevRanked.find(pf => pf.name === cur.name)
+          if (!prevF) continue
+          const powerDelta = cur.total - prevF.total
+          if (Math.abs(powerDelta) >= 5) {
+            toasts.push({ id: `fac_${toastId++}`, icon: '⚔', text: `${cur.name} 实力 ${powerDelta > 0 ? '+' : ''}${powerDelta}`, type: 'faction', createdAt: Date.now() })
+          }
+          if (prevF.rank !== cur.rank && prevF.rank > 0 && cur.rank > 0) {
+            const moved = prevF.rank > cur.rank ? '↑' : '↓'
+            toasts.push({ id: `fac_r_${toastId++}`, icon: '⚔', text: `${cur.name} #${prevF.rank} → #${cur.rank} ${moved}`, type: 'faction', createdAt: Date.now() })
+          }
+        }
+        // ── Objective progress ──
+        for (const cur of newObjs.main) {
+          const prevO = prev.objectives.main.find(o => o.id === cur.id)
+          if (prevO && prevO.progress < cur.progress) {
+            toasts.push({ id: `obj_${toastId++}`, icon: '🎯', text: `主线 ${cur.title} · ${prevO.progress}% → ${cur.progress}%`, type: 'objective', createdAt: Date.now() })
+          }
+        }
+        // ── Scene change ──
+        if (newScene && prev.scene && newScene !== prev.scene) {
+          toasts.push({ id: `scn_${toastId++}`, icon: '📍', text: `抵达新区域：${newScene}`, type: 'scene', createdAt: Date.now() })
+        }
+        // ── Chapter change ──
+        if (newChapter !== prev.chapter) {
+          toasts.push({ id: `ch_${toastId++}`, icon: '📖', text: `第${prev.chapter}章 完成 · 进入第${newChapter}章`, type: 'chapter', createdAt: Date.now() })
+          setChapterCompletion({ chapter: prev.chapter, achievements: [] })
+          if (chapterTimerRef.current) clearTimeout(chapterTimerRef.current)
+          chapterTimerRef.current = setTimeout(() => setChapterCompletion(null), 5000)
+        }
+        // ── New discovery (unified) ──
+        const prevCharNames = new Set(prev.characters.map(c => c.name))
+        for (const c of newChars) {
+          if (c.tier !== '主角' && c.name && !prevCharNames.has(c.name) && prev.characters.length > 0)
+            toasts.push({ id: `disc_c_${toastId++}`, icon: '✨', text: `已发现新角色：${c.name}`, type: 'new_discovery', createdAt: Date.now() })
+        }
+        const prevFactionNames = new Set(prev.factions.map(f => f.name))
+        for (const f of newFactions) {
+          if (!prevFactionNames.has(f.name) && prev.factions.length > 0)
+            toasts.push({ id: `disc_f_${toastId++}`, icon: '✨', text: `已发现新势力：${f.name}`, type: 'new_discovery', createdAt: Date.now() })
+        }
+        // Queue toasts
+        if (toasts.length > 0) {
+          setConsequenceToasts(toasts)
+          if (consequenceTimerRef.current) clearTimeout(consequenceTimerRef.current)
+          consequenceTimerRef.current = setTimeout(() => setConsequenceToasts([]), 3000)
+          // Add to history (keep last 5)
+          const changes = toasts.map(t => ({ icon: t.icon, text: t.text }))
+          setWorldChanges(prev => {
+            const merged = [...prev, ...changes]
+            return merged.slice(-5)
+          })
+        }
+      }
       void getHistory().then((hist) => {
         if (!hist.error) setTimelineCache(hist.turns)
       })
@@ -1862,6 +1990,20 @@ export default function Game() {
                     🗺世界
                   </a>
                 </div>
+
+                {/* ── Phase 5.7: World change history ── */}
+                {worldChanges.length > 0 && (
+                  <div className="flex items-center gap-2 px-3 pb-1 flex-wrap">
+                    <span className="text-[10px] text-game-dim shrink-0">📋最近</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {worldChanges.map((wc, i) => (
+                        <span key={i} className="whitespace-nowrap text-[10px] text-game-muted/70">
+                          {wc.icon} {wc.text}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               )
             })()}
@@ -2150,8 +2292,62 @@ export default function Game() {
                     Scene: {scene || '—'} · Visual: {visuals.scene.scene_id || '—'}
                   </p>
                 )}
+                {/* ── Phase 5.7: Chapter completion card ── */}
+                {chapterCompletion && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -12, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    className="mb-4 rounded-lg bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/15 border border-amber-400/30 px-4 py-3 text-center"
+                  >
+                    <div className="text-sm font-bold text-amber-300 mb-1">📖 第{chapterCompletion.chapter}章 完成</div>
+                    {chapterCompletion.achievements.length > 0 && (
+                      <div className="text-xs text-amber-200/70 space-y-0.5">
+                        {chapterCompletion.achievements.map((a, i) => (
+                          <div key={i}>✦ {a}</div>
+                        ))}
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+                {/* ── Phase 5.7: Choice result echo ── */}
+                {lastChoiceText && !isViewingPast && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="mb-4 rounded-md border border-game-accent/20 bg-game-accent/5 px-3 py-2"
+                  >
+                    <div className="text-[10px] text-game-dim mb-1">【你的选择】</div>
+                    <div className="text-xs font-medium text-game-text">{lastChoiceText}</div>
+                  </motion.div>
+                )}
+                {/* ── Phase 5.7: Consequence toasts (unified) ── */}
+                {consequenceToasts.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-2 mb-4">
+                    {consequenceToasts.map(t => (
+                      <motion.div
+                        key={t.id}
+                        initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className={cn(
+                          'rounded-full px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium shadow-md',
+                          t.type === 'relation' && 'bg-pink-500/15 border border-pink-400/30 text-pink-200',
+                          t.type === 'faction' && 'bg-amber-500/15 border border-amber-400/30 text-amber-200',
+                          t.type === 'objective' && 'bg-emerald-500/15 border border-emerald-400/30 text-emerald-200',
+                          t.type === 'scene' && 'bg-blue-500/15 border border-blue-400/30 text-blue-200',
+                          t.type === 'chapter' && 'bg-purple-500/15 border border-purple-400/30 text-purple-200',
+                          t.type === 'new_discovery' && 'bg-game-accent/15 border border-game-accent/30 text-game-accent',
+                        )}
+                      >
+                        <span className="text-sm">{t.icon}</span>
+                        <span>{t.text}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
                 {/* ── Phase 5.6: One-time event cards ── */}
-                {eventCards.length > 0 && (
+                {consequenceToasts.length === 0 && eventCards.length > 0 && (
                   <div className="flex flex-wrap justify-center gap-2 mb-4">
                     {eventCards.map(ev => (
                       <div key={ev.id} className="rounded-full bg-game-accent/15 border border-game-accent/30 px-3 py-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -2161,8 +2357,8 @@ export default function Game() {
                     ))}
                   </div>
                 )}
-                {/* ── Phase 5.6: Objective progress toast ── */}
-                {objectiveToast.visible && (
+                {/* ── Phase 5.6: Objective progress toast (fallback, hidden when consequence toasts active) ── */}
+                {consequenceToasts.length === 0 && objectiveToast.visible && (
                   <div className="flex justify-center mb-4">
                     <motion.div
                       initial={{ opacity: 0, y: -8, scale: 0.95 }}
