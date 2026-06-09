@@ -39,7 +39,7 @@ function CharacterChip({ item }: { item: VisualIdentityView }) {
     <div className="flex items-center gap-2 p-2 rounded-md border border-neural-cyan/10 bg-neural-glass/20">
       <div className="w-10 h-10 rounded overflow-hidden bg-neural-void shrink-0">
         {item.latest_image ? (
-          <img src={item.latest_image} alt="" className="w-full h-full object-cover" />
+          <img src={item.latest_image} alt="" className="w-full h-full object-cover object-top" />
         ) : null}
       </div>
       <div className="min-w-0">

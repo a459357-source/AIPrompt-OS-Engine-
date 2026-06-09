@@ -1518,7 +1518,7 @@ export default function NewStory() {
                               return (
                                 <div className="w-full h-36 bg-neural-void/60 border-b border-game-border/30">
                                   {imgUrl ? (
-                                    <img src={imgUrl} alt={c?.name || ''} className="w-full h-full object-cover" loading="lazy" />
+                                    <img src={imgUrl} alt={c?.name || ''} className="w-full h-full object-cover object-top" loading="lazy" />
                                   ) : (
                                     <div className="w-full h-full flex flex-col items-center justify-center gap-1 border-2 border-dashed border-game-border/25 mx-2 my-2 rounded-lg">
                                       <span className="text-game-dim text-lg select-none">🎭</span>

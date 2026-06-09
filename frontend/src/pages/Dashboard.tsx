@@ -480,7 +480,7 @@ export default function Dashboard() {
                       <div className="flex items-center gap-3 text-xs">
                         {c.image_url && (
                           <div className="w-8 h-8 rounded-full overflow-hidden border border-game-border/50 shrink-0 bg-neural-void/60">
-                            <img src={c.image_url} alt={c.name} className="w-full h-full object-cover" loading="lazy" />
+                            <img src={c.image_url} alt={c.name} className="w-full h-full object-cover object-top" loading="lazy" />
                           </div>
                         )}
                         <span className="text-game-text font-medium flex-1">{c.name}</span>

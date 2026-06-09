@@ -236,7 +236,7 @@ function GameStatusList({
           </div>
           {img && (
             <div className="w-full rounded-md overflow-hidden border border-game-border/50">
-              <img src={img} alt={c.name} className="w-full h-32 object-cover" loading="lazy" />
+              <img src={img} alt={c.name} className="w-full h-32 object-cover object-top" loading="lazy" />
             </div>
           )}
           {c.relation && <p className="text-xs text-game-muted">{c.relation}</p>}
@@ -1773,7 +1773,7 @@ export default function Game() {
                     {visuals.characters.map((vc) => (
                       <div key={vc.name} className="flex flex-col items-center gap-1">
                         <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-game-accent/40 shadow-lg shadow-game-accent/10">
-                          <img src={vc.image_url} alt={vc.name} className="w-full h-full object-cover" loading="lazy" />
+                          <img src={vc.image_url} alt={vc.name} className="w-full h-full object-cover object-top" loading="lazy" />
                         </div>
                         <span className="text-[10px] text-game-muted text-center leading-tight max-w-[72px] truncate">{vc.name}</span>
                       </div>
@@ -1967,7 +1967,7 @@ export default function Game() {
                             <div className="flex flex-wrap justify-center gap-1.5 mt-1">
                               {optionAvatars.map((url, j) => (
                                 <div key={j} className="w-7 h-7 rounded-full overflow-hidden border border-game-border/40 bg-neural-void/40">
-                                  <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                  <img src={url} alt="" className="w-full h-full object-cover object-top" loading="lazy" />
                                 </div>
                               ))}
                             </div>
