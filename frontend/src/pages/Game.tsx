@@ -1765,7 +1765,7 @@ export default function Game() {
               >
                 {visuals.scene?.image_url && !isViewingPast && (
                   <div className="w-full rounded-lg overflow-hidden border border-game-border/30 mb-4">
-                    <img src={visuals.scene.image_url} alt={scene} className="w-full max-h-64 object-cover" loading="lazy" />
+                    <img src={visuals.scene.image_url} alt={scene} className="w-full object-contain" loading="lazy" />
                   </div>
                 )}
                 {visuals.characters.length > 0 && !isViewingPast && (
