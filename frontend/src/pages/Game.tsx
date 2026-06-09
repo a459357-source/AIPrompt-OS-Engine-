@@ -1304,6 +1304,10 @@ export default function Game() {
     marginBottom: 'var(--story-paragraph-spacing)',
   } as const
   const storyContentMaxWidth = storyMaxWidthCSSValue(appSettings.maxWidth)
+  const storyCharVisuals = useMemo(() => {
+    if (!displayStory) return []
+    return visuals.characters.filter(vc => displayStory.includes(vc.name))
+  }, [displayStory, visuals.characters])
 
   const gameLeftPanel = useMemo(() => {
     if (!hasGame || readingMode) return null
@@ -1768,9 +1772,9 @@ export default function Game() {
                     <img src={visuals.scene.image_url} alt={scene} className="w-full max-h-96 object-contain" loading="lazy" />
                   </div>
                 )}
-                {visuals.characters.length > 0 && !isViewingPast && (
+                {storyCharVisuals.length > 0 && !isViewingPast && (
                   <div className="flex flex-wrap justify-center gap-3 mb-4 px-2">
-                    {visuals.characters.map((vc) => (
+                    {storyCharVisuals.map((vc) => (
                       <div key={vc.name} className="flex flex-col items-center gap-1">
                         <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-game-accent/40 shadow-lg shadow-game-accent/10">
                           <img src={vc.image_url} alt={vc.name} className="w-full h-full object-cover object-top" loading="lazy" />
