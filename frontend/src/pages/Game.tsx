@@ -1604,80 +1604,157 @@ export default function Game() {
               )}
             </div>
 
-            {/* ── World Snapshot ── */}
-            {!isViewingPast && !readingMode && hasGame && (
-              <div className="shrink-0 border-b border-game-border/30">
-                <div className="flex items-center gap-4 px-3 py-1.5 text-xs flex-wrap">
+            {/* ── Strategic HUD ── */}
+            {!isViewingPast && !readingMode && hasGame && (() => {
+              const protagonist = characters.find(c => c.tier === '主角')
+              const protagName = protagonist?.name || '主角'
+              const protagLevel = protagonist?.level || 'Lv1'
+              const protagTitle = protagonist?.role?.trim() || ''
+
+              const worldSummary = (() => {
+                if (status === 'CLIMAX') return '天下动荡'
+                if (status === 'TENSION') {
+                  const hostile = factions.some(f => f.attitude_label === '敌对')
+                  return hostile ? '势力冲突' : '局势紧张'
+                }
+                if (status === 'COOLDOWN') return '动荡暂息'
+                if (status === 'BUILD') return '天下稳定'
+                return '开局'
+              })()
+
+              const eventLabel = (() => {
+                const ctx = narrativeNode?.context?.trim()
+                if (!ctx) return null
+                return ctx.length > 12 ? ctx.slice(0, 12) + '…' : ctx
+              })()
+
+              const topFactions = [...factions]
+                .sort((a, b) => {
+                  const pa = (a.power?.military ?? 0) + (a.power?.economic ?? 0) + (a.power?.political ?? 0) + (a.power?.technology ?? 0)
+                  const pb = (b.power?.military ?? 0) + (b.power?.economic ?? 0) + (b.power?.political ?? 0) + (b.power?.technology ?? 0)
+                  return pb - pa
+                })
+                .slice(0, 4)
+
+              const getRelIcon = (aff: number) => aff >= 65 ? '❤️' : aff >= 55 ? '🤝' : aff >= 45 ? '😐' : aff >= 35 ? '⚠' : '💀'
+              const getFactionColor = (label: string) => label === '敌对' ? 'text-red-400' : label === '友好' || label === '同盟' ? 'text-green-400' : 'text-game-muted'
+              const rankChars = [...characters]
+                .filter(c => c.name && c.tier !== '主角')
+                .sort((a, b) => {
+                  if (a.tier === '核心' && b.tier !== '核心') return -1
+                  if (b.tier === '核心' && a.tier !== '核心') return 1
+                  return (b.affection ?? 50) - (a.affection ?? 50)
+                })
+                .slice(0, 5)
+
+              const sceneChars = narrativeNode?.characters?.map(c => c.name) || []
+
+              return (
+              <div className="shrink-0 border-b border-game-border/30 text-[11px] leading-tight">
+                {/* Row 1 — Core Intel */}
+                <div className="flex items-center gap-3 px-3 py-1 flex-wrap">
+                  {/* Protagonist */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-game-accent font-bold text-xs">👤{protagName}</span>
+                    <span className="text-game-dim text-[10px]">{protagLevel}</span>
+                    {protagTitle && <span className="text-game-muted text-[10px] ml-0.5">· {protagTitle}</span>}
+                  </div>
+                  <span className="text-game-border/50">│</span>
+
+                  {/* World State Summary */}
+                  <span className="shrink-0 text-game-text/80 whitespace-nowrap">🌍{worldSummary}</span>
+                  <span className="text-game-border/50">│</span>
+
                   {/* Objectives */}
                   {objectives.main.length > 0 && (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-[10px] text-game-dim">🎯</span>
-                      <span className="text-game-text font-medium truncate max-w-[200px]">{objectives.main[0].title}</span>
-                      <span className="text-game-accent/80 tabular-nums text-[11px]">{objectives.main[0].progress}%</span>
-                    </div>
+                    <>
+                      <span className="text-game-text font-medium truncate max-w-[180px] shrink-0">🎯{objectives.main[0].title}</span>
+                      <span className="text-game-accent/80 tabular-nums shrink-0">{objectives.main[0].progress}%</span>
+                      <span className="text-game-border/50">│</span>
+                    </>
                   )}
-                  {/* Divider */}
-                  {objectives.main.length > 0 && (factions.length > 0 || characters.length > 0) && (
-                    <span className="text-game-border/60">│</span>
-                  )}
-                  {/* Factions */}
-                  {factions.length > 0 && (() => {
-                    const topFactions = [...factions]
-                      .sort((a, b) => {
-                        const pa = (a.power?.military ?? 0) + (a.power?.economic ?? 0) + (a.power?.political ?? 0) + (a.power?.technology ?? 0)
-                        const pb = (b.power?.military ?? 0) + (b.power?.economic ?? 0) + (b.power?.political ?? 0) + (b.power?.technology ?? 0)
-                        return pb - pa
-                      })
-                      .slice(0, 4)
-                    return topFactions.length > 0 ? (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] text-game-dim shrink-0">⚔</span>
-                        {topFactions.map((f) => {
+
+                  {/* Faction Leaderboard */}
+                  {topFactions.length > 0 && (
+                    <>
+                      <span className="text-[10px] text-game-dim shrink-0">⚔</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {topFactions.map((f, i) => {
                           const total = (f.power?.military ?? 0) + (f.power?.economic ?? 0) + (f.power?.political ?? 0) + (f.power?.technology ?? 0)
-                          const labelColor = f.attitude_label === '敌对' ? 'text-red-400' : f.attitude_label === '友好' || f.attitude_label === '同盟' ? 'text-green-400' : 'text-game-muted'
+                          const fc = getFactionColor(f.attitude_label)
                           return (
-                            <span key={f.name} className={`whitespace-nowrap ${labelColor}`}>
-                              <span className="font-medium">{f.name}</span>
-                              {total > 0 && <span className="text-game-dim ml-0.5 text-[10px]">{total}</span>}
+                            <span key={f.name} className={`whitespace-nowrap ${fc}`}>
+                              <span className="text-game-dim text-[9px]">{i + 1}</span>
+                              <span className="font-medium ml-0.5">{f.name}</span>
+                              <span className="text-game-dim ml-0.5 text-[10px]">{total}</span>
                             </span>
                           )
                         })}
                       </div>
-                    ) : null
-                  })()}
-                  {/* Divider */}
-                  {characters.length > 0 && factions.length > 0 && (
-                    <span className="text-game-border/60">│</span>
+                      {rankChars.length > 0 && <span className="text-game-border/50">│</span>}
+                    </>
                   )}
-                  {/* Characters */}
-                  {characters.length > 0 && (() => {
-                    const getRelIcon = (affection: number) => affection >= 65 ? '❤️' : affection >= 55 ? '🤝' : affection >= 45 ? '😐' : affection >= 35 ? '⚠' : '💀'
-                    const rankChars = [...characters]
-                      .filter(c => c.name && c.tier !== '主角')
-                      .sort((a, b) => {
-                        if (a.tier === '核心' && b.tier !== '核心') return -1
-                        if (b.tier === '核心' && a.tier !== '核心') return 1
-                        return (b.affection ?? 50) - (a.affection ?? 50)
-                      })
-                      .slice(0, 5)
-                    return rankChars.length > 0 ? (
+                </div>
+
+                {/* Row 2 — Relationships & Context */}
+                <div className="flex items-center gap-3 px-3 pb-1 flex-wrap">
+                  {/* Relationship Radar */}
+                  {rankChars.length > 0 && (
+                    <>
+                      <span className="text-[10px] text-game-dim shrink-0">👥</span>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] text-game-dim shrink-0">👥</span>
                         {rankChars.map((c) => {
                           const aff = c.affection ?? 50
                           return (
-                            <span key={c.name} className="whitespace-nowrap text-game-text/90">
-                              <span className="text-[11px]">{getRelIcon(aff)}</span>
-                              <span className="text-[11px] ml-0.5">{c.name}</span>
+                            <span key={c.name} className="whitespace-nowrap text-game-text/85 group relative cursor-help" title={`${c.name}: 好感度 ${aff}`}>
+                              <span className="text-[12px]">{getRelIcon(aff)}</span>
+                              <span className="ml-0.5">{c.name}</span>
+                              <span className="text-game-dim ml-0.5 text-[10px] tabular-nums">{aff}</span>
                             </span>
                           )
                         })}
                       </div>
-                    ) : null
-                  })()}
+                      {(sceneChars.length > 0 || eventLabel) && <span className="text-game-border/50">│</span>}
+                    </>
+                  )}
+
+                  {/* Current Event */}
+                  {eventLabel && (
+                    <>
+                      <span className="shrink-0 whitespace-nowrap text-game-text/70">📜{eventLabel}</span>
+                      {sceneChars.length > 0 && <span className="text-game-border/50">│</span>}
+                    </>
+                  )}
+
+                  {/* Scene Participants */}
+                  {sceneChars.length > 0 && (
+                    <>
+                      <span className="text-[10px] text-game-dim shrink-0">🎭本场景</span>
+                      <div className="flex items-center gap-1.5 flex-wrap text-game-muted/80">
+                        {sceneChars.slice(0, 6).map((name, i) => (
+                          <span key={name} className="whitespace-nowrap">
+                            {name}
+                            {i < sceneChars.slice(0, 6).length - 1 && <span className="text-game-dim">·</span>}
+                          </span>
+                        ))}
+                        {sceneChars.length > 6 && <span className="text-game-dim">+{sceneChars.length - 6}</span>}
+                      </div>
+                      <span className="text-game-border/50">│</span>
+                    </>
+                  )}
+
+                  {/* World Explorer Entry */}
+                  <a
+                    href="/visual/world"
+                    className="shrink-0 whitespace-nowrap text-game-dim hover:text-game-accent transition-colors ml-auto"
+                    title="打开世界总览"
+                  >
+                    🗺世界
+                  </a>
                 </div>
               </div>
-            )}
+              )
+            })()}
 
             {/* Story — scrollable */}
             <div ref={storyScrollRef} className="flex-1 overflow-y-auto min-h-0 space-y-3">
