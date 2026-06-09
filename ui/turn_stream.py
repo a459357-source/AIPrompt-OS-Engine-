@@ -82,6 +82,7 @@ def build_turn_payload(result: dict, *, force_sync_visuals: bool = False) -> dic
         if story_ill:
             visuals["scene"] = story_ill
 
+    from ui.routes.api import _objectives_for_game
     return {
         "story": result.get("story", ""),
         "options": result.get("options", []),
@@ -91,6 +92,7 @@ def build_turn_payload(result: dict, *, force_sync_visuals: bool = False) -> dic
             "scene": state.get("scene", result.get("scene", "")),
             "characters": chars_with_trust,
             "factions": factions_data,
+            "objectives": _objectives_for_game(state),
             "force_event_pending": state.get("force_event_pending", False),
             "chapter": state.get("chapter", 1),
         },

@@ -444,6 +444,8 @@ export default function Game() {
   const [presetWeights, setPresetWeights] = useState<Record<string, ContentWeights>>({})
   const [readingMode, setReadingMode] = useState(false)
   const [relationPanelOpen, setRelationPanelOpen] = useState(true)
+  const [chapter, setChapter] = useState(1)
+  const [forceEventPending, setForceEventPending] = useState(false)
   const [genSettingsOpen, setGenSettingsOpen] = useState(() => {
     const saved = localStorage.getItem('promptos_gen_settings_open')
     return saved === 'true'
@@ -547,6 +549,8 @@ export default function Game() {
     setTurn((st.turn as number) || 1)
     setStatus((st.status as string) || 'SETUP')
     setScene((st.scene as string) || '')
+    setChapter((st.chapter as number) || 1)
+    setForceEventPending((st.force_event_pending as boolean) || false)
     const chars = st.characters as Record<string, CharInfo> | undefined
     if (chars) {
       setCharacters(dedupeCharactersByName(Object.values(chars).map((c) => ({
@@ -1484,7 +1488,7 @@ export default function Game() {
             <div className={cn('shrink-0', readingMode && 'game-chrome-hidden')}>
               <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2 text-sm">
-                <Badge variant="primary">📖 第 {isViewingPast && viewingTurn ? viewingTurn : turn} 轮</Badge>
+                <Badge variant="primary">📖 第{chapter}章 · 第 {isViewingPast && viewingTurn ? viewingTurn : turn} 轮</Badge>
                 {isViewingPast && (
                   <Badge variant="outline" size="sm" className="text-game-accent border-game-accent/40">
                     回顾中
@@ -1501,6 +1505,9 @@ export default function Game() {
                   {status}
                 </Badge>
                 {scene && <span className="text-game-muted text-xs truncate max-w-[250px]">📍 {scene}</span>}
+                {forceEventPending && !isViewingPast && (
+                  <Badge variant="warning" size="sm">⚠ 强制事件待触发</Badge>
+                )}
               </div>
 
               <div className="flex items-center gap-1 flex-wrap justify-end">
@@ -1842,15 +1849,45 @@ export default function Game() {
                   </div>
                 )}
                 {storyCharVisuals.length > 0 && !isViewingPast && (
-                  <div className="flex flex-wrap justify-center gap-3 mb-4 px-2">
+                  <div className="flex flex-wrap justify-center gap-4 mb-5 px-2">
                     {storyCharVisuals.map((vc) => (
-                      <div key={vc.name} className="flex flex-col items-center gap-1">
-                        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-game-accent/40 shadow-lg shadow-game-accent/10">
-                          <img src={vc.image_url} alt={vc.name} className="w-full h-full object-cover object-top" loading="lazy" />
+                      <div key={vc.name} className="flex flex-col items-center gap-1.5">
+                        <div className="rounded-md overflow-hidden border border-game-accent/30 bg-neural-void/60 shadow-md shadow-game-accent/5">
+                          <img src={vc.image_url} alt={vc.name} className="h-72 max-w-[180px] object-contain object-top" loading="lazy" />
                         </div>
-                        <span className="text-[10px] text-game-muted text-center leading-tight max-w-[72px] truncate">{vc.name}</span>
+                        <span className="text-xs text-game-text font-medium text-center leading-tight max-w-[120px] truncate">{vc.name}</span>
                       </div>
                     ))}
+                  </div>
+                )}
+                {visuals.factions.length > 0 && factions.length > 0 && !isViewingPast && (
+                  <div className="flex flex-wrap justify-center gap-3 mb-5 px-2">
+                    {factions.slice(0, 4).map((f) => {
+                      const fImg = visuals.factions.find(vf => vf.name === f.name)?.image_url
+                      const total = (f.power?.military ?? 0) + (f.power?.economic ?? 0) + (f.power?.political ?? 0) + (f.power?.technology ?? 0)
+                      return (
+                        <div key={f.name} className="flex items-center gap-2 rounded-md border border-game-border/40 px-3 py-2 bg-game-bg/30">
+                          {fImg ? (
+                            <div className="w-9 h-9 rounded-md overflow-hidden border border-game-border/50 shrink-0">
+                              <img src={fImg} alt={f.name} className="w-full h-full object-cover" loading="lazy" />
+                            </div>
+                          ) : (
+                            <div className="w-9 h-9 rounded-md border border-dashed border-game-border/30 shrink-0 bg-neural-void/40 flex items-center justify-center">
+                              <span className="text-game-dim text-xs">🏛</span>
+                            </div>
+                          )}
+                          <div className="flex flex-col min-w-0 leading-tight">
+                            <span className="text-xs font-medium text-game-text truncate">{f.name}</span>
+                            {total > 0 && (
+                              <span className="text-[11px] text-game-accent/80 tabular-nums">实力：{total}</span>
+                            )}
+                            {f.attitude_label && (
+                              <span className="text-[10px] text-game-muted">{f.attitude_label}</span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
                 {narrativeNode?.context && !isViewingPast && (
