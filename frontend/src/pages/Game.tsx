@@ -1438,6 +1438,9 @@ export default function Game() {
   }, [narrativeNode?.context])
 
   // ── Phase 5.6: One-time event cards ──
+  const prevFactionNamesRef = useRef<Set<string>>(new Set())
+  const prevChapterRef = useRef(1)
+
   const eventCards = useMemo(() => {
     const cards: { id: string; icon: string; label: string }[] = []
     if (isViewingPast || !hasGame) return cards
@@ -1455,9 +1458,6 @@ export default function Game() {
     prevChapterRef.current = chapter
     return cards.filter(c => !shownEventCards.has(c.id))
   }, [newCharacters, factions, chapter, isViewingPast, hasGame, shownEventCards])
-
-  const prevFactionNamesRef = useRef<Set<string>>(new Set())
-  const prevChapterRef = useRef(1)
 
   useEffect(() => {
     if (eventCards.length === 0) return
