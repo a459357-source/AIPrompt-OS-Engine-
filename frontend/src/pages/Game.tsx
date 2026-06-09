@@ -235,8 +235,8 @@ function GameStatusList({
             </div>
           </div>
           {img && (
-            <div className="w-full rounded-md overflow-hidden border border-game-border/50">
-              <img src={img} alt={c.name} className="w-full h-32 object-cover object-top" loading="lazy" />
+            <div className="w-full rounded-md overflow-hidden border border-game-border/50 bg-neural-void/60">
+              <img src={img} alt={c.name} className="w-full max-h-56 object-contain object-top" loading="lazy" />
             </div>
           )}
           {c.relation && <p className="text-xs text-game-muted">{c.relation}</p>}
@@ -1765,7 +1765,7 @@ export default function Game() {
               >
                 {visuals.scene?.image_url && !isViewingPast && (
                   <div className="w-full rounded-lg overflow-hidden border border-game-border/30 mb-4">
-                    <img src={visuals.scene.image_url} alt={scene} className="w-full max-h-64 object-cover" loading="lazy" />
+                    <img src={visuals.scene.image_url} alt={scene} className="w-full max-h-64 object-contain" loading="lazy" />
                   </div>
                 )}
                 {visuals.characters.length > 0 && !isViewingPast && (
