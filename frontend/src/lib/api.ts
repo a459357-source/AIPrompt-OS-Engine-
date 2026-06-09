@@ -292,6 +292,12 @@ export async function getNpcs(): Promise<{ characters: NpcData[]; stats: { total
   return res.json()
 }
 
+export async function getCharacterVisuals(): Promise<Record<string, string>> {
+  const res = await apiFetch('/api/character-visuals')
+  if (!res.ok) return {}
+  return res.json()
+}
+
 export async function generateNpc(roleHint?: string): Promise<NpcData & { error?: string }> {
   const fd = new FormData()
   fd.append('role_hint', roleHint || '')

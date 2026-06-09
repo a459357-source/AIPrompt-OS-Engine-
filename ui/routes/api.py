@@ -237,6 +237,20 @@ async def api_generation_status():
     return JSONResponse(get_generation_status())
 
 
+@router.get("/character-visuals")
+async def api_character_visuals():
+    """Return a map of character name → image_url for the world-builder character cards."""
+    from fastapi.responses import JSONResponse
+    char_image_map: dict[str, str] = {}
+    try:
+        from engine.game_runtime import read_all_character_visuals
+        for v in read_all_character_visuals():
+            char_image_map[v["name"]] = v["image_url"]
+    except Exception:
+        pass
+    return JSONResponse(char_image_map)
+
+
 @router.get("/npcs")
 async def api_npcs():
     """Return all characters with full data as JSON."""

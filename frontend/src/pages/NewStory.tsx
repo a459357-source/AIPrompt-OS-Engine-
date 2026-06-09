@@ -4,7 +4,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Globe, Network, Users, GitBranch, Gem } from 'lucide-react'
-import { generateWorld, generateField, generateRules, createStory } from '@/lib/api'
+import { generateWorld, generateField, generateRules, createStory, getCharacterVisuals } from '@/lib/api'
 import { logger } from '@/lib/logger'
 import { useAutoSave } from '@/hooks/useAutoSave'
 import { notifyDraftTitle, notifyWorldTitleChanged } from '@/hooks/useDocumentTitle'
@@ -78,6 +78,7 @@ const characterSchema = z.object({
   personality: personalityBrainSchema,
   background: z.string(),
   special_ability: z.string(),
+  image_url: z.string().optional(),
 })
 
 function emptyCharacter(isMain: boolean): FormValues['characters'][number] {
@@ -93,6 +94,7 @@ function emptyCharacter(isMain: boolean): FormValues['characters'][number] {
     personality: { ...EMPTY_PERSONALITY_BRAIN },
     background: '',
     special_ability: '',
+    image_url: '',
   }
 }
 
@@ -523,6 +525,7 @@ export default function NewStory() {
     dependence: number; hostility: number; attraction: number; tags: string[];
   }>>({})
   const [artifacts, setArtifacts] = useState<{ name: string; type: string; description: string; ownerType: string; ownerId: string; importance: number; abilities: string[]; tags: string[] }[]>([])
+  const [charImageMap, setCharImageMap] = useState<Record<string, string>>({})
   const [factions, setFactions] = useState<FactionRow[]>([])
   const patchFaction = useCallback((idx: number, patch: Partial<FactionRow>) => {
     setFactions((prev) => prev.map((f, i) => (i === idx ? { ...f, ...patch } : f)))
@@ -665,6 +668,15 @@ export default function NewStory() {
     return () => clearTimeout(timer)
   }, [factions.length, getValues, applyDemoGraph])
 
+  // Fetch character portraits from visual_registry
+  useEffect(() => {
+    let cancelled = false
+    getCharacterVisuals().then((map) => {
+      if (!cancelled) setCharImageMap(map)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
   const applyWorldGenResult = useCallback((data: WorldGenResponse): string[] => {
     if (!data.characters?.length) {
       if (data.title) setValue('title', String(data.title).slice(0, 20))
@@ -773,6 +785,8 @@ export default function NewStory() {
       showStatus(`❌ ${msg}`, 'error')
       setFieldErrors((prev) => ({ ...prev, world: msg }))
     }
+    // Refresh character portraits after world gen
+    getCharacterVisuals().then(setCharImageMap).catch(() => {})
     setGenerating(null)
   }, [keywords, applyWorldGenResult, getValues, setValue, adultMode])
 
@@ -1497,7 +1511,23 @@ export default function NewStory() {
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.95 }}
                         >
-                          <Card className={`${isMain ? 'border-game-accent/50 bg-game-accent/[0.03]' : ''}`}>
+                          <Card className={`${isMain ? 'border-game-accent/50 bg-game-accent/[0.03]' : ''} overflow-hidden`}>
+                            {/* ── V6.7: Character portrait in world-builder ── */}
+                            {(() => {
+                              const imgUrl = charImageMap[c?.name || ''] || c?.image_url
+                              return (
+                                <div className="w-full h-36 bg-neural-void/60 border-b border-game-border/30">
+                                  {imgUrl ? (
+                                    <img src={imgUrl} alt={c?.name || ''} className="w-full h-full object-cover" loading="lazy" />
+                                  ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center gap-1 border-2 border-dashed border-game-border/25 mx-2 my-2 rounded-lg">
+                                      <span className="text-game-dim text-lg select-none">🎭</span>
+                                      <span className="text-game-dim text-[10px]">暂无立绘</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
                             <CardHeader className="pb-2">
                               <div className="flex items-center justify-between">
                                 <Badge variant={isMain ? 'accent' : 'success'} size="sm">
