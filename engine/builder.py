@@ -57,7 +57,7 @@ def _player_choice_prompt(
         if 0 <= idx < len(prev_options):
             base = (
                 f"玩家本轮选择了选项 {letter}：{prev_options[idx]}\n"
-                "请在本轮 story 中直接写出该选择的行动与后果，不得推迟到下一轮。"
+                "请在本轮 story 开头（前 20-30% 篇幅）直接展示该选择的即时后果——追踪展示追踪结果、感知展示感知到的信息、撤退展示撤退结果、调查展示发现的线索、谈判展示对方回应、行动展示行动结果。不得忽略或推迟到下一轮。"
             )
             return base + strategy.get_choice_execution_hint(prev_options[idx])
         return (
