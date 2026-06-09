@@ -1,9 +1,9 @@
 {
   "version": 1,
   "style_bible": {
-    "world_tone": "东亚奇幻宫廷",
-    "visual_language": ["muted gold accents", "ink wash atmosphere", "layered textile detail"],
-    "emotion_palette": ["庄严", "压抑", "克制"]
+    "world_tone": "",
+    "visual_language": [],
+    "emotion_palette": []
   },
   "characters": {},
   "locations": {},
