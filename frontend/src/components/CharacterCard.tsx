@@ -28,17 +28,20 @@ export function CharacterCard({ character, index, isMain, onRemove, className, t
       transition={{ duration: 0.2 }}
     >
       <Card className={`overflow-hidden border-neural-cyan/20 ${isMain ? 'border-neural-magenta/40 bg-neural-magenta/5 glass-panel-glow' : 'glass-panel'} ${className || ''}`}>
-        {/* ── V6.7: Character portrait (enlarged) ── */}
-        {c.image_url ? (
-          <div className="relative w-full h-48 overflow-hidden bg-neural-void/60 border-b border-game-border/30">
-            <img src={c.image_url} alt={c.name || ''} className="w-full h-full object-cover" loading="lazy" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
-          </div>
-        ) : (
-          <div className="w-full h-24 overflow-hidden bg-neural-void/40 border-b border-game-border/20 flex items-center justify-center">
-            <span className="text-game-dim text-3xl select-none">🎭</span>
-          </div>
-        )}
+        {/* ── V6.7: Character portrait (always visible frame) ── */}
+        <div className="relative w-full h-48 overflow-hidden bg-neural-void/60 border-b border-game-border/30">
+          {c.image_url ? (
+            <>
+              <img src={c.image_url} alt={c.name || ''} className="w-full h-full object-cover" loading="lazy" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
+            </>
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-1 border-2 border-dashed border-game-border/30 mx-2 my-2 rounded-lg">
+              <span className="text-game-dim text-2xl select-none">🎭</span>
+              <span className="text-game-dim text-[10px]">暂无立绘</span>
+            </div>
+          )}
+        </div>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 flex-wrap">
