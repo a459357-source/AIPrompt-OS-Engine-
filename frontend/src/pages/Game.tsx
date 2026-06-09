@@ -245,7 +245,7 @@ function GameStatusList({
           </div>
           {img && (
             <div className="w-full rounded-md overflow-hidden border border-game-border/50 bg-neural-void/60">
-              <img src={img} alt={c.name} className="w-full max-h-56 object-contain object-top" loading="lazy" />
+              <img src={img} alt={c.name} className="w-full max-h-80 object-contain object-top" loading="lazy" />
             </div>
           )}
           {c.relation && <p className="text-xs text-game-muted">{c.relation}</p>}
