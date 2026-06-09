@@ -359,6 +359,19 @@ function GameBusyOverlay({ message }: { message: string }) {
   )
 }
 
+const INTRODUCED_CHARS_KEY = 'promptos_introduced_chars_v1'
+
+function loadIntroducedChars(): Set<string> {
+  try {
+    const raw = localStorage.getItem(INTRODUCED_CHARS_KEY)
+    return raw ? new Set(JSON.parse(raw)) : new Set()
+  } catch { return new Set() }
+}
+
+function saveIntroducedChars(names: Set<string>) {
+  try { localStorage.setItem(INTRODUCED_CHARS_KEY, JSON.stringify([...names])) } catch {}
+}
+
 export default function Game() {
   const appSettings = useAppSettings()
   const [story, setStory] = useState('')
@@ -454,6 +467,9 @@ export default function Game() {
   const loadSeqRef = useRef(0)
   const typewriterBufRef = useRef('')
   const typewriterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // ── First-appearance intro tracking ──
+  const [introducedChars, setIntroducedChars] = useState<Set<string>>(() => loadIntroducedChars())
   const flushTypewriter = useCallback(() => {
     if (typewriterTimerRef.current) return
     typewriterTimerRef.current = setInterval(() => {
@@ -557,6 +573,9 @@ export default function Game() {
       if (data.error) { setError(data.error); setLoading(false); return }
 
       if (data.not_started) {
+        // New game — reset first-appearance tracking
+        setIntroducedChars(new Set())
+        saveIntroducedChars(new Set())
         const gen = await getGenerationStatus()
         if (loadSeq !== loadSeqRef.current || !mountedRef.current) return
         if (gen.active && gen.story) {
@@ -1333,6 +1352,32 @@ export default function Game() {
     return visuals.characters.filter(vc => displayStory.includes(vc.name))
   }, [displayStory, visuals.characters])
 
+  // ── First-appearance detection ──
+  const newCharacters = useMemo(() => {
+    if (!displayStory || isViewingPast) return []
+    return characters.filter(c => {
+      if (!c.name) return false
+      if (c.tier === '主角') return false
+      if (introducedChars.has(c.name)) return false
+      if (!displayStory.includes(c.name)) return false
+      return true
+    })
+  }, [displayStory, characters, introducedChars, isViewingPast])
+
+  // ── Persist introduced chars to localStorage ──
+  useEffect(() => {
+    if (newCharacters.length === 0) return
+    const next = new Set(introducedChars)
+    let changed = false
+    for (const c of newCharacters) {
+      if (!next.has(c.name)) { next.add(c.name); changed = true }
+    }
+    if (changed) {
+      setIntroducedChars(next)
+      saveIntroducedChars(next)
+    }
+  }, [newCharacters])  // eslint-disable-line react-hooks/exhaustive-deps
+
   const gameLeftPanel = useMemo(() => {
     if (!hasGame || readingMode) return null
     return (
@@ -1810,6 +1855,21 @@ export default function Game() {
                 )}
                 {narrativeNode?.context && !isViewingPast && (
                   <p className="text-xs text-game-dim italic mb-4 border-l-2 border-game-border/40 pl-3">{narrativeNode.context}</p>
+                )}
+                {!isViewingPast && newCharacters.length > 0 && (
+                  <div className="mb-5 space-y-3">
+                    {newCharacters.map((c) => (
+                      <div key={c.name} className="rounded-lg border border-game-accent/30 bg-game-accent/5 px-4 py-3 text-center">
+                        <p className="text-[10px] text-game-accent/70 font-neural-mono tracking-widest uppercase mb-1">新角色登场</p>
+                        <p className="text-base font-bold text-game-text">{c.name}</p>
+                        <p className="text-xs text-game-muted mt-0.5">
+                          {c.role && <span>{c.role}</span>}
+                          {c.role && c.faction && <span className="text-game-dim mx-1">·</span>}
+                          {c.faction && <span>{c.faction}</span>}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 )}
                 {appSettings.animations ? (
                   <motion.div key={viewingTurn ?? turn} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
